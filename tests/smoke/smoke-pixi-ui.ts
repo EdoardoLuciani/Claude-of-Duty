@@ -4,6 +4,9 @@ import { Container, DOMAdapter, Text, ViewSystem, WebGPURenderer } from 'pixi.js
 import * as THREE from 'three/webgpu';
 
 import { Rng } from '../../src/core/rng.ts';
+import type { GameSystem } from '../../src/game/index.ts';
+import type { MarketSystem } from '../../src/market/index.ts';
+import type { RenderSystem } from '../../src/render/index-webgpu.ts';
 import { ScoreBar } from '../../src/ui/compass.ts';
 import { Crosshair } from '../../src/ui/crosshair.ts';
 import type { GameOverScreen } from '../../src/ui/gameover.ts';
@@ -22,12 +25,15 @@ import { setHudTextResolution } from '../../src/ui/pixi-type.ts';
 import { Prompt, Banner } from '../../src/ui/prompts.ts';
 import type { RadioPanel } from '../../src/ui/radio.ts';
 import type { StartGate } from '../../src/ui/start.ts';
+import { WeaponSystem } from '../../src/weapons/index.ts';
+import { createTestContext, createTestInput, type TestProviders } from '../lib/context.ts';
 import { fixture } from '../lib/fixture.ts';
 import {
   createRetainedHud,
   installUiDocument,
   deleteGlobal,
   captureMethod,
+  UiPlayer,
 } from '../lib/ui-fixture.ts';
 
 const restoreDocument = installUiDocument();
@@ -405,4 +411,192 @@ console.log(
   'ok mainline HUD: guarded shared device, constructor/init/cleanup isolation, adapter restoration and native-control teardown'
 );
 
+// Exercise the production event wiring and snapshot-to-controller path without a GPU.
+Object.defineProperties(document, {
+  head: { value: document.createElement('head'), configurable: true },
+  body: { value: document.createElement('body'), configurable: true },
+});
+const listenerDescriptors = ['addEventListener', 'removeEventListener'].map(
+  (key): [string, PropertyDescriptor | undefined] => [
+    key,
+    Object.getOwnPropertyDescriptor(globalThis, key),
+  ]
+);
+for (const [key] of listenerDescriptors)
+  Object.defineProperty(globalThis, key, { value: (): void => {}, configurable: true });
+const createHud = captureMethod(PixiHud, 'create');
+const wired = new UiSystem();
+try {
+  PixiHud.create = async (): Promise<PixiHud> => {
+    const hud = createRetainedHud();
+    hud.resize = (): void => {};
+    hud.update = (): void => {};
+    hud.dispose = (): void => {
+      hud.injury.dispose();
+      hud.stage.destroy({ children: true });
+    };
+    return hud;
+  };
+  const weapons = new WeaponSystem();
+  const weaponState = weapons.getHudState();
+  weapons.getHudState = (): typeof weaponState => weaponState;
+  const run = {
+    score: 400,
+    kills: 4,
+    wave: 3,
+    enemiesRemaining: 2,
+    waveTotal: 8,
+    waveIncoming: false,
+    nextWaveIn: 0,
+  };
+  const providers: TestProviders = {
+    weapons,
+    game: fixture<GameSystem>({ getHudState: (): typeof run => run }),
+    market: fixture<MarketSystem>({
+      delay: 10,
+      open: false,
+      getHudState: (): ReturnType<MarketSystem['getHudState']> => ({
+        credits: 100,
+        marketIn: 0,
+        items: [],
+        build: null,
+        attachments: [],
+      }),
+    }),
+    render: fixture<RenderSystem>({ renderer: game }),
+  };
+  const ctx = createTestContext({
+    providers,
+    input: createTestInput(),
+    canvas: fixture<HTMLCanvasElement>({ clientWidth: 1920, clientHeight: 1080 }),
+    engine: fixture<ReturnType<typeof createTestContext>['engine']>({ error: null }),
+  });
+  const player = new UiPlayer(ctx);
+  providers.player = player;
+  await wired.init(ctx);
+  const cues: string[] = [];
+  wired.sfx = (id): void => {
+    cues.push(id);
+  };
+  const frame = (): void => wired.lateUpdate(0, ctx);
+  const fire = {
+    weapon: { id: 'pistol' as const },
+    origin: new THREE.Vector3(),
+    dir: new THREE.Vector3(0, 0, -1),
+    seed: 1,
+  };
+  ctx.events.emit('weapon:fire', {
+    ...fire,
+    weapon: { id: 'ai_rifle' },
+    actor: { name: 'enemy' },
+  });
+  assert.deepEqual([wired.crosshair.kick, wired.crosshair.kickVel], [0, 0]);
+  for (const actor of [player, 'player', { isPlayer: true }]) {
+    const before = wired.crosshair.kickVel;
+    ctx.events.emit('weapon:fire', { ...fire, actor });
+    assert(wired.crosshair.kickVel > before, 'local-player identities retain firing bloom');
+  }
+  frame();
+  const beforeEvents = { ...wired.state };
+  ctx.events.emit('weapon:reload', {
+    weapon: fire.weapon,
+    actor: { name: 'enemy' },
+    phase: 'start',
+  });
+  ctx.events.emit('weapon:reload', { weapon: fire.weapon, actor: player, phase: 'start' });
+  ctx.events.emit('score:change', { score: 900, delta: 500, reason: 'kill', kills: 9 });
+  ctx.events.emit('player:state', { ads: true, sprinting: true, sliding: false, stance: 'prone' });
+  ctx.events.emit('wave:start', { wave: 4, enemies: 12, squads: 3, perSquad: 4 });
+  assert.equal(wired.banner.title, 'WAVE 4');
+  ctx.events.emit('wave:complete', { wave: 4, nextWave: 5, delay: 25 });
+  assert.equal(wired.banner.title, 'WAVE 4 CLEARED');
+  const beforeFlinch = wired.crosshair.kickVel;
+  ctx.events.emit('damage:taken', {
+    amount: 10,
+    health: 90,
+    from: new THREE.Vector3(1, 0, 0),
+    armourAbsorbed: 10,
+    armour: 40,
+    plateBreak: false,
+  });
+  assert(wired.crosshair.kickVel > beforeFlinch);
+  assert(wired.arcs.pool.items.some((item): boolean => item.alive));
+  assert(wired.health.armourFlash > 0);
+  const beforeBlast = wired.crosshair.kickVel;
+  ctx.events.emit('explosion', { position: new THREE.Vector3(), radius: 5, damage: 20 });
+  assert(wired.crosshair.kickVel > beforeBlast, 'near explosions retain flinch');
+  assert.deepEqual(
+    wired.state,
+    beforeEvents,
+    'events affect feedback, not snapshot-owned readouts'
+  );
+  assert.deepEqual(cues, ['objective', 'objective']);
+
+  Object.assign(weaponState, {
+    name: 'P320',
+    ammo: 8,
+    reserve: 32,
+    magSize: 17,
+    mode: 'semi',
+    reloading: true,
+    reloadProgress: 0.6,
+  });
+  Object.assign(run, {
+    score: 900,
+    wave: 4,
+    enemiesRemaining: 0,
+    waveIncoming: true,
+    nextWaveIn: 25,
+  });
+  player.health.value = 90;
+  player.movement.stance = 'prone';
+  frame();
+  assert.deepEqual(
+    [
+      wired.state.weaponName,
+      wired.state.ammo,
+      wired.state.reserve,
+      wired.state.fireMode,
+      wired.state.reloading,
+      wired.state.reloadProgress,
+      wired.state.health,
+      wired.state.crouch,
+      wired.state.score,
+      wired.state.wave,
+      wired.state.enemiesRemaining,
+      wired.state.nextWaveIn,
+    ],
+    ['P320', 8, 32, 'semi', true, 0.6, 90, true, 900, 4, 0, 25]
+  );
+  ctx.events.emit('weapon:reload', { weapon: fire.weapon, phase: 'end' });
+  assert.equal(wired.state.reloading, true, 'reload end also waits for the snapshot');
+  weaponState.reloading = false;
+  player.health.value = 100;
+  frame();
+  assert.equal(wired.state.health, 100);
+  assert.equal(wired.state.reloading, false);
+  const beforeRestart = { ...wired.state };
+  ctx.events.emit('game:restart', {});
+  assert.deepEqual(wired.state, beforeRestart, 'restart readouts follow provider reset snapshots');
+  assert.equal(wired.banner.t, 1);
+  Object.assign(run, {
+    score: 0,
+    wave: 1,
+    enemiesRemaining: 0,
+    waveIncoming: false,
+    nextWaveIn: 0,
+  });
+  frame();
+  assert.equal(wired.state.score, 0);
+  assert.equal(wired.state.wave, 1);
+} finally {
+  PixiHud.create = createHud;
+  wired.dispose();
+  for (const [key, descriptor] of listenerDescriptors)
+    if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+    else deleteGlobal(key);
+}
+console.log(
+  'ok HUD authority: local firing, snapshot readouts, transient feedback and restart readouts'
+);
 restoreDocument();
