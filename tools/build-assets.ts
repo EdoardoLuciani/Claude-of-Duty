@@ -143,29 +143,23 @@ const STANDALONE_TOOLS: Partial<Record<ModelId, string[]>> = {
   tor_mini: ['tools/blender/tor_mini'],
 };
 
-// Editable products used by authoring and attachment-fit checks.
-const EDITABLE_BLENDS: Partial<Record<ModelId, string>> = {
-  mcx: 'mcx-virtus.blend',
-  acog: 'acog.blend',
-  scope: 'scope.blend',
-  suppressor9mm: 'suppressor9mm.blend',
-  suppressor338: 'suppressor338.blend',
-  suppressor12g: 'suppressor12g.blend',
-};
-
 /** One Blender build plus its gltfpack cook for a MODEL_COOKS entry. */
 function cookStep(id: ModelId, salt: string[]): AssetStep {
   const { directory, source, output } = MODEL_COOKS[id];
-  const blend = EDITABLE_BLENDS[id];
   const tools = STANDALONE_TOOLS[id] ?? [`tools/blender/${id}`, ...(SHARED_TOOLS[id] ?? [])];
   return {
     id,
     inputs: [...tools, ...authoredJson(directory)],
     // Only this model's cook settings, so one profile edit rebuilds one model.
     salt: [...salt, JSON.stringify(MODEL_COOKS[id]), ...GLTFPACK_FLAGS, GLTFPACK_VERSION],
-    outputs: [`${directory}/${source}`, output, ...(blend ? [`${directory}/${blend}`] : [])],
+    // The editable .blend is used by authoring and attachment-fit checks.
+    outputs: [
+      `${directory}/${source}`,
+      output,
+      `${directory}/${source.replace(/\.glb$/, '.blend')}`,
+    ],
     commands: [
-      blender(id === 'exps3' ? tools[0] : `tools/blender/${id}/build.py`),
+      blender(tools[0].endsWith('.py') ? tools[0] : `${tools[0]}/build.py`),
       bun('build/models.ts', id),
     ],
   };

@@ -26,12 +26,9 @@ import { WeaponLaser } from '../../src/weapons/laser.ts';
 import { ReticleMaterials } from '../../src/weapons/materials-tsl.ts';
 import { makeMCXModel } from '../../src/weapons/mcx.ts';
 import { makeMPXModel } from '../../src/weapons/mpx.ts';
-import type {
-  AuthoredModels,
-  WeaponEntry,
-  WeaponModelRecord,
-} from '../../src/weapons/runtime-types.ts';
+import type { WeaponEntry, WeaponModelRecord } from '../../src/weapons/runtime-types.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
+import { fixtureKeys } from '../lib/audio-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
 import { fixture } from '../lib/fixture.ts';
 
@@ -508,67 +505,32 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     assert.equal(mcx.def.eyeRelief, WEAPON_DEFS.mcx.eyeRelief);
     assert(irons.visible && !ironsRemoved.visible && baseDevice.visible);
   }
-  // Every calibre's can follows the same contract. The M590 keeps only permanent
+  // Every fitted can follows the same contract. The M590 keeps only permanent
   // adapter hardware, so mounting must not require a replaceable MUZZLE_device.
+  baseDevice.removeFromParent();
   const exposed = new THREE.Group();
   exposed.name = 'MUZZLE_device_removed';
   root.add(exposed);
   const cans = { suppressor: can, suppressor9mm: can, suppressor338: can, suppressor12g: can };
-  // Only the members attachment mounting reads; each weapon's full record differs.
-  const parts = { scene: model.scene, root, opticMountRest: model.opticMountRest };
-  const nodes = { sight: model.nodes.sight, muzzle: model.nodes.muzzle };
-  const fits = [
-    [
-      'suppressor',
-      fixture<AuthoredModels['lmg']>({
-        ...parts,
-        id: 'lmg',
-        nodes: fixture<AuthoredModels['lmg']['nodes']>(nodes),
-      }),
-    ],
-    [
-      'suppressor9mm',
-      fixture<AuthoredModels['pistol']>({
-        ...parts,
-        id: 'pistol',
-        nodes: fixture<AuthoredModels['pistol']['nodes']>(nodes),
-      }),
-    ],
-    [
-      'suppressor338',
-      fixture<AuthoredModels['sniper']>({
-        ...parts,
-        id: 'sniper',
-        nodes: fixture<AuthoredModels['sniper']['nodes']>(nodes),
-      }),
-    ],
-    [
-      'suppressor12g',
-      fixture<AuthoredModels['shotgun']>({
-        ...parts,
-        id: 'shotgun',
-        nodes: fixture<AuthoredModels['shotgun']['nodes']>(nodes),
-      }),
-    ],
-  ] as const;
-  for (const [muzzle, weaponModel] of fits) {
-    const { id } = weaponModel;
-    const config: AttachmentConfig = { ...BASE_ATTACHMENTS, muzzle };
-    assert(isAttachmentConfig(config, id), `${id} fits ${muzzle}`);
-    if (id === 'shotgun') baseDevice.removeFromParent();
-    const weapon = fixture<WeaponEntry>({
-      ...entry,
-      id,
-      model: weaponModel,
-      def: { ...WEAPON_DEFS[id] },
-    });
-    viewmodel.active = weapon;
-    configureWeaponAttachments(weapon, config, cans);
-    assert(weapon.def.suppressed && exposed.visible, `${muzzle} suppresses ${id}`);
-    const exit = canExit.position.clone().applyMatrix4(muzzleMount.matrixWorld);
-    assert(viewmodel.muzzleWorld(new THREE.Vector3()).distanceTo(exit) < 1e-10);
-    configureWeaponAttachments(weapon, BASE_ATTACHMENTS, {});
-    assert(!weapon.def.suppressed && !exposed.visible && weapon.muzzleSocket === null);
+  for (const id of WEAPON_IDS) {
+    for (const muzzle of fixtureKeys(WEAPON_DEFS[id].fits?.muzzle ?? {})) {
+      const config: AttachmentConfig = { ...BASE_ATTACHMENTS, muzzle };
+      const muzzleModel = fixture<WeaponModelRecord>({ ...model });
+      muzzleModel.id = id;
+      const weapon = fixture<WeaponEntry>({
+        ...entry,
+        id,
+        model: muzzleModel,
+        def: { ...WEAPON_DEFS[id] },
+      });
+      viewmodel.active = weapon;
+      configureWeaponAttachments(weapon, config, cans);
+      assert(weapon.def.suppressed && exposed.visible, `${muzzle} suppresses ${id}`);
+      const exit = canExit.position.clone().applyMatrix4(muzzleMount.matrixWorld);
+      assert(viewmodel.muzzleWorld(new THREE.Vector3()).distanceTo(exit) < 1e-10);
+      configureWeaponAttachments(weapon, BASE_ATTACHMENTS, {});
+      assert(!weapon.def.suppressed && !exposed.visible && weapon.muzzleSocket === null);
+    }
   }
   root.add(baseDevice);
   viewmodel.active = null;
