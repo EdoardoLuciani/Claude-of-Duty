@@ -382,26 +382,30 @@ strings with `isWeaponId` at entry. Authored models carry literal adapter IDs,
 and the loader table checks complete ID coverage and per-ID adapter returns.
 `WeaponState.attachments` is an immutable `{ optic, muzzle, rail }` snapshot; null slots
 retain the authored base weapon, and `optic: null` aims through its iron sights. `src/weapons/attachments.ts` owns
-the finite catalog (`rmr | acog | scope` optics, TOR Mini `laser`, M4/MCX/MPX `suppressor`),
+the finite catalog (`rmr | acog | scope` optics, TOR Mini `laser`, one `suppressor`),
 boundary validation, asset loading and the common gameplay/inspection mount solver.
 No attachment economy yet.
 `WeaponDef.fits` has one shape per slot: a partial record keyed by attachment id whose
-entry enables that verified fit and holds its data (`fits.optic[id].eyeRelief`; rail and
-muzzle entries are empty). `isAttachmentConfig()` is the single compatibility rule for
+entry enables that verified fit and holds its data (`fits.optic[id].eyeRelief`,
+`fits.muzzle.suppressor.model` naming the weapon's calibre can; rail entries are empty).
+The player-facing id stays `suppressor` on every weapon; assets are keyed by can model
+(`srd762ti`, `suppressor9mm`, `suppressor338`, `suppressor12g`). `isAttachmentConfig()` is the single compatibility rule for
 gameplay, URL/debug input and capture tooling; unverified fits are rejected, never silently
 changed. Irons are not a separate choice: with `WeaponDef.removableIrons`, any mounted optic
 hides `IRON_sights` and shows an optional `IRON_sights_removed` part, and removing the optic
 restores them. Weapons without it keep fixed irons, which every fitted optic must clear.
+`WeaponDef.removableMuzzleDevice` does the same for `MUZZLE_device` and an optional
+`MUZZLE_device_removed` adapter; without it (M590) permanent muzzle hardware stays under
+the can. Both flags make the named node required, so a missing part fails at load.
 
-`loadAttachments()` returns one `AttachmentAssets` record keyed by attachment id; a failed
-load only leaves that id absent (unavailable), never blocks the base weapons. The weapon
+`loadAttachments()` returns one `AttachmentAssets` record keyed by optic/rail id or can model;
+a failed load only leaves that key absent (unavailable), never blocks the base weapons. The weapon
 system owns those assets and disposes them after the viewmodel; mounts and inspection
 clones own transforms only and never release shared geometry/materials/maps.
 `weapons.setAttachments(id, config)` changes an owned, loaded weapon synchronously outside
 the frame loop. `mountAttachments()` validates every asset and datum first, then attaches
 one group per slot under the weapon's authored `MOUNT_optic`/`MOUNT_rail`/`MOUNT_muzzle`
-(empty slots stay detached) and switches the replaced base parts (`IRON_sights`,
-`MUZZLE_device` with optional `MUZZLE_device_removed`). Instances follow the authored
+(empty slots stay detached) and switches the replaced base parts (`replacedNodes()`). Instances follow the authored
 parent and animation, never a baked live pose; the ADS datum uses the rest-pose optic mount
 captured in the same weapon frame as the authored sight/muzzle points. The commit
 resolves sight/`OpticData`, laser emitter, muzzle socket and the effective private
@@ -422,7 +426,9 @@ gameplay. MCX and MPX are iron-sight bases with verified catalog fits; neither
 retains an integrated optic or suppressor.
 Per-weapon mount datums, clearances and fitting decisions live in each weapon's
 `assets/weapons/*/README.md` and each attachment's `assets/attachments/*/README.md`;
-Blender sources are under `tools/blender/` (`rmr/`, `acog/`, `scope/`, `suppressor/`).
+Blender sources are under `tools/blender/` (`rmr/`, `acog/`, `scope/`, `tor_mini/`, and the
+`suppressor*/` cans sharing `can.py`); weapon fit checks load built attachments through
+`attachment_source.py`.
 
 Debug URL input is narrowed in `main.ts`: `attachmentWeapon` (default M4) must pass
 `isWeaponId` plus compatibility/ownership checks; `attachmentOptic=rmr|acog|scope|none`,

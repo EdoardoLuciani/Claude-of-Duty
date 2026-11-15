@@ -126,10 +126,10 @@ const SHARED_TOOLS: Partial<Record<ModelId, string[]>> = {
   mpx: ['tools/blender/review_hands.py', 'tools/blender/hand-reference.ts'],
 };
 const STANDALONE_TOOLS: Partial<Record<ModelId, string[]>> = {
-  suppressor: ['tools/blender/suppressor'],
-  suppressor9mm: ['tools/blender/suppressor9mm'],
-  suppressor338: ['tools/blender/suppressor338'],
-  suppressor12g: ['tools/blender/suppressor12g'],
+  srd762ti: ['tools/blender/suppressor', 'tools/blender/can.py'],
+  suppressor9mm: ['tools/blender/suppressor9mm', 'tools/blender/can.py'],
+  suppressor338: ['tools/blender/suppressor338', 'tools/blender/can.py'],
+  suppressor12g: ['tools/blender/suppressor12g', 'tools/blender/can.py'],
   acog: [
     'tools/blender/acog',
     'tools/blender/mcx/primitives.py',
