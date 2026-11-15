@@ -32,68 +32,41 @@ before further simplification. KTX2/meshopt decoders stay local; RGBA8 fallback
 does not retain compressed-texture memory savings. Use compatible AgX OCIO,
 never exposure compensation.
 
-## Attachment contract (#666)
+## Attachment contract
 
-The base has no glass, reticle, suppressor or laser. SIGLITE irons are fixed:
-`removableIrons` stays unset. There is no optic rail, plate or `MOUNT_optic`, and
-`fits.optic` is absent: gameplay, inspection, market and capture validation reject
-all optics. Only the optional TOR Mini laser and compact 9mm suppressor are supported,
-independently or together. The normal iron-sight ADS pose is unchanged.
+The base has no glass, reticle, suppressor or laser. SIGLITE irons are fixed
+(`removableIrons` unset), and there is no optic rail, plate, `MOUNT_optic` or
+`fits.optic`, so every optic is rejected. The optional TOR Mini laser and compact
+9mm suppressor are supported independently or together.
 
-Game-space mount datums in metres (native Blender uses +Y forward, +Z up):
-
-| Datum | Position | Owner / orientation |
-| --- | --- | --- |
-| `MOUNT_muzzle` | `[0, .037, -.132]` | tilting barrel; -Z forward, +Y up, unit scale |
-| `MOUNT_rail` | `[0, .002, -.122]` | frame; local +Y points into the underside seat; frame-owned TOR Mini |
+| Datum | Owner / orientation |
+| --- | --- |
+| `MOUNT_muzzle` | tilting barrel; -Z forward, +Y up, unit scale |
+| `MOUNT_rail` | frame; local +Y points into the underside seat |
 
 The thread travels with the barrel, not the slide; the enlarged upper muzzle
-opening clears barrel tilt. `check.py` checks thread/slide clearance and the fixed
-iron ray, then runs the laser and suppressor weapon/hand sweeps across all eight
-clips. These are sampled external-fit checks, not collision-free internal
-operating geometry. Hands, authored action timing and ammunition events are unchanged.
-SIGLITE rings and luminous insets are baked onto the sight faces, with extra
-host-island UV density in the same atlas. They have no overlapping runtime caps.
-The checker samples green emission at all three projected inset centres,
-neutral rear sight housing and front-facing upper-ring normals.
+opening clears barrel tilt. SIGLITE rings and luminous insets are baked onto the
+sight faces in the shared atlas; the checker samples green emission at the inset
+centres, a neutral rear housing and front-facing upper-ring normals.
 
-TOR Mini (#686) uses an explicitly extended game-fit integral frame rail: its
-front advances 14 mm to native +Y=.141 and a fifth cross-slot at .129 supports the
-module's forward seat. This is not a factory Compact frame. The nose projects a
-few millimetres ahead of the barrel but remains below its bore/slide path; it
-never follows the slide. The source sweep tests actual deformed hands at 120 Hz,
-including the early tactical/empty reload intervals missed by a coarser sweep.
-See the [shared laser mount contract](../../attachments/steiner-tor-mini/README.md#weapon-mounting-686).
+The TOR Mini seats on an extended game-fit integral frame rail with one extra
+cross-slot (not the factory Compact frame). Its nose stays below the bore/slide
+path and never follows the slide. See the
+[shared laser mount contract](../../attachments/steiner-tor-mini/README.md#weapon-mounting).
 
-## Compact 9mm suppressor (#714)
+## Compact 9mm suppressor
 
-The P320's `suppressor` fit names the `suppressor9mm` can model: the original
-[compact booster can](../../attachments/compact-9mm/README.md), not the shared
-SRD762Ti rifle exterior.
-The muzzle seat follows the tilting barrel, never the frame or slide.
-`MUZZLE_device` owns the removable thread protector; `MUZZLE_device_removed`
-owns the exposed helical thread. Both are ordinary meshes under the barrel bone
-and share its atlas; the barrel tube/crown stays in the mechanical skin.
-Preserve the thread geometry: bevel decimation can enlarge its crest into the
-booster receiving bore. The common solver switches the two states.
+The `suppressor` fit names the `suppressor9mm` can model: the original
+[compact booster can](../../attachments/compact-9mm/README.md). The muzzle seat
+follows the tilting barrel. `MUZZLE_device` owns the removable thread protector;
+`MUZZLE_device_removed` owns the exposed helical thread, both ordinary meshes under
+the barrel bone. Preserve the thread geometry: bevel decimation can enlarge its
+crest into the booster receiving bore. In loaded rest the can stays below the fixed
+SIGLITE aim ray, so no raised sights or altered ADS position are needed; during
+tilt and empty lockback the bore moves, as it should.
 
-The can is 135 mm long and at most 28.4 mm across. In loaded rest its top is
-51.2 mm above the rig origin, leaving **2.5 mm below** the fixed SIGLITE 53.7 mm
-aim ray. No raised sights, hidden irons or altered ADS position are needed.
-During the actual Browning tilt
-and empty lockback the bore moves, as it should; this is not a claim that a
-locked-open handgun retains a live firing sight picture.
-
-`check.py` includes the asset-owned `suppressor.py` sweep: 1172 poses at 120 Hz
-across all eight clips (Idle, Fire, Last_Shot, Reload_Tactical, Reload_Empty,
-Inspect, Draw, Holster), including exact endpoints. It verifies the invariant
-barrel-relative mount matrix, intersections against the **evaluated mechanical
-skin**, all ten deformed mesh components belonging to both shared arms/hands,
-TOR Mini and its emitter ray. It also ray-tests the loaded-rest
-iron sightline. Editable sparse source controls are not used as a proxy
-for subframe mechanical-skin motion. Source checks are sampled external-fit
-proofs, not internal booster engineering or continuous collision certification.
-
-Build the compact can and laser first (`bun run assets`), then run
-the Blender check above. Native WebGPU hip and iron ADS captures and runtime
-exit/part-switch checks supplement the source sweep.
+`check.py` checks thread/slide clearance and the fixed iron ray, then runs the
+laser and asset-owned `suppressor.py` sweeps at 120 Hz across every clip. They
+verify the barrel-relative mount, intersections against the evaluated mechanical
+skin, both shared arms, TOR Mini and its emitter ray. Build the compact can and
+laser first (`bun run assets`).

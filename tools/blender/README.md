@@ -44,18 +44,12 @@ python -c "import pstats; pstats.Stats('/tmp/m4.prof').strip_dirs().sort_stats('
 ```
 
 Change the script and scratch paths for another asset. This profiles the Blender
-build, not the separate gltfpack cook. Profiling adds overhead; compare equivalent
-inputs and pool contention. Use the supported profiler rather than patching
-Blender operator classes, which may be immutable.
+build, not the separate gltfpack cook.
 
 ## Common Picatinny interface
 
-`picatinny.py` owns the nominal MIL-STD-1913 profile (1999 Figure 1 / Figure 2):
-19.0 mm top flat, 21.209 mm maximum head width, 15.672 mm neck, 45° flanks,
-5.2324 mm recoil grooves at 10.0076 mm pitch and 2.9972 mm groove depth.
-The basic .108-inch flank dimension is not the rail's overall height. These
-are shared game-art dimensions, not a manufacturing-tolerance certificate.
-Weapon sources own orientation, support, length and mount location; do not scale
+`picatinny.py` owns the nominal MIL-STD-1913 profile and pitch shared by every
+weapon rail and attachment clamp. Weapon sources own orientation, support, length and mount location; do not scale
 the profile or add vertical runtime seating offsets. A mount origin is a groove centre.
 `fits.optic[id].railSlots` may select whole forward grooves (default zero); gameplay,
 inspection and rest/live ADS datums share it, and `attachment_source.RAIL_SLOTS` mirrors it
@@ -69,11 +63,14 @@ After `bun run assets`, run:
 blender -b -t 2 --python-exit-code 1 --python tools/blender/check_picatinny.py
 ```
 
-This reads the actual generated meshes: thirteen weapon interfaces, five clamp
-assemblies, independent profile/pitch/depth rays and an inset slotted solid that
-rejects penetration rather than exempting the entire mating rail. Then run each
-weapon's `check.py` for surrounding geometry, mechanisms, hands and combined slots.
-Finite source samples and browser captures do not replace final human approval.
+This reads the actual generated rails and clamps against profile/pitch/depth rays
+and an inset slotted solid. Then run each weapon's `check.py` for surrounding
+geometry, mechanisms, hands and combined slots.
+
+Weapon and attachment models are original game art, not manufacturer CAD or
+certified hardware. Fit checks sample finite source poses (clips at 120 Hz with the
+review arm skins); they do not prove continuous clearance or runtime IK/recoil
+transitions, and do not replace in-engine captures and final human approval.
 
 ## Rebuild discipline
 

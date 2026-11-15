@@ -1,8 +1,8 @@
 # Early Accuracy International AX338
 
 Early solid-carrier AX338, .338 LM/27-inch barrel, Dark Earth panels, ten-round
-magazine, factory brake and removable rail-mounted aperture/post irons. No
-optional attachment is installed by default. Original art; human sign-off is pending.
+magazine, factory brake and removable rail-mounted aperture/post irons. Original
+art; human sign-off is pending.
 
 [Shared workflow](../../../tools/blender/README.md)
 
@@ -23,59 +23,39 @@ blender -b -t 2 assets/weapons/ax338/ax338.blend --python-exit-code 1 \
 bun run models:cook -- ax338
 ```
 
-Use `--output /tmp/ax338-review` for scratch builds.
-The shared [PM II](../../attachments/schmidt-bender-pm-ii/README.md) now has its
-own canonical source in `tools/blender/scope/build.py`; the rifle neither builds
-nor exports scope geometry, glass or a reticle. Build all three standalone optics
+Use `--output /tmp/ax338-review` for scratch builds. Build the standalone optics
 before running the attachment checks (normal `bun run build` does this).
 
 ## Sights and attachment datums
 
-All positions below are game-frame metres, +Y up / −Z forward, under `AX338_RIG`:
+Game-frame metres, +Y up / -Z forward, under `AX338_RIG`:
 
-| Datum | Position | Contract |
-| --- | --- | --- |
-| `SOCKET_sight` | `[0, .151, .055]` | Rear aperture centre; front post tip `[0, .151, −.540]`, 595 mm sight radius |
-| `MOUNT_optic` | `[0, .118, −.089]` | Identity orientation; actual top-rail tooth contact plane |
-| `MOUNT_muzzle` | `[0, .075, −.7958]` | Barrel-crown seating plane for the dedicated .338 can; identity rotation/unit scale |
-| `MOUNT_rail` | `[.038, .075, −.455]` | Right-side KeySlot/Picatinny adapter; local +Y points inward (−X), −Z stays forward |
+| Datum | Contract |
+| --- | --- |
+| `SOCKET_sight` | Rear aperture centre, aligned with the front post tip |
+| `MOUNT_optic` | Identity orientation; actual top-rail tooth contact plane |
+| `MOUNT_muzzle` | Barrel-crown seating plane for the dedicated .338 can; identity, unit scale |
+| `MOUNT_rail` | Right-side KeySlot/Picatinny adapter ahead of the support hand; local +Y points inward (-X) |
 
-Irons are one removable `IRON_sights` assembly; no replacement part is needed.
-RMR and ACOG clear installed irons; PM II crosses the rear aperture (301 actual
-triangle contacts in the reference check). Any mounted optic hides the irons at
-runtime, so neither case shows them together. Base ADS uses the common unscoped FOV/sensitivity; mounted
-optics own magnification. Per-optic eye relief is RMR 125 mm / ACOG 110 mm / PM II
-90 mm; base irons use 70 mm.
+Irons are one removable `IRON_sights` assembly with no replacement part. RMR and
+ACOG clear the installed irons; the PM II crosses the rear aperture, and any mounted
+optic hides the irons at runtime.
 
-`check.py` loads each standalone editable optic and checks foot seating, measured
-iron clashes, the aperture opening and post alignment. It sweeps all nine clips:
-1545 bolt poses at 120 Hz and 320 actual deformed-hand/sleeve poses at 24 Hz plus
-clip endpoints, with all three optics and the irons. A separate 181-pose sweep
-rotates the stock around its physical left hinge through 180°; this is a geometric
-clearance check, not an authored gameplay fold action. These sampled checks do
-not certify continuous clearance or factory fidelity.
+`check.py` loads each standalone optic and checks foot seating, iron clashes, the
+aperture opening and post alignment. It sweeps every clip's bolt and deformed
+hand/sleeve poses with the optics and irons, plus a separate geometric stock-fold
+sweep around the physical hinge (not a gameplay fold action).
 
-TOR Mini (#686) seats on the authored short right-side adapter ahead of the
-support hand. Its shared checker sweeps all clips at 120 Hz plus the separate
-181-position stock fold, including actual hands, bolt and all three optics.
-See the [shared laser contract](../../attachments/steiner-tor-mini/README.md#weapon-mounting-686).
-The dedicated [280 × 50 mm .338 suppressor](../../attachments/suppressor-338/README.md)
-is the AX338's `suppressor` fit (can model `suppressor338`), not SRD762Ti or runtime scaling.
-`MUZZLE_device` owns the factory brake **and** lock nut; installing the can hides
-both and shows the 20 mm open adapter under `MUZZLE_device_removed`. Removing it
-restores the original brake. The installed endcap is `[0, .075, −1.0758]`; the
-adapter and endcap both pass a 10.6 mm clear gauge. No stat/audio changes.
+The AX338's `suppressor` fit mounts the dedicated
+[.338 suppressor](../../attachments/suppressor-338/README.md). `MUZZLE_device` owns
+the factory brake **and** lock nut; installing the can hides both and shows the open
+adapter under `MUZZLE_device_removed`. `muzzle.py` (also called by `check.py`)
+checks the can/adapter against every component, the evaluated hands and the mounted
+TOR Mini/optics; the adapter meets the barrel only at the crown plane. The asset has
+no bipod.
 
-`muzzle.py` (also called by `check.py`) checks actual can/adapter surfaces against
-all existing components and evaluated hands over all nine clips at 120 Hz plus
-endpoints, and the mounted TOR Mini/RMR/ACOG/PM II. The adapter meets the barrel
-only at the crown plane. **Bipod clearance is N/A:** this asset's `build.py` and
-`actions.py` contain no bipod geometry/control; a future bipod is not certified.
-This is a sampled source-surface check, not continuous or runtime-hand acceptance.
-
-**Full right-hand DCC acceptance still fails** against the grip allowance.
-Passing the muzzle or attachment sweep does not waive this separate failure.
-Reproduce the current report with:
+**Full right-hand DCC acceptance still fails** against the grip allowance; passing
+the muzzle or attachment sweeps does not waive it. Reproduce the report with:
 
 ```sh
 blender -b -t 2 assets/weapons/ax338/ax338.blend --python-exit-code 1 \

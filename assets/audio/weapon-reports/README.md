@@ -1,4 +1,4 @@
-# Weapon report banks (#668)
+# Weapon report banks
 
 Selected edited derivatives live in `public/audio/samples/`. The owner explicitly
 confirmed the necessary rights and approved publishing these edits. Original library
@@ -41,20 +41,19 @@ ffmpeg -i "$MASTER" -map_metadata -1 -c:a libopus -b:a 192k \
 on the cropped take's timeline. No normalization, pitch shift, EQ, compression,
 limiting, synthetic reinforcement or layered action samples. Preserve the inter-shot
 recorded decay. Construction-kit `Distant 02` is an authored microphone perspective,
-not a claim that the microphone stood at the game's 140 m crossfade endpoint.
+not a calibrated recording at the game's distant crossfade endpoint.
 
 Update the frozen master/native-decoder references in `samples/reference.json`.
 `REPORT_DISTANT_MATCH` in `src/audio/weapons.ts` is
 `sqrt(mean close mono energy / mean distant mono energy)`, where mono energy is
 `sum(mean(channels)^2) / sampleRate` across each complete edited float master.
 Verify every encoded take decodes, is non-silent, has an unclipped peak and retains
-the expected attack/full tail before accepting the edit. Human listening acceptance
-remains separate from these numeric checks.
+the expected attack/full tail before accepting the edit.
 
 ## Runtime scope
 
 `src/audio/weapons.ts` selects explicit banks from each fire event's effective
 `suppressed` state. Unknown suppressed identities stay silent; no runtime fallback
 borrows another bank. Empty triggers still play their mechanical dry-fire cue.
-MCX/MPX are unsuppressed iron-sight bases. Installing a catalog suppressor selects
-the suppressed report bank; removing it restores the unsuppressed bank.
+Installing a suppressor selects the suppressed bank; removing it restores the
+unsuppressed bank.

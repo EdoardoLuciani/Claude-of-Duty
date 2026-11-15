@@ -1,50 +1,28 @@
 # Shared suppressor
 
-Authoring authority: `tools/blender/suppressor/build.py` (shared can helpers in `tools/blender/can.py`).
-Cook/asset id: `srd762ti` (`/models/attachments/srd762ti.runtime.glb`).
-Build with `bun run assets`; native Blender/GLB and cooked runtime products are ignored.
-The exterior is extracted into shared Python from the MCX's authored SRD762Ti:
-236 mm long, 44 mm maximum diameter, graphite ceramic, shallow circumferential
-seams, wrench flats and a recessed open endcap. The MCX still calls the same
-geometry until its base conversion (#662); no generated weapon file is an input.
+Authoring authority: `tools/blender/suppressor/build.py` (shared can helpers in
+`tools/blender/can.py`). Cook/asset id: `srd762ti`
+(`/models/attachments/srd762ti.runtime.glb`). Build with `bun run assets`; native
+Blender/GLB and cooked runtime products are ignored. Graphite ceramic exterior with
+shallow seams, wrench flats and a recessed open endcap.
 
 ## Datums and fit
 
-Metres, +Y up, -Z forward in glTF. `SOCKET_mount` is the rear seating
-plane at the origin. `SOCKET_muzzle` is at [0, 0, -0.236], the front
-endcap face, not the legacy MCX's socket 2 mm ahead of it.
-Weapons supply `MOUNT_muzzle` in this same frame, with unit scale;
-rotation/translation belongs to the authored mount, never runtime scale tuning.
-`MUZZLE_device` holds the removable base device; optional
-`MUZZLE_device_removed` holds the adapter shown with the can installed.
+Metres, +Y up, -Z forward in glTF. `SOCKET_mount` is the rear seating plane at the
+origin; `SOCKET_muzzle` is the front endcap face. Weapons supply `MOUNT_muzzle` in
+this same frame, with unit scale; rotation/translation belongs to the authored
+mount, never runtime scale tuning. `MUZZLE_device` holds the removable base device;
+optional `MUZZLE_device_removed` holds the adapter shown with the can installed.
 
-M4 (#670) and MPX (#663) fits are enabled. The M4's 1/2-28 barrel receives an authored
-5/8-24 adapter sleeve at the barrel shoulder; the SureFire FH556RC is removed,
-not incorrectly enclosed by a direct-thread can. Removing the attachment restores
-the entire original flash hider. This is an exterior gameplay fit, not a claim of
-manufacturer-approved hardware or internal baffle engineering.
+The M4, MCX, MPX and EVOLYS mount this can. The M4 receives an authored adapter
+sleeve at the barrel shoulder; its flash hider is hidden, not enclosed by a
+direct-thread can. The MPX is a deliberate game-fit compromise: the same exterior
+with an open 9mm-capable endcap and rear sleeve receiving its authored adapter,
+ray-tested by the native build.
 
-## Caliber decision
+## Calibre decision
 
-Do **not** scale this rifle can indiscriminately:
-- 5.56/.300 BLK/7.62 can share this exterior once each authored fit is verified.
-- .338 uses the separately authored [AX338 can](../suppressor-338/README.md)
-  (can model `suppressor338`, #713); SRD762Ti is never scaled/reused for that fit.
-- MPX (#663) uses an approved universal **GAME-FIT** compromise: the same
-  236×44mm exterior with a 10.4mm open endcap and shadow annulus, and an open
-  19mm rear sleeve receiving its authored adapter. The native build ray-tests a
-  10.2mm gauge through all three. This is not manufacturer-approved 9mm SRD762Ti
-  compatibility, rated hardware, or a redesign/certification of physical baffles.
-  External shape and socket transforms are unchanged.
-- P320 (9 mm) uses the separate [`suppressor9mm` compact booster can](../compact-9mm/README.md)
-  (#714); this fixed rifle direct-thread model is not a P320 fit.
-- M590 (12 gauge) needs a dedicated large-bore model and adapter, not a stretched
-  7.62 can. Its dedicated [suppressor12g](../12g-suppressor/README.md) now supplies
-  that fit (#715); this rifle can is never mounted on the M590.
-
-Every weapon sells the same `suppressor` attachment; its `fits.muzzle.suppressor.model`
-selects the can (`srd762ti` here; the .338, pistol and shotgun use their own), so this
-rifle model is never substituted for them. Unverified combinations
-are rejected by the common fit validator. No damage, velocity, recoil, accuracy,
-AI-hearing or handling modifiers are introduced, and no shop purchase is added.
-The existing suppressed flash recipe and the #668 recordings are presentation only.
+Never scale this rifle can for another calibre. The AX338, P320 and M590 mount their
+own [.338](../suppressor-338/README.md), [compact 9mm](../compact-9mm/README.md) and
+[12-gauge](../12g-suppressor/README.md) cans through
+`fits.muzzle.suppressor.model`; the player always buys one `suppressor`.

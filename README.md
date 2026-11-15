@@ -122,44 +122,20 @@ only for new attachments, while a new weapon also costs its base price. Removing
 replacing an attachment discards it without a refund. Closing the market cancels the
 draft; swapped-out weapons lose their attachments and restart clears the loadout.
 Supplies keep their immediate **Buy** buttons. All controls support keyboard use.
-The M4 starts with irons and supports the shared RMR, ACOG (chevron) and PM II scope
-(P4FL).
-M4 iron sights are not a separate choice: mounting any optic swaps the A2/front and
-rear assemblies for a low-profile gas block, and removing the optic restores the irons
-and base handling. For debug/capture, use `?attachmentOptic=rmr`, `acog`, `scope` or
-`none`, or `bun tools/capture.ts --shot=ads --optic=scope --out=/tmp/m4-scope-ads.png`.
-All weapons except P320 also support the shared EXPS3-0 holographic sight (350 credits):
-`optic: 'exps3'`, `?attachmentOptic=exps3`, or
+
+Every weapon starts on irons. All but the P320 accept the RMR, EXPS3, ACOG and PM II
+scope; mounting one swaps removable irons for their stowed state (M590 keeps fixed
+irons). Every weapon accepts the TOR Mini laser and a suppressor; each mounts its own
+calibre can. Attachments change no handling or ballistic stats: a can moves the
+projectile/flash origin to its endcap and selects suppressed reports, and the laser
+draws a beam and surface dot along its emitter axis without predicting spread or drop.
+**L** toggles the mounted laser per gun, independently of the **F** flashlight.
+
+For debug/capture, `?attachmentWeapon=<id>` with `attachmentOptic`, `attachmentRail`
+and `attachmentMuzzle` (`none` clears a slot) configures a build, as do
+`tools/capture.ts --optic/--rail/--muzzle`, e.g.
 `bun tools/capture.ts --weapon=rifle --optic=exps3 --shot=ads`.
-It uses a 68 MOA ring / 1 MOA dot with the red dot's 0.62 ADS FOV/sensitivity scale.
-Mounted optics replace removable irons automatically; M590 keeps its fixed irons.
-P320 is irons-only and supports the laser and suppressor.
-The [EXPS3 asset contract](assets/attachments/eotech-exps3-0/README.md) describes
-shared Picatinny geometry, clearance checks and visual limitations.
-
-The M4 also supports `rail: 'laser'` (Steiner TOR Mini), independently of optics.
-It adds a green beam and surface dot, with **no stat changes** or AI light reaction.
-Press **L** to toggle the mounted weapon laser independently of **F** (flashlight).
-The switch stays with each gun across weapon swaps; a newly mounted module starts
-on. Removal, dropping the gun, death and restart clear its switch; pause/shop
-preserve it and ignore toggle input. Grenade/radio/bandage use hides the beam and
-blocks toggling until the weapon is out again.
-The beam rigidly follows the module’s emitter axis through sway, recoil and ADS,
-with emitter-origin occlusion and a surface dot. It does not converge on the
-camera crosshair or predict random spread, penetration or bullet drop.
-Use `?attachmentRail=laser` or `bun tools/capture.ts --shot=weapon --rail=laser`;
-`attachmentRail=none`/`rail: null` removes it. `tools/profile.ts --rail=laser|none`
-provides matched performance captures.
-
-Every weapon supports `muzzle: 'suppressor'`, mounting the can its fit names (the shared
-SRD762Ti on the M4, MCX, MPX and EVOLYS; dedicated P320, AX338 and M590 cans).
-It replaces the base muzzle device and moves projectile/flash/smoke
-origins to the can's endcap; audio and flash follow the configuration on the next shot.
-It changes no handling or ballistic stats. Use `?attachmentMuzzle=suppressor` or
-`bun tools/capture.ts --shot=weapon --muzzle=suppressor --out=/tmp/m4-suppressed.png`;
-`attachmentMuzzle=none`/`muzzle: null` restores the base device. Market inspection
-matches the selected build. Each weapon's suppressor costs 350 credits
-([fit/size decision](assets/attachments/sig-srd762ti/README.md)).
+`tools/profile.ts --rail=laser|none` provides matched laser performance captures.
 
 M4/P320 are the starting weapons; MCX, EVOLYS, MPX, AX338 and M590 are shop options.
 The day/night clock
