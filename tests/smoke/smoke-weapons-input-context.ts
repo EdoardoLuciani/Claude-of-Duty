@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
+import m590Manifest from '../../assets/weapons/m590/manifest.json' with { type: 'json' };
 import { bindingLabel } from '../../src/core/bindings.ts';
 import { Input } from '../../src/core/input.ts';
 import { EventBus } from '../../src/core/registry.ts';
@@ -19,12 +20,12 @@ import type { UiSystem } from '../../src/ui/index.ts';
 import { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
 import { BASE_ATTACHMENTS, makeOpticModel } from '../../src/weapons/attachments.ts';
 import { ProjectileSim } from '../../src/weapons/ballistics.ts';
-import { Clip } from '../../src/weapons/clips.ts';
+import { buildManifestClips, Clip } from '../../src/weapons/clips.ts';
 import { WEAPON_IDS } from '../../src/weapons/defs.ts';
 import type { WeaponId } from '../../src/weapons/defs.ts';
 import { GRENADE_FUSE, MAX_SHOTS_PER_FRAME } from '../../src/weapons/index.ts';
 import type { WeaponEntry, WeaponModelRecord } from '../../src/weapons/runtime-types.ts';
-import type { Viewmodel } from '../../src/weapons/viewmodel.ts';
+import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { ArmedWeaponSystem, weaponState } from '../lib/ballistics-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
 import { fixture } from '../lib/fixture.ts';
@@ -273,6 +274,36 @@ for (const [primary, first, second] of [
   assert.equal(wp.viewmodel.clipName, 'reloadEmpty');
   wp._completeReload(true);
   assert(wp.state.chambered && wp.state.mag === wp.current.magSize - 1);
+}
+
+// A tube reload restarts the same authored Clip from its end callback.
+{
+  const { wp } = makeHarness();
+  assert(wp.applyBuild('shotgun', BASE_ATTACHMENTS));
+  const vm = new Viewmodel(wp.ctx, wp.mats);
+  vm._solveHands = (): void => {};
+  vm.active = fixture<WeaponEntry>({
+    def: wp.current,
+    group: new THREE.Group(),
+    clips: buildManifestClips({ reloadTac: 'Reload_Tactical' }, m590Manifest.clips),
+    sight: new THREE.Vector3(),
+    optic: null,
+    animation: fixture<WeaponEntry['animation']>({ reset(): void {}, update(): void {} }),
+  });
+  wp.viewmodel = vm;
+  vm.onClipEvent = (name, clip): void => wp._onClipEvent(name, clip);
+  wp.state.mag = 0;
+  wp.state.reserve = 2;
+  const phases: string[] = [];
+  wp.ctx.events.on('weapon:reload', ({ phase }): void => {
+    phases.push(phase);
+  });
+  assert(wp.reload());
+  for (let i = 0; i < 120 && wp.reloading; i++) vm.update(1 / 60, wp._state);
+  assert(!wp.reloading, 'the repeated clip completes');
+  assert.deepEqual(phases, ['start', 'shellin', 'end', 'start', 'shellin', 'end']);
+  assert.equal(wp.ammo.mag, 3, 'both shells transfer alongside the chambered round');
+  assert.equal(wp.state.reserve, 0);
 }
 
 // Same-frame operations retain their order, independent of physical event order.

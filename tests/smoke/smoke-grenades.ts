@@ -401,8 +401,20 @@ assert.equal(wp.canFire(), true, 'the bought gun fires right away');
 wp._onClipEvent('grenade:release', 'grenadeThrow');
 assert.equal(wp._grenades.length, 1, 'a late grenade:release does not respawn');
 assert.equal(bodies.length, 1, 'still one rigid body');
+// The cancelled timeline cannot supply done. The next cook must reset release.
+pressG();
+input.firePressed = true;
+input.down.add('Mouse0');
+step();
+input.firePressed = false;
+input.down.delete('Mouse0');
+step();
+wp._onClipEvent('grenade:release', 'grenadeThrow');
+wp._onClipEvent('grenade:release', 'grenadeThrow');
+assert.equal(bodies.length, 2, 'the next spent grenade releases exactly once');
+assert.equal(wp.grenades, 0);
 wp._onClipEvent('grenade:done', 'grenadeThrow');
-assert.equal(wp.canFire(), true, 'still firing after a late grenade:done');
+assert.equal(wp.canFire(), true, 'firing resumes after the next throw');
 assert.equal(wp.grenadeEquipped, false, 'no phantom grenade left behind');
 resetLive();
 

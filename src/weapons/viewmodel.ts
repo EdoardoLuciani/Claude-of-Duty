@@ -1220,10 +1220,12 @@ export class Viewmodel {
       const c = this.clip;
       const tt = clamp(this.clipT, 0, c.duration);
       c.sample(tt, res);
-      for (const ev of c.events) {
-        if (ev.t > this.clipPrevT && ev.t <= tt) this.onClipEvent?.(ev.name, c.name);
-      }
+      // Callbacks may restart this same Clip; keep their reset cursor intact.
+      const prevT = this.clipPrevT;
       this.clipPrevT = tt;
+      for (const ev of c.events) {
+        if (ev.t > prevT && ev.t <= tt) this.onClipEvent?.(ev.name, c.name);
+      }
       px += res.pos[0];
       py += res.pos[1];
       pz += res.pos[2];

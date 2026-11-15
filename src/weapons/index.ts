@@ -1377,6 +1377,7 @@ export class WeaponSystem {
     if (this.grenades <= 0) return;
     const type = action === 'ads' ? 'short' : 'long';
     this.cooking = true;
+    this._throwReleased = false;
     this._throwType = type;
     this._cookAction = action;
     this._cookTime = 0;
