@@ -7,6 +7,9 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, extname, join, resolve } from 'node:path';
 
 const ROOT = resolve(import.meta.dirname, '..');
+// Bump for shared cooking implementation changes; profile/flag/version changes
+// already invalidate their own cache keys without hashing this whole module.
+export const MODEL_COOK_RECIPE = 'model-cook-v1';
 export const GLTFPACK_VERSION = 'gltfpack 1.3';
 // Preserve named mechanics and authored timing. Float positions/UVs avoid
 // dequantization wrapper nodes and texture-transform clones in the runtime.

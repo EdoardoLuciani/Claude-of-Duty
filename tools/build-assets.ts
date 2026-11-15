@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Build every generated runtime asset, skipping steps whose inputs are unchanged.
- * Blender 5.2.2 and gltfpack 1.3 are needed only when a Blender step is stale.
+ * Blender 5.2.2 is needed only for stale authoring; gltfpack 1.3 for stale cooks.
  * OW_SKIP_ASSETS=1 (`bun run build:ci`) skips Blender/model assets, but builds the world.
  *
  * Player arms run first, then the bandage, which re-saves player-arms.blend.
@@ -35,6 +35,7 @@ import {
   GLTFPACK_FLAGS,
   GLTFPACK_VERSION,
   MODEL_COOKS,
+  MODEL_COOK_RECIPE,
   isModelId,
   type ModelId,
 } from '../build/models.ts';
@@ -44,6 +45,7 @@ interface AssetStep {
   inputs: string[];
   outputs: string[];
   salt?: string[];
+  blender?: boolean;
   commands: Array<[string, ...string[]]>;
 }
 import {
@@ -83,6 +85,7 @@ const authoredJson = (dir: string): string[] =>
 
 const ARMS: AssetStep = {
   id: 'arms',
+  blender: true,
   inputs: [
     'tools/blender/player_arms.py',
     'tools/blender/player_bandage.py',
@@ -98,6 +101,7 @@ const ARMS: AssetStep = {
 
 export const SOLDIER_STEP: AssetStep = {
   id: 'soldiers',
+  blender: true,
   inputs: [...SOLDIER_INPUTS],
   salt: [REVISION],
   outputs: soldierProductPaths().map((file): string => relative(ROOT, file)),
@@ -143,26 +147,35 @@ const STANDALONE_TOOLS: Partial<Record<ModelId, string[]>> = {
   tor_mini: ['tools/blender/tor_mini'],
 };
 
-/** One Blender build plus its gltfpack cook for a MODEL_COOKS entry. */
-function cookStep(id: ModelId, salt: string[]): AssetStep {
-  const { directory, source, output } = MODEL_COOKS[id];
+/** Native authoring must finish before its independently cached runtime cook. */
+export function modelSteps(id: ModelId, salt: string[]): [AssetStep, AssetStep] {
+  const model = MODEL_COOKS[id];
+  const { directory, source, output } = model;
   const tools = STANDALONE_TOOLS[id] ?? [`tools/blender/${id}`, ...(SHARED_TOOLS[id] ?? [])];
-  return {
-    id,
-    inputs: [...tools, ...authoredJson(directory)],
-    // Only this model's cook settings, so one profile edit rebuilds one model.
-    salt: [...salt, JSON.stringify(MODEL_COOKS[id]), ...GLTFPACK_FLAGS, GLTFPACK_VERSION],
-    // The editable .blend is used by authoring and attachment-fit checks.
-    outputs: [
-      `${directory}/${source}`,
-      output,
-      `${directory}/${source.replace(/\.glb$/, '.blend')}`,
-    ],
-    commands: [
-      blender(tools[0].endsWith('.py') ? tools[0] : `${tools[0]}/build.py`),
-      bun('build/models.ts', id),
-    ],
-  };
+  return [
+    {
+      id: `${id}-author`,
+      blender: true,
+      inputs: [...tools, ...authoredJson(directory)],
+      salt,
+      // Only some standalone authors emit a manifest; all weapon authors do.
+      outputs: [
+        `${directory}/${source}`,
+        `${directory}/${source.replace(/\.glb$/, '.blend')}`,
+        ...(!Object.hasOwn(STANDALONE_TOOLS, id) || id === 'exps3' || id === 'tor_mini'
+          ? [`${directory}/manifest.json`]
+          : []),
+      ],
+      commands: [blender(tools[0].endsWith('.py') ? tools[0] : `${tools[0]}/build.py`)],
+    },
+    {
+      id: `${id}-cook`,
+      inputs: [`${directory}/${source}`],
+      salt: [MODEL_COOK_RECIPE, JSON.stringify(model), ...GLTFPACK_FLAGS, GLTFPACK_VERSION],
+      outputs: [output],
+      commands: [bun('build/models.ts', id)],
+    },
+  ];
 }
 
 function listFiles(path: string): string[] {
@@ -185,7 +198,7 @@ function inputHash(step: AssetStep): string {
     hash
       .update(path)
       .update('\0')
-      .update(path.endsWith('.blend') ? bytes : canonicalText(bytes))
+      .update(/\.(blend|glb)$/.test(path) ? bytes : canonicalText(bytes))
       .update('\0');
   }
   return hash.digest('hex');
@@ -215,8 +228,7 @@ const run = ([command, ...args]: [string, ...string[]], stdio: StdioOptions): Pr
     child.on('exit', (code): void => done(code ?? 1));
   });
 
-let failed = false;
-async function build(step: AssetStep): Promise<void> {
+export async function buildAssetStep(step: AssetStep): Promise<boolean> {
   const hash = inputHash(step);
   const stamp = join(CACHE, `${step.id}.sha256`);
   if (
@@ -226,9 +238,10 @@ async function build(step: AssetStep): Promise<void> {
     step.outputs.every((file): boolean => existsSync(join(ROOT, file)))
   ) {
     console.log(`[assets] ${step.id}: up to date`);
-    return;
+    return true;
   }
-  checkBlender();
+  if (step.blender) checkBlender();
+  mkdirSync(CACHE, { recursive: true });
   rmSync(stamp, { force: true });
   const log = join(CACHE, `${step.id}.log`);
   console.log(`[assets] ${step.id}: building (log: ${relative(ROOT, log)})`);
@@ -241,24 +254,28 @@ async function build(step: AssetStep): Promise<void> {
     closeSync(fd);
   }
   if (code) {
-    failed = true;
     const tail = readFileSync(log, 'utf8').trimEnd().split('\n').slice(-30).join('\n');
     console.error(`[assets] ${step.id}: FAILED (exit ${code})\n${tail}`);
-    return;
+    return false;
   }
   writeFileSync(stamp, hash);
   console.log(`[assets] ${step.id}: built in ${((performance.now() - start) / 1000).toFixed(0)}s`);
+  return true;
 }
 
-/** Build steps on JOBS workers; stops starting new steps after a failure. */
-async function pool(steps: AssetStep[]): Promise<void> {
-  const queue = [...steps];
+let failed = false;
+/** Each worker authors then cooks one model; stops starting steps after a failure. */
+async function pool(jobs: AssetStep[][]): Promise<void> {
+  const queue = [...jobs];
   await Promise.all(
     Array.from({ length: JOBS }, async (): Promise<void> => {
       while (!failed) {
-        const step = queue.shift();
-        if (!step) break;
-        await build(step);
+        const steps = queue.shift();
+        if (!steps) break;
+        for (const step of steps) {
+          if (failed) break;
+          if (!(await buildAssetStep(step))) failed = true;
+        }
       }
     })
   );
@@ -274,18 +291,18 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (!process.env.OW_SKIP_ASSETS) {
     mkdirSync(CACHE, { recursive: true });
     // Weapons load the arms blend, so they wait for it and hash its inputs.
-    await build(ARMS);
+    failed = !(await buildAssetStep(ARMS));
     if (!failed) {
       const armsHash = inputHash(ARMS);
       await pool([
         ...Object.keys(MODEL_COOKS)
           .filter(isModelId)
           .filter((id): boolean => !Object.hasOwn(STANDALONE_TOOLS, id))
-          .map((id): AssetStep => cookStep(id, [armsHash])),
+          .map((id): AssetStep[] => modelSteps(id, [armsHash])),
         ...Object.keys(STANDALONE_TOOLS)
           .filter(isModelId)
-          .map((id): AssetStep => cookStep(id, [])),
-        SOLDIER_STEP,
+          .map((id): AssetStep[] => modelSteps(id, [])),
+        [SOLDIER_STEP],
       ]);
     }
     if (!failed)
