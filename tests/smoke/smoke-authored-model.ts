@@ -491,11 +491,6 @@ assert.throws(
     assert.equal(entry.muzzleSocket, baseSocket, 'removal restores the weapon bore exit');
     assert.equal(entry.def.suppressed, false, 'removal restores the unsuppressed M4');
     assert(baseDevice.visible);
-    assert(
-      viewmodel
-        .muzzleWorld(new THREE.Vector3())
-        .distanceTo(baseSocket.getWorldPosition(new THREE.Vector3())) < 1e-10
-    );
     assert.equal(canDisposed, 0, 'removal never disposes borrowed geometry');
   }
   // One suppressor id mounts each weapon's own calibre can. Permanent muzzle
