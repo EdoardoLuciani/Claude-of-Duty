@@ -118,7 +118,6 @@ export class Arm {
   _thumbTo!: THREE.Quaternion;
   _poseTime!: number;
   _poseDuration!: number;
-  _poseBlend!: number;
   bodyUp: THREE.Vector3 = new THREE.Vector3(0, 1, 0);
   bodyRight: THREE.Vector3 = new THREE.Vector3(1, 0, 0);
   poses: Partial<Record<string, HandPoseData>> = {};
@@ -426,7 +425,6 @@ export class Arm {
       HAND_POSE_EASE[Math.min(i + 1, HAND_POSE_EASE.length - 1)],
       sample - i
     );
-    this._poseBlend = u;
     for (let i = 0; i < 4; i++)
       this.fingers[i].root.rotation.y = THREE.MathUtils.lerp(
         this._spreadFrom[i],
@@ -457,19 +455,6 @@ export class Arm {
     // Half-angle saddle rotation keeps the web from collapsing under opposition.
     this.thumbWeb.quaternion.copy(this.thumbRest).slerp(this.thumb.root.quaternion, 0.5);
     for (const joint of this.flexJoints) joint.bone.rotation.x = joint.source.rotation.x * 0.5;
-  }
-
-  setTrigger(t: number): void {
-    // Only the firing grip owns the trigger. Reload/pinch/utility poses must
-    // retain their authored index pose rather than being overwritten each frame.
-    if (!this.pose.startsWith('grip')) return;
-    const f = this.fingers[0];
-    t = THREE.MathUtils.clamp(t, 0, 1);
-    for (let j = 0; j < 3; j++) {
-      const rest = THREE.MathUtils.lerp(this._poseFrom[j], this._poseTo[j], this._poseBlend);
-      f.joints[j].rotation.x = rest - t * (j === 0 ? 0.03 : j === 1 ? 0.08 : 0.04);
-    }
-    this.updateFlex();
   }
 
   // An authored fixed elbow is authoritative, not a preference for the IK

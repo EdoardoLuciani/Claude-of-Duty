@@ -330,7 +330,6 @@ export class Viewmodel {
   recRot: Spring3 = new Spring3();
   settle: Spring3 = new Spring3(2.05, 0.77);
   sprintT: number = 0;
-  triggerT: number = 0;
 
   constructor(ctx: ViewmodelContext, mats: ReticleMaterials) {
     this.ctx = ctx;
@@ -547,8 +546,6 @@ export class Viewmodel {
       eject: new THREE.Vector3().fromArray(model.nodes.eject),
       ejectDir: new THREE.Vector3().fromArray(model.nodes.ejectDir).normalize(),
       optic: null,
-      gripR: model.nodes.gripR,
-      gripL: model.nodes.gripL,
       magLen: model.magSize.len,
       shell: model.shell,
       lhandPose: `support:${model.id}`,
@@ -1043,8 +1040,6 @@ export class Viewmodel {
     this.sprintT = damp(this.sprintT, sprintTarget, 9, dt);
     this.lowReadyT = damp(this.lowReadyT, s.lowReady ? 1 : 0, 8, dt);
 
-    this.triggerT = damp(this.triggerT, s.trigger ? 1 : 0, 26, dt);
-
     const hipP = def.hipPos;
     const hipR = def.hipRot;
     this._basePos.set(hipP[0], hipP[1], hipP[2]);
@@ -1266,26 +1261,15 @@ export class Viewmodel {
       return;
     }
 
-    // ---- shooting hand: welded to the grip ----
-    const gR = w.gripR;
-    this._handPos.fromArray(gR.pos);
-    handBasis(this._handQuat, gR.finger ?? [0, -0.35, -0.94], gR.back ?? [0.95, 0.25, 0.18]);
-    let poseR = w.rhandPose;
-
-    if (poseR !== this.armR.pose) this.armR.setPose(poseR, 0.1);
-    w.animation.handTarget?.('right', this._handPos, this._handQuat);
+    // Authored wrists drive upper/forearm IK; authored fingers then replace
+    // the pose-blended fingers. Weapon pose names keep utility transitions eased.
+    if (w.rhandPose !== this.armR.pose) this.armR.setPose(w.rhandPose, 0.1);
+    if (w.lhandPose !== this.armL.pose) this.armL.setPose(w.lhandPose, 0.1);
+    w.animation.handTarget('right', this._handPos, this._handQuat);
     this.armR.solve(this._handPos, this._handQuat);
-    this.armR.setTrigger(this.triggerT);
-
-    // ---- support hand: welded to its grip ----
-    const gL = w.gripL;
-    const pose = w.lhandPose;
-    this._handPosL.fromArray(gL.pos);
-    handBasis(this._handQuatL, gL.finger ?? [0.82, 0.5, -0.28], gL.back ?? [-0.5, 0.32, -0.8]);
-    w.animation.handTarget?.('left', this._handPosL, this._handQuatL);
-    if (pose !== this.armL.pose) this.armL.setPose(pose, 0.1);
+    w.animation.handTarget('left', this._handPosL, this._handQuatL);
     this.armL.solve(this._handPosL, this._handQuatL);
-    w.animation.applyHands?.(this.armL, this.armR);
+    w.animation.applyHands(this.armL, this.armR);
   }
 
   /**

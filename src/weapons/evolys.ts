@@ -43,11 +43,8 @@ export function makeEvolysModel(gltf: GLTF): EvolysModel {
       eject: point('SOCKET_ejection'),
       sight: point('SOCKET_sight'),
       ejectDir: [0.86, 0.44, 0.26],
-      gripR: handReference.grips.right,
-      gripL: handReference.grips.left,
       magSeat: { pos: point('SOCKET_pouch'), rot: [0, 0, 0] },
       triggerPivot: { pos: point('trigger'), rot: [0, 0, 0] },
-      handguard: { axis: [0, 0.075, 0], dir: [0, 0, 1], r: 0.027, z0: -0.23, z1: -0.4 },
     },
     shell: { caseLen: 0.051, rimR: 0.005975 },
     magSize: { len: 0.125 },
@@ -72,7 +69,6 @@ type EvolysModel = AuthoredModelData<
   AuthoredNodes & {
     magSeat: { pos: [number, number, number]; rot: number[] };
     triggerPivot: { pos: [number, number, number]; rot: number[] };
-    handguard: { axis: number[]; dir: number[]; r: number; z0: number; z1: number };
   }
 > & {
   label: string;

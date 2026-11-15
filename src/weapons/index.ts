@@ -263,7 +263,6 @@ export class WeaponSystem {
     speed: 0,
     crouch: false,
     airborne: false,
-    trigger: false,
     empty: false,
     magazineLoaded: true,
     remainingRounds: 0,
@@ -1293,7 +1292,6 @@ export class WeaponSystem {
       this._triggerLatched = false;
       this._pendingShots = 0;
       this._state.ads = false;
-      this._state.trigger = false;
       this.viewmodel.stopClip();
     }
   }
@@ -1686,14 +1684,10 @@ export class WeaponSystem {
       if (input.actionPressed('cycleWeapon')) this.nextWeapon();
       if (input.wheel) this.nextWeapon();
       this._runTrigger(input.fire, input.firePressed, def, s);
-      st.trigger = input.fire && this.canFire();
       // Auto-reload on a dry trigger pull, like every modern shooter.
       if (input.firePressed && st.empty) this.reload();
     } else if (this.debugMode && !this.disabled && player?.dead !== true) {
       this._runDebug();
-      st.trigger = this._sinceShot < 0.09;
-    } else {
-      st.trigger = false;
     }
     // A cooldown that ran out this frame may credit its overshoot only to a
     // round fired in this same frame; idle or gated time never banks shots.
@@ -1911,7 +1905,6 @@ export class WeaponSystem {
     }
     this._state.sprint = false;
     this._state.speed = 0;
-    this._state.trigger = false;
     // At the harness's fixed 60 Hz, early rounds populate smoke, brass and tracers.
     // A two-frame tail overlaps flash lifetimes across the uncertain grab window:
     // --settle controls grabFrame, but harness rAF and screenshot RPC can drift.

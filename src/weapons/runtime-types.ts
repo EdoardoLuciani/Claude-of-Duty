@@ -34,21 +34,9 @@ export type AuthoredModels = {
   shotgun: Awaited<ReturnType<typeof loadM590>>;
 };
 export type AuthoredWeaponModel = AuthoredModels[WeaponId];
-export interface GripData {
-  pos: number[];
-  finger?: number[];
-  back?: number[];
-}
 export interface TransformData {
   pos: number[];
   rot?: number[];
-}
-export interface CylinderContact {
-  axis: [number, number, number];
-  dir: [number, number, number];
-  r: number;
-  z0: number;
-  z1: number;
 }
 export interface OpticData {
   kind?: string;
@@ -66,8 +54,6 @@ export interface WeaponNodes {
   eject: number[];
   ejectDir?: number[];
   magSeat: { pos: number[]; rot: number[] };
-  gripR: GripData;
-  gripL: GripData;
   chargePull?: number[];
   boltTravel?: number[];
   triggerPull?: number;
@@ -75,8 +61,6 @@ export interface WeaponNodes {
   boltRest?: TransformData;
   triggerPivot?: TransformData;
   selectorPivot?: TransformData;
-  supportContact?: CylinderContact;
-  handguard?: { axis: number[]; dir: number[]; r: number; z0: number; z1: number };
 }
 export type WeaponModelRecord = AuthoredWeaponModel;
 export interface WeaponEntry {
@@ -100,8 +84,6 @@ export interface WeaponEntry {
   eject: THREE.Vector3;
   ejectDir: THREE.Vector3;
   optic: OpticData | null;
-  gripR: GripData;
-  gripL: GripData;
   magLen: number;
   shell?: { caseLen: number; rimR: number };
   lhandPose: string;
@@ -122,8 +104,8 @@ export interface WeaponAnimation {
   dispose(): void;
   magazineBody?: THREE.Object3D;
   poseQ: THREE.Quaternion;
-  handTarget?(side: 'left' | 'right', position: THREE.Vector3, quaternion: THREE.Quaternion): void;
-  applyHands?(left: Arm, right: Arm): void;
+  handTarget(side: 'left' | 'right', position: THREE.Vector3, quaternion: THREE.Quaternion): void;
+  applyHands(left: Arm, right: Arm): void;
 }
 export interface ViewState {
   ads: boolean;
@@ -132,7 +114,6 @@ export interface ViewState {
   speed: number;
   crouch: boolean;
   airborne: boolean;
-  trigger: boolean;
   empty: boolean;
   magazineLoaded?: boolean;
   remainingRounds?: number;

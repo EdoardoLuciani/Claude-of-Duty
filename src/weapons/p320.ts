@@ -43,8 +43,6 @@ export function makeP320Model(gltf: GLTF): P320Model {
       eject: point('SOCKET_ejection'),
       sight: point('SOCKET_sight'),
       ejectDir: [0.82, 0.52, 0.24],
-      gripR: handReference.grips.right,
-      gripL: handReference.grips.left,
       magSeat: { pos: [0, -0.04, 0.025], rot: [0, 0, 0] },
     },
     shell: { caseLen: 0.0192, rimR: 0.00478 },

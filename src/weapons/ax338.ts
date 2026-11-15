@@ -43,11 +43,8 @@ export function makeAX338Model(gltf: GLTF): AX338Model {
       eject: point('SOCKET_ejection'),
       sight: point('SOCKET_sight'),
       ejectDir: [0.88, 0.4, 0.22],
-      gripR: handReference.grips.right,
-      gripL: handReference.grips.left,
       magSeat: { pos: point('SOCKET_magazine'), rot: [0, 0, 0] },
       triggerPivot: { pos: point('trigger'), rot: [0, 0, 0] },
-      handguard: { axis: [0, 0.075, 0], dir: [0, 0, 1], r: 0.027, z0: -0.175, z1: -0.581 },
     },
     shell: { caseLen: 0.0697, rimR: 0.0074 },
     magSize: { len: manifest.dimensions.magazineHeight },
@@ -71,7 +68,6 @@ type AX338Model = AuthoredModelData<
   AuthoredNodes & {
     magSeat: { pos: [number, number, number]; rot: number[] };
     triggerPivot: { pos: [number, number, number]; rot: number[] };
-    handguard: { axis: number[]; dir: number[]; r: number; z0: number; z1: number };
   }
 > & {
   label: string;
