@@ -448,12 +448,12 @@ export class WeaponSystem {
 
   _configureAttachments(id: WeaponId, config: AttachmentConfig): boolean {
     if (!this.canConfigure(id, config)) return false;
-    const current = this._requireState(id).attachments;
-    if (SLOTS.every((slot): boolean => config[slot] === current[slot])) return true;
+    const state = this._requireState(id);
+    if (SLOTS.every((slot): boolean => config[slot] === state.attachments[slot])) return true;
     const entry = this._viewmodel?.weapons.get(id);
     if (!entry) return false;
     configureWeaponAttachments(entry, config, this._attachments);
-    this._requireState(id).attachments = entry.attachments;
+    state.attachments = entry.attachments;
     if (this.activeId === id) {
       this.viewmodel.reticle.visible = false;
       this.viewmodel.scopeOverlay.visible = false;
