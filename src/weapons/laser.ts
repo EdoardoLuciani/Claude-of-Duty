@@ -4,8 +4,6 @@ import { MeshBasicNodeMaterial } from 'three/webgpu';
 
 import type { EngineSystems } from '../core/context.ts';
 import { MASK } from '../physics/surfaces.ts';
-import { dropAt } from './ballistics.ts';
-import type { WeaponDef } from './defs.ts';
 
 /** One retained world draw for the beam and surface spot; no lights or decals.
  * Only transforms/attributes change when mounted: the shader is warmed at boot.
@@ -59,55 +57,35 @@ export class WeaponLaser {
     scene.add(this.mesh);
   }
 
-  /** Capture gameplay aim before the camera/viewmodel's cosmetic firing overlay. */
-  updateAim(
-    camera: THREE.PerspectiveCamera,
-    def: WeaponDef,
-    muzzle: THREE.Vector3,
-    physics: EngineSystems['physics'],
-    owner: unknown
-  ): void {
-    // Match tryFire's unspread, zeroed bore. This is a sight aid, not a predictor
-    // of random spread/penetration or the round's curved flight beyond its zero.
-    this.direction.set(0, 0, -1).applyQuaternion(camera.quaternion);
-    this.up.set(0, 1, 0).applyQuaternion(camera.quaternion);
-    this.end
-      .copy(camera.position)
-      .addScaledVector(this.direction, def.zeroRange)
-      .addScaledVector(this.up, dropAt(def, def.zeroRange));
-    this.direction.copy(this.end).sub(muzzle).normalize();
-    const aim = physics.raycast(muzzle, this.direction, def.maxRange, MASK.BULLET, owner);
-    this.end.copy(aim.point); // pooled query results must be copied before the next query
-  }
-
   update(
     camera: THREE.PerspectiveCamera,
     viewCamera: THREE.PerspectiveCamera,
     emitter: THREE.Object3D,
     physics: EngineSystems['physics'],
     owner: unknown,
-    height: number
+    height: number,
+    maxRange: number
   ): void {
-    emitter.getWorldPosition(this.origin);
-    // The model is rendered with the separate first-person FOV. Map its apparent
-    // emitter to the world projection so the ribbon starts on the actual lens.
+    emitter.updateWorldMatrix(true, false);
+    this.origin.setFromMatrixPosition(emitter.matrixWorld);
+    this.direction.set(0, 0, -1).transformDirection(emitter.matrixWorld);
+    // Map the whole rigid emitter ray through the separate first-person FOV,
+    // not just its origin. Sampling after the firing overlay keeps the ribbon
+    // on the lens and along its -Z axis during sway, recoil and ADS alike.
     camera.updateMatrixWorld();
     viewCamera.updateMatrixWorld();
     this.origin.applyMatrix4(viewCamera.matrixWorldInverse);
+    this.direction.transformDirection(viewCamera.matrixWorldInverse);
     const ratio =
       Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) /
       Math.tan(THREE.MathUtils.degToRad(viewCamera.fov / 2));
     this.origin.x *= ratio;
     this.origin.y *= ratio;
     this.origin.applyMatrix4(camera.matrixWorld);
-    this.direction.copy(this.end).sub(this.origin).normalize();
-    const hit = physics.raycast(
-      this.origin,
-      this.direction,
-      this.origin.distanceTo(this.end) + 0.02,
-      MASK.BULLET,
-      owner
-    );
+    this.direction.x *= ratio;
+    this.direction.y *= ratio;
+    this.direction.transformDirection(camera.matrixWorld);
+    const hit = physics.raycast(this.origin, this.direction, maxRange, MASK.BULLET, owner);
     this.end.copy(hit.point);
     this.normal.copy(hit.normal);
 

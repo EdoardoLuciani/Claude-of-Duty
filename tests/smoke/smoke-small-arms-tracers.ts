@@ -59,6 +59,7 @@ function makeRifle(seed: number): ArmedWeaponSystem {
   wp.states.set('rifle', {
     def,
     attachments: BASE_ATTACHMENTS,
+    laserEnabled: false,
     pattern: buildRecoilPattern(def, Rng),
     mag: def.magSize,
     chambered: true,

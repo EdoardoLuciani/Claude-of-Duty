@@ -16,6 +16,7 @@ import type { loadP320 } from './p320.ts';
 export interface WeaponState {
   def: WeaponDef;
   attachments: AttachmentConfig;
+  laserEnabled: boolean;
   pattern: Float32Array;
   mag: number;
   chambered: boolean;

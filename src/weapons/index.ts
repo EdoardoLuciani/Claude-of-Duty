@@ -390,6 +390,7 @@ export class WeaponSystem {
     return {
       def,
       attachments: BASE_ATTACHMENTS,
+      laserEnabled: false,
       pattern: buildRecoilPattern(def, Rng),
       mag: def.magSize,
       chambered: true,
@@ -453,6 +454,7 @@ export class WeaponSystem {
     const entry = this._viewmodel?.weapons.get(id);
     if (!entry) return false;
     configureWeaponAttachments(entry, config, this._attachments);
+    if (config.rail !== state.attachments.rail) state.laserEnabled = config.rail === 'laser';
     state.attachments = entry.attachments;
     if (this.activeId === id) {
       this.viewmodel.reticle.visible = false;
@@ -465,6 +467,7 @@ export class WeaponSystem {
   /** Attachments belong to the gun: dropping it or restarting returns the base build. */
   _resetAttachments(id: WeaponId): void {
     const state = this._requireState(id);
+    state.laserEnabled = false;
     if (state.attachments === BASE_ATTACHMENTS) return;
     state.attachments = BASE_ATTACHMENTS;
     const entry = this._viewmodel?.weapons.get(id);
@@ -1494,6 +1497,8 @@ export class WeaponSystem {
    *  a stowed one stays safe in the pouch. Never `endGrenade()` a committed
    *  throw without releasing it — the release beat must fire exactly once. */
   _onPlayerDeath(): void {
+    for (const state of this.states.values()) state.laserEnabled = false;
+    if (this._laser) this._laser.mesh.visible = false;
     // A live grenade in your hand is a live grenade: it drops and cooks.
     this._dropCookedGrenade();
     // A committed throw must not be cancelled: if the release beat had not
@@ -1657,6 +1662,14 @@ export class WeaponSystem {
 
     // ---- input -----------------------------------------------------------
     if (live) {
+      if (
+        input.actionPressed('laser') &&
+        s.attachments.rail === 'laser' &&
+        !this.grenadeEquipped &&
+        !this.radioEquipped &&
+        !this.healing
+      )
+        s.laserEnabled = !s.laserEnabled;
       if (input.actionPressed('reload')) this.reload();
       if (input.actionPressed('fireMode')) this.cycleFireMode();
       if (input.actionPressed('inspect')) this.inspect();
@@ -1816,16 +1829,13 @@ export class WeaponSystem {
       emitter &&
       def &&
       physics &&
+      this.state?.laserEnabled &&
       !this.disabled &&
       !this.player?.dead &&
       !this.grenadeEquipped &&
       !this.radioEquipped &&
       !this.healing;
     if (laser) laser.mesh.visible = false;
-    if (showLaser) {
-      vm.muzzleWorld(this._muzzle);
-      laser.updateAim(ctx.camera, def, this._muzzle, physics, this.player);
-    }
 
     this.player?.applyFireVibe(vm.anchor);
 
@@ -1836,7 +1846,8 @@ export class WeaponSystem {
         emitter,
         physics,
         this.player,
-        ctx.get('render').screenSize.height
+        ctx.get('render').screenSize.height,
+        def.maxRange
       );
     }
 
