@@ -162,11 +162,16 @@ market item to preview it; click its card (Enter/Space on the focused card) to
 keep it selected. Supplies use locally bundled painted illustrations; weapons retain
 interactive 3D previews. Drag to orbit around the weapon and scroll to zoom; panning is
 disabled. In the focused 3D view, arrows rotate, +/- zoom and Home resets.
-Toolbar buttons also provide zoom and reset. Inspection never spends credits:
-use the explicit Buy/Swap button to purchase supplies or weapons.
-Inspection previews each weapon's current attachment configuration. The M4 starts
-with irons and supports the shared RMR, ACOG (chevron) and PM II scope (P4FL)
-via `weapons.setAttachments()`; separate attachment purchases are not implemented yet.
+Toolbar buttons also provide zoom and reset. Inspection never spends credits.
+Weapon cards open a customization draft: choose an optic, suppressor and laser from
+verified fits, then **Buy Build / Apply Changes** or **Cancel**. The preview changes
+immediately; gameplay and credits change only on confirmation. Owned weapons charge
+only for new attachments, while a new weapon also costs its base price. Removing or
+replacing an attachment discards it without a refund. Closing the market cancels the
+draft; swapped-out weapons lose their attachments and restart clears the loadout.
+Supplies keep their immediate **Buy** buttons. All controls support keyboard use.
+The M4 starts with irons and supports the shared RMR, ACOG (chevron) and PM II scope
+(P4FL).
 M4 iron sights are not a separate choice: mounting any optic swaps the A2/front and
 rear assemblies for a low-profile gas block, and removing the optic restores the irons
 and base handling. For debug/capture, use `?attachmentOptic=rmr`, `acog`, `scope` or
@@ -185,8 +190,8 @@ origins to the can's endcap; audio and flash follow the configuration on the nex
 It changes no handling or ballistic stats. Use `?attachmentMuzzle=suppressor` or
 `bun tools/capture.ts --shot=weapon --muzzle=suppressor --out=/tmp/m4-suppressed.png`;
 `attachmentMuzzle=none`/`muzzle: null` restores the flash hider. Market inspection
-matches the stored config; no attachment purchase is added. Other muzzle fits stay
-unavailable pending their authored checks and caliber-specific variants
+matches the selected build. The market offers each weapon's verified suppressor,
+including caliber-specific variants, for the same 350-credit price
 ([fit/size decision](assets/attachments/sig-srd762ti/README.md)).
 
 M4/P320 are the starting weapons; MCX, EVOLYS, MPX and AX338 are shop options.

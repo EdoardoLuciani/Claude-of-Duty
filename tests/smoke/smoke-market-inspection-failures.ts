@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three/webgpu';
 
 import { MarketInspection } from '../../src/ui/market-inspection.ts';
+import { BASE_ATTACHMENTS, type AttachmentConfig } from '../../src/weapons/attachments.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
 import { installUiDocument } from '../lib/ui-fixture.ts';
 
@@ -83,6 +84,64 @@ try {
   assert.equal(stale.model, current, 'late model failure cannot clear a newer selection');
   assert.equal(current.disposed, 0);
   assert.equal(stale.failed, false);
+
+  // Reconfiguring the same weapon must reload its clone, not hit the id-only cache.
+  const requests: Array<AttachmentConfig | undefined> = [];
+  const base = model();
+  const redDot = model();
+  const configured = fixture(async (_id, config): Promise<TrackedModel> => {
+    requests.push(config);
+    return config?.optic === 'rmr' ? redDot : base;
+  });
+  const config = { ...BASE_ATTACHMENTS, optic: 'rmr' } as const;
+  await configured.select('rifle', 'Rifle', BASE_ATTACHMENTS);
+  configured.camera.position.set(2, 1, 1);
+  const orbit = configured.camera.position.clone();
+  await configured.select('rifle', 'Rifle', config);
+  assert.deepEqual(requests, [BASE_ATTACHMENTS, config], 'preview receives the exact draft');
+  assert.equal(base.disposed, 1, 'old configured clone is released');
+  assert.equal(configured.model, redDot);
+  assert(
+    configured.camera.position.distanceTo(orbit) < 1e-10,
+    'attachment changes preserve inspection angle'
+  );
+  await configured.select('rifle', 'Rifle', config);
+  assert.equal(requests.length, 2, 'unchanged draft does not rebuild');
+  configured.hide();
+  assert.equal(redDot.disposed, 1);
+
+  let finish: (value: TrackedModel) => void = (): never => {
+    throw Error('not initialized');
+  };
+  const oldConfig = model();
+  const newConfig = model();
+  const racing = fixture((_id, value): Promise<TrackedModel> =>
+    value === BASE_ATTACHMENTS
+      ? new Promise((resolve): void => {
+          finish = resolve;
+        })
+      : Promise.resolve(newConfig)
+  );
+  let resets = 0;
+  racing.reset = (): void => {
+    resets++;
+  };
+  const oldRequest = racing.select('rifle', 'Rifle', BASE_ATTACHMENTS);
+  await Promise.resolve();
+  await racing.select('rifle', 'Rifle', config);
+  finish(oldConfig);
+  await oldRequest;
+  assert.equal(oldConfig.disposed, 1, 'late same-weapon draft is released');
+  assert.equal(racing.model, newConfig, 'late draft cannot overwrite the latest config');
+  assert.equal(resets, 1, 'rapid edits before the first clone loads still frame the weapon');
+  const closedModel = model();
+  const closedRequest = racing.select('rifle', 'Rifle', BASE_ATTACHMENTS);
+  await Promise.resolve();
+  racing.hide();
+  finish(closedModel);
+  await closedRequest;
+  assert.equal(closedModel.disposed, 1, 'closing releases a late preview');
+  assert.equal(racing.model, null, 'closed market cannot recreate previews');
 
   const broken = fixture(async (): Promise<never> => {
     throw Error('must not load after renderer failure');
