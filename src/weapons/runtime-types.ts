@@ -34,10 +34,6 @@ export type AuthoredModels = {
   shotgun: Awaited<ReturnType<typeof loadM590>>;
 };
 export type AuthoredWeaponModel = AuthoredModels[WeaponId];
-export interface TransformData {
-  pos: number[];
-  rot?: number[];
-}
 export interface OpticData {
   kind?: string;
   reticle?: string;
@@ -47,20 +43,6 @@ export interface OpticData {
   ringMoa?: number;
   minDotPixels?: number;
   dotOpacity?: number;
-}
-export interface WeaponNodes {
-  sight: number[];
-  muzzle: number[];
-  eject: number[];
-  ejectDir?: number[];
-  magSeat: { pos: number[]; rot: number[] };
-  chargePull?: number[];
-  boltTravel?: number[];
-  triggerPull?: number;
-  chargeRest?: TransformData;
-  boltRest?: TransformData;
-  triggerPivot?: TransformData;
-  selectorPivot?: TransformData;
 }
 export type WeaponModelRecord = AuthoredWeaponModel;
 export interface WeaponEntry {

@@ -56,5 +56,5 @@ remains separate from these numeric checks.
 `src/audio/weapons.ts` selects explicit banks from each fire event's effective
 `suppressed` state. Unknown suppressed identities stay silent; no runtime fallback
 borrows another bank. Empty triggers still play their mechanical dry-fire cue.
-The existing integrated MCX/MPX suppressors/defaults remain until the separate
-muzzle attachment/model conversion; this change adds no shop items or mount fits.
+MCX/MPX are unsuppressed iron-sight bases. Installing a catalog suppressor selects
+the suppressed report bank; removing it restores the unsuppressed bank.

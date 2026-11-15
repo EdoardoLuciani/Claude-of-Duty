@@ -4,8 +4,8 @@ Original reference-backed **green 7003** reconstruction; visual-review candidate
 not manufacturer CAD or final human visual acceptance. No flashlight. References,
 photo rights and known approximations: [reference-review.json](reference-review.json).
 Open: human visual acceptance.
-The optimized target is **5,924 triangles** (down from 9,978), one opaque material,
-with the same 2K map resolution. Detailed high source remains in the blend.
+The optimized target uses one opaque material and a 2K atlas; detailed high source
+remains in the blend.
 
 ## Build and inspect
 
@@ -53,10 +53,6 @@ sub-0.12 mm bevels instead of modeling them. Larger edge radii and pressure-pad
 relief stay in geometry. The aperture retains 32 outline segments; the checker
 protects those segments and enforces a **6,000-triangle** target budget.
 
-Uncompressed RGBA8 maps occupy 48 MiB before mips / approximately 64 MiB with full
-mips. That is not the cooked GPU texture allocation or a gameplay performance claim.
-The same asset is intended to be shared, not duplicated per compatible weapon.
-
 ## Mount and emitter contract
 
 Manufacturer nominal envelope: **2.1 × 1.3 × 1.2 inches**, approximately
@@ -79,15 +75,7 @@ contains no camera-aim or bullet-zero assumption.
 
 ## Weapon mounting (#686)
 
-Runtime laser compatibility is enabled for **all seven weapons** through
-`fits.rail.laser`. M590 now passes the complete authoring gates with strict
-zero-crossing firing-hand checks, not a repinned shared-arm exception. Its extended
-integrated-sight top rail now supports RMR/ACOG/PM II after the #716 forward
-extension; the separate underside laser seat is independent. MPX's corrected
-adapter/frame and MCX's fitted hand motion also have complete sampled native/runtime
-evidence rather than snapshots.
-Finite sampling and remaining cross-feature/browser acceptance limits still apply.
-
+Runtime laser compatibility is enabled for all seven weapons through `fits.rail.laser`.
 The module is optional and independent of optics/irons. `rail: null` removes it;
 removing an optic does not remove the laser. No statistics, AI perception, beam
 zeroing or emitter-occlusion semantics change. Gameplay and market inspection
@@ -114,42 +102,12 @@ body outward. These are authored game-fit adaptations, not certified hardware.
 | MCX VIRTUS | Enabled | `[.03064, .10247, −.361]` | Receiver; upper-right chamfer adapter, shared optics and removable SRD762Ti |
 | SIG MPX | Enabled | `[.037, 0, −.295]` | Receiver; four-tooth right adapter, two anchors in the last M-LOK slot, shared optics and removable suppressor |
 
-P320's rail extension is an explicit deviation from the Compact factory frame.
-The module nose sits a few millimetres ahead of its barrel exit, below the bore;
-barrel/slide/hand motion is unchanged. M590's laser deliberately does **not**
-move with the forend: its clamps grip the fixed tube between the pump and end cap.
-EVOLYS intentionally recalibrates its support hold 23 mm rearward and 16 mm lower
-and stages release/regrip below the rail; feed/pouch/charging beats stay intact.
-Its lower rail and actual module are checked against both evaluated hands.
-MPX removes the unused rear tooth/flange that crossed the glove, retaining four
-full teeth under the TOR clamp and backing seated on actual handguard lands.
-Both anchors remain in the last real slot. Its native check passes 998 poses;
-a native-WebGPU fixture passes 4,096 actual runtime-hand poses including returns,
-cancellations and last-shot lockback. The normalized runtime/inspection mount
-preserves the shared attachment frame, keeping the module/emitter bore-forward.
-See the [MPX fit and limits](../../weapons/sig-mpx/README.md#tor-mini-rail-686).
-
-Each changed weapon's `check.py` calls `tools/blender/tor_mini/mounts.py` against
-actual editable TOR/weapon/optic surfaces. It checks forward direction, rail
-contact, emitter clearance and intersections over every clip at 120 Hz, including
-fractional endpoints; AX338 also sweeps its stock hinge through 181 positions.
-Only bounded mating rail/clamp contacts are exempt, not hands or mechanisms.
-MCX now includes runtime-driven DCC review arms: 1,656 sampled source poses across
-nine tracks check both arms, support hardware, module and emitter, with evaluated
-skin parity against actual runtime references. This complements the earlier native
-WebGPU sweep of 5,051 runtime poses, including returns/cancellation transitions,
-against the real adapter and cooked laser plus the hand/emitter corridor. Fitted
-draw fingers and a lowered post-charge return resolve the motion crossings. See the
-[MCX receipt and limits](../../weapons/mcx-virtus/README.md#tor-mini-rail-686).
-Sampling is not continuous-clearance or human visual certification. M590's
-0.10 mm lower-wrist relief removes the former coarse-glove contact; its old
-file/topology-pinned exception is retired in favor of strict zero crossings.
-Its full source check now reaches and passes mechanism, hand, RMR/ACOG/PM II and
-TOR checks across 739 poses after the #716 extension. Historical native-WebGPU
-sampling added 10,194 actual runtime poses across irons/RMR/ACOG before that
-rail/datum change, against hardware/module/emitter, the native/cooked relieved
-stock neck and top rail/sight, and the selected optic.
-See the [M590 contract and reference](../../weapons/m590/README.md).
+P320's extended rail is a game-fit deviation from the Compact factory frame.
+M590's clamps attach to the fixed tube, never the moving forend. Each weapon's
+`check.py` checks actual module, hardware, hands and mechanisms through the native
+clips; AX338 also sweeps the stock hinge. Only bounded mating rail/clamp contacts
+are exempt. See each weapon README for its mount and known limitations.
+Finite source sampling does not certify runtime transitions or human visual acceptance.
 The isolated sweep remains available for diagnostics, not a substitute for full checks:
 
 
@@ -160,18 +118,10 @@ bun tools/capture.ts --port=5186 --weapon=smg --rail=laser --shot=weapon --out=/
 # Also use --shot=ads, --reload, and the existing market inspection controls.
 ```
 
-MCX/MPX are now iron-sight bases with shared optics and removable suppressors.
-All seven weapons have calibre-specific shared-catalog suppressor fits; the
-current source checks include combined configurations. Any future attachment
-geometry still needs actual mesh/motion checks, not an estimated cylinder or empty datum.
+Combined configurations require actual mesh/motion checks, not estimated cylinders
+or empty datums.
 
 ## Review standard
-
-Historical initial-integration native browser receipts failed on two TSL inline `Fn()` return
-errors. The `rail: null` M4 control ran on the **changed branch**, not unmodified
-`7cb4fbf`; it establishes reproduction without an installed laser only, not
-baseline attribution or a harmless-error waiver. No unmodified-base control was
-performed. Issue #686 is not complete or merge-ready.
 
 Compare silhouette and feature placement against **both manufacturer side views**,
 then use the front/rear quarters to check the open channel, screw heads, aperture,

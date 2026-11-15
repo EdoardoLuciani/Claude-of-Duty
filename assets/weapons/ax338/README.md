@@ -12,9 +12,7 @@ are read-only inputs; never refit during ordinary rebuilds.
 Ordinary meshes retain nine clips, independent magazines and `IRON_sights`.
 Preserve 60°/100 mm bolt motion, the 1.1 s cycle, 2.8/3.6 s reloads, events,
 STEP visibility and spent-ammo persistence. Runtime sampling normalizes rotations.
-The #665 raw-GLB comparison preserved all 1215 named clip/node/TRS channels' input
-and output bytes and interpolation across all nine clips. The registered cook
-uses 16-bit colors/positions without added simplification.
+The registered cook uses 16-bit colors/positions without added simplification.
 
 Run from the repository root with Blender 5.2.2 and gltfpack 1.3:
 
@@ -75,18 +73,9 @@ only at the crown plane. **Bipod clearance is N/A:** this asset's `build.py` and
 `actions.py` contain no bipod geometry/control; a future bipod is not certified.
 This is a sampled source-surface check, not continuous or runtime-hand acceptance.
 
-**Full right-hand DCC acceptance still fails.** The frozen authoring baseline
-measured 252 violations / 474 poses, maximum 7.041641 mm against a 1 mm allowance;
-the matching left sweep passed at 0.903077 mm. Run `contact.py -- --side right`
-against the blend to inspect it. Passing source/runtime tests does not waive this
-failure. Sampled contact checks do not certify continuous clearance or factory
-fidelity. Detailed representation comparisons and historical exceptions remain
-in Git history; they are not permission to relax tolerances or claim FPS gains.
-
-The #713 same-command baseline/changed-head right-hand rerun measured **identical**
-reports: 192 violations / 414 poses, maximum 7.041641045 mm, 59088 surface pairs
-at the unchanged 1 mm allowance. The earlier count above describes the historical
-frozen report, not this rerun. Neither result passes full firing-hand acceptance:
+**Full right-hand DCC acceptance still fails** against the grip allowance.
+Passing the muzzle or attachment sweep does not waive this separate failure.
+Reproduce the current report with:
 
 ```sh
 blender -b -t 2 assets/weapons/ax338/ax338.blend --python-exit-code 1 \
