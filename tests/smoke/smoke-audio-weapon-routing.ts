@@ -6,11 +6,7 @@ import { AudioSystem } from '../../src/audio/index.ts';
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
 import type { SpatialField } from '../../src/audio/spatial.ts';
 import type { WeaponProfile } from '../../src/audio/types.ts';
-import {
-  SUPPRESSED_WEAPON_PROFILES,
-  WEAPON_PROFILES,
-  resolveProfile,
-} from '../../src/audio/weapons.ts';
+import { WEAPON_PROFILES, resolveProfile } from '../../src/audio/weapons.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
 import {
@@ -36,7 +32,9 @@ const audio = new AudioSystem(),
   samples = new WeaponSampleBank(actx);
 const profiles: WeaponProfile[] = [
   ...Object.values(WEAPON_PROFILES),
-  ...Object.values(SUPPRESSED_WEAPON_PROFILES),
+  ...Object.keys(WEAPON_PROFILES).flatMap(
+    (name): WeaponProfile | never[] => resolveProfile(name, true) ?? []
+  ),
 ];
 for (const profile of profiles) {
   samples.buffers[profile.sample] = [new FixtureAudioBuffer({ duration: 3, kind: profile.sample })];
@@ -112,7 +110,10 @@ for (const [id, key] of fixtureEntries(expected)) {
   for (const distance of [0, 20, 45, 70, 140, 300]) {
     for (const suppressed of [false, true, false]) {
       weapon.suppressed = suppressed;
-      const expectedProfile = suppressed ? SUPPRESSED_WEAPON_PROFILES[key] : WEAPON_PROFILES[key];
+      const expectedProfile = resolveProfile(key, suppressed);
+      assert(
+        expectedProfile && expectedProfile.sample === `${key}${suppressed ? '-suppressed' : ''}`
+      );
       captureState.seen = null;
       audio._onFire({
         weapon,

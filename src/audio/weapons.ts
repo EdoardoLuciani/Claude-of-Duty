@@ -84,7 +84,7 @@ export const WEAPON_PROFILES = {
 
 /** Approved donor substitutions are explicit banks, never runtime missing-sample fallbacks.
  * Actual models, calibre compromises and rights: samples/weapon-reports-provenance.json. */
-export const SUPPRESSED_WEAPON_PROFILES = {
+const SUPPRESSED_WEAPON_PROFILES = {
   rifle: { sample: 'rifle-suppressed', distantSample: 'rifle-suppressed-distant' },
   mcx: { sample: 'mcx-suppressed', distantSample: 'mcx-suppressed-distant' },
   mpx: { sample: 'mpx-suppressed', distantSample: 'mpx-suppressed-distant' },

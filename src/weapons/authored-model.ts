@@ -135,26 +135,21 @@ export function authoredModel(
   return { root, opticMountRest, animations, point };
 }
 
-/** Common adapter product; each weapon retains its exact nodes and hand poses. */
-export interface AuthoredModelData<
-  Id extends WeaponId,
-  Nodes extends AuthoredNodes,
-> extends WeaponSceneMaterials {
+/** Common adapter product; weapons add their own hand poses and metadata. */
+export interface AuthoredModelData<Id extends WeaponId> extends WeaponSceneMaterials {
   id: Id;
   scene: THREE.Group;
   root: THREE.Object3D;
   /** Weapon-frame `MOUNT_optic` at load (rest pose), like `point()`; null without a mount. */
   readonly opticMountRest: THREE.Matrix4 | null;
   animations: THREE.AnimationClip[];
-  nodes: Nodes;
+  nodes: AuthoredNodes;
   shell: { caseLen: number; rimR: number };
   magSize: { len: number };
 }
 
-export interface AuthoredNodes {
-  muzzle: [number, number, number];
+interface AuthoredNodes {
   eject: [number, number, number];
   sight: [number, number, number];
   ejectDir: number[];
-  magSeat: { pos: number[]; rot: number[] };
 }

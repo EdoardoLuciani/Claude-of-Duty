@@ -12,7 +12,6 @@ import {
   rebaseNativeWeapon,
   requiredNode,
   type AuthoredModelData,
-  type AuthoredNodes,
 } from './authored-model.ts';
 import { createAuthoredRig, sampleAuthoredPose } from './authored-rig.ts';
 import { buildManifestClips, type Clip } from './clips.ts';
@@ -42,11 +41,9 @@ export function makeMPXModel(gltf: GLTF): MPXModel {
     reactiveFire: true,
     handPoses: { left: handReference.sides.left.grip, right: handReference.sides.right.grip },
     nodes: {
-      muzzle: point('SOCKET_muzzle'),
       eject: point('SOCKET_ejection'),
       sight: point('SOCKET_sight'),
       ejectDir: [0.82, 0.52, 0.24],
-      magSeat: { pos: point('SOCKET_magazine'), rot: [0, 0, 0] },
     },
     shell: { caseLen: 0.0192, rimR: 0.00478 },
     magSize: { len: 0.192 },
@@ -65,12 +62,7 @@ export async function loadMPX(renderer: Pick<Renderer, 'hasFeature'>): Promise<M
 
 /** Samples the actual Blender curves, including fingers. Upper/forearm IK is
  * the only runtime solve; wrists and finger contact are not reconstructed. */
-type MPXModel = AuthoredModelData<
-  'smg',
-  AuthoredNodes & {
-    magSeat: { pos: [number, number, number]; rot: number[] };
-  }
-> & {
+type MPXModel = AuthoredModelData<'smg'> & {
   label: string;
   reactiveFire: boolean;
   handPoses: {

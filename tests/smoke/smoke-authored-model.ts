@@ -152,7 +152,6 @@ assert.throws(
     opticMountRest: new THREE.Matrix4().makeTranslation(socket.position),
     nodes: fixture<Extract<WeaponModelRecord, { id: 'rifle' }>['nodes']>({
       sight: [0, 0.1395, 0.034],
-      muzzle: [0, 0.075, -0.5],
     }),
   });
   const entry = fixture<WeaponEntry>({
@@ -456,7 +455,7 @@ assert.throws(
   muzzleMount.rotation.y = 0.13;
   const baseSocket = new THREE.Object3D();
   baseSocket.name = 'SOCKET_muzzle';
-  baseSocket.position.fromArray(model.nodes.muzzle);
+  baseSocket.position.set(0, 0.075, -0.5);
   root.add(muzzleMount, baseSocket);
   const canScene = datums('SOCKET_mount', 'SOCKET_muzzle');
   const canExit = requiredNode(canScene, 'SOCKET_muzzle');

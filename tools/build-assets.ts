@@ -112,11 +112,7 @@ const SHARED_TOOLS: Partial<Record<ModelId, string[]>> = {
   p320: ['tools/blender/hand-reference.ts'],
   m590: ['tools/blender/hand-reference.ts'],
   ax338: ['tools/blender/hand-reference.ts'],
-  evolys: [
-    'tools/blender/rmr/geometry.py',
-    'tools/blender/review_hands.py',
-    'tools/blender/hand-reference.ts',
-  ],
+  evolys: ['tools/blender/review_hands.py', 'tools/blender/hand-reference.ts'],
   mpx: ['tools/blender/review_hands.py', 'tools/blender/hand-reference.ts'],
 };
 const STANDALONE_TOOLS: Partial<Record<ModelId, string[]>> = {

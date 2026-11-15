@@ -117,8 +117,8 @@ export const SHOTS: Record<string, ShotDefinition> = {
     apply: (e): string | undefined => {
       const weapons = e.ctx.peek('weapons');
       const pose = weapons?.debugPose('ads');
-      // Capture freezes player FOV updates; use the mounted optic's effective
-      // magnification instead of the old fixed red-dot framing.
+      // Capture freezes player FOV updates; frame the mounted optic's effective
+      // ADS magnification.
       e.camera.fov = e.config.fov * (weapons?.current?.adsFovScale ?? e.config.adsFovScale);
       e.camera.updateProjectionMatrix();
       return pose;

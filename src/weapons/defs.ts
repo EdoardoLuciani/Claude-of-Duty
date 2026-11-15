@@ -243,8 +243,8 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
       muzzle: { suppressor: { model: 'srd762ti' } },
       optic: {
         ...OPTIC_FITS,
-        // Seven forward rail slots clear the ocular from the charging hand; eye
-        // relief grows by the same 70 mm so the ADS hold stays where it was.
+        // Forward rail slots clear the ocular from the charging hand; eye relief
+        // includes that forward offset.
         scope: { eyeRelief: 0.16, railSlots: 7 },
       },
       rail: { laser: {} },
@@ -310,13 +310,13 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     viewFov: 0.7, // Open irons, matching the rifle iron-sight weapon FOV.
     drawTime: 0.52,
     holsterTime: 0.34,
-    // Preserve the reactive hip pose; the base muzzle ends at its thread protector.
+    // Reactive hip pose; the base muzzle ends at its thread protector.
     firingShoulderZ: 0.12, // MPX inspection must not stretch a behind-eye arm.
-    adsFiringShoulderZ: 0.28, // Keep the established ADS shoulder anchor behind the wrist.
+    adsFiringShoulderZ: 0.28, // ADS shoulder anchor stays behind the wrist.
     hipPos: [0.111, -0.163, -0.288],
     hipRot: [-0.05, 0.072, -0.131],
     adsCant: [0, 0, 0.005],
-    // Aim through the deployed rear peep, not the removed ROMEO4T optical axis.
+    // Aim through the deployed rear peep.
     eyeRelief: 0.06,
     fits: {
       optic: OPTIC_FITS,

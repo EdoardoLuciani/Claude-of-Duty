@@ -350,7 +350,7 @@ def build_geometry(materials):
         empty(name,loc,parent)
 
     # Rail contact frames: attachment Blender +Y maps to rifle +X; +Z stays up.
-    # Shift optics 45 mm forward from the old ACOG seat to clear the deployed rear leaf.
+    # The optic mount sits forward of the deployed rear leaf so mounted optics clear it.
     for name, loc in [('MOUNT_optic',(-.036,0,.046)),('MOUNT_muzzle',(.274,0,0))]:
         mount = empty(name,loc,body)
         mount.rotation_euler.z = -math.pi/2

@@ -10,10 +10,10 @@ export class Clip {
   duration: number;
   events: ClipEvent[];
 
-  constructor(name: string, duration: number, channels: { events?: ClipEvent[] }) {
+  constructor(name: string, duration: number, events: ClipEvent[]) {
     this.name = name;
     this.duration = duration;
-    this.events = channels.events ?? [];
+    this.events = events;
   }
 }
 
@@ -37,12 +37,11 @@ export function buildManifestClips(
   const clips: Record<string, Clip> = {};
   for (const [name, source] of Object.entries(aliases)) {
     const info = manifestClip(manifest, source);
-    clips[name] = new Clip(name, info.duration, {
-      events: info.events.map((ev): { t: number; name: string } => ({
-        t: ev.time,
-        name: ev.event,
-      })),
-    });
+    clips[name] = new Clip(
+      name,
+      info.duration,
+      info.events.map((ev): ClipEvent => ({ t: ev.time, name: ev.event }))
+    );
   }
   return clips;
 }
@@ -67,7 +66,7 @@ export function buildMagazineClips(
       if (mapped) events.push({ t: ev.time, name: mapped });
     }
     events.push({ t: duration - 0.0001, name: 'end' });
-    clips[name] = new Clip(name, duration, { events });
+    clips[name] = new Clip(name, duration, events);
   }
   return clips;
 }
