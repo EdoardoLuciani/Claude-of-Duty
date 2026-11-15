@@ -296,6 +296,8 @@ export class Agent {
   desiredSpeed: number = 0;
   speed: number = 0;
   crouch: boolean = false;
+  // Reserved tactical destination; only cover at the supported hide point may peek.
+  elevatedDestination: BakedCoverPoint | null = null;
   cover: BakedCoverPoint | null = null;
   coverPos: THREE.Vector3 = new THREE.Vector3();
   _coverPathMax: number = Infinity;
@@ -695,6 +697,8 @@ export class Agent {
     if (this.ladder) return;
     if (this.state === s) return;
     const prev = this.state;
+    if (this.elevatedDestination && s !== STATE.COMBAT && (s !== STATE.SUPPRESSED || !this.cover))
+      this._rejectCover('elevated-state');
     this.state = s;
     this.stateTime = 0;
     this.wantFire = false;
@@ -1018,8 +1022,7 @@ export class Agent {
         this.wantFire = false;
         const height = INFANTRY.crouchHeight * this.scale;
         if (!this.cover || !this._coverMap.protects(this.coverPos, this.lastKnown, height)) {
-          this.ai.cover?.release(this.id);
-          this.cover = null;
+          this._releaseCover();
           this._setState(STATE.COMBAT);
           this._combat(dt);
           break;
@@ -1118,8 +1121,7 @@ export class Agent {
     if (visible && (this._engaging || this._engageCooldown <= 0)) {
       if (!this._engaging) {
         this._endPeek();
-        this.ai.cover?.release(this.id);
-        this.cover = null;
+        this._releaseCover();
         // Flank/retreat routes resume when the interruption ends. Cover travel
         // is reconsidered from the new engagement position instead.
         if (this.state === STATE.COMBAT) {
@@ -1153,7 +1155,8 @@ export class Agent {
 
   _tryElevation(dt: number): boolean {
     const sq = this.squad;
-    if (sq?.elevated !== this || !this.cover || this.state === STATE.SUPPRESSED) return false;
+    const destination = this.elevatedDestination;
+    if (sq?.elevated !== this || !destination || this.state === STATE.SUPPRESSED) return false;
     const target =
       this.hasTarget && this.lastKnownKind === EVIDENCE.VISUAL ? this.lastKnown : sq.contact;
     if (this.suppression >= TACTICS.strongSuppression) {
@@ -1181,6 +1184,14 @@ export class Agent {
       this.aimWeight = 0.35;
       this.combatAction = 'elevated-travel';
       return true;
+    }
+    if (!this.cover) {
+      if (!this.grounded || (this.controller && !this._ladderSupported())) {
+        this._rejectCover('elevated-unsupported');
+        return false;
+      }
+      this.cover = destination;
+      this._coverCheck = 0;
     }
     this._coverCheck -= dt;
     if (this._coverCheck <= 0) {
@@ -1421,8 +1432,7 @@ export class Agent {
         .add(this.position)
         .addScaledVector(perp, 4);
       if (this._goTo(flank)) {
-        this.cover = null;
-        this.ai.cover?.release(this.id);
+        this._releaseCover();
         this._setState(STATE.FLANK);
         sq.claimFlank(this);
         return;
@@ -1510,8 +1520,7 @@ export class Agent {
       matching = dx * dx + dz * dz < 2;
     }
     if (matching || this._goOffAxis(target)) {
-      this.cover = null;
-      this.ai.cover?.release(this.id);
+      this._releaseCover();
       this._setState(STATE.FLANK);
       sq.claimFlank(this);
       this.wantFire = false;
@@ -1536,13 +1545,21 @@ export class Agent {
     f.until = this._combatClock + TACTICS.failedCoverAge;
   }
 
+  _releaseCover(): void {
+    this.ai.cover?.release(this.id);
+    this.cover = this.elevatedDestination = null;
+    if (this.squad?.elevated === this) this.squad.elevated = null;
+  }
+
   _rejectCover(reason: string): void {
-    if (this.cover) this._rememberFailedPosition(this.cover);
+    const destination = this.elevatedDestination ?? this.cover;
+    if (destination) this._rememberFailedPosition(destination);
+    this._cancelRouteProof();
+    if (this.ladder) this.ladder.deferred = false;
     this.coverFailure = reason;
     this._coverPathMax = Infinity;
     this._endPeek();
-    this.ai.cover?.release(this.id);
-    this.cover = null;
+    this._releaseCover();
     this.hasMoveTarget = this.pathPending = false;
     this.pathLen = 0;
     this.repathTimer = 0.6;
@@ -1961,7 +1978,8 @@ export class Agent {
     this.navStart.height = this.navGoal.height = this.height;
     if (!this.pathPending) this._waitingNav = false;
     this.pathObjective =
-      PATH_OBJECTIVE[this.state] ?? (this.cover ? 'cover' : this.role === 'wrap' ? 'wrap' : 'move');
+      PATH_OBJECTIVE[this.state] ??
+      (this.cover || this.elevatedDestination ? 'cover' : this.role === 'wrap' ? 'wrap' : 'move');
     const dy = dest.y;
     if (
       !this.cover ||
@@ -2217,6 +2235,25 @@ export class Agent {
     this._rememberSafePosition();
     this.hasMoveTarget = this.pathIndex < this.pathLen;
     this.repathTimer = 0;
+    const destination = this.elevatedDestination;
+    if (destination) {
+      const target =
+        this.hasTarget && this.lastKnownKind === EVIDENCE.VISUAL
+          ? this.lastKnown
+          : (this.squad?.contact ?? this.lastKnown);
+      if (
+        !this._ladderSupported() ||
+        isBannedCover(destination, this.squad?.banned) ||
+        !this._coverMap.protects(
+          this.coverPos,
+          target,
+          destination.high ? this.height : INFANTRY.crouchHeight * this.scale
+        )
+      ) {
+        this._rejectCover('elevated-landing');
+        return;
+      }
+    }
     if (l.deferred) this._goTo(this._pendingDest);
   }
 
@@ -2291,7 +2328,8 @@ export class Agent {
         l.hold = this._ladderHold(l);
         l.retry = PATH_FAIL_WAIT;
       }
-      l.deferred = true;
+      // Holding invalidates a live continuation, but must not revive a rejected goal.
+      if (this.hasMoveTarget) l.deferred = true;
       if (!l.hold || !this._moveLanding(l.hold, dt)) return;
       if (l.claimed) {
         this.ai.releaseLadder(this);
@@ -2472,7 +2510,7 @@ export class Agent {
         status: 'approach',
       };
       this._endPeek();
-      this.ai.cover?.release(this.id);
+      if (!this.elevatedDestination) this._releaseCover();
       this.cover = null;
       this._engaging = false;
       this._recovering = false;
@@ -2494,7 +2532,10 @@ export class Agent {
       const final = this.pathIndex === this.pathLen - 1;
       // Descending soldiers must reach the floor, not stop on the last tread.
       const radius = final
-        ? this.cover || this._recovering || this.pathObjective === 'local'
+        ? this.cover ||
+          this.elevatedDestination ||
+          this._recovering ||
+          this.pathObjective === 'local'
           ? INFANTRY.precisionRadius
           : INFANTRY.arrivalRadius
         : Math.min(
@@ -2693,8 +2734,7 @@ export class Agent {
     this.speed = 0;
     this.grounded = this.controller.grounded;
     this._endPeek();
-    this.ai.cover?.release(this.id);
-    this.cover = null;
+    this._releaseCover();
     this._recoveryCount = 0;
     this.relocations++;
     this.recoveryOutcome = 'relocated';
@@ -3168,7 +3208,7 @@ export class Agent {
     this.state = STATE.DEAD;
     this.wantFire = false;
     this.animator.enabled = false;
-    this.ai.cover?.release(this.id);
+    this._releaseCover();
     if (this.controller) this.phys.removeCharacter(this.controller);
     this.controller = null;
     for (const c of this.colliders) this.phys.removeCollider(c);
@@ -3321,8 +3361,7 @@ export class Agent {
     this._cancelRouteProof();
     this._endPeek();
     this._clearSearch();
-    this.ai.cover?.release(this.id);
-    this.cover = null;
+    this._releaseCover();
     this.alive = false;
     this.wantFire = false;
     this.hasMoveTarget = this.pathPending = false;

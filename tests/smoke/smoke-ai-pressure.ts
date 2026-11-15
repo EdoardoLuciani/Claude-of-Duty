@@ -388,9 +388,12 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
     pick(_from, _target, opts): BakedCoverPoint {
       picks++;
       assert.equal(opts?.elevated, true);
+      point.claimed = climber.id;
       return point;
     },
-    release(): void {},
+    release(): void {
+      point.claimed = -1;
+    },
   });
   climber._goTo = function (p): true {
     this.path = [this.position.clone(), new THREE.Vector3().copy(p)];
@@ -406,6 +409,8 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
   sq.contactAge = 0;
   sq._updateElevation(TACTICS.elevatedCheck);
   assert.equal(sq.elevated, climber);
+  assert.equal(climber.elevatedDestination, point);
+  assert.equal(climber.cover, null, 'reserved destination is not occupied hide/peek cover');
   assert.equal(climber.hasTarget, false);
   assert.equal(climber._tryElevation(0.1), true);
   assert.equal(climber.combatAction, 'elevated-travel');
@@ -417,6 +422,8 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
   assert.equal(sq.elevated, null, 'unsupported climb is reassessed');
   assert.equal(climber.hasMoveTarget, false);
   assert.equal(climber.coverFailure, 'elevated-reassess');
+  assert.equal(climber.elevatedDestination, null);
+  assert.equal(point.claimed, -1, 'reassessment releases the destination reservation');
   holder.wantFire = true;
   sq.contactAge = TACTICS.elevatedContactAge + 1;
   sq._updateElevation(10);
@@ -428,6 +435,8 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
   assert.equal(climber._tryElevation(0.1), false);
   assert.equal(climber.coverFailure, 'elevated-route-cost');
   assert.equal(climber.cover, null, 'complete but tactically excessive paths are rejected');
+  assert.equal(climber.elevatedDestination, null);
+  assert.equal(point.claimed, -1, 'route rejection releases the destination reservation');
 }
 // Async local samples belong to one frozen intent, but live sight and the
 // complete current-foot route are still mandatory before movement.

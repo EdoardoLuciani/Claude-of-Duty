@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
 
-import { Scene, Mesh, BoxGeometry, MeshBasicMaterial } from 'three';
+import { Scene, Mesh, BoxGeometry, MeshBasicMaterial, Vector3 } from 'three';
 
+import { AttachmentQueries } from '../../src/ai/attachment-queries.ts';
 import { INFANTRY } from '../../src/ai/capabilities.ts';
 import type { LadderDescriptor, LadderDirection, LadderCursor } from '../../src/ai/ladder.ts';
 import {
@@ -11,9 +12,16 @@ import {
   LADDER,
   ladderMoveBudget,
 } from '../../src/ai/ladder.ts';
+import { CoverMap, SurfaceNav } from '../../src/ai/nav.ts';
+import { Squad } from '../../src/ai/squad.ts';
+import { TACTICS } from '../../src/ai/tuning.ts';
 import type { WorldLadder } from '../../src/core/model-metadata.ts';
 import { CharacterController } from '../../src/physics/character.ts';
+import { makeAgent, makeAi } from '../lib/agent-fixture.ts';
+import { coverPoint } from '../lib/ai-brain-fixture.ts';
 import { mutableLadder } from '../lib/ai-movement-fixture.ts';
+import { NativeWorker } from '../lib/attachment-worker-fixture.ts';
+import { fixture as typedFixture } from '../lib/fixture.ts';
 import {
   ladderProfiles,
   ladderController as controller,
@@ -768,6 +776,194 @@ for (const reason of [
   assert.equal(m.status, 'failed');
   assert.equal(m.failure, expected);
   restored(c);
+}
+// A squad destination must survive the real route, worker proof and ladder motor.
+const nav = await SurfaceNav.load(f.surfaceRaw, f.physics, {
+  sha256: f.meta.navigation!.sha256,
+  ladders: descriptors,
+});
+const service = (nav.worker = new AttachmentQueries(nav, {
+  workerFactory: (): NativeWorker => new NativeWorker(),
+}));
+try {
+  await service.start();
+  for (const outcome of ['arrive', 'exposed', 'cancel', 'redirect', 'death'] as const) {
+    const descriptor = descriptors[0],
+      ai = makeAi(nav),
+      a = makeAgent({ ai, phys: f.physics, state: 'combat' }),
+      holder = makeAgent({
+        id: 2,
+        state: 'combat',
+        hasTarget: true,
+        targetVisible: true,
+        wantFire: true,
+      }),
+      sq = new Squad(a.rng),
+      destination = new Vector3()
+        .copy(descriptor.points[3])
+        .addScaledVector(descriptor.normal, 0.8),
+      point = coverPoint({ x: destination.x, y: destination.y, z: destination.z, high: true }),
+      queued = makeAgent({ id: 3, ai, phys: f.physics }),
+      newDestination = destination.clone().addScaledVector(descriptor.normal, 0.8);
+    queued.controller = controller(f.physics.staticWorld, descriptor, 'up', queued);
+    queued.position.copy(queued.controller.position);
+    a.controller = controller(f.physics.staticWorld, descriptor, 'up', a);
+    a.position.copy(a.controller.position);
+    ai.agents.push(a);
+    sq.add(holder);
+    sq.add(a);
+    sq.ai = ai;
+    sq.holder = holder;
+    sq.hasContact = true;
+    sq.contact.copy(a.position).add(new Vector3(20, 0, 20));
+    sq.contactAge = 0;
+    let protects = true,
+      validations = 0;
+    ai.cover = typedFixture<CoverMap>({
+      pick(): typeof point {
+        point.claimed = a.id;
+        return point;
+      },
+      release(): void {
+        point.claimed = -1;
+      },
+      protects(): boolean {
+        validations++;
+        return protects;
+      },
+    });
+    ai._pathBudget = 2;
+    sq._updateElevation(TACTICS.elevatedCheck);
+    assert.equal(a.elevatedDestination, point);
+    let mounted = false,
+      interrupted = false,
+      held = false,
+      releasedClaim = false,
+      queuedClimbed = false,
+      redirected = false,
+      cancelledRequests = 0;
+    const requestPath = ai.requestPath.bind(ai);
+    ai.requestPath = (from, to, out, actor): number => {
+      if (interrupted && (outcome === 'cancel' || outcome === 'redirect') && actor === a) {
+        if (to.distanceToSquared(destination) < 1e-10) cancelledRequests++;
+        else assert.ok(to.equals(newDestination), 'only an explicit new destination may resume');
+      }
+      return requestPath(from, to, out, actor);
+    };
+    const deadline = performance.now() + 10000;
+    for (let frame = 0; frame < 1200; frame++) {
+      assert.ok(performance.now() < deadline, 'finite traversal proof drain');
+      ai._pathBudget = 2;
+      ai._servePendingPaths();
+      a._think(1 / 60);
+      a._move(1 / 60);
+      if (ai.agents.includes(queued)) {
+        queued.desiredSpeed = 3.5;
+        queued._move(1 / 60);
+        queuedClimbed ||= queued.ladder?.motor?.phase === 'shaft';
+      }
+      if (a.ladder) {
+        mounted = true;
+        assert.equal(a.cover, null, 'ladder cannot occupy hide/peek cover');
+        assert.equal(a.peeking, false);
+        assert.equal(a.wantFire, false);
+        if (!interrupted) {
+          assert.equal(a.elevatedDestination, point);
+          assert.equal(point.claimed, a.id);
+          sq._updateElevation(1 / 60);
+          assert.equal(sq.elevated, a, 'mounting cannot cancel its own assignment');
+        }
+        if (
+          !interrupted &&
+          a.ladder.motor?.phase === 'shaft' &&
+          a.ladder.motor.cursor.distance > 2.1
+        ) {
+          interrupted = true;
+          if (outcome === 'exposed') protects = false;
+          if (outcome === 'cancel' || outcome === 'redirect') {
+            // Cancel tactical intent, not the exclusive motor in the shaft.
+            a._goTo(a.coverPos);
+            holder.wantFire = false;
+            sq._updateElevation(TACTICS.elevatedSupportGrace + 0.1);
+            assert.equal(a.ladder.deferred, false);
+            assert.equal(a.elevatedDestination, null);
+            assert.equal(point.claimed, -1);
+            ai.agents.push(queued);
+            queued._goTo(newDestination.clone().addScaledVector(descriptor.normal, 1));
+          }
+          if (outcome === 'death') {
+            a.die(a.eye, null);
+            assert.equal(a.ladder, null);
+            assert.equal(a.elevatedDestination, null);
+            assert.equal(sq.elevated, null);
+            assert.equal(point.claimed, -1);
+            break;
+          }
+        }
+      }
+      if (a.ladder?.finished && a.ladder.hold) {
+        held = true;
+        if (!a.ladder.claimed) {
+          releasedClaim = true;
+          if (outcome === 'redirect' && !redirected) {
+            redirected = true;
+            a._goTo(newDestination);
+            assert.equal(a.ladder.deferred, true);
+          }
+        }
+      }
+      if (mounted && !a.ladder) break;
+      await new Promise((resolve): NodeJS.Timeout => setTimeout(resolve, 0));
+    }
+    assert.ok(mounted, 'scenario must cross actual ladder entry');
+    assert.ok(interrupted, 'scenario must reach the native motor shaft phase');
+    if (outcome !== 'death') {
+      assert.equal(a.ladder, null, 'motor completes at a supported landing');
+      assert.ok(a.controller!.grounded);
+      assert.ok(a.position.distanceTo(new Vector3().copy(descriptor.points[3])) < 1e-6);
+      if (outcome === 'cancel' || outcome === 'redirect') {
+        assert.ok(
+          held && releasedClaim && queuedClimbed,
+          'real queued actor forces exit holding and claim release'
+        );
+        assert.equal(cancelledRequests, 0, 'holding must not resurrect the cancelled destination');
+        if (outcome === 'redirect') {
+          assert.ok(
+            a.hasMoveTarget || a.pathPending,
+            'explicit traversal request survives holding'
+          );
+          assert.ok(redirected && a._pendingDest.equals(newDestination));
+        }
+      }
+      if (outcome === 'arrive') {
+        for (let frame = 0; frame < 120 && !a.cover; frame++) {
+          a._think(1 / 60);
+          a._move(1 / 60);
+        }
+        assert.ok(
+          a.position.distanceTo(destination) < 0.25,
+          'walk the post-ladder continuation to cover'
+        );
+        assert.ok(validations > 0, 'landing revalidates destination protection');
+        assert.equal(a.elevatedDestination, point);
+        assert.equal(point.claimed, a.id);
+        a._tryElevation(0);
+        assert.equal(a.cover, point, 'only supported arrival enables hide/peek cover');
+        assert.equal(a.combatAction, 'elevated-peek');
+      } else {
+        assert.equal(a.elevatedDestination, null);
+        assert.equal(point.claimed, -1);
+        if (outcome !== 'redirect')
+          assert.equal(a.hasMoveTarget, false, 'cancelled goal cannot resume after landing');
+        if (outcome === 'exposed') assert.equal(a.coverFailure, 'elevated-landing');
+      }
+    }
+    queued.dispose();
+    a.dispose();
+    assert.equal(point.claimed, -1);
+  }
+} finally {
+  nav.dispose();
 }
 if (process.env.LADDER_REPORT)
   writeFileSync(

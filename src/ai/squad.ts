@@ -98,7 +98,7 @@ export class Squad {
     if (this.flanker === agent) this.flanker = null;
     if (this.wrapper === agent) this.wrapper = null;
     if (this.holder === agent) this.holder = null;
-    if (this.elevated === agent) this.elevated = null;
+    if (this.elevated === agent) agent._rejectCover('elevated-removed');
     if (agent.squad === this) agent.squad = null;
     if (this.intent === INTENT.PIN) {
       this.peekTokens = Math.max(1, Math.round(this.members.length * 0.5));
@@ -207,7 +207,8 @@ export class Squad {
         a.cover && (a.peeking || a._returning || a.position.distanceTo(a.coverPos) < 0.5);
       const cancel =
         !a.alive ||
-        !a.cover ||
+        !a.elevatedDestination ||
+        isBannedCover(a.elevatedDestination, this.banned) ||
         a.state === 'retreat' ||
         a.role === 'wrap' ||
         this.contactAge > TACTICS.elevatedContactAge ||
@@ -215,7 +216,7 @@ export class Squad {
           (this._unsupported > TACTICS.elevatedSupportGrace ||
             this.time - this.elevatedSince > TACTICS.elevatedTimeMax));
       if (cancel) {
-        if (a.alive && a.cover) a._rejectCover('elevated-reassess');
+        if (a.elevatedDestination) a._rejectCover('elevated-reassess');
         this.elevated = null;
         this.elevationStatus = 'reassess';
         this._elevatedWait = TACTICS.elevatedCheck;
@@ -276,7 +277,8 @@ export class Squad {
       this._unsupported = 0;
       m._endPeek();
       m._setState('combat');
-      m.cover = pick;
+      m.cover = null;
+      m.elevatedDestination = pick;
       m.coverPos.set(pick.x, pick.y, pick.z);
       m.firePos.copy(m.coverPos);
       m._elevatedRouteChecked = false;
