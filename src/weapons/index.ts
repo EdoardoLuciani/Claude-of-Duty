@@ -415,11 +415,38 @@ export class WeaponSystem {
     return createWeaponInspection(entry, config, this._attachments);
   }
 
+  getAttachments(id: WeaponId): AttachmentConfig {
+    return this._requireState(id).attachments;
+  }
+
+  /** Includes asset readiness, not just the authored fit. Also works for unowned guns. */
+  canConfigure(id: WeaponId, config: AttachmentConfig): boolean {
+    return (
+      isAttachmentConfig(config, id) &&
+      this._viewmodel?.weapons.has(id) === true &&
+      hasAttachmentAssets(id, config, this._attachments)
+    );
+  }
+
+  /** Market: fit before swapping ownership, so a rejected build never drops the old gun. */
+  applyBuild(id: WeaponId, config: AttachmentConfig): boolean {
+    if (this.owns(id)) return this.setAttachments(id, config);
+    return this._equipSlot(
+      id,
+      id === 'pistol' || id === 'smg' || id === 'shotgun' ? SECONDARY_IDS : PRIMARY_IDS,
+      config
+    );
+  }
+
   /** Synchronous, outside the frame loop; reject changes to unowned/unloaded guns. */
   setAttachments(id: WeaponId, config: AttachmentConfig): boolean {
-    if (!this.owned.has(id) || !isAttachmentConfig(config, id)) return false;
+    return this.owned.has(id) && this._configureAttachments(id, config);
+  }
+
+  _configureAttachments(id: WeaponId, config: AttachmentConfig): boolean {
+    if (!this.canConfigure(id, config)) return false;
     const entry = this.viewmodel.weapons.get(id);
-    if (!entry || !hasAttachmentAssets(id, config, this._attachments)) return false;
+    if (!entry) return false;
     configureWeaponAttachments(entry, config, this._attachments);
     this._requireState(id).attachments = entry.attachments;
     if (this.activeId === id) {
@@ -587,9 +614,10 @@ export class WeaponSystem {
   }
 
   /** Market: buy into a weapon slot, replacing the old gun and refreshing ammo. */
-  _equipSlot(id: WeaponId, slot: readonly WeaponId[]): boolean {
+  _equipSlot(id: WeaponId, slot: readonly WeaponId[], config?: AttachmentConfig): boolean {
     if (!slot.includes(id) || this.owned.has(id)) return false;
     if (!this._hasMesh(id)) return false;
+    if (config && !this._configureAttachments(id, config)) return false;
     for (const weapon of slot)
       if (weapon !== id && this.owned.delete(weapon)) this._resetAttachments(weapon);
     this.owned.add(id);

@@ -203,8 +203,10 @@ export function hasAttachmentAssets(
   assets: AttachmentAssets
 ): boolean {
   const can = fittedCan(id, config.muzzle);
-  return [config.optic, config.rail, can].every(
-    (key): boolean => key === null || (key !== undefined && assets[key] !== undefined)
+  return (
+    (config.optic === null || assets[config.optic] !== undefined) &&
+    (config.rail === null || assets[config.rail] !== undefined) &&
+    (can === null || (can !== undefined && assets[can] !== undefined))
   );
 }
 

@@ -384,7 +384,13 @@ and the loader table checks complete ID coverage and per-ID adapter returns.
 retain the authored base weapon, and `optic: null` aims through its iron sights. `src/weapons/attachments.ts` owns
 the finite catalog (`rmr | acog | scope` optics, TOR Mini `laser`, one `suppressor`),
 boundary validation, asset loading and the common gameplay/inspection mount solver.
-No attachment economy yet.
+`src/market/attachments.ts` owns attachment prices, not compatibility. Market holds one
+unconfirmed build; begin/edit/cancel never mutate gameplay. `getHudState()` pools its
+quote, slot costs/discard warnings and compatible/available offers. Confirmation rechecks
+credits, shop state and asset readiness, then calls `weapons.applyBuild()` before charging.
+New weapons are configured before replacing ownership; existing weapons only change
+attachments. Unchanged attachments are free, removal/replacement gives no refund, and
+closing/restart discards the draft.
 `WeaponDef.fits` has one shape per slot: a partial record keyed by attachment id whose
 entry enables that verified fit and holds its data (`fits.optic[id].eyeRelief`,
 `fits.muzzle.suppressor.model` naming the weapon's calibre can; rail entries are empty).

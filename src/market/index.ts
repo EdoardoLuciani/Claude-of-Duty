@@ -8,8 +8,14 @@ import type { SystemId, EngineContext } from '../core/context.ts';
 import type { EngineEventMap } from '../core/events.ts';
 import type { Health } from '../player/health.ts';
 import type { PlayerSystem } from '../player/index.ts';
+import {
+  BASE_ATTACHMENTS,
+  isAttachmentConfig,
+  type AttachmentConfig,
+} from '../weapons/attachments.ts';
 import type { WeaponId } from '../weapons/defs.ts';
 import type { WeaponSystem } from '../weapons/index.ts';
+import { ATTACHMENT_CATALOG } from './attachments.ts';
 
 type MarketItemId = WeaponId | 'ammo' | 'grenade' | 'armour' | 'bandage' | 'carpet';
 type MarketSlot = 'kit' | 'secondary' | 'primary' | 'strike';
@@ -27,10 +33,31 @@ interface HudItem {
   affordable: boolean;
   action: MarketAction;
 }
+interface HudBuildSlot {
+  slot: keyof AttachmentConfig;
+  cost: number;
+  discarded: string | null;
+}
+interface HudBuild {
+  id: WeaponId;
+  config: AttachmentConfig;
+  owned: boolean;
+  baseCost: number;
+  total: number;
+  affordable: boolean;
+  available: boolean;
+  changed: boolean;
+  canConfirm: boolean;
+  slots: HudBuildSlot[];
+}
 interface HudState {
   credits: number;
   marketIn: number;
   items: HudItem[];
+  build: HudBuild | null;
+  attachments: Array<
+    (typeof ATTACHMENT_CATALOG)[number] & { compatible: boolean; available: boolean }
+  >;
 }
 
 /** Grace period after a wave clear before the shop opens: time to collect
@@ -157,10 +184,34 @@ export class MarketSystem {
   delay: number = MARKET_DELAY;
   declare _marketAt: number;
   declare _pendingWave: number;
+  _pending: { id: WeaponId; config: AttachmentConfig } | null = null;
+  _candidate = { ...BASE_ATTACHMENTS };
+  _buildHud: HudBuild = {
+    id: 'rifle',
+    config: BASE_ATTACHMENTS,
+    owned: false,
+    baseCost: 0,
+    total: 0,
+    affordable: false,
+    available: false,
+    changed: false,
+    canConfirm: false,
+    slots: (['optic', 'muzzle', 'rail'] as const).map((slot): HudBuildSlot => ({
+      slot,
+      cost: 0,
+      discarded: null,
+    })),
+  };
   // Preallocated HUD snapshot, pooled like every other subsystem's.
   _hud: HudState = {
     credits: 0,
     marketIn: 0,
+    build: null,
+    attachments: ATTACHMENT_CATALOG.map((entry): HudState['attachments'][number] => ({
+      ...entry,
+      compatible: false,
+      available: false,
+    })),
     items: CATALOG.map((c): HudItem => ({
       id: c.id,
       label: c.label,
@@ -246,6 +297,7 @@ export class MarketSystem {
 
   /** Resume the run. The wave countdown continues where it froze. */
   closeShop(): void {
+    this.cancelBuild();
     if (!this.open) return;
     this.open = false;
     this.ctx.time.scale = this._prevScale;
@@ -271,6 +323,75 @@ export class MarketSystem {
     return true;
   }
 
+  /** One draft, never an inventory: changing selection discards the previous draft. */
+  beginBuild(id: WeaponId): boolean {
+    if (!this.open) return false;
+    this._pending = {
+      id,
+      config: this.weapons.owns(id) ? this.weapons.getAttachments(id) : BASE_ATTACHMENTS,
+    };
+    return true;
+  }
+
+  setBuild(config: AttachmentConfig): boolean {
+    if (!this.open || !this._pending || !isAttachmentConfig(config, this._pending.id)) return false;
+    this._pending.config = Object.freeze({ ...config });
+    return true;
+  }
+
+  cancelBuild(): void {
+    this._pending = null;
+    this._hud.build = null;
+  }
+
+  confirmBuild(): boolean {
+    const build = this.getHudState().build;
+    if (!build?.canConfirm || !this.weapons.applyBuild(build.id, build.config)) return false;
+    this.credits -= build.total;
+    this.beginBuild(build.id);
+    return true;
+  }
+
+  _updateBuild(): void {
+    const pending = this._pending;
+    this._hud.build = pending ? this._buildHud : null;
+    if (!pending) return;
+    const { id, config } = pending;
+    const h = this._buildHud;
+    h.id = id;
+    h.config = config;
+    h.owned = this.weapons.owns(id);
+    const current = h.owned ? this.weapons.getAttachments(id) : BASE_ATTACHMENTS;
+    h.baseCost = 0;
+    if (!h.owned) for (const item of CATALOG) if (item.id === id) h.baseCost = item.cost;
+    h.total = h.baseCost;
+    h.changed = !h.owned;
+    for (const line of h.slots) {
+      const selected = config[line.slot];
+      const previous = current[line.slot];
+      line.cost = 0;
+      line.discarded = null;
+      if (selected !== previous) h.changed = true;
+      for (const entry of ATTACHMENT_CATALOG) {
+        if (entry.id === selected && selected !== previous) line.cost = entry.cost;
+        if (selected !== previous && entry.id === previous) line.discarded = entry.label;
+      }
+      h.total += line.cost;
+    }
+    h.available = this.weapons.canConfigure(id, config);
+    h.affordable = this.credits >= h.total;
+    h.canConfirm = this.open && h.changed && h.available && h.affordable;
+    for (const offer of this._hud.attachments) {
+      Object.assign(this._candidate, config);
+      // Keep slot/id correlation explicit without allocating candidate objects per frame.
+      if (offer.slot === 'optic') this._candidate.optic = offer.id;
+      else if (offer.slot === 'muzzle') this._candidate.muzzle = offer.id;
+      else this._candidate.rail = offer.id;
+      offer.compatible = isAttachmentConfig(this._candidate, id);
+      offer.available = offer.compatible && this.weapons.canConfigure(id, this._candidate);
+    }
+  }
+
   /** Stable, allocation-free snapshot polled by the HUD and the shop overlay. */
   getHudState(): HudState {
     const h = this._hud;
@@ -286,6 +407,7 @@ export class MarketSystem {
       const gun = it.slot === 'primary' || it.slot === 'secondary';
       it.action = gun ? (lvl >= it.max ? 'equipped' : 'swap') : lvl >= it.max ? 'max' : 'buy';
     }
+    this._updateBuild();
     return h;
   }
 

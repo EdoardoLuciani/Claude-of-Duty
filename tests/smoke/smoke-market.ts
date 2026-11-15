@@ -1,5 +1,18 @@
 import assert from 'node:assert/strict';
 
+import * as THREE from 'three';
+import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+
+import {
+  BASE_ATTACHMENTS,
+  makeOpticModel,
+  makeLaserModel,
+  makeSuppressorModel,
+} from '../../src/weapons/attachments.ts';
+import type { WeaponEntry, WeaponModelRecord } from '../../src/weapons/runtime-types.ts';
+import type { Viewmodel } from '../../src/weapons/viewmodel.ts';
+import { fixture } from '../lib/fixture.ts';
+
 /**
  * Bun smoke test for the market and armour systems — no browser.
  * Exercises the credits mirror (score:change), the post-wave grace period,
@@ -9,7 +22,7 @@ import assert from 'node:assert/strict';
  */
 import { MarketSystem, MARKET_DELAY } from '../../src/market/index.ts';
 import { Health } from '../../src/player/health.ts';
-import { WEAPON_IDS, PRIMARY_IDS } from '../../src/weapons/defs.ts';
+import { WEAPON_IDS, PRIMARY_IDS, WEAPON_DEFS } from '../../src/weapons/defs.ts';
 import type { WeaponId } from '../../src/weapons/defs.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
 import { createTestContext } from '../lib/context.ts';
@@ -378,6 +391,135 @@ check('close restores the previous time scale', context.time.scale === 0.5);
 context.time.scale = 1;
 market.credits = 99999;
 check('carpet unbuyable with the shop closed', market.buy('carpet') === false);
+
+// ---- attachment builds: real mounting, no GPU or asset fetch ----------------
+const entries = new Map<WeaponId, WeaponEntry>();
+for (const id of ['rifle', 'lmg'] as const) {
+  const scene = new THREE.Group();
+  for (const name of ['IRON_sights', 'MOUNT_optic', 'MOUNT_rail', 'MOUNT_muzzle', 'MUZZLE_device'])
+    scene.add(Object.assign(new THREE.Object3D(), { name }));
+  const model = {
+    scene,
+    root: scene,
+    opticMountRest: new THREE.Matrix4(),
+    nodes: fixture<Extract<WeaponModelRecord, { id: 'lmg' }>['nodes']>({ sight: [0, 0.14, 0.03] }),
+  };
+  entries.set(
+    id,
+    fixture<WeaponEntry>({
+      id,
+      def: weaponState(id).def,
+      model:
+        id === 'rifle'
+          ? fixture<Extract<WeaponModelRecord, { id: 'rifle' }>>({ ...model, id })
+          : fixture<Extract<WeaponModelRecord, { id: 'lmg' }>>({ ...model, id }),
+      attachments: BASE_ATTACHMENTS,
+      attachmentGroup: new THREE.Group(),
+      railGroup: new THREE.Group(),
+      muzzleGroup: new THREE.Group(),
+      sight: new THREE.Vector3(),
+    })
+  );
+}
+weapons.viewmodel = fixture<Viewmodel>({
+  weapons: entries,
+  reticle: new THREE.Object3D(),
+  scopeOverlay: new THREE.Object3D(),
+});
+const opticScene = new THREE.Group();
+for (const name of ['MOUNT_base', 'SOCKET_sight', 'SOCKET_mount', 'SOCKET_laser', 'SOCKET_muzzle'])
+  opticScene.add(Object.assign(new THREE.Object3D(), { name }));
+Object.assign(weapons, {
+  _attachments: {
+    rmr: makeOpticModel(fixture<GLTF>({ scene: opticScene }), 'rmr'),
+    acog: makeOpticModel(fixture<GLTF>({ scene: opticScene.clone() }), 'acog'),
+    laser: makeLaserModel(fixture<GLTF>({ scene: opticScene.clone() })),
+    srd762ti: makeSuppressorModel(fixture<GLTF>({ scene: opticScene.clone() })),
+  },
+});
+market.openShop();
+market.credits = 1350;
+const redDotLaser = { ...BASE_ATTACHMENTS, optic: 'rmr', rail: 'laser' } as const;
+assert(market.beginBuild('rifle') && market.setBuild(redDotLaser));
+assert.equal(market.getHudState().build?.total, 450, 'owned gun charges attachments only');
+assert.equal(weapons.getAttachments('rifle'), BASE_ATTACHMENTS, 'draft does not equip');
+market.cancelBuild();
+assert.equal(market.credits, 1350);
+assert.equal(weapons.getAttachments('rifle'), BASE_ATTACHMENTS);
+assert(!market.confirmBuild());
+assert(market.beginBuild('lmg') && market.setBuild(redDotLaser));
+const hudBuild = market.getHudState().build;
+assert(hudBuild);
+assert.equal(hudBuild.total, 1650, 'new gun includes its base price');
+assert(!hudBuild.canConfirm && !market.confirmBuild());
+assert(weapons.owns('rifle') && !weapons.owns('lmg'));
+assert.equal(market.credits, 1350);
+market.credits = 1650;
+assert.equal(market.getHudState().build, hudBuild, 'quote reuses its snapshot');
+assert(market.confirmBuild());
+assert.equal(market.credits, 0);
+assert(weapons.owns('lmg') && !weapons.owns('rifle'));
+assert.deepEqual(weapons.getAttachments('lmg'), redDotLaser);
+assert.equal(market.getHudState().build?.total, 0, 'unchanged attachments are not charged twice');
+assert(!market.confirmBuild(), 'unchanged build cannot be purchased twice');
+market.credits = 400;
+assert(market.setBuild({ ...redDotLaser, optic: 'acog' }));
+assert.equal(market.getHudState().build?.total, 400);
+assert.equal(market.getHudState().build?.slots[0].discarded, 'Red dot');
+market.cancelBuild();
+assert.equal(weapons.getAttachments('lmg').optic, 'rmr', 'cancel preserves replaced attachment');
+assert(market.beginBuild('lmg') && market.setBuild({ ...redDotLaser, optic: 'acog' }));
+assert(market.confirmBuild());
+assert.equal(market.credits, 0, 'replacement gives no refund');
+assert(market.setBuild(BASE_ATTACHMENTS) && market.confirmBuild(), 'removal costs nothing');
+assert.equal(weapons.getAttachments('lmg').optic, null);
+market.credits = 350;
+assert(market.setBuild({ ...BASE_ATTACHMENTS, muzzle: 'suppressor' }));
+assert.equal(market.getHudState().build?.total, 350);
+assert(market.confirmBuild(), 'suppressor purchase resolves the weapon-specific can asset');
+assert.equal(market.credits, 0);
+assert(market.setBuild(BASE_ATTACHMENTS) && market.confirmBuild());
+assert(market.setBuild(redDotLaser));
+assert.equal(market.getHudState().build?.total, 450, 'discarded attachments must be bought again');
+const fits = WEAPON_DEFS.lmg.fits;
+assert(fits?.optic);
+const opticFits = fits.optic;
+delete fits.optic;
+try {
+  assert(!market.setBuild({ ...redDotLaser, optic: 'acog' }), 'unverified optic is incompatible');
+  assert.deepEqual(market.getHudState().build?.config, redDotLaser);
+} finally {
+  fits.optic = opticFits;
+}
+assert(market.setBuild({ ...BASE_ATTACHMENTS, optic: 'scope' }));
+market.credits = 9999;
+assert(!market.confirmBuild(), 'missing attachment asset cannot be purchased');
+assert.equal(market.credits, 9999);
+assert.equal(weapons.getAttachments('lmg').optic, null);
+assert(market.beginBuild('rifle') && market.setBuild(redDotLaser));
+const rifleEntry = entries.get('rifle');
+assert(rifleEntry);
+entries.delete('rifle');
+assert(!market.confirmBuild(), 'unloaded new weapon cannot replace the owned gun');
+assert(weapons.owns('lmg') && !weapons.owns('rifle'));
+assert.equal(market.credits, 9999);
+entries.set('rifle', rifleEntry);
+assert(market.confirmBuild());
+assert.equal(weapons.getAttachments('lmg'), BASE_ATTACHMENTS, 'swap discards the old build');
+assert(market.beginBuild('lmg'));
+assert.deepEqual(market.getHudState().build?.config, BASE_ATTACHMENTS, 'rebuy starts at base');
+assert.equal(market.getHudState().build?.total, 1200);
+assert(market.confirmBuild());
+assert.equal(weapons.getAttachments('rifle'), BASE_ATTACHMENTS);
+assert(market.beginBuild('rifle') && market.setBuild(redDotLaser));
+market.closeShop();
+assert.equal(market.getHudState().build, null, 'closing drops unconfirmed build');
+assert(!market.confirmBuild() && !market.beginBuild('rifle'));
+market.openShop();
+assert(market.beginBuild('rifle'));
+context.events.emit('game:restart', {});
+assert.equal(market.getHudState().build, null, 'restart drops unconfirmed build');
+assert.equal(market.credits, 0);
 
 // ---- armour damage -------------------------------------------------------
 let damage: import('../../src/core/events.ts').EngineEventMap['damage:taken'] | undefined;
