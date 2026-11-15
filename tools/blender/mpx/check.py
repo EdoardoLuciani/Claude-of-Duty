@@ -168,7 +168,6 @@ from tor_mini.mounts import check_laser_mount
 check_laser_mount('mpx')
 
 # Mount every actual shared asset; do not substitute proxy attachment bounds.
-ROOT = Path(__file__).resolve().parents[3]
 rig = bpy.data.objects['MPX_RIG']
 weapon = [o for o in bpy.data.collections['MPX | editable exterior components'].objects if o.type == 'MESH']
 hands = [o for o in scene.objects if o.type == 'MESH' and any('authored hands' in c.name for c in o.users_collection)]
@@ -203,19 +202,9 @@ for name in ('IRON_sights_removed','MUZZLE_device_removed'):
 bpy.context.view_layer.update()
 mounted = {}
 loaded = []
-for id,folder,slot,base_name in [('rmr','trijicon-rmr','optic','MOUNT_base'),
-                               ('acog','trijicon-acog','optic','MOUNT_base'),
-                               ('scope','schmidt-bender-pm-ii','optic','MOUNT_base'),
-                               ('suppressor','sig-srd762ti','muzzle','SOCKET_mount'),
-                               ('laser','steiner-tor-mini','rail','SOCKET_mount')]:
-    path = ROOT/'assets/attachments'/folder/(('tor-mini' if id=='laser' else id)+'.blend')
-    assert path.exists(), ('build shared attachment first',path)
-    with bpy.data.libraries.load(str(path)) as (source,target):
-        target.objects = source.objects
-    objects = [o for o in target.objects if o is not None]
-    for obj in objects: scene.collection.objects.link(obj)
-    bpy.context.view_layer.update()
-    base = next(o for o in objects if o.name == base_name or o.name.startswith(base_name+'.'))
+import attachment_source
+for id,slot in [('rmr','optic'),('acog','optic'),('scope','optic'),('srd762ti','muzzle'),('laser','rail')]:
+    objects,base = attachment_source.load(id)
     mesh = [o for o in objects if o.type == 'MESH']
     transform = rig.matrix_world.inverted() @ bpy.data.objects['MOUNT_'+slot].matrix_world @ base.matrix_world.inverted()
     mounted[id] = surface(mesh,transform)
@@ -240,7 +229,7 @@ for id,target in mounted.items():
     for obj in fixed:
         if id=='laser' and obj.name.startswith('Laser rail adapter tooth'): continue  # precise contact checked above
         assert not target.overlap(surface([obj],rig.matrix_world.inverted())), (id,obj.name,'attachment hits base weapon')
-    if id == 'suppressor':
+    if id == 'srd762ti':
         assert not target.overlap(surface(list(bpy.data.objects['MUZZLE_device_removed'].children),rig.matrix_world.inverted())), 'suppressor hits adapter'
         # A 9mm round plus .6mm radial margin must pass the actual endcap/shadow.
         for i in range(32):
@@ -250,9 +239,9 @@ for id,target in mounted.items():
 # Catalog slots coexist: compare optics against the mounted laser and can,
 # plus rail/muzzle against each other (never compare alternative optics).
 for optic in ('rmr','acog','scope'):
-    for other in ('laser','suppressor'):
+    for other in ('laser','srd762ti'):
         assert not mounted[optic].overlap(mounted[other]), (optic,other,'slot attachments intersect')
-assert not mounted['laser'].overlap(mounted['suppressor']), 'rail/muzzle intersection'
+assert not mounted['laser'].overlap(mounted['srd762ti']), 'rail/muzzle intersection'
 for name in ('IRON_sights','IRON_sights_removed'):
     parts=[o for o in bpy.data.objects[name].children if o.type=='MESH']
     mounted[name]=surface(parts,rig.matrix_world.inverted())
@@ -270,7 +259,7 @@ for name,info in clips.items():
             bounds=[inverse@evaluated.matrix_world@Vector(p) for p in evaluated.bound_box]
             for id,target in mounted.items():
                 # Broad phase excludes objects clearly below the optic rail or behind the muzzle.
-                if id=='suppressor':
+                if id=='srd762ti':
                     if max(p.x for p in bounds)<.316: continue
                 elif id!='laser' and (max(p.z for p in bounds)<.041 or max(p.x for p in bounds)<-.16): continue
                 elif id=='laser': continue  # separate 120Hz TOR sweep includes precise mating/emitter checks

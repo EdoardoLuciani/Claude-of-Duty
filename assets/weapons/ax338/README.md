@@ -62,7 +62,7 @@ support hand. Its shared checker sweeps all clips at 120 Hz plus the separate
 181-position stock fold, including actual hands, bolt and all three optics.
 See the [shared laser contract](../../attachments/steiner-tor-mini/README.md#weapon-mounting-686).
 The dedicated [280 × 50 mm .338 suppressor](../../attachments/suppressor-338/README.md)
-uses the separate `suppressor338` catalog ID, not SRD762Ti or runtime scaling.
+is the AX338's `suppressor` fit (can model `suppressor338`), not SRD762Ti or runtime scaling.
 `MUZZLE_device` owns the factory brake **and** lock nut; installing the can hides
 both and shows the 20 mm open adapter under `MUZZLE_device_removed`. Removing it
 restores the original brake. The installed endcap is `[0, .075, −1.0758]`; the

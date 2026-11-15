@@ -10,7 +10,8 @@ import { disposeWeaponLoader } from './asset-loader.ts';
 import {
   BASE_ATTACHMENTS,
   configureWeaponAttachments,
-  ironSightNodes,
+  REPLACED_SLOTS,
+  replacedNodes,
   isAttachmentConfig,
   hasAttachmentAssets,
   loadAttachments,
@@ -423,7 +424,7 @@ export class WeaponSystem {
     return (
       isAttachmentConfig(config, id) &&
       this._viewmodel?.weapons.has(id) === true &&
-      hasAttachmentAssets(config, this._attachments)
+      hasAttachmentAssets(id, config, this._attachments)
     );
   }
 
@@ -529,15 +530,13 @@ export class WeaponSystem {
       }
       // Both removable iron/muzzle states must be warm before runtime swaps.
       for (const w of this.viewmodel.weapons.values()) {
-        const irons = ironSightNodes(w.model);
-        for (const node of [
-          ...(irons ? [irons.installed, irons.removed] : []),
-          w.model.root.getObjectByName('MUZZLE_device'),
-          w.model.root.getObjectByName('MUZZLE_device_removed'),
-        ]) {
-          if (!node) continue;
-          visible.push([node, node.visible]);
-          node.visible = true;
+        for (const slot of REPLACED_SLOTS) {
+          const nodes = replacedNodes(w.model, slot);
+          for (const node of nodes ? [nodes.installed, nodes.removed] : []) {
+            if (!node) continue;
+            visible.push([node, node.visible]);
+            node.visible = true;
+          }
         }
       }
       const groups = [...this.viewmodel.weapons.values()].map((w): THREE.Object3D => w.group);

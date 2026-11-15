@@ -2,13 +2,12 @@
 
 Finite 120 Hz source samples, not continuous collision or human visual acceptance.
 """
-from pathlib import Path
 import bpy
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 from mcx.review_hands import review_tracks, select_review_clip
 
-ROOT = Path(__file__).resolve().parents[3]
+import attachment_source
 
 
 def geometry(obj, inverse):
@@ -54,31 +53,10 @@ def check_attachment_fits():
     hands = [o for o in bpy.data.collections['MCX | authored hands (shared appearance)'].objects if o.type == 'MESH']
     attachments = []
     loaded = []
-    for id, folder, slot, datum in [
-        ('rmr','trijicon-rmr','optic','MOUNT_base'),
-        ('acog','trijicon-acog','optic','MOUNT_base'),
-        ('scope','schmidt-bender-pm-ii','optic','MOUNT_base'),
-        ('suppressor','sig-srd762ti','muzzle','SOCKET_mount'),
-        ('tor-mini','steiner-tor-mini','rail','SOCKET_mount'),
-    ]:
-        path = ROOT/'assets/attachments'/folder/(id+'.blend')
-        assert path.exists(), f'Build shared {id} first: {path}'
-        with bpy.data.libraries.load(str(path),link=False) as (source,target):
-            target.objects = source.objects
-        for obj in target.objects:
-            scene.collection.objects.link(obj)
-        loaded.extend(target.objects)
-        bpy.context.view_layer.update()
-        base = next(o for o in target.objects if o.name.startswith(datum))
-        mount = bpy.data.objects['MOUNT_'+slot]
-        transform = mount.matrix_world @ base.matrix_world.inverted()
-        for obj in target.objects:
-            if obj.parent is None:
-                matrix = transform @ obj.matrix_world
-                obj.parent = mount
-                obj.matrix_world = matrix
-        bpy.context.view_layer.update()
-        meshes = [o for o in target.objects if o.type == 'MESH' and
+    for id, slot in [('rmr','optic'),('acog','optic'),('scope','optic'),('srd762ti','muzzle'),('laser','rail')]:
+        objects = attachment_source.seat(id, bpy.data.objects['MOUNT_'+slot])
+        loaded.extend(objects)
+        meshes = [o for o in objects if o.type == 'MESH' and
                   (slot != 'rail' or o.name.startswith('TOR_MINI_body'))]
         surface = tree(meshes,inverse)
         # Only real rail mating faces may contact optics; other receiver,
@@ -111,10 +89,10 @@ def check_attachment_fits():
             print('MCX_OPTIC_SEAT:',id,len(contacts),'actual tooth contacts; span',span,'m')
         elif slot == 'muzzle':
             assert not surface.overlap(tree(list(installed.children),inverse)), 'can clips irons'
-            exit = next(o for o in target.objects if o.name.startswith('SOCKET_muzzle'))
+            exit = attachment_source.named(objects, 'SOCKET_muzzle')
             assert (inverse @ exit.matrix_world.translation-Vector((.510,0,0))).length < 1e-6, 'installed exit'
         elif slot == 'rail':
-            emitter = next(o for o in target.objects if o.name.startswith('SOCKET_laser'))
+            emitter = attachment_source.named(objects, 'SOCKET_laser')
             emitter_frame = inverse @ emitter.matrix_world
         attachments.append((id,surface))
     # Optical, muzzle and laser slots may coexist; optic alternatives do not.

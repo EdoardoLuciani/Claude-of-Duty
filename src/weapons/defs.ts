@@ -2,7 +2,7 @@
  * zeroRange is the sight-line crossing; learned sightline recoil is separate from random spread.
  */
 
-import type { MuzzleId, OpticId, RailId } from './attachments.ts';
+import type { CanModel, MuzzleId, OpticId, RailId } from './attachments.ts';
 
 export const WEAPON_IDS = ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper', 'mcx'] as const;
 export type WeaponId = (typeof WEAPON_IDS)[number];
@@ -80,11 +80,14 @@ export interface WeaponDef {
   fits?: {
     optic?: Partial<Record<OpticId, { eyeRelief: number }>>;
     rail?: Partial<Record<RailId, Record<string, never>>>;
-    muzzle?: Partial<Record<MuzzleId, Record<string, never>>>;
+    muzzle?: Partial<Record<MuzzleId, { model: CanModel }>>;
   };
   /** Authored `IRON_sights` are hidden whenever an optic is mounted (an optional
    * `IRON_sights_removed` part replaces them); unset keeps fixed irons under an optic. */
   removableIrons?: true;
+  /** Authored `MUZZLE_device` is hidden whenever a can is mounted (an optional
+   * `MUZZLE_device_removed` part replaces it); unset keeps permanent muzzle hardware. */
+  removableMuzzleDevice?: true;
   sprintPos: TuningVector;
   sprintRot: TuningVector;
   lowReadyPos: TuningVector;
@@ -154,10 +157,11 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     eyeRelief: 0.06,
     fits: {
       optic: { rmr: { eyeRelief: 0.125 }, acog: { eyeRelief: 0.11 }, scope: { eyeRelief: 0.09 } },
-      muzzle: { suppressor: {} },
+      muzzle: { suppressor: { model: 'srd762ti' } },
       rail: { laser: {} },
     },
     removableIrons: true,
+    removableMuzzleDevice: true,
     sprintPos: [0.09, -0.275, -0.275],
     sprintRot: [-0.4, 0.6, 0.2],
     lowReadyPos: [0.112, -0.29, -0.289],
@@ -230,11 +234,12 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     // Bring the eye closer to open the rear aperture; its bore and aim datum stay authored.
     eyeRelief: 0.03,
     fits: {
-      muzzle: { suppressor: {} },
+      muzzle: { suppressor: { model: 'srd762ti' } },
       optic: { rmr: { eyeRelief: 0.125 }, acog: { eyeRelief: 0.11 }, scope: { eyeRelief: 0.09 } },
       rail: { laser: {} },
     },
     removableIrons: true,
+    removableMuzzleDevice: true,
     /* Sprint: gun dropped and angled across the body, muzzle down-left.
      * Carried over by the same delta as the hip pose so the blend does not
      * translate the weapon 90 mm sideways on the way into a sprint. */
@@ -304,10 +309,11 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     eyeRelief: 0.06,
     fits: {
       optic: { rmr: { eyeRelief: 0.125 }, acog: { eyeRelief: 0.11 }, scope: { eyeRelief: 0.09 } },
-      muzzle: { suppressor: {} },
+      muzzle: { suppressor: { model: 'srd762ti' } },
       rail: { laser: {} },
     },
     removableIrons: true,
+    removableMuzzleDevice: true,
     sprintPos: [0.088, -0.24, -0.262],
     sprintRot: [-0.38, 0.58, 0.19],
     lowReadyPos: [0.108, -0.252, -0.276],
@@ -375,10 +381,11 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     eyeRelief: 0.03,
     fits: {
       optic: { rmr: { eyeRelief: 0.125 }, acog: { eyeRelief: 0.11 }, scope: { eyeRelief: 0.09 } },
-      muzzle: { suppressor: {} },
+      muzzle: { suppressor: { model: 'srd762ti' } },
       rail: { laser: {} },
     },
     removableIrons: true,
+    removableMuzzleDevice: true,
     sprintPos: [0.09, -0.29, -0.285],
     sprintRot: [-0.42, 0.62, 0.22],
     lowReadyPos: [0.108, -0.305, -0.295],
@@ -449,8 +456,9 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     fits: {
       optic: { rmr: { eyeRelief: 0.394 }, acog: { eyeRelief: 0.308 }, scope: { eyeRelief: 0.2 } },
       rail: { laser: {} },
-      muzzle: { suppressor9mm: {} },
+      muzzle: { suppressor: { model: 'suppressor9mm' } },
     },
+    removableMuzzleDevice: true,
     sprintPos: [0.09, -0.25, -0.28],
     sprintRot: [-0.42, 0.5, 0.14],
     lowReadyPos: [0.1, -0.26, -0.32],
@@ -519,7 +527,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     fits: {
       optic: { rmr: { eyeRelief: 0.12 }, acog: { eyeRelief: 0.1 }, scope: { eyeRelief: 0.09 } },
       rail: { laser: {} },
-      muzzle: { suppressor12g: {} },
+      muzzle: { suppressor: { model: 'suppressor12g' } },
     },
     sprintPos: [0.09, -0.27, -0.28],
     sprintRot: [-0.42, 0.58, 0.2],
@@ -581,9 +589,10 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     fits: {
       optic: { rmr: { eyeRelief: 0.125 }, acog: { eyeRelief: 0.11 }, scope: { eyeRelief: 0.09 } },
       rail: { laser: {} },
-      muzzle: { suppressor338: {} },
+      muzzle: { suppressor: { model: 'suppressor338' } },
     },
     removableIrons: true,
+    removableMuzzleDevice: true,
     sprintPos: [0.088, -0.31, -0.3],
     sprintRot: [-0.46, 0.66, 0.22],
     lowReadyPos: [0.11, -0.32, -0.31],

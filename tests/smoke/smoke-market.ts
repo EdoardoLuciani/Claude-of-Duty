@@ -3,7 +3,12 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-import { BASE_ATTACHMENTS, makeOpticModel, makeLaserModel } from '../../src/weapons/attachments.ts';
+import {
+  BASE_ATTACHMENTS,
+  makeOpticModel,
+  makeLaserModel,
+  makeSuppressorModel,
+} from '../../src/weapons/attachments.ts';
 import type { WeaponEntry, WeaponModelRecord } from '../../src/weapons/runtime-types.ts';
 import type { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { fixture } from '../lib/fixture.ts';
@@ -17,7 +22,7 @@ import { fixture } from '../lib/fixture.ts';
  */
 import { MarketSystem, MARKET_DELAY } from '../../src/market/index.ts';
 import { Health } from '../../src/player/health.ts';
-import { WEAPON_IDS, PRIMARY_IDS } from '../../src/weapons/defs.ts';
+import { WEAPON_IDS, PRIMARY_IDS, WEAPON_DEFS } from '../../src/weapons/defs.ts';
 import type { WeaponId } from '../../src/weapons/defs.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
 import { createTestContext } from '../lib/context.ts';
@@ -391,7 +396,7 @@ check('carpet unbuyable with the shop closed', market.buy('carpet') === false);
 const entries = new Map<WeaponId, WeaponEntry>();
 for (const id of ['rifle', 'lmg'] as const) {
   const scene = new THREE.Group();
-  for (const name of ['IRON_sights', 'MOUNT_optic', 'MOUNT_rail', 'MUZZLE_device'])
+  for (const name of ['IRON_sights', 'MOUNT_optic', 'MOUNT_rail', 'MOUNT_muzzle', 'MUZZLE_device'])
     scene.add(Object.assign(new THREE.Object3D(), { name }));
   const model = {
     scene,
@@ -422,13 +427,14 @@ weapons.viewmodel = fixture<Viewmodel>({
   scopeOverlay: new THREE.Object3D(),
 });
 const opticScene = new THREE.Group();
-for (const name of ['MOUNT_base', 'SOCKET_sight', 'SOCKET_mount', 'SOCKET_laser'])
+for (const name of ['MOUNT_base', 'SOCKET_sight', 'SOCKET_mount', 'SOCKET_laser', 'SOCKET_muzzle'])
   opticScene.add(Object.assign(new THREE.Object3D(), { name }));
 Object.assign(weapons, {
   _attachments: {
     rmr: makeOpticModel(fixture<GLTF>({ scene: opticScene }), 'rmr'),
     acog: makeOpticModel(fixture<GLTF>({ scene: opticScene.clone() }), 'acog'),
     laser: makeLaserModel(fixture<GLTF>({ scene: opticScene.clone() })),
+    srd762ti: makeSuppressorModel(fixture<GLTF>({ scene: opticScene.clone() })),
   },
 });
 market.openShop();
@@ -467,13 +473,24 @@ assert(market.confirmBuild());
 assert.equal(market.credits, 0, 'replacement gives no refund');
 assert(market.setBuild(BASE_ATTACHMENTS) && market.confirmBuild(), 'removal costs nothing');
 assert.equal(weapons.getAttachments('lmg').optic, null);
+market.credits = 350;
+assert(market.setBuild({ ...BASE_ATTACHMENTS, muzzle: 'suppressor' }));
+assert.equal(market.getHudState().build?.total, 350);
+assert(market.confirmBuild(), 'suppressor purchase resolves the weapon-specific can asset');
+assert.equal(market.credits, 0);
+assert(market.setBuild(BASE_ATTACHMENTS) && market.confirmBuild());
 assert(market.setBuild(redDotLaser));
 assert.equal(market.getHudState().build?.total, 450, 'discarded attachments must be bought again');
-assert(
-  !market.setBuild({ ...redDotLaser, muzzle: 'suppressor12g' }),
-  'wrong caliber is incompatible'
-);
-assert.deepEqual(market.getHudState().build?.config, redDotLaser);
+const fits = WEAPON_DEFS.lmg.fits;
+assert(fits?.optic);
+const opticFits = fits.optic;
+delete fits.optic;
+try {
+  assert(!market.setBuild({ ...redDotLaser, optic: 'acog' }), 'unverified optic is incompatible');
+  assert.deepEqual(market.getHudState().build?.config, redDotLaser);
+} finally {
+  fits.optic = opticFits;
+}
 assert(market.setBuild({ ...BASE_ATTACHMENTS, optic: 'scope' }));
 market.credits = 9999;
 assert(!market.confirmBuild(), 'missing attachment asset cannot be purchased');

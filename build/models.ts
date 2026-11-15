@@ -59,10 +59,10 @@ export const MODEL_COOKS = {
     output: 'public/models/attachments/suppressor338.runtime.glb',
     flags: [],
   },
-  suppressor: {
+  srd762ti: {
     directory: 'assets/attachments/sig-srd762ti',
     source: 'suppressor.glb',
-    output: 'public/models/attachments/suppressor.runtime.glb',
+    output: 'public/models/attachments/srd762ti.runtime.glb',
     flags: [],
   },
   acog: {
