@@ -763,7 +763,7 @@ export function patchGeometry(
     nrm.push(0, 1, 0);
     uv.push(Math.cos(t), Math.sin(t));
   }
-  for (let i = 0; i < lobes; i++) idx.push(0, 1 + i, 1 + ((i + 1) % lobes));
+  for (let i = 0; i < lobes; i++) idx.push(0, 1 + ((i + 1) % lobes), 1 + i);
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));

@@ -7,7 +7,29 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { gzipSync } from 'node:zlib';
 
+import { Vector3 } from 'three';
+
 import { isRecord } from '../../src/core/guards.ts';
+import { keyedRng, patchGeometry } from '../../tools/worldgen/util.ts';
+
+// Single-sided patches must face up, including the closing fan triangle.
+for (const opts of [{}, { lobes: 11, wobble: 0.6, sag: 0.15 }]) {
+  const patch = patchGeometry(keyedRng('patch-winding'), 2, opts);
+  const position = patch.getAttribute('position');
+  const normal = patch.getAttribute('normal');
+  const indices = patch.getIndex();
+  assert(indices);
+  for (let i = 0; i < indices.count; i += 3) {
+    const corners = [0, 1, 2].map((j): number => indices.getX(i + j));
+    const [a, b, c] = corners.map((j): Vector3 => new Vector3().fromBufferAttribute(position, j));
+    const face = b.sub(a).cross(c.sub(a));
+    assert(face.y > 0, 'nondegenerate patch faces must point upward');
+    for (const corner of corners) {
+      assert(face.dot(new Vector3().fromBufferAttribute(normal, corner)) > 0);
+    }
+  }
+  patch.dispose();
+}
 
 const root = resolve(import.meta.dirname, '../..');
 const world = join(root, 'public/models/world');
