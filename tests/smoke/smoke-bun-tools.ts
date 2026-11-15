@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { availableParallelism, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -49,7 +49,13 @@ if (args[0] === '-v') {
   assert.equal(flags[2], '-o');
   const scratchOutput = flags[3];
   assert(typeof scratchOutput === 'string');
-  assert.deepEqual(flags.slice(4), [...GLTFPACK_FLAGS, ...MODEL_COOKS.p320.flags]);
+  assert(!GLTFPACK_FLAGS.includes('-tj'), 'cache flags exclude machine-local scheduling');
+  assert.deepEqual(flags.slice(4), [
+    ...GLTFPACK_FLAGS,
+    '-tj',
+    String(Math.max(1, Math.floor(availableParallelism() / 4))),
+    ...MODEL_COOKS.p320.flags,
+  ]);
   assert(!existsSync(dirname(scratchOutput)), 'successful cook removes its scratch directory');
 
   const failed = spawnSync(BUN, args, {

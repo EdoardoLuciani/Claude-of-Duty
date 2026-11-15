@@ -36,8 +36,6 @@ export const GLTFPACK_FLAGS = [
   '-tu',
   '-tq',
   '8',
-  '-tj',
-  String(ENCODING_THREADS),
 ];
 // Opt assets in here after validating their adapters and visual/animation fidelity.
 // Simplification is model-specific, never a blanket default for all models.
@@ -134,9 +132,12 @@ function cookModel(input: string, output: string, flags: string[]): void {
   const scratch = mkdtempSync(join(tmpdir(), 'model-cook-'));
   try {
     const cooked = join(scratch, basename(output));
-    execFileSync(encoder, ['-i', input, '-o', cooked, ...GLTFPACK_FLAGS, ...flags], {
-      stdio: 'inherit',
-    });
+    // Scheduling is machine-local, not part of the output-affecting cache flags.
+    execFileSync(
+      encoder,
+      ['-i', input, '-o', cooked, ...GLTFPACK_FLAGS, '-tj', String(ENCODING_THREADS), ...flags],
+      { stdio: 'inherit' }
+    );
     mkdirSync(dirname(output), { recursive: true });
     copyFileSync(cooked, output);
     console.log(`Cooked ${input} -> ${output} (${statSync(output).size} bytes)`);
