@@ -125,14 +125,15 @@ Supplies keep their immediate **Buy** buttons. All controls support keyboard use
 
 Every weapon starts on irons. All but the P320 accept the RMR, EXPS3, ACOG and PM II
 scope; mounting one swaps removable irons for their stowed state (M590 keeps fixed
-irons). Every weapon accepts the TOR Mini laser and a suppressor; each mounts its own
-calibre can. Attachments change no handling or ballistic stats: a can moves the
+irons). Every weapon accepts the TOR Mini laser and a suppressor: the M4, MCX, MPX and
+EVOLYS share the SRD762Ti; P320, AX338 and M590 mount dedicated cans. Attachments change no handling or ballistic stats: a can moves the
 projectile/flash origin to its endcap and selects suppressed reports, and the laser
 draws a beam and surface dot along its emitter axis without predicting spread or drop.
 **L** toggles the mounted laser per gun, independently of the **F** flashlight.
 
-For debug/capture, `?attachmentWeapon=<id>` with `attachmentOptic`, `attachmentRail`
-and `attachmentMuzzle` (`none` clears a slot) configures a build, as do
+For debug/capture, `attachmentOptic`, `attachmentRail` and `attachmentMuzzle` (`none`
+clears a slot) configure an owned weapon at boot (`?attachmentWeapon=<id>`, default
+`rifle`), as do
 `tools/capture.ts --optic/--rail/--muzzle`, e.g.
 `bun tools/capture.ts --weapon=rifle --optic=exps3 --shot=ads`.
 `tools/profile.ts --rail=laser|none` provides matched laser performance captures.
