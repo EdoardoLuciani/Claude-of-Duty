@@ -287,7 +287,7 @@ def build(output,render=False,quick=False):
         for z in np.arange(hg0-.019,hg0-.130,-.011):
             box('Panel moulded rib',(side*.0295,.044,float(z)),(.0015,.026,.0025),fde,hg,.0006)
         for z in (hg0-.010,hg0-.122):fastener('Panel screw',side*.030,.042,z,.003,hg)
-    # MIL-STD-1913 pitch 10.01 mm; teeth/cross slots modelled, not normal-only.
+    # Shared MIL-STD-1913 profile (picatinny.py): real teeth and cross slots.
     box('Integral rail web',(0,.104,-.252),(.014,.011,.655),black,hg,.0004)
     for name, outline, spans, mat in [
         ('Continuous top rail',picatinny.section(.118,.1075,slot=True),[(-.5795,.0755)],black),

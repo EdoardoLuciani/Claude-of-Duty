@@ -179,7 +179,7 @@ and base handling. For debug/capture, use `?attachmentOptic=rmr`, `acog`, `scope
 All seven weapons also support the shared EXPS3-0 holographic sight (350 credits):
 `optic: 'exps3'`, `?attachmentOptic=exps3`, or
 `bun tools/capture.ts --weapon=rifle --optic=exps3 --shot=ads`.
-It uses a nonmagnified 68 MOA ring / 1 MOA dot, with world FOV/sensitivity scales of 1.
+It uses a 68 MOA ring / 1 MOA dot with the red dot's 0.62 ADS FOV/sensitivity scale.
 Mounted optics replace removable irons automatically; P320/M590 keep their fixed irons.
 The [EXPS3 asset contract](assets/attachments/eotech-exps3-0/README.md) describes
 shared Picatinny geometry, clearance checks and visual limitations.

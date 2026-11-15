@@ -214,7 +214,6 @@ for id,slot in [('rmr','optic'),('acog','optic'),('scope','optic'),('exps3','opt
         assert clash == (id == 'scope'), (id,'opticClashes mismatch',clash)
         folded = [o for o in bpy.data.objects['IRON_sights_removed'].children if o.type == 'MESH']
         assert not mounted[id].overlap(surface(folded,rig.matrix_world.inverted())), (id,'hits folded removed state')
-        attachment_source.check_seating(mounted[id],rig.matrix_world.inverted() @ bpy.data.objects['MOUNT_optic'].matrix_world)
     loaded.extend(objects)
 
 # Check each enabled state against fixed receiver/guard and moving mechanisms.

@@ -93,11 +93,11 @@ zeroing or emitter-occlusion semantics change. Gameplay and market inspection
 use the same solver and borrowed asset; there is no weapon-specific renderer.
 
 `MOUNT_rail` positions below are in runtime metres (+Y up, −Z forward).
-Rails and channels now use the [common Picatinny profile](../../../tools/blender/README.md#common-picatinny-interface).
+Rails and channels use the [common Picatinny profile](../../../tools/blender/README.md#common-picatinny-interface).
 The recoil key is centred on the mount's groove. The non-bearing upper inner jaw
 corners are chamfered to clear adjacent rail shoulders, while retaining the external
-bar height, rail purchase and nominal manufacturer envelope. The M4's mount is
-sixteen grooves forward of its former seat to clear the actual support glove.
+bar height, rail purchase and nominal manufacturer envelope. The M4's mount sits
+on the right RIS II rail ahead of the support glove.
 
 The module body is **below** its local mount: local +Y points **into** the seat,
 not out of the weapon. Side mounts therefore retain forward −Z but turn the

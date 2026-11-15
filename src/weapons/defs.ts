@@ -11,8 +11,6 @@ export const SECONDARY_IDS = ['pistol', 'smg', 'shotgun'] as const satisfies rea
 export type WeaponMode = 'auto' | 'burst' | 'semi';
 export type WeaponClass = 'carbine' | 'smg' | 'pistol' | 'lmg' | 'shotgun' | 'sniper';
 type TuningVector = [number, number, number];
-/** MIL-STD-1913 groove pitch, matching the offline Picatinny profile. */
-export const PICATINNY_PITCH = 0.394 * 0.0254;
 
 /** Authored tuning is checked against this contract, not inferred into one. */
 export interface WeaponDef {
@@ -243,8 +241,9 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
       optic: {
         rmr: { eyeRelief: 0.125 },
         acog: { eyeRelief: 0.11 },
-        // Seven forward rail slots clear the ocular from the charging hand.
-        scope: { eyeRelief: 0.09, railSlots: 7 },
+        // Seven forward rail slots clear the ocular from the charging hand; eye
+        // relief grows by the same 70 mm so the ADS hold stays where it was.
+        scope: { eyeRelief: 0.16, railSlots: 7 },
         exps3: { eyeRelief: 0.2 },
       },
       rail: { laser: {} },

@@ -93,9 +93,8 @@ def check_laser_mount(weapon):
     optics = []
     optic_objects = []
     if weapon not in ('mcx', 'mpx'):
-        fits = attachment_source.optic_fits('rifle') if weapon == 'm4' else {}
         for optic in attachment_source.OPTICS:
-            objects = attachment_source.seat(optic, bpy.data.objects['MOUNT_optic'],rail_slots=fits.get(optic,{}).get('railSlots',0))
+            objects = attachment_source.seat(optic, bpy.data.objects['MOUNT_optic'], weapon=weapon)
             optics.extend(o for o in objects if o.type == 'MESH')
             optic_objects.extend(objects)
     clips = json.loads(scene['clips'])

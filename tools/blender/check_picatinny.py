@@ -71,7 +71,8 @@ def check_clamp(id):
         assert not tree.overlap(gauge),(id,obj.name,'penetrates inset rail gauge')
     tree=surface(meshes,inverse)
     # Probe both actual saddle strips at land centres. A floating clamp fails too.
-    for y in ((-.0050038,.0150114) if id=='laser' else (-.0050038,.0050038)):
+    half=picatinny.PITCH/2
+    for y in ((-half,3*half) if id=='laser' else (-half,half)):
         for x in ((-.002,.002) if id=='laser' else (-.008,.008)):
             point=hit(tree,(x,y,-.0005),(0,0,1))
             assert abs(point.z)<2e-6,(id,'saddle not seated',x,y,tuple(point))

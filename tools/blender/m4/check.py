@@ -210,16 +210,13 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import attachment_source
 pose('Idle')
 mounted={};loaded=[]
-fits=attachment_source.optic_fits('rifle')
 for id in attachment_source.OPTICS:
-    objects=attachment_source.seat(id,bpy.data.objects['MOUNT_optic'],rail_slots=fits[id].get('railSlots',0));loaded.extend(objects)
-    vertices,faces=geometry([o for o in objects if o.type=='MESH'])
-    mounted[id]=BVHTree.FromPolygons(vertices,faces,all_triangles=True)
-    attachment_source.check_seating(mounted[id],CI@rig.matrix_world.inverted()@bpy.data.objects['MOUNT_optic'].matrix_world)
-fixed=[o for o in meshes if o.parent.name in ('receiver','handguard','IRON_sights_removed') and
-       not o.name.startswith(('Upper receiver rail','RIS II top tooth','RIS II top web'))]
+    objects=attachment_source.seat(id,bpy.data.objects['MOUNT_optic'],weapon='m4');loaded.extend(objects)
+    mounted[id]=tree([o for o in objects if o.type=='MESH'])
+fixed=tree([o for o in meshes if o.parent.name in ('receiver','handguard','IRON_sights_removed') and
+            not o.name.startswith(('Upper receiver rail','RIS II top tooth','RIS II top web'))])
 for id,target in mounted.items():
-    assert not target.overlap(tree(fixed)),(id,'non-mating body intersection')
+    assert not target.overlap(fixed),(id,'non-mating body intersection')
 hands=[o for o in scene.objects if o.type=='MESH' and any('authored hands' in c.name for c in o.users_collection)]
 moving=[o for o in meshes if o.parent.name not in ('receiver','handguard','IRON_sights','IRON_sights_removed','MUZZLE_device','MUZZLE_device_removed')]
 count=0

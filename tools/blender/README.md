@@ -37,7 +37,8 @@ are shared game-art dimensions, not a manufacturing-tolerance certificate.
 Weapon sources own orientation, support, length and mount location; do not scale
 the profile or add vertical runtime seating offsets. A mount origin is a groove centre.
 `fits.optic[id].railSlots` may select whole forward grooves (default zero); gameplay,
-inspection, rest/live ADS datums and the M4 source check share that physical choice.
+inspection and rest/live ADS datums share it, and `attachment_source.RAIL_SLOTS` mirrors it
+for source checks.
 Optic/laser sources machine the matching channel before UV/bake/export, retaining
 exact saddle contact and 0.1 mm transverse assembly clearance on the flanks.
 

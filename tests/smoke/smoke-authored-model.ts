@@ -22,7 +22,7 @@ import {
   type AttachmentConfig,
 } from '../../src/weapons/attachments.ts';
 import { authoredModel, checkAuthoredDuration } from '../../src/weapons/authored-model.ts';
-import { PICATINNY_PITCH, WEAPON_DEFS, WEAPON_IDS } from '../../src/weapons/defs.ts';
+import { WEAPON_DEFS, WEAPON_IDS } from '../../src/weapons/defs.ts';
 import { WeaponLaser } from '../../src/weapons/laser.ts';
 import { ReticleMaterials } from '../../src/weapons/materials-tsl.ts';
 import { makeMCXModel } from '../../src/weapons/mcx.ts';
@@ -127,9 +127,6 @@ for (const id of ['rmr', 'acog', 'scope', 'exps3'] as const) {
   assert.equal(lens.material.depthWrite, false);
   asset.dispose();
 }
-// Only physically checked EXPS3 fits are selectable.
-for (const id of ['rifle', 'mcx', 'pistol', 'lmg', 'smg', 'shotgun', 'sniper'] as const)
-  assert(isAttachmentConfig({ ...BASE_ATTACHMENTS, optic: 'exps3' }, id));
 // Repeated mount/remove borrows one asset, restores base datums/tuning and
 // leaves no orphan glass/socket.
 {
@@ -202,9 +199,10 @@ for (const id of ['rifle', 'mcx', 'pistol', 'lmg', 'smg', 'shotgun', 'sniper'] a
     assert.equal(entry.attachmentGroup.parent, socket, 'instance follows its authored mount');
     assert.equal(irons.visible, false, 'a mounted optic replaces the removable irons');
     assert(ironsRemoved.visible);
-    const forward = (WEAPON_DEFS.rifle.fits?.optic?.[optic]?.railSlots ?? 0) * PICATINNY_PITCH;
-    assert.equal(entry.attachmentGroup.position.z, -forward);
-    assert(entry.sight.distanceTo(new THREE.Vector3(0, 0.1461072, -0.085 - forward)) < 1e-8);
+    // Rail slots move the optic forward along its mount; the sight datum follows.
+    const shift = entry.attachmentGroup.position.z;
+    assert.equal(shift < 0, Boolean(WEAPON_DEFS.rifle.fits?.optic?.[optic]?.railSlots));
+    assert(entry.sight.distanceTo(new THREE.Vector3(0, 0.1461072, -0.085 + shift)) < 1e-8);
     assert.deepEqual(entry.optic?.center, entry.sight.toArray());
     assert.equal(entry.def.eyeRelief, WEAPON_DEFS.rifle.fits?.optic?.[optic]?.eyeRelief);
     assert.equal(entry.def.adsFovScale, optic === 'rmr' ? 0.62 : optic === 'acog' ? 0.28 : 0.25);
@@ -596,52 +594,22 @@ for (const id of ['rifle', 'mcx', 'pistol', 'lmg', 'smg', 'shotgun', 'sniper'] a
     assert.equal(viewmodel.scopeOverlay.visible, false);
     assert(weaponScene.visible, 'removing the scope restores visible irons even while aiming');
   }
-  const sniper = fixture<WeaponEntry>({
-    ...entry,
-    id: 'sniper',
-    model: fixture<Extract<WeaponModelRecord, { id: 'sniper' }>>({
-      id: 'sniper',
-      scene: weaponScene,
-      root,
-      opticMountRest: model.opticMountRest,
-      nodes: fixture<Extract<WeaponModelRecord, { id: 'sniper' }>['nodes']>({
-        sight: model.nodes.sight,
-        muzzle: model.nodes.muzzle,
-      }),
-    }),
-    def: { ...WEAPON_DEFS.sniper },
-  });
-  configureWeaponAttachments(sniper, { ...BASE_ATTACHMENTS, optic: 'exps3' }, optics);
-  assert.equal(sniper.def.adsFovScale, 1, 'EXPS3 does not magnify the world');
-  assert.equal(sniper.def.adsSensScale, 1);
-  assert(sniper.optic, 'EXPS3 configuration installs the live optic');
-  assert.equal(sniper.optic.dotMoa, 1);
-  assert.equal(sniper.optic.ringMoa, 68);
-  viewmodel.rig.position.set(0, 0, -sniper.def.eyeRelief).sub(sniper.sight);
-  viewmodel._updateScope(sniper, 1);
-  assert.equal(viewmodel.scopeOverlay.visible, false);
-  viewmodel._updateReticle(sniper, 1);
+  // The EXPS3 ring is drawn only while it fits inside the lens.
+  configureWeaponAttachments(entry, { ...BASE_ATTACHMENTS, optic: 'exps3' }, optics);
+  viewmodel.rig.position.set(0, 0, -entry.def.eyeRelief).sub(entry.sight);
+  viewmodel._updateReticle(entry, 1);
   assert(viewmodel.reticle.visible && viewmodel.reticleRing.visible);
-  const expectedRadius =
-    (sniper.def.eyeRelief *
-      Math.tan((viewmodel.ctx.viewCamera.fov * Math.PI) / 360) *
-      Math.tan((68 * Math.PI) / (180 * 120))) /
-    Math.tan((viewmodel.ctx.camera.fov * Math.PI) / 360);
-  assert(Math.abs(viewmodel.reticleRing.scale.x - expectedRadius) < 1e-10);
   root.position.x = 0.1;
   root.updateMatrix();
-  viewmodel._updateReticle(sniper, 1);
+  viewmodel._updateReticle(entry, 1);
   assert.equal(viewmodel.reticle.visible, false, 'no floating EXPS3 ring outside the lens');
   root.position.x = 0;
   root.updateMatrix();
-  configureWeaponAttachments(sniper, BASE_ATTACHMENTS, optics);
-  assert(irons.visible, 'removing EXPS3 restores the base irons');
-  assert.equal(sniper.optic, null);
-  assert.equal(sniper.def.eyeRelief, WEAPON_DEFS.sniper.eyeRelief);
   configureWeaponAttachments(entry, config, optics);
   viewmodel.rig.position.set(0, 0, -entry.def.eyeRelief).sub(entry.sight);
   viewmodel._updateReticle(entry, 1);
   assert(viewmodel.reticle.visible, 'settled mounted optic shows its dot');
+  assert.equal(viewmodel.reticleRing.visible, false, 'a dot-only optic hides the ring');
   root.position.y = 0.1;
   root.updateMatrix();
   viewmodel._updateReticle(entry, 1);

@@ -11,9 +11,11 @@ import {
   type WeaponSceneMaterials,
 } from './asset-material.ts';
 import { requiredNode } from './authored-model.ts';
-import { PICATINNY_PITCH, WEAPON_DEFS, type WeaponId } from './defs.ts';
+import { WEAPON_DEFS, type WeaponId } from './defs.ts';
 import type { OpticData, WeaponEntry, WeaponModelRecord } from './runtime-types.ts';
 
+/** MIL-STD-1913 groove pitch (tools/blender/picatinny.py): one `railSlots` step. */
+const PICATINNY_PITCH = 0.394 * 0.0254;
 const OPTIC_IDS = ['rmr', 'acog', 'scope', 'exps3'] as const;
 export type OpticId = (typeof OPTIC_IDS)[number];
 export type RailId = 'laser';
@@ -64,8 +66,8 @@ const OPTICS: Record<
   }
 > = {
   exps3: {
-    adsFovScale: 1,
-    adsSensScale: 1,
+    adsFovScale: 0.62,
+    adsSensScale: 0.62,
     optic: { apertureR: 0.011, dotMoa: 1, ringMoa: 68, minDotPixels: 2, dotOpacity: 0.9 },
     glass: { prefix: '10 |', opacity: 0.13 },
   },

@@ -443,7 +443,7 @@ Blender sources are under `tools/blender/` (`rmr/`, `acog/`, `scope/`, `tor_mini
 45° flanks and recoil grooves; weapon sources retain rail supports/lengths and
 attachment sources machine their channels before bake/export. `check_picatinny.py`
 measures actual rails and checks actual clamps against an inset slotted gauge.
-EXPS3 uses the live-axis 68 MOA ring / 1 MOA dot path at 1x world FOV/sensitivity.
+EXPS3 uses the live-axis 68 MOA ring / 1 MOA dot path with the red dot's 0.62 ADS FOV/sensitivity scale.
 
 Debug URL input is narrowed in `main.ts`: `attachmentWeapon` (default M4) must pass
 `isWeaponId` plus compatibility/ownership checks; `attachmentOptic=rmr|acog|scope|exps3|none`,

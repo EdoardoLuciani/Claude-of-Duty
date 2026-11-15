@@ -291,7 +291,6 @@ export class Viewmodel {
   // ---- reticle ----------------------------------------------------------
   reticle: THREE.Object3D = new THREE.Object3D();
   declare reticleRing: THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
-  declare dotMaterial: THREE.Material;
   declare dotCore: THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
   scopeOverlay: THREE.Object3D = new THREE.Object3D();
   declare scopeMask: THREE.Mesh<THREE.BufferGeometry, MeshBasicNodeMaterial>;
@@ -379,23 +378,18 @@ export class Viewmodel {
     this.reticle.name = 'ow-reticle';
     this.anchor.add(this.reticle);
     // Unit-radius dot, scaled by its published angular size in _updateReticle.
-    this.dotMaterial = mats.reticle(0xff1206, 0.95);
-    this.dotCore = new THREE.Mesh(new THREE.CircleGeometry(1, 32), this.dotMaterial);
-    this.dotCore.renderOrder = 21;
-    this.dotCore.frustumCulled = false;
-    this.dotCore.userData.owNoPrepass = true;
-    this.dotCore.castShadow = false;
-    this.reticle.add(this.dotCore);
-    this.reticleRing = new THREE.Mesh(
-      new THREE.RingGeometry(0.84, 1, 96),
-      mats.reticle(0xff1206, 6.5)
-    );
-    this.reticleRing.renderOrder = 21;
-    this.reticleRing.frustumCulled = false;
-    this.reticleRing.userData.owNoPrepass = true;
-    this.reticleRing.castShadow = false;
+    const dot = mats.reticle(0xff1206, 0.95);
+    this.dotCore = new THREE.Mesh(new THREE.CircleGeometry(1, 32), dot);
+    // Optional circle (EXPS3); shares the dot's material, so one opacity fades both.
+    this.reticleRing = new THREE.Mesh(new THREE.RingGeometry(0.84, 1, 96), dot);
     this.reticleRing.visible = false;
-    this.reticle.add(this.reticleRing);
+    for (const mark of [this.dotCore, this.reticleRing]) {
+      mark.renderOrder = 21;
+      mark.frustumCulled = false;
+      mark.userData.owNoPrepass = true;
+      mark.castShadow = false;
+      this.reticle.add(mark);
+    }
 
     this.scopeOverlay.name = 'ow-scope';
     this.scopeOverlay.visible = false;
@@ -1450,8 +1444,6 @@ export class Viewmodel {
     this.dotCore.scale.setScalar(
       s * viewTan * Math.max(angularR, (optic.minDotPixels ?? 0) / height)
     );
-    this.dotCore.material =
-      optic.ringMoa === undefined ? this.dotMaterial : this.reticleRing.material;
     this.dotCore.material.opacity = alpha * (optic.dotOpacity ?? 1);
     this.reticleRing.visible = optic.ringMoa !== undefined;
     this.reticleRing.scale.setScalar(ringRadius);

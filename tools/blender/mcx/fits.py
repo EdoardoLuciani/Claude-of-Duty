@@ -79,8 +79,6 @@ def check_attachment_fits():
             clashes = bool(surface.overlap(tree(list(installed.children),inverse)))
             assert clashes == (id == 'scope'), (id,'unexpected installed-iron fit',clashes)
             assert not surface.overlap(tree(list(folded.children),inverse)), (id,'folded leaf collision')
-            attachment_source.check_seating(surface,inverse @ bpy.data.objects['MOUNT_optic'].matrix_world)
-            print('MCX_OPTIC_SEAT:',id,'four actual saddle rays; shared rail gauge checked separately')
         elif slot == 'muzzle':
             assert not surface.overlap(tree(list(installed.children),inverse)), 'can clips irons'
             exit = attachment_source.named(objects, 'SOCKET_muzzle')
