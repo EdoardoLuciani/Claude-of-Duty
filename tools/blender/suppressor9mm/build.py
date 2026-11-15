@@ -48,4 +48,4 @@ tube('Endcap | service ring', .130, .135, .0136, .0052, steel)
 tube('Endcap | recessed bore', .133, .134, .007, .0052, coat)
 # Real 10.4 mm opening: verify an unobstructed 10.2 mm gauge, including booster.
 can.assert_clear('9mm', (0, .0025, .0051), .135)
-can.export(root, out, 'suppressor9mm', .135)
+can.export(root, out, 'suppressor9mm', .135, batch=True)

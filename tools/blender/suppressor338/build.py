@@ -28,4 +28,4 @@ can.text('338 calibre engraving', '.338 LM  /  11 mm', (-.0251, .065, -.003), .0
 # 10.6 mm clear gauge: .338 projectile (8.59 mm) plus >1 mm radial margin.
 _, vertices = can.assert_clear('338', (0, .0025, .0045, .0053), .280, rays=48)
 assert abs(max(p.x for p in vertices)-.025) < .0002
-can.export(root, out, 'suppressor338', .280)
+can.export(root, out, 'suppressor338', .280, batch=True)
