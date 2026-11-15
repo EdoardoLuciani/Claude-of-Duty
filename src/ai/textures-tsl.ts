@@ -141,8 +141,6 @@ export interface SoldierMaterialOptions {
 
 /** Committed procedural GLB maps, no WebGL material or shader dependency. */
 export class SoldierMaterialsNode {
-  declare sets: Record<string, SoldierTextureSet>;
-  declare details: Record<string, Texture>;
   declare camoStats: Record<string, CamoStats>;
 
   static async fromCache({
@@ -172,7 +170,7 @@ export class SoldierMaterialsNode {
         details[name] = await load(`ai-detail-${name}`, false);
       })
     );
-    const library = new SoldierMaterialsNode(sets, details, manifest.camoStats ?? {});
+    const library = new SoldierMaterialsNode(manifest.camoStats ?? {});
     const names = Object.keys(sets);
     library.layers = new Map([...names, 'glass'].map((name, i): [string, number] => [name, i]));
     const maps = (field: keyof SoldierTextureSet): (Texture | null)[] => [
@@ -190,6 +188,14 @@ export class SoldierMaterialsNode {
         anisotropy
       ),
     };
+    // Packing copied the pixels; the decoded sources are no longer needed.
+    for (const texture of [
+      ...Object.values(sets).flatMap((set): Texture[] => [set.albedo, set.orm, set.normal]),
+      ...Object.values(details),
+    ]) {
+      texture.dispose();
+      if (isClosable(texture.image)) texture.image.close();
+    }
     return library;
   }
 
@@ -199,13 +205,7 @@ export class SoldierMaterialsNode {
   surfaceTables: DataTexture[] = [];
   arrays: Record<'albedo' | 'orm' | 'normal' | 'detail', DataArrayTexture> | null = null;
 
-  constructor(
-    sets: Record<string, SoldierTextureSet>,
-    details: Record<string, Texture>,
-    camoStats: Record<string, CamoStats> = {}
-  ) {
-    this.sets = sets;
-    this.details = details;
+  constructor(camoStats: Record<string, CamoStats> = {}) {
     this.camoStats = camoStats;
   }
 
@@ -278,18 +278,6 @@ export class SoldierMaterialsNode {
     this.arrays = null;
     for (const table of this.surfaceTables) table.dispose();
     this.surfaceTables.length = 0;
-    for (const set of Object.values(this.sets)) {
-      for (const texture of [set.albedo, set.orm, set.normal]) {
-        texture.dispose();
-        const image = texture.image;
-        if (isClosable(image)) image.close();
-      }
-    }
-    for (const texture of Object.values(this.details)) {
-      texture.dispose();
-      const image = texture.image;
-      if (isClosable(image)) image.close();
-    }
     this.combined.clear();
   }
 }
