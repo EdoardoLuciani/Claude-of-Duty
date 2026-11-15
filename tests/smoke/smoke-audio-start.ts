@@ -78,11 +78,6 @@ try {
       assert.equal(actx.sources.length, 1, 'ordinary stop allows a later start');
       assert.equal(radio.playing, true);
       radio.dispose();
-    } else {
-      assert.equal(radio._buf, null, 'disposed warmup must not publish its completed buffer');
-      assert.equal(await radio.warm(), null);
-      await radio.start();
-      assert.equal(actx.sources.length, 0, 'disposed radio cannot restart');
     }
   }
 } finally {

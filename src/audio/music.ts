@@ -167,7 +167,6 @@ export class TentRadio {
   _gain: GainNode | null = null;
   _lfo: OscillatorNode | null = null;
   playing: boolean = false;
-  private _disposed: boolean = false;
   private _request: number = 0;
 
   constructor(actx: BaseAudioContext, mixer: TentRadioMixer, rng: Rng) {
@@ -178,11 +177,9 @@ export class TentRadio {
 
   /** Kick off the offline render; first `start()` awaits this. */
   warm(): Promise<AudioBuffer | null> {
-    if (this._disposed) return Promise.resolve(null);
     if (this._warm) return this._warm;
     this._warm = renderBed(this.actx.sampleRate, this.rng)
       .then((buf): AudioBuffer | null => {
-        if (this._disposed) return null;
         this._buf = buf;
         return buf;
       })
@@ -194,7 +191,7 @@ export class TentRadio {
   }
 
   async start(): Promise<void> {
-    if (this._disposed || this.playing) return;
+    if (this.playing) return;
     const request = this._request;
     if (!this._buf) await this.warm();
     if (request !== this._request) return;
@@ -275,7 +272,6 @@ export class TentRadio {
   }
 
   dispose(): void {
-    this._disposed = true;
     this.stop();
     this._buf = null;
     this._warm = null;
