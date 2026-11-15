@@ -1,6 +1,6 @@
 # AX338 .338-class suppressor (#713)
 
-Original exterior authored by `tools/blender/suppressor-338/build.py`, **not** a
+Original exterior authored by `tools/blender/suppressor338/build.py`, **not** a
 reused or scaled SRD762Ti. The 280 mm × 50 mm graphite ceramic body has a stepped
 steel rear sleeve, six wrench lands, shallow circumferential seams and a recessed
 11 mm open endcap. The saved source and native/cooked GLBs are ignored products.
@@ -35,9 +35,9 @@ suppression generically; no damage, handling, audio-bank or stat changes.
 ## Build and check
 
 ```sh
-blender -b -t 2 --python-exit-code 1 --python tools/blender/suppressor-338/build.py
+blender -b -t 2 --python-exit-code 1 --python tools/blender/suppressor338/build.py
 blender -b -t 2 assets/attachments/suppressor-338/suppressor338.blend \
-  --python-exit-code 1 --python tools/blender/suppressor-338/check.py
+  --python-exit-code 1 --python tools/blender/suppressor338/check.py
 bun run models:cook -- suppressor338
 # Build AX338, TOR Mini and all standalone optics first (bun run assets):
 blender -b -t 2 assets/weapons/ax338/ax338.blend --python-exit-code 1 \
