@@ -68,7 +68,7 @@ assert(reference);
 assert('tabIndex' in reference);
 assert.equal(reference.tabIndex, 0, 'reference is keyboard scrollable');
 assert.equal(nodes.filter((node): boolean => node.tagName === 'DD').length, controls.length);
-assert.equal(controls.length, 23, 'only the concise grouped reference is rendered');
+assert.equal(controls.length, 24, 'only the concise grouped reference is rendered');
 assert.ok(
   !nodes.some((node): boolean => ['DETAILS', 'SUMMARY'].includes(node.tagName)),
   'no disclosure UI'
@@ -101,6 +101,7 @@ for (const distinction of [
   'Aim down sights (hold; weapon out)',
   'Interact (hold): ammo 0.45s / aimed intel 4s',
   'Flashlight (toggle)',
+  'Mounted weapon laser (toggle; weapon out)',
   'Bandage (hold 3s)',
   'Equip / stow grenade (toggle)',
   'Grenade out: cook long / short (hold); release to throw',

@@ -18,7 +18,7 @@ import { Movement } from '../../src/player/movement.ts';
 import type { RadioSystem } from '../../src/radio/index.ts';
 import type { UiSystem } from '../../src/ui/index.ts';
 import { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
-import { BASE_ATTACHMENTS, makeOpticModel } from '../../src/weapons/attachments.ts';
+import { BASE_ATTACHMENTS, makeLaserModel, makeOpticModel } from '../../src/weapons/attachments.ts';
 import { ProjectileSim } from '../../src/weapons/ballistics.ts';
 import { buildManifestClips, Clip } from '../../src/weapons/clips.ts';
 import { WEAPON_IDS } from '../../src/weapons/defs.ts';
@@ -205,22 +205,27 @@ for (const [primary, first, second] of [
   assert.deepEqual(wp.weaponIds, ['rifle', 'pistol']);
   assert.equal(wp.activeId, 'rifle');
 }
-// Swapped-out and restarted weapons lose their attachments.
+// Mounted laser switches belong to the gun, not the flashlight or active slot.
 {
   type RifleModel = Extract<WeaponModelRecord, { id: 'rifle' }>;
-  const { wp } = makeHarness();
+  const { wp, input, tap, frame, player } = makeHarness();
   const scene = new THREE.Group();
   const irons = Object.assign(new THREE.Object3D(), { name: 'IRON_sights' });
   scene.add(
     irons,
     Object.assign(new THREE.Object3D(), { name: 'MUZZLE_device' }),
-    Object.assign(new THREE.Object3D(), { name: 'MOUNT_optic' })
+    Object.assign(new THREE.Object3D(), { name: 'MOUNT_optic' }),
+    Object.assign(new THREE.Object3D(), { name: 'MOUNT_rail' })
   );
   const opticScene = new THREE.Group();
   for (const name of ['MOUNT_base', 'SOCKET_sight'])
     opticScene.add(Object.assign(new THREE.Object3D(), { name }));
   const rmr = makeOpticModel(fixture<GLTF>({ scene: opticScene }), 'rmr');
-  Object.assign(wp, { _attachments: { rmr } });
+  const laserScene = new THREE.Group();
+  for (const name of ['SOCKET_mount', 'SOCKET_laser'])
+    laserScene.add(Object.assign(new THREE.Object3D(), { name }));
+  const laser = makeLaserModel(fixture<GLTF>({ scene: laserScene }));
+  Object.assign(wp, { _attachments: { rmr, laser } });
   Object.assign(wp.viewmodel, {
     reticle: new THREE.Object3D(),
     scopeOverlay: new THREE.Object3D(),
@@ -243,15 +248,65 @@ for (const [primary, first, second] of [
     laserEmitter: null,
     sight: new THREE.Vector3(),
   });
+  const config = { ...BASE_ATTACHMENTS, rail: 'laser' } as const;
+  assert.equal(wp.state.laserEnabled, false);
+  tap('KeyL');
+  assert.equal(wp.state.laserEnabled, false, 'L cannot enable a missing module');
+  assert(wp.setAttachments('rifle', config));
+  assert(wp.state.laserEnabled, 'newly mounted module starts on');
+  tap('KeyF');
+  assert(wp.state.laserEnabled, 'F never toggles the laser');
+  frame({ down: ['KeyL'] });
+  assert(!wp.state.laserEnabled, 'L toggles independently of F');
+  frame();
+  assert(!wp.state.laserEnabled, 'holding L does not repeat');
+  frame({ up: ['KeyL'] });
+  wp.setWeaponImmediate('pistol');
+  tap('KeyL');
+  wp.setWeaponImmediate('rifle');
+  assert(!wp.state.laserEnabled, 'switching away and back preserves the per-gun switch');
+  assert(wp.setAttachments('rifle', { ...config, optic: 'rmr' }));
+  assert(!wp.state.laserEnabled, 'optic changes preserve an off switch');
+  for (const gate of [
+    'frozen',
+    'disabled',
+    'dead',
+    'control',
+    'grenade',
+    'radio',
+    'heal',
+  ] as const) {
+    input.frozen = gate === 'frozen';
+    input.enabled = gate !== 'disabled';
+    player.health.dead = gate === 'dead';
+    player.controlEnabled = gate !== 'control';
+    wp.grenadeEquipped = gate === 'grenade';
+    wp.radioEquipped = gate === 'radio';
+    wp.healing = gate === 'heal';
+    tap('KeyL');
+    assert(!wp.state.laserEnabled, `${gate} ignores L`);
+  }
+  player.controlEnabled = input.enabled = true;
+  input.frozen = player.health.dead = wp.grenadeEquipped = wp.radioEquipped = wp.healing = false;
+  tap('KeyL');
+  assert(wp.state.laserEnabled, 'a fresh live press toggles on');
+  wp._onPlayerDeath();
+  assert(!wp.state.laserEnabled, 'death switches off');
+  wp.disabled = false;
+  assert(wp.setAttachments('rifle', BASE_ATTACHMENTS));
+  assert(!wp.state.laserEnabled, 'removal switches off');
+  assert(wp.setAttachments('rifle', config) && wp.state.laserEnabled, 'remount starts on');
   for (const drop of [
     (): boolean => wp.applyBuild('lmg', BASE_ATTACHMENTS),
     (): void => wp.resetForNewGame(),
   ]) {
     wp.resetForNewGame();
-    assert(wp.setAttachments('rifle', { ...BASE_ATTACHMENTS, optic: 'rmr' }));
+    assert(wp.setAttachments('rifle', { ...config, optic: 'rmr' }));
+    assert(wp.state.laserEnabled);
     assert(!irons.visible, 'a mounted optic replaces the removable irons');
     drop();
     assert.equal(weaponState(wp, 'rifle').attachments, BASE_ATTACHMENTS);
+    assert(!weaponState(wp, 'rifle').laserEnabled, 'drop/restart clears the switch');
     assert(irons.visible, 'the mounted build is reset, not only the stored config');
   }
 }

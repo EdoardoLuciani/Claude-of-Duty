@@ -688,7 +688,6 @@ for (const id of ['rmr', 'acog', 'scope', 'exps3'] as const) {
   rig.fov = camera.fov;
   rig.fireVibe = 1;
   rig.fireVibeTime = 0.07;
-  const muzzle = new THREE.Vector3(0, 0, -0.3);
   const actor = physics.addCollider({
     shape: 'sphere',
     radius: 0.5,
@@ -711,9 +710,8 @@ for (const id of ['rmr', 'acog', 'scope', 'exps3'] as const) {
     viewCamera.quaternion.copy(camera.quaternion);
     anchor.position.copy(camera.position);
     anchor.quaternion.copy(camera.quaternion);
-    laser.updateAim(camera, WEAPON_DEFS.rifle, muzzle, physics, null);
     rig.applyFireVibe(camera, viewCamera, anchor);
-    laser.update(camera, viewCamera, emitter, physics, null, 1080);
+    laser.update(camera, viewCamera, emitter, physics, null, 1080, WEAPON_DEFS.rifle.maxRange);
     dot.set(0, 0, 0);
     for (let i = 4; i < 8; i++) dot.add(new THREE.Vector3().fromBufferAttribute(positions, i));
     dot.multiplyScalar(0.25);
@@ -738,16 +736,48 @@ for (const id of ['rmr', 'acog', 'scope', 'exps3'] as const) {
   const unshakenEmitter = emitter.getWorldPosition(new THREE.Vector3());
   update(1);
   assert(
-    dot.distanceTo(unshakenSpot) < 1e-5,
-    'cosmetic firing shake preserves the ballistic target'
+    dot.distanceTo(unshakenSpot) > 1e-5,
+    'the rigid beam follows firing shake instead of steering back to the ballistic target'
   );
   assert(
     emitter.getWorldPosition(new THREE.Vector3()).distanceTo(unshakenEmitter) > 1e-5,
     'the rendered emitter still follows cosmetic firing shake'
   );
-  assert.equal(laser.geometry.getAttribute('position'), positions, 'updates reuse the same buffer');
   physics.colliders.length = 0;
-  update();
+  for (const fov of [70, 35]) {
+    rig.fov = fov;
+    viewCamera.fov = 55;
+    viewCamera.updateProjectionMatrix();
+    rig.rotation.set(0.1, 0.4, 0.03);
+    for (const yaw of [-0.12, 0.12]) {
+      emitter.rotation.set(0.08, yaw, 0.02);
+      update(1);
+      const start = new THREE.Vector3()
+        .fromBufferAttribute(positions, 0)
+        .add(new THREE.Vector3().fromBufferAttribute(positions, 1))
+        .multiplyScalar(0.5);
+      const end = new THREE.Vector3()
+        .fromBufferAttribute(positions, 2)
+        .add(new THREE.Vector3().fromBufferAttribute(positions, 3))
+        .multiplyScalar(0.5);
+      assert(Math.abs(start.distanceTo(end) - WEAPON_DEFS.rifle.maxRange) < 1e-4);
+      const lens = emitter.getWorldPosition(new THREE.Vector3()).project(viewCamera);
+      const forward = emitter.localToWorld(new THREE.Vector3(0, 0, -1)).project(viewCamera);
+      const projectedStart = start.project(camera);
+      const projectedEnd = end.project(camera);
+      assert(
+        Math.hypot(projectedStart.x - lens.x, projectedStart.y - lens.y) < 1e-5,
+        'beam starts on the projected emitter in hip/ADS FOVs'
+      );
+      const axis = new THREE.Vector2(forward.x - lens.x, forward.y - lens.y).normalize();
+      const beam = new THREE.Vector2(projectedEnd.x - lens.x, projectedEnd.y - lens.y).normalize();
+      assert(
+        axis.dot(beam) > 0.99999,
+        'beam follows the posed emitter axis, not the camera crosshair'
+      );
+    }
+  }
+  assert.equal(laser.geometry.getAttribute('position'), positions, 'updates reuse the same buffer');
   assert.equal(laser.geometry.drawRange.count, 6, 'a miss draws only the beam, no floating dot');
   laser.dispose();
   assert.equal(scene.children.length, 0);

@@ -80,6 +80,7 @@ export function initializeWeaponStates(
     weapons.states.set(id, {
       def,
       attachments: BASE_ATTACHMENTS,
+      laserEnabled: false,
       pattern: buildRecoilPattern(def, Rng),
       mag: def.magSize,
       chambered: true,

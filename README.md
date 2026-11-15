@@ -91,7 +91,7 @@ Bindings are fixed defaults in `src/core/bindings.ts`.
 | LMB / RMB               | Fire / hold ADS                                        |
 | R / B / I               | Reload / fire mode / inspect                           |
 | 1 / 2, Tab / wheel      | Equipped primary/secondary, cycle pair                 |
-| Hold T, F               | Ammo/intel interaction, flashlight toggle              |
+| Hold T, F, L            | Ammo/intel, flashlight / mounted laser toggle          |
 | Hold H                  | Bandage (3 seconds; +50 HP on completion)              |
 | G, then LMB / RMB       | Equip grenade; cook long/short throw, release to throw |
 | X, then 1 / 2 / 3       | Radio; immediate carpet-bomb request / locked requests |
@@ -138,8 +138,14 @@ shared Picatinny geometry, clearance checks and visual limitations.
 
 The M4 also supports `rail: 'laser'` (Steiner TOR Mini), independently of optics.
 It adds a green beam and surface dot, with **no stat changes** or AI light reaction.
-The dot follows the unspread aim ray and respects emitter occlusion; it does not
-predict random spread, penetration or bullet drop over the full trajectory.
+Press **L** to toggle the mounted weapon laser independently of **F** (flashlight).
+The switch stays with each gun across weapon swaps; a newly mounted module starts
+on. Removal, dropping the gun, death and restart clear its switch; pause/shop
+preserve it and ignore toggle input. Grenade/radio/bandage use hides the beam and
+blocks toggling until the weapon is out again.
+The beam rigidly follows the module’s emitter axis through sway, recoil and ADS,
+with emitter-origin occlusion and a surface dot. It does not converge on the
+camera crosshair or predict random spread, penetration or bullet drop.
 Use `?attachmentRail=laser` or `bun tools/capture.ts --shot=weapon --rail=laser`;
 `attachmentRail=none`/`rail: null` removes it. `tools/profile.ts --rail=laser|none`
 provides matched performance captures.

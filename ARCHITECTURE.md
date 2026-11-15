@@ -43,8 +43,8 @@ from their implementations, not handwritten consumer APIs. `Engine.add()` and
 
 `src/core/bindings.ts` owns default bindings, action IDs and labels. Input snapshots
 actions; gameplay consumers own their state machines. `src/ui/controls.ts` builds the
-pause-menu reference from the binding labels. Tab and wheel are cycle requests, not
-guaranteed swaps.
+pause-menu reference from the binding labels. F toggles the flashlight; L independently
+toggles the mounted weapon laser. Tab and wheel are cycle requests, not guaranteed swaps.
 
 Time contains `elapsed, raw, dt, fixed, alpha, scale, frame`; interpolate with
 `alpha`. Respect `config.q` feature flags and particle/decal/shadow budgets.
@@ -330,10 +330,14 @@ Debug input is narrowed in `main.ts`: `attachmentWeapon` must pass ID,
 compatibility and ownership checks; `attachmentOptic=rmr|acog|scope|exps3|none`,
 `attachmentRail=laser|none` and `attachmentMuzzle=suppressor|none` select slots.
 `tools/capture.ts` uses the same validator.
-The laser owns one retained beam/dot mesh, no light/decal or per-frame allocation.
-Pooled bullet-mask queries find unspread muzzle aim and clip the emitter ray without
-damage/effects. The dot is not a prediction of spread, penetration or curved flight;
-it changes no stats or AI perception. Flashlight retains separate light ownership.
+The laser owns one retained beam/dot mesh, no light/decal or per-frame allocation;
+boot warms it even without a module. One pooled bullet-mask query clips the rigid
+-Z emitter ray without damage/effects. Origin and direction share the first-person/world
+FOV mapping and are sampled after firing vibration, without camera-crosshair convergence.
+L toggles per-weapon state across swaps and pause/shop; new mounts start on,
+removal/drop/restart/death switch off. Busy hands hide the beam and block L.
+The dot is not a prediction of spread, penetration or curved flight; it changes no
+stats or AI perception. Flashlight retains separate light ownership.
 
 `tools/blender/soldiers/` builds seeded parametric soldiers; a Bun GLTFExporter cook
 preserves the runtime joint/attribute format. `tools/export-models.ts` validates and
