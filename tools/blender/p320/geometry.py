@@ -5,6 +5,7 @@ import bpy
 import bmesh
 from mathutils import Vector, Matrix
 from .materials import build_source_materials
+import picatinny
 
 def build_geometry(asset):
     def active(o):
@@ -129,10 +130,14 @@ def build_geometry(asset):
     # See-through cantilever rail supports the PM II's 177 mm mounting foot.
     # Its open centre preserves the fixed SIGLITE ray below the rail deck.
     for side in (-1,1):
-        box('Optic bridge | side support',(side*.009,.003,.0565),(.004,.056,.012),steel,slide,.0004)
-    box('Optic bridge | rail deck',(0,.003,.064),(.0212,.180,.004),steel,slide,.0004)
-    for y in (-.077,-.067,-.057,-.047,-.037,-.027,-.017,-.007,.003,.013,.023,.033,.043,.053,.063,.073,.083):
-        rounded_cut(bpy.data.objects['Optic bridge | rail deck'],(0,y,.066),(.024,.004,.002),.0002)
+        box('Optic bridge | side support',(side*.0065,.003,.0565),(.002,.056,.012),steel,slide,.0003)
+    for outline, spans in [
+        (picatinny.section(.066,.061,slot=True), [(-.087,.093)]),
+        (picatinny.section(.066,.061), picatinny.lands(-.087,.093,.003)),
+    ]:
+        for a,b in spans:
+            vertices,faces=picatinny.prism(outline,a,b)
+            mesh('Optic bridge | rail deck',vertices,faces,steel,slide,0)
     cut(shroud,cyl('CUT',(0,.127,.025),.0044,.017,None,None,'Y',48,0))
     rounded_cut(shroud,(.009,.049,.045),(.023,.032,.021),.0010)
     for side in (-1,1):
@@ -198,8 +203,8 @@ def build_geometry(asset):
         rounded_cut(guard,(0,.0686,z),(.021,.0015,.0010),.0003)
     # Game-fit accessory rail: 14 mm forward extension and a fifth slot
     # support the TOR Mini ahead of the reload hand; not a factory frame.
-    rail=profile('Frame | integral accessory rail',[(.069,.014),(.141,.014),(.141,.002),(.071,.002)],.021,polymer,body,.0005)
-    for y in (.081,.093,.105,.117,.129):rounded_cut(rail,(0,y,.0017),(.026,.0042,.006),.0003)
+    frame_matrix=Matrix.Translation((0,.122,.002))@Matrix.Rotation(math.pi,4,'Y')
+    rail_parts=picatinny.build_rail('Frame | integral accessory rail',frame_matrix,-.053,.019,polymer,body,asset,bottom=-.012)
     for side in (-1,1):
         text('SIGSAUER',(side*.0161,-.004 if side==-1 else -.028,-.036),.0042,side,body,polymer,.00012)
         # Compact-medium molding under the dust cover, not a bright white label.
@@ -316,7 +321,7 @@ def build_geometry(asset):
 
     # Union the molded frame pieces so the grip neck and rail are not visibly
     # assembled from intersecting slabs. Preserve the sculpted grip's smooth faces.
-    for piece in (frame,guard,rail):
+    for piece in (frame,guard,*rail_parts):
         active(grip);mod=grip.modifiers.new('Continuous molded frame','BOOLEAN');mod.operation='UNION';mod.object=piece
         bpy.ops.object.modifier_apply(modifier=mod.name);bpy.data.objects.remove(piece,do_unlink=True)
     grip.name='Frame | continuous compact medium polymer shell'

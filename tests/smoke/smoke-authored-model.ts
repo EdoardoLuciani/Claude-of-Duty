@@ -109,7 +109,7 @@ assert.throws(
   /missing Inspect clip/
 );
 // Shared glass remains a single thin-alpha surface, even if source art uses transmission.
-for (const id of ['rmr', 'acog', 'scope'] as const) {
+for (const id of ['rmr', 'acog', 'scope', 'exps3'] as const) {
   const scene = new THREE.Group();
   for (const name of ['MOUNT_base', 'SOCKET_sight']) {
     const node = new THREE.Object3D();
@@ -154,7 +154,7 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
   const lens = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial());
   assetScene.add(base, sight, lens);
   const asset = makeOpticModel(fixture<GLTF>({ scene: assetScene }), 'rmr');
-  const optics = { rmr: asset, acog: asset, scope: asset };
+  const optics = { rmr: asset, acog: asset, scope: asset, exps3: asset };
   let disposed = 0;
   let ownerDisposed = false;
   asset.scene.addEventListener('dispose', (): void => {
@@ -199,7 +199,10 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     assert.equal(entry.attachmentGroup.parent, socket, 'instance follows its authored mount');
     assert.equal(irons.visible, false, 'a mounted optic replaces the removable irons');
     assert(ironsRemoved.visible);
-    assert(entry.sight.distanceTo(new THREE.Vector3(0, 0.1461072, -0.085)) < 1e-8);
+    // Rail slots move the optic forward along its mount; the sight datum follows.
+    const shift = entry.attachmentGroup.position.z;
+    assert.equal(shift < 0, Boolean(WEAPON_DEFS.rifle.fits?.optic?.[optic]?.railSlots));
+    assert(entry.sight.distanceTo(new THREE.Vector3(0, 0.1461072, -0.085 + shift)) < 1e-8);
     assert.deepEqual(entry.optic?.center, entry.sight.toArray());
     assert.equal(entry.def.eyeRelief, WEAPON_DEFS.rifle.fits?.optic?.[optic]?.eyeRelief);
     assert.equal(entry.def.adsFovScale, optic === 'rmr' ? 0.62 : optic === 'acog' ? 0.28 : 0.25);
@@ -591,10 +594,22 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     assert.equal(viewmodel.scopeOverlay.visible, false);
     assert(weaponScene.visible, 'removing the scope restores visible irons even while aiming');
   }
+  // The EXPS3 ring is drawn only while it fits inside the lens.
+  configureWeaponAttachments(entry, { ...BASE_ATTACHMENTS, optic: 'exps3' }, optics);
+  viewmodel.rig.position.set(0, 0, -entry.def.eyeRelief).sub(entry.sight);
+  viewmodel._updateReticle(entry, 1);
+  assert(viewmodel.reticle.visible && viewmodel.reticleRing.visible);
+  root.position.x = 0.1;
+  root.updateMatrix();
+  viewmodel._updateReticle(entry, 1);
+  assert.equal(viewmodel.reticle.visible, false, 'no floating EXPS3 ring outside the lens');
+  root.position.x = 0;
+  root.updateMatrix();
   configureWeaponAttachments(entry, config, optics);
   viewmodel.rig.position.set(0, 0, -entry.def.eyeRelief).sub(entry.sight);
   viewmodel._updateReticle(entry, 1);
   assert(viewmodel.reticle.visible, 'settled mounted optic shows its dot');
+  assert.equal(viewmodel.reticleRing.visible, false, 'a dot-only optic hides the ring');
   root.position.y = 0.1;
   root.updateMatrix();
   viewmodel._updateReticle(entry, 1);

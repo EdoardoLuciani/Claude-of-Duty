@@ -14,7 +14,9 @@ import { requiredNode } from './authored-model.ts';
 import { WEAPON_DEFS, type WeaponId } from './defs.ts';
 import type { OpticData, WeaponEntry, WeaponModelRecord } from './runtime-types.ts';
 
-const OPTIC_IDS = ['rmr', 'acog', 'scope'] as const;
+/** MIL-STD-1913 groove pitch (tools/blender/picatinny.py): one `railSlots` step. */
+const PICATINNY_PITCH = 0.394 * 0.0254;
+const OPTIC_IDS = ['rmr', 'acog', 'scope', 'exps3'] as const;
 export type OpticId = (typeof OPTIC_IDS)[number];
 export type RailId = 'laser';
 export type MuzzleId = 'suppressor';
@@ -63,6 +65,12 @@ const OPTICS: Record<
     };
   }
 > = {
+  exps3: {
+    adsFovScale: 0.62,
+    adsSensScale: 0.62,
+    optic: { apertureR: 0.011, dotMoa: 1, ringMoa: 68, minDotPixels: 2, dotOpacity: 0.9 },
+    glass: { prefix: '10 |', opacity: 0.13 },
+  },
   rmr: {
     adsFovScale: 0.62,
     adsSensScale: 0.62,
@@ -308,6 +316,9 @@ export function mountAttachments(
     throw new Error(`[weapons] incompatible attachments: ${model.id} ${JSON.stringify(config)}`);
   const opticAsset = opticId && assets[opticId];
   const opticSlot = stageMount(model, 'optic', opticId, opticAsset);
+  // Select physical grooves along the rail, never a vertical seating correction.
+  const slots = opticId ? (WEAPON_DEFS[model.id].fits?.optic?.[opticId]?.railSlots ?? 0) : 0;
+  opticSlot.group.position.z = -slots * PICATINNY_PITCH;
   const rail = stageMount(model, 'rail', config.rail, config.rail && assets[config.rail]);
   // isAttachmentConfig guarantees a fitted can for any installed muzzle.
   const can = fittedCan(model.id, config.muzzle) ?? null;
@@ -323,7 +334,7 @@ export function mountAttachments(
     if (!transform) throw new Error(`[weapons] ${model.id} has no optic mount`);
     mountedOptic = {
       mount: opticSlot.parent,
-      sight: opticAsset.sight.clone().sub(opticAsset.mount),
+      sight: opticAsset.sight.clone().sub(opticAsset.mount).add(opticSlot.group.position),
     };
     sight.copy(mountedOptic.sight).applyMatrix4(transform);
     optic = { ...OPTICS[opticId].optic, center: sight.toArray() };

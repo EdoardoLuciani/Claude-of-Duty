@@ -76,7 +76,7 @@ export interface WeaponDef {
   /** Verified fits per attachment slot: a key enables that attachment on this weapon
    * and holds its fit data. Unverified fits stay absent; no handling modifiers. */
   fits?: {
-    optic?: Partial<Record<OpticId, { eyeRelief: number }>>;
+    optic?: Partial<Record<OpticId, { eyeRelief: number; railSlots?: number }>>;
     rail?: Partial<Record<RailId, Record<string, never>>>;
     muzzle?: Partial<Record<MuzzleId, { model: CanModel }>>;
   };
@@ -154,7 +154,12 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     adsCant: [0, 0, 0],
     eyeRelief: 0.06,
     fits: {
-      optic: { rmr: { eyeRelief: 0.125 }, acog: { eyeRelief: 0.11 }, scope: { eyeRelief: 0.09 } },
+      optic: {
+        rmr: { eyeRelief: 0.125 },
+        acog: { eyeRelief: 0.11 },
+        scope: { eyeRelief: 0.09 },
+        exps3: { eyeRelief: 0.2 },
+      },
       muzzle: { suppressor: { model: 'srd762ti' } },
       rail: { laser: {} },
     },
@@ -233,7 +238,14 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     eyeRelief: 0.03,
     fits: {
       muzzle: { suppressor: { model: 'srd762ti' } },
-      optic: { rmr: { eyeRelief: 0.125 }, acog: { eyeRelief: 0.11 }, scope: { eyeRelief: 0.09 } },
+      optic: {
+        rmr: { eyeRelief: 0.125 },
+        acog: { eyeRelief: 0.11 },
+        // Seven forward rail slots clear the ocular from the charging hand; eye
+        // relief grows by the same 70 mm so the ADS hold stays where it was.
+        scope: { eyeRelief: 0.16, railSlots: 7 },
+        exps3: { eyeRelief: 0.2 },
+      },
       rail: { laser: {} },
     },
     removableIrons: true,
@@ -306,7 +318,12 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     // Aim through the deployed rear peep, not the removed ROMEO4T optical axis.
     eyeRelief: 0.06,
     fits: {
-      optic: { rmr: { eyeRelief: 0.125 }, acog: { eyeRelief: 0.11 }, scope: { eyeRelief: 0.09 } },
+      optic: {
+        rmr: { eyeRelief: 0.125 },
+        acog: { eyeRelief: 0.11 },
+        scope: { eyeRelief: 0.09 },
+        exps3: { eyeRelief: 0.2 },
+      },
       muzzle: { suppressor: { model: 'srd762ti' } },
       rail: { laser: {} },
     },
@@ -378,7 +395,12 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     adsCant: [0, 0, 0.004],
     eyeRelief: 0.03,
     fits: {
-      optic: { rmr: { eyeRelief: 0.125 }, acog: { eyeRelief: 0.11 }, scope: { eyeRelief: 0.09 } },
+      optic: {
+        rmr: { eyeRelief: 0.125 },
+        acog: { eyeRelief: 0.11 },
+        scope: { eyeRelief: 0.09 },
+        exps3: { eyeRelief: 0.2 },
+      },
       muzzle: { suppressor: { model: 'srd762ti' } },
       rail: { laser: {} },
     },
@@ -452,7 +474,12 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     // Long-relief game fit: compensate each ocular's distance from the slide
     // mount to retain the iron-sight wrist extension, not a rifle-to-face pose.
     fits: {
-      optic: { rmr: { eyeRelief: 0.394 }, acog: { eyeRelief: 0.308 }, scope: { eyeRelief: 0.2 } },
+      optic: {
+        rmr: { eyeRelief: 0.394 },
+        acog: { eyeRelief: 0.308 },
+        scope: { eyeRelief: 0.2 },
+        exps3: { eyeRelief: 0.353 },
+      },
       rail: { laser: {} },
       muzzle: { suppressor: { model: 'suppressor9mm' } },
     },
@@ -523,7 +550,12 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     // Extended integrated-sight rail seats RMR/ACOG and both PM II pedestals.
     // The optional TOR Mini stays on the fixed forward magazine-tube clamps.
     fits: {
-      optic: { rmr: { eyeRelief: 0.12 }, acog: { eyeRelief: 0.1 }, scope: { eyeRelief: 0.09 } },
+      optic: {
+        rmr: { eyeRelief: 0.12 },
+        acog: { eyeRelief: 0.1 },
+        scope: { eyeRelief: 0.09 },
+        exps3: { eyeRelief: 0.2 },
+      },
       rail: { laser: {} },
       muzzle: { suppressor: { model: 'suppressor12g' } },
     },
@@ -585,7 +617,12 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     adsCant: [0, 0, 0],
     eyeRelief: 0.07,
     fits: {
-      optic: { rmr: { eyeRelief: 0.125 }, acog: { eyeRelief: 0.11 }, scope: { eyeRelief: 0.09 } },
+      optic: {
+        rmr: { eyeRelief: 0.125 },
+        acog: { eyeRelief: 0.11 },
+        scope: { eyeRelief: 0.09 },
+        exps3: { eyeRelief: 0.2 },
+      },
       rail: { laser: {} },
       muzzle: { suppressor: { model: 'suppressor338' } },
     },

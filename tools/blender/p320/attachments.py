@@ -1,4 +1,5 @@
 """Physical checks against the available shared optics, never absent slot assets."""
+import math
 import bpy
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
@@ -88,8 +89,9 @@ def check_mounts(clips):
             for track in obj.animation_data.nla_tracks:
                 track.mute = track.name != name
         end = info['frames'][1]
-        for frame in sorted(set([0, end, *range(0, end + 1, 12), *([2, 4, 7] if name in ('Fire', 'Last_Shot') else [])])):
-            scene.frame_set(frame)
+        for step in range(math.ceil(info['duration']*120)+1):
+            frame=min(step/120*scene.render.fps,end)
+            scene.frame_set(math.floor(frame),subframe=frame%1)
             bpy.context.view_layer.update()
             assert not tree([shroud]).overlap(tree([thread])), (name, frame, 'thread/slide')
             weapon = tree(body)
@@ -110,4 +112,4 @@ def check_mounts(clips):
                 bridge = tree([o for o in sources if o.name.startswith(('Optic plate |', 'Optic bridge |'))])
                 assert bridge.ray_cast(origin, direction, .13)[0] is None, 'fixed iron sight ray blocked'
             samples += 1
-    print(f'P320_MOUNTS_OK: {samples} clip samples x 3 optics, fixed iron ray, thread/slide and hand clearances; optic sweep (muzzle/laser sweeps run separately)')
+    print(f'P320_MOUNTS_OK: {samples} 120Hz clip samples x {len(optics)} optics, fixed iron ray, thread/slide and hand clearances; optic sweep (muzzle/laser sweeps run separately)')

@@ -47,8 +47,9 @@ not the original SKU50774 sight assembly or manufacturer CAD certification.
 
 [Reference photos and published 4-inch/eight-slot description](https://jerkingthetrigger.com/2013/10/29/aimpro-tactical-ghost-ring-rail/)
 show a receiver-hugging base, recessed fasteners and a protected rear aperture.
-The game-art scout extension now has **164.904 mm of teeth**, 17 lugs / 16 slots
-at 10.008 mm pitch, from z **−247.2 to −82.296 mm**. The former nominal 101.6 mm
+The game-art scout extension now has **174.904 mm of teeth**, 18 lugs / 17 slots
+at 10.0076 mm pitch, from z **−255.452 to −80.548 mm**. The common Picatinny
+profile needs one additional forward land to retain full PM II pedestal support. The former nominal 101.6 mm
 section actually had only 84.84 mm of tooth envelope. The extension grows forward
 over the barrel, not back through the fixed ghost-ring ears. Four modeled screw
 heads/shanks and receiver bores remain unchanged; the continuous receiver-seated
@@ -61,13 +62,14 @@ Local outlines and screw stations are photo-derived estimates, not engineering d
 
 | Datum | Runtime metres / orientation | Ownership |
 | --- | --- | --- |
-| `MOUNT_optic` | `[0, .091, -.168]`, identity | receiver; extended sixteen-slot rail |
+| `MOUNT_optic` | `[0, .091, -.168]`, identity | receiver; extended seventeen-slot rail |
 | `MOUNT_muzzle` | `[0, .068, -.6672884763]`, identity | receiver; adapter forward face |
 | `MOUNT_rail` | `[0, .009, -.575]`, identity | receiver; fixed forward magazine-tube clamp rail |
 
-`fits.optic` enables **RMR / ACOG / PM II** with .120 / .100 / .090 m eye relief.
-The datum moves **33.804 mm forward** to seat the PM II without altering the shared
-optic asset or mount solver. RMR/ACOG are therefore not geometrically unchanged:
+`fits.optic` enables **RMR / ACOG / PM II / EXPS3** with .120 / .100 / .090 / .200 m eye relief.
+The datum remains 33.804 mm forward of the former seat. Rails and clamp channels
+now use the [shared Picatinny profile](../../../tools/blender/README.md#common-picatinny-interface),
+without changing the runtime mount solver. RMR/ACOG are not geometrically unchanged:
 their compatibility, four-ray seating, strict animated clearance and native-WebGPU
 ADS framing were revalidated at their unchanged eye relief.
 
@@ -137,7 +139,7 @@ The can clears the blade/cheeks, tube cap, lug and TOR Mini/clamps, but its wide
 body intentionally occludes the low ghost-ring sightline. Fixed irons remain
 unchanged; use the RMR/ACOG/PM II fits when suppressing, with no automatic
 optic selection or eye-relief change. `muzzle.py`, appended to `check.py`, checks
-the can against all three actual optic meshes and sight rays alongside TOR Mini
+the can against all four actual optic meshes and sight rays alongside TOR Mini
 and 120 Hz full-clip deformed-hand/mechanism checks. The combined check retains
 the rail/pedestal and fixed-ear clearance gates. See the can README for bore/spread
 bounds, commands and finite-sampling limits.

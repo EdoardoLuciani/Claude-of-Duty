@@ -4,6 +4,8 @@ Do not confuse surface contact/support or explicit clearance with factory CAD.
 """
 import json
 import math
+import sys
+from pathlib import Path
 import bpy
 from mathutils import Matrix, Vector
 from mathutils.bvhtree import BVHTree
@@ -151,7 +153,7 @@ assert attached(pick('USGI floorplate'),pick('USGI formed aluminum body')),'maga
 guard=pick('RIS II')
 lo,hi=bounds(guard);near(hi[2]-lo[2],.31115);near(hi[0]-lo[0],.056642);near(hi[1]-lo[1],.05715)
 rail=bpy.data.objects['MOUNT_rail']
-assert (CI@rail.matrix_world.translation-Vector((.0285,.075,-.250))).length<1e-6,'right-rail contact datum moved'
+assert (CI@rail.matrix_world.translation-Vector((.028321,.075,-.4101216))).length<1e-6,'right-rail contact datum moved'
 assert (CI@(rail.matrix_world.to_3x3()@Vector((0,0,-1)))-Vector((1,0,0))).length<1e-6,'laser body must sit outboard'
 assert (CI@(rail.matrix_world.to_3x3()@Vector((0,1,0)))-Vector((0,0,-1))).length<1e-6,'laser must face forward'
 front=bpy.data.objects['SOCKET_front_post'];sight=bpy.data.objects['SOCKET_sight']
@@ -201,3 +203,35 @@ for z in (-.430,-.350,-.250,-.155):
         hit,_,_,distance=guard_tree.ray_cast(Vector((0,.075,z)),direction,.06)
         assert hit is None or distance>=radius,f'RIS II 29.210 mm gauge is obstructed at {z}/{i}: {distance}'
 print('M4_GEOMETRY_OK: supported assembly, open aligned irons, 368.300 mm barrel / RIS II complete envelope / 66.040 mm flash hider')
+
+# Actual shared optics, including both deformed hands throughout every native clip.
+# The separate gauge check distinguishes rail seating from penetration.
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+import attachment_source
+pose('Idle')
+mounted={};loaded=[]
+for id in attachment_source.OPTICS:
+    objects=attachment_source.seat(id,bpy.data.objects['MOUNT_optic'],weapon='m4');loaded.extend(objects)
+    mounted[id]=tree([o for o in objects if o.type=='MESH'])
+fixed=tree([o for o in meshes if o.parent.name in ('receiver','handguard','IRON_sights_removed') and
+            not o.name.startswith(('Upper receiver rail','RIS II top tooth','RIS II top web'))])
+for id,target in mounted.items():
+    assert not target.overlap(fixed),(id,'non-mating body intersection')
+hands=[o for o in scene.objects if o.type=='MESH' and any('authored hands' in c.name for c in o.users_collection)]
+moving=[o for o in meshes if o.parent.name not in ('receiver','handguard','IRON_sights','IRON_sights_removed','MUZZLE_device','MUZZLE_device_removed')]
+count=0
+for name,info in clips.items():
+    for frame in range(math.ceil(info['duration']*120)+1):
+        pose(name,min(frame/120,info['duration']))
+        vertices,faces=geometry(hands,evaluated=True)
+        skin=BVHTree.FromPolygons(vertices,faces,all_triangles=True)
+        mechanism=tree([o for o in moving if min(o.scale)>.5])
+        for id,target in mounted.items():
+            assert not target.overlap(skin),(id,name,frame,'optic/hand intersection')
+            assert not target.overlap(mechanism),(id,name,frame,'optic/mechanism intersection')
+        count+=1
+pose('Idle')
+for obj in loaded:bpy.data.objects.remove(obj,do_unlink=True)
+print('M4_OPTIC_CLEARANCE_OK:',count,'120Hz poses; four real optics, both hands and mechanisms; no contact-window exemptions')
+from tor_mini.mounts import check_laser_mount
+check_laser_mount('m4')

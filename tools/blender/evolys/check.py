@@ -8,6 +8,7 @@ from pathlib import Path
 import bpy
 from mathutils import Matrix, Vector, Quaternion
 ROOT=Path(__file__).resolve().parents[3];OUT=ROOT/'assets/weapons/fn-evolys-762'
+sys.path.insert(0,str(ROOT/'tools/blender'))
 manifest=json.loads((OUT/'manifest.json').read_text());scene=bpy.context.scene
 C=Matrix(((1,0,0),(0,0,-1),(0,1,0)));CI=C.inverted()
 asset=bpy.data.collections['EVOLYS | authored components']
@@ -43,6 +44,7 @@ for z in (manifest['dimensions']['barrelFace'],manifest['dimensions']['barrelCro
 assert abs(manifest['dimensions']['barrelFace']-manifest['dimensions']['barrelCrown']-.406)<1e-8
 # Cross-sections expose actual full-depth triangular vents; no dark decals.
 from mathutils.bvhtree import BVHTree
+import picatinny
 bvh=BVHTree.FromObject(hg,bpy.context.evaluated_depsgraph_get())
 for px,py in [(1316,168),(1365,180),(1412,168),(1461,180),(1507,168),(1558,180)]:
     s=.948/(1956-57);z=(805-px)*s;y=.075+(219-py)*s
@@ -50,7 +52,8 @@ for px,py in [(1316,168),(1365,180),(1412,168),(1461,180),(1507,168),(1558,180)]
     direction=hg.matrix_world.inverted().to_3x3()@(C@Vector((1,0,0)))
     hit=bvh.ray_cast(origin,direction,.12);assert hit[0] is None,('closed handguard opening',px)
 # Receiver stays below the rail; the separately removable irons own the axis.
-assert max(p.y for p in points(bpy.data.objects['receiver_mesh']))<.128,'receiver intrudes into the rail-top clearance'
+rail_top=.075+(219-123)*(.948/(1956-57))+.002+.0055
+assert max(p.y for p in points(bpy.data.objects['receiver_mesh']))<=rail_top+1e-6,'receiver intrudes above the rail contact plane'
 # The rear carrier/tube closes the upper pad joint and cheek-to-web seam.
 stock_mesh=bpy.data.objects['stock_mesh'];stock_bvh=BVHTree.FromObject(stock_mesh,bpy.context.evaluated_depsgraph_get())
 for px,py in [(92,206),(105,238),(190,253),(220,253),(300,256),(380,246)]:
@@ -61,7 +64,6 @@ for px,py in [(92,206),(105,238),(190,253),(220,253),(300,256),(380,246)]:
 sight=CI@bpy.data.objects['SOCKET_sight'].matrix_world.translation
 front=CI@bpy.data.objects['SOCKET_front_post'].matrix_world.translation
 assert abs(sight.x)<1e-6 and abs(front.x)<1e-6 and abs(front.y-sight.y)<1e-6
-rail_top=.075+(219-123)*(.948/(1956-57))+.002
 assert abs(sight.y-rail_top-.026)<.000002
 irons=bpy.data.objects['IRON_sights_mesh']
 assert irons.parent==bpy.data.objects['IRON_sights']
@@ -99,16 +101,17 @@ assert (CI@rail.matrix_world.translation-Vector((0,lower_y,-.363725))).length<1e
 normal=CI@rail.matrix_world.to_3x3()@C@Vector((0,1,0))
 assert (normal-Vector((0,1,0))).length<1e-6
 # Actual underside teeth and the recoil-key slot, not just a floating mount datum.
-for z in [-.225-i*.01005 for i in range(16)]:
+for a,b in picatinny.lands(-.392,-.2224,-.363725):
+    z=(a+b)/2
     origin=hg.matrix_world.inverted()@(C@Vector((0,lower_y-.01,z)))
     direction=hg.matrix_world.inverted().to_3x3()@(C@Vector((0,1,0)))
     hit=bvh.ray_cast(origin,direction,.02)[0]
     assert hit is not None and abs((CI@(hg.matrix_world@hit)).y-lower_y)<1e-6,'missing lower rail tooth'
 for x in (-.00265,.00265):
-    for z in (-.370725-.0021,-.370725+.0021):
+    for z in (-.363725-.0021,-.363725+.0021):
         origin=hg.matrix_world.inverted()@(C@Vector((x,lower_y-.01,z)))
         hit=bvh.ray_cast(origin,direction,.02)[0]
-        assert hit is not None and abs((CI@(hg.matrix_world@hit)).y-(lower_y+.003))<1e-6,'recoil key is not over a supported rail slot'
+        assert hit is not None and abs((CI@(hg.matrix_world@hit)).y-(lower_y+picatinny.SLOT_DEPTH))<1e-6,'recoil key is not over a supported rail slot'
 belt=bpy.data.objects['belt_rig'];sample('Fire',0)
 start=belt.pose.bones['belt_3'].matrix.translation.copy();sample('Fire',.060)
 end=belt.pose.bones['belt_3'].matrix.translation.copy();assert abs((end-start).length-.0127)<.0002
@@ -183,7 +186,7 @@ fixed_irons=rig_tree([irons]);rail_tree=rig_tree([bpy.data.objects['receiver_mes
 bpy.data.objects['MUZZLE_device_removed'].hide_viewport=False
 bpy.context.view_layer.update()
 import attachment_source
-for attachment_id,seat in [('rmr',mount),('acog',mount),('scope',mount),('srd762ti',muzzle_mount),('laser',rail)]:
+for attachment_id,seat in [('rmr',mount),('acog',mount),('scope',mount),('exps3',mount),('srd762ti',muzzle_mount),('laser',rail)]:
     objects=attachment_source.seat(attachment_id,seat)
     meshes=[o for o in objects if o.type=='MESH']
     attachments[attachment_id]=rig_tree(meshes)

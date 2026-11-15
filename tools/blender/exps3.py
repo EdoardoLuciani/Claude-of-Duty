@@ -22,6 +22,8 @@ OUT = ROOT / 'assets/attachments/eotech-exps3-0'
 MM = 0.001
 # Photo-backed art datums, not certified optical/installation specifications.
 OPTICAL_Z = 48.2
+# The flat underside of the QD saddle, not its projecting clamp jaws.
+RAIL_TOP_Z = 4.8
 PANE_MM = (30, 23)
 CLEAR_MM = (30, 22)
 CORNER_MM = 5.4
@@ -52,12 +54,14 @@ def finishes(output):
         'paint': material('07 | off-white pad print', (.72, .75, .72), 0, .55),
         'yellow': material('08 | laser warning yellow', (.84, .62, .025), 0, .62),
         'ink': material('09 | label ink and recesses', (.004, .005, .006), 0, .66),
-        'glass': material('10 | AR-coated optical glass', (.89, .97, .96), 0, .075),
+        'glass': material('10 | AR-coated optical glass', (.03, .10, .12), 0, .14),
     }
     glass = mats['glass'].node_tree.nodes.get('Principled BSDF')
-    glass.inputs['Transmission Weight'].default_value = 1
+    glass.inputs['Transmission Weight'].default_value = 0
+    glass.inputs['Alpha'].default_value = .13
+    mats['glass'].surface_render_method = 'DITHERED'
     glass.inputs['IOR'].default_value = 1.5
-    mats['glass'].use_raytrace_refraction = True
+    mats['glass'].use_raytrace_refraction = False
     mats['glass'].use_backface_culling = False
     # Original seeded micro-finish, never a photographic texture or painted fake wear.
     rng = np.random.default_rng(330)
@@ -426,7 +430,7 @@ def screw(name, pos, mats, parent, axis='X', sign=1, radius=2.6):
 def build_geometry(mats):
     root = bpy.data.objects.new('ATTACHMENT_exps3', None)
     bpy.context.collection.objects.link(root)
-    for name, pos in [('SOCKET_mount', (0,0,0)), ('SOCKET_sight', (0,-23.1,OPTICAL_Z)),
+    for name, pos in [('MOUNT_base', (0,0,RAIL_TOP_Z)), ('SOCKET_mount', (0,0,RAIL_TOP_Z)), ('SOCKET_sight', (0,-23.1,OPTICAL_Z)),
                       ('SOCKET_lens_rear', (0,-23.1,OPTICAL_Z)), ('SOCKET_lens_front', (0,18.1,OPTICAL_Z))]:
         obj = bpy.data.objects.new(name, None)
         bpy.context.collection.objects.link(obj)
@@ -435,7 +439,7 @@ def build_geometry(mats):
         obj.empty_display_size = .004
     root['assetId'] = 'eotech-exps3-0'
     root['forward'] = '-Z after glTF export'
-    root['reticle'] = 'EXPS3-0: 68 MOA ring / 1 MOA dot; runtime projection deferred, no baked reticle'
+    root['reticle'] = 'EXPS3-0: 68 MOA ring / 1 MOA dot; runtime projection, no baked reticle'
     hood = shroud(mats['hood'], root)
     skirt = [(1.5,8),(-6.5,3.7),(-31.9,3.7),(-34,5.7),(-34,8)]
     for lo,hi in [(-26,-24.2),(24.2,26)]:
@@ -534,25 +538,26 @@ def build_geometry(mats):
         sleeve.rotation_euler = (b-a).to_track_quat('Z','Y').to_euler()
         active(sleeve)
         bpy.ops.object.transform_apply(location=False,rotation=True,scale=True)
+    # Raised QD mount; all internal purchase surfaces use the common rail gauge.
+    import picatinny
     # Raised quick-detach mount with real open rail channel and clamp shoulders.
     deck = [(-22.5,1.7),(-22.5,6.7),(22.5,6.7),(22.5,1.7),(10.6,1.7),
             (9,4.2),(8,4.8),(-8,4.8),(-9,4.2),(-10.6,1.7)]
-    prism('7mm raised mount deck with open channel',deck,-34,33,mats['mount'],root,'Y',.3)
+    prism('7mm raised mount deck with open channel',deck,-34,33,mats['mount'],root,'Y',.2)
     for sign in (-1,1):
-        jaw = [(sign*x,z) for x,z in [(10.6,1.7),(10.6,-1.8),(12.4,-4.5),(15,-5.5),
-                                     (22,-5.5),(22,3.5)]]
+        jaw = [(sign*x,z) for x,z in [(10.6,3.5),(7.6,0),(22,0),(22,3.5)]]
         prism('Picatinny clamp jaw '+str(sign), jaw, -34, 33, mats['mount'], root, 'Y', .25)
     lever = [(-34,-1.5),(-34,2.5),(-31,4.5),(17,4.5),(25,3),(28,1.5),
              (28,-1.5),(23,-2.5),(-30,-2.5)]
     prism('QD closed contoured lever',lever,-29.2,-25,mats['mount'],root,bevel=.65)
-    cylinder('QD lever pivot', (-27.2,25,1), 4.2, 3.2, mats['mount'], root)
+    cylinder('QD lever pivot', (-27.2,25,1), 4.2, 3.2, mats['mount'], root, sides=16 if LOW_POLY else 48)
     box('QD locking catch', (-27.7,20,4.5), (2.5,9,4), mats['body'], root, .5)
     oval = [(13+y,z) for y,z in rounded_rect(31,9,4.2)]
     pad = prism('QD oval tension pad',oval,22.25,23.05,mats['mount'],root,bevel=.12)
     inset = [(13+y,z) for y,z in rounded_rect(28.6,7.3,3.4)]
     subtract(prism('QD oval inset cutter',inset,22.4,23.5,mats['mount'],root,bevel=0),pad)
     cylinder('Crossbolt adjustment washer', (23,13,0), 5, 1.3, mats['steel'], root)
-    nut = cylinder('QD slotted tension nut', (24,13,0), 4.3, 2, mats['edge'], root)
+    nut = cylinder('QD slotted tension nut', (24,13,0), 4.3, 2, mats['edge'], root, sides=16 if LOW_POLY else 48)
     subtract(box('Tension nut tool slot cutter',(25,13,0),(1,8.2,.8),mats['edge'],root,0),nut)
     subtract(cylinder('Crossbolt bore cutter',(24.7,13,0),1.8,1.6,mats['edge'],root,bevel=0),nut)
     surface_normals(cylinder('Crossbolt recessed floor',(23.915,13,0),1.78,.02,mats['ink'],root,bevel=0))
@@ -659,6 +664,12 @@ def build_geometry(mats):
         stripe = [(5.2+r*math.cos(a+d),31.5+r*math.sin(a+d))
                   for r,d in [(0.7,-.04),(1.5,-.04),(1.5,.04),(0.7,.04)]]
         prism('Laser warning ray '+str(i), stripe, -26.68,-26.66, mats['ink'], root, bevel=0)
+    # The channel also passes through the low rear casting; clearing only the
+    # separate jaws left the cover intruding into a real rail's upper shoulders.
+    bpy.context.view_layer.update()
+    low_parts=[o for o in root.children_recursive if o.type=='MESH' and
+               min((o.matrix_world@Vector(p)).z for p in o.bound_box)<RAIL_TOP_Z*MM]
+    picatinny.cut_channel(low_parts,Matrix.Translation((0,0,RAIL_TOP_Z*MM)),-.040,.070)
     return root
 
 
@@ -713,6 +724,11 @@ def studio(quick):
 
 
 def export(output, root, optimization):
+    base = next(o for o in root.children if o.name == 'MOUNT_base')
+    sight = next(o for o in root.children if o.name == 'SOCKET_sight')
+    assert (base.location - Vector((0, 0, RAIL_TOP_Z*MM))).length < 1e-8
+    assert abs((sight.location-base.location).z - .0434) < 1e-8
+    assert not root.animation_data and not any(o.animation_data for o in root.children_recursive)
     # Only the optimized root is selected; editable high source never enters glTF.
     bpy.ops.object.select_all(action='DESELECT')
     root.select_set(True)
@@ -738,8 +754,8 @@ def export(output, root, optimization):
         'blendSha256':hashlib.sha256((output/'exps3-0.blend').read_bytes()).hexdigest(),
         'blender':bpy.app.version_string,'units':'metres',
         'axes':{'right':'+X','up':'+Y','forward':'-Z'},'nominalEnvelopeMm':[58.4,73.7,96.5],
-        'mountOrigin':'rail top centre; SOCKET_mount at [0,0,0]',
-        'opticalDatum':f'provisional photo-derived {OPTICAL_Z}mm above the current rail datum; not manufacturer-certified',
+        'mountOrigin':f'QD saddle contact; MOUNT_base/SOCKET_mount at [0,{RAIL_TOP_Z}mm,0] in glTF',
+        'opticalDatum':f'{OPTICAL_Z-RAIL_TOP_Z}mm above QD saddle contact; photo-derived, not manufacturer-certified',
         'opticalWindow':{'nominalPaneMm':list(PANE_MM),'clearOpeningMm':list(CLEAR_MM),
             'clearCornerRadiusMm':CORNER_MM,'centreAboveArtDatumMm':OPTICAL_Z,
             'carrierOuterMm':[39,30.4],'gasketOuterMm':[33,25],
@@ -783,11 +799,11 @@ def build(output, render=False, quick=False):
     views = studio(quick)
     notes = bpy.data.texts.new('START HERE')
     notes.write('EXPS3-0 original visual reconstruction, not CAD or manufacturing data.\n'
-                'Source: tools/blender/exps3.py. Native metres; rail-top mount origin.\n'
+                'Source: tools/blender/exps3.py. Native metres; explicit QD saddle mount datum.\n'
                 'SOURCE_HIGH retains the editable detailed model; EXPS3_body/glass are the optimized target.\n'
                 'Unique UV base-color/normal/ORM atlases are baked with native Cycles, not studio light.\n'
                 'Photo/reference uncertainty and the provisional sight datum are in README.md.\n'
-                'No runtime reticle, ADS integration or paid attachment system in this asset PR.\n')
+                'Runtime projects the 68/1 MOA reticle; no baked reticle or attachment economy.\n')
     active(root)
     bpy.ops.wm.save_as_mainfile(filepath=str(output/'exps3-0.blend'))
     if render:

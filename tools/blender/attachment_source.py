@@ -6,19 +6,26 @@ Build the attachment first (`bun run assets`); checks read its editable `.blend`
 from pathlib import Path
 
 import bpy
+from mathutils import Matrix, Vector
+
+import picatinny
 
 ROOT = Path(__file__).resolve().parents[2]
-OPTICS = ('rmr', 'acog', 'scope')
+OPTICS = ('rmr', 'acog', 'scope', 'exps3')
 SOURCES = {
     'rmr': 'trijicon-rmr/rmr.blend',
     'acog': 'trijicon-acog/acog.blend',
     'scope': 'schmidt-bender-pm-ii/scope.blend',
+    'exps3': 'eotech-exps3-0/exps3-0.blend',
     'laser': 'steiner-tor-mini/tor-mini.blend',
     'srd762ti': 'sig-srd762ti/suppressor.blend',
     'suppressor9mm': 'compact-9mm/suppressor9mm.blend',
     'suppressor338': 'suppressor-338/suppressor338.blend',
     'suppressor12g': '12g-suppressor/suppressor12g.blend',
 }
+# Whole forward grooves per weapon fit; mirrors `fits.optic[id].railSlots` in
+# src/weapons/defs.ts, which places the same optic at runtime.
+RAIL_SLOTS = {'m4': {'scope': 7}}
 
 
 def named(objects, name):
@@ -34,24 +41,30 @@ def load(id, names=None):
     with bpy.data.libraries.load(str(path), link=False) as (source, loaded):
         loaded.objects = [n for n in source.objects if names is None or n in names]
     objects = [o for o in loaded.objects if o is not None]
+    roots = [o for o in objects if o.name.startswith('ATTACHMENT_')]
+    if names is None and roots:
+        # Keep the exported asset only, not bake donors or review props beside it.
+        objects = [roots[0], *roots[0].children_recursive]
     for obj in objects:
         bpy.context.scene.collection.objects.link(obj)
     bpy.context.view_layer.update()
     return objects, named(objects, 'MOUNT_base' if id in OPTICS else 'SOCKET_mount')
 
 
-def seat(id, mount, names=None):
+def seat(id, mount, names=None, weapon=None):
     """Load an attachment and parent it under a weapon mount with its datum on the
-    mount origin, so it follows the mount through posed clips. Returns its objects and wrapper."""
+    mount origin (or the weapon's selected rail slot), so it follows the mount through
+    posed clips. Returns its objects and wrapper."""
     objects, datum = load(id, names)
+    offset = Vector((0, RAIL_SLOTS.get(weapon, {}).get(id, 0)*picatinny.PITCH, 0))
     wrapper = bpy.data.objects.new(f'fit check | {id}', None)
     bpy.context.scene.collection.objects.link(wrapper)
     wrapper.parent = mount
-    wrapper.matrix_basis = datum.matrix_world.inverted()
+    wrapper.matrix_basis = Matrix.Translation(offset) @ datum.matrix_world.inverted()
     for obj in objects:
         if obj.parent is None:
             obj.parent = wrapper
     bpy.context.view_layer.update()
-    seated = datum.matrix_world.translation-mount.matrix_world.translation
-    assert seated.length < 1e-7, (id, 'datum off its weapon mount')
+    seated = datum.matrix_world.translation-mount.matrix_world @ offset
+    assert seated.length < 1e-7, (id, 'datum off its selected rail slot')
     return [wrapper, *objects]

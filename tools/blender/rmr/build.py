@@ -6,6 +6,7 @@ from mathutils import Matrix, Vector
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from rmr.geometry import build_rmr
+import picatinny
 
 ROOT=Path(__file__).resolve().parents[3]
 OUT=ROOT/'assets/attachments/trijicon-rmr'
@@ -77,10 +78,11 @@ def text(label,loc,size,side,parent):
 # A 23 mm see-through riser clears the M4's fixed front sight. Its rail-contact
 # datum stays at zero; the same low RM33 geometry is used by the EVOLYS build.
 for side in (-1,1):
-    box('Riser side',(side*.010, .0115,0),(.006,.023,.045),black,root,.0008)
+    box('Riser side',(side*.010, .00925,0),(.006,.0275,.045),black,root,.0003)
 box('Riser top',(0,.021,0),(.026,.004,.045),black,root,.0007)
 for z in (-.012,.012):
     cyl('Riser cross bolt',(0,.002,z),.002,.030,steel,root,'X',24)
+picatinny.cut_channel([o for o in root.children if o.type=='MESH'],Matrix.Identity(4),-.023,.023)
 sight_y=build_rmr(box,cyl,mesh,cut,text,root,.023,0,black,bright,rubber,steel,glass)
 empty('MOUNT_base',parent=root)
 empty('SOCKET_sight',(0,sight_y,-.018),root)

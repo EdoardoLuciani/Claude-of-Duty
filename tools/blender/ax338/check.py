@@ -195,6 +195,7 @@ for foot in [o for o in iron_meshes if o.name.startswith('Iron rail foot')]:
 rail_teeth=[o for o in bpy.data.objects if o.type=='MESH' and o.name.startswith('Rail tooth')]
 assert any(abs(max(p.y for p in points(o.name))-.118)<.000001 for o in rail_teeth)
 iron_tree=surface(iron_meshes)
+fixed_tree=surface([o for o in body_meshes if not o.name.startswith('Rail tooth')])
 mounted={}
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import attachment_source
@@ -211,19 +212,13 @@ for optic_id in attachment_source.OPTICS:
         assert abs(max(p.y for p in v)-min(p.y for p in v)-.417)<.000001,'standalone PM II length changed'
     hits=iron_tree.overlap(mounted[optic_id])
     assert bool(hits)==(optic_id=='scope'),(optic_id,'opticClashes must match actual iron intersections',len(hits))
-    # Contact plane is authored at zero; the ACOG's projecting clamp screw is
-    # intentionally below its shoe. Verify the actual foot, not that screw.
-    foot_name={'rmr':'Riser side','acog':'ACOG rail shoe','scope':'AI mount base'}[optic_id]
-    feet=[o for o in meshes if o.name.startswith(foot_name)]
-    assert feet,(optic_id,'missing mount foot')
-    v,_=geometry(feet,transform)
-    assert abs(min(p.z for p in v)-.118)<.00011,(optic_id,'optic not seated on rail')
+    assert not mounted[optic_id].overlap(fixed_tree),(optic_id,'crosses non-mating body')
     print('AX338_OPTIC_FIT',optic_id,'iron triangle contacts',len(hits))
 
 bolt_parts=[o for o in bpy.data.objects if o.type=='MESH' and o.parent==bolt]
 stock=bpy.data.objects['stock'];stock_parts=[o for o in stock.children if o.type=='MESH']
 hands=[o for o in bpy.data.objects if o.type=='MESH' and o.name.startswith(('AX338_left_','AX338_right_'))]
-mechanical_poses=0;hand_poses=0
+mechanical_poses=0
 for name,info in manifest['clips'].items():
     for frame in range(math.ceil(info['duration']*120)+1):
         select(name,min(frame/120,info['duration']));mechanical_poses+=1
@@ -231,12 +226,11 @@ for name,info in manifest['clips'].items():
         for optic_id,target in mounted.items():
             assert not moving.overlap(target),(name,frame,optic_id,'bolt hits optic')
         assert not moving.overlap(iron_tree),(name,frame,'bolt hits irons')
-        # Actual deformed review glove/sleeve, sampled at 24 Hz plus endpoints.
-        if frame%5==0 or frame==math.ceil(info['duration']*120):
-            hand_poses+=1;moving=surface(hands,evaluated=True)
-            for optic_id,target in mounted.items():
-                assert not moving.overlap(target),(name,frame,optic_id,'hand/sleeve hits optic')
-            assert not moving.overlap(iron_tree),(name,frame,'hand/sleeve hits irons')
+        # Actual deformed review glove/sleeve at the same native rate.
+        moving=surface(hands,evaluated=True)
+        for optic_id,target in mounted.items():
+            assert not moving.overlap(target),(name,frame,optic_id,'hand/sleeve hits optic')
+        assert not moving.overlap(iron_tree),(name,frame,'hand/sleeve hits irons')
 select('Idle')
 # The rifle has no authored fold clip: separately sweep the stock's actual left
 # hinge through 180 degrees at 1-degree intervals, without inventing an action.
@@ -247,7 +241,7 @@ for angle in range(181):
     for optic_id,target in mounted.items():
         assert not moving.overlap(target),(angle,optic_id,'folding stock hits optic')
     assert not moving.overlap(iron_tree),(angle,'folding stock hits irons')
-print('AX338_ATTACHMENT_CLEARANCE_OK:',mechanical_poses,'120 Hz bolt poses;',hand_poses,'24 Hz deformed-hand poses; 181 stock fold poses; rmr/acog/scope and irons')
+print('AX338_ATTACHMENT_CLEARANCE_OK:',mechanical_poses,'120 Hz bolt and deformed-hand poses; 181 stock fold poses; all optics and irons')
 
 # Actual shared rail attachment, independent of the optic catalog.
 from tor_mini.mounts import check_laser_mount

@@ -12,6 +12,7 @@ import bpy
 import numpy as np
 from mathutils import Vector, Matrix
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+import picatinny
 from m590.actions import author_actions
 ROOT=Path(__file__).resolve().parents[3]
 from m590.export_actions import prepare_export_actions, validate_export
@@ -197,18 +198,20 @@ def build(output, render=False, quick=False):
     # Reference: jerkingthetrigger.com/2013/10/29/aimpro-tactical-ghost-ring-rail/
     # Scout-style game-art extension for the PM II, not AIMPRO manufacturer CAD.
     # Keep receiver screw seats and fixed ghost-ring ears; cantilever grows forward.
-    rail_front=-.2472;rail_pitch=.010008;rail_top=.091;base_top=.0865
+    rail_front=-.2572076;rail_top=.091;base_top=.0865
     base_rings=[[(x,y,rail_front) for x,y in (
-        (-.0105,.083),(0,.083),(.0105,.083),
-        (.0105,base_top),(0,base_top),(-.0105,base_top))]]
+        (-picatinny.NECK_HALF,.083),(0,.083),(picatinny.NECK_HALF,.083),
+        (picatinny.NECK_HALF,base_top),(0,base_top),(-picatinny.NECK_HALF,base_top))]]
     for z in (-.190,-.040):
-        bottom=[(x,seat.ray_cast(Vector((x,.100,z)),Vector((0,-1,0)),.03)[0].y-.00005,z) for x in (-.0105,0,.0105)]
+        bottom=[(x,seat.ray_cast(Vector((x,.100,z)),Vector((0,-1,0)),.03)[0].y-.00005,z) for x in (-picatinny.NECK_HALF,0,picatinny.NECK_HALF)]
         base_rings.append(bottom+[(x,base_top,z) for x,_,_ in reversed(bottom)])
     rail_base=loft('Optic rail receiver base',base_rings,receiver_finish,bevel=.0001,rounded=False)
-    section=[(-.0078,base_top),(.0078,base_top),(.0106,.0886),(.0106,rail_top),(-.0106,rail_top),(-.0106,.0886)]
-    for i in range(17):  # 164.904 mm of teeth fully supports both 28 mm pedestals.
-        z=rail_front+.002388+i*rail_pitch
-        loft('Optic Picatinny lug',[[(x,y,z+s*.002388) for x,y in section] for s in (-1,1)],receiver_finish,bevel=.00010,rounded=False)
+    for name, outline, spans in [
+        ('Optic rail groove bed',picatinny.section(rail_top,base_top,slot=True),[(rail_front,-.0805478)]),
+        ('Optic Picatinny lug',picatinny.section(rail_top,base_top),picatinny.lands(rail_front,-.0805478,-.168)),
+    ]:
+        for a,b in spans:
+            loft(name,[[(x,y,z) for x,y in outline] for z in (a,b)],receiver_finish,bevel=0,rounded=False)
     for z in (-.174,-.144,-.104,-.075):
         cut(rail_base,cyl('CUT rail screw pocket',(0,.086,z),.0028,.008,None,None,'Y',12,0))
         cut(receiver,cyl('CUT receiver tapped seat',(0,.084,z),.0015,.004,None,None,'Y',12,0))
@@ -248,8 +251,8 @@ def build(output, render=False, quick=False):
         tube('Laser rail tube clamp',(0,.0348,z),.016,.01295,.008,steel,sides=24)
         cyl('Laser rail clamp screw',(.015,.0348,z),.002,.004,steel,axis='X',sides=24)
     box('Laser rail adapter web',(0,.0165,laser_z),(.014,.009,.055),steel)
-    for i in range(5):
-        box('Laser rail adapter tooth',(0,.011,laser_z-.020+i*.010),(.020,.004,.0052),steel,bevel=.0003)
+    bpy.context.view_layer.update()
+    picatinny.build_rail('Laser rail adapter',bpy.data.objects['MOUNT_rail'].matrix_world@Matrix.Rotation(math.pi,4,'Y'),-.0226,.0226,steel,body,asset)
     # Fixed conventional stock, neck/comb/toe loft; no pistol grip or adjustable tube.
     guard=profile('Metal trigger guard',smooth_rows([(-.050,.022),(-.027,.022),(.014,.022),(.023,.017),(.025,.006),(.022,-.005),(.014,-.012),(-.005,-.016),(-.022,-.015),(-.035,-.011),(-.042,-.003),(-.044,.005)],True),.010,bevel=.0006)
     cut(guard,profile('CUT trigger window',smooth_rows([(-.040,.018),(-.022,.019),(.011,.019),(.018,.015),(.019,.006),(.016,-.003),(.009,-.009),(-.005,-.0125),(-.021,-.0115),(-.030,-.008),(-.036,-.002),(-.039,.005)],True),.028,None,None,0),True)
@@ -315,24 +318,17 @@ def build(output, render=False, quick=False):
         rib=tube('Forend grip rib',(0,.0348,-.301-i*.009),.0245,.0215,.005,polymer,forend)
         rib.modifiers['Selective edge radius'].width=.0012;rib.modifiers['Selective edge radius'].segments=3
     for x in (-.0132,.0132):box('Twin action bar',(x,.040,-.290),(.0024,.004,.280),steel,forend,.0005)
-    profile('Bottom rail spine',[(-.500,.014),(-.494,.009),(-.301,.009),(-.294,.014),(-.294,.018),(-.500,.018)],.023,polymer,forend,.0008)
-    for i in range(18):
-        z=-.298-i*.0107
-        lug_section=[(-.008,.010),(.008,.010),(.0115,.006),(.0115,.004),(-.0115,.004),(-.0115,.006)]
-        loft('Bottom Picatinny lug',[[(x,y,z+s*.0025) for x,y in lug_section] for s in (-1,1)],polymer,forend,.0005)
+    profile('Bottom rail spine',[(-.500,.014),(-.494,.009),(-.301,.009),(-.294,.014),(-.294,.018),(-.500,.018)],picatinny.NECK_HALF*2,polymer,forend,.0003)
+    for a,b in picatinny.lands(-.500,-.294,-.298):
+        loft('Bottom Picatinny lug',[[(x,.004-y,z) for x,y in picatinny.section()] for z in (a,b)],polymer,forend,0)
     for x in (-.023,.023):
         profile('Side rail transition',[(-.501,.032),(-.497,.024),(-.425,.024),(-.420,.032),(-.424,.046),(-.495,.046)],.004,polymer,forend,.0012,x=x)
         for i in range(7):
-            z=-.428-i*.0107
-            # Inward neck relief only: same outer head silhouette/contact envelope,
-            # tooth stations and count. Owner 03:27 supports the step, not its width.
-            silhouette=[(-.003,.028),(-.002,.025),(.002,.025),(.003,.028),(.003,.043),(.002,.046),(-.002,.046),(-.003,.043)]
-            neck=[(dz,.0305+(y-.025)*(.010/.021)) for dz,y in silhouette]
+            z=-.428-i*picatinny.PITCH
             side=1 if x>0 else -1
-            loft('Side Picatinny lug',[
-                [(side*depth,y,z+dz) for dz,y in shape]
-                for depth,shape in ((.018,neck),(.024,neck),(.025,silhouette),(.028,silhouette))
-            ],polymer,forend,.0007,False)
+            loft('Side Picatinny lug',[[(side*(.028+depth),.0355+across,z+dz)
+                for across,depth in picatinny.section(bottom=-.010)]
+                for dz in (-picatinny.LAND/2,picatinny.LAND/2)],polymer,forend,0,False)
     # Crown/barrel clearance remains a genuine open scallop throughout the stroke.
     for o in list(asset.objects):
         if o.type=='MESH' and (o.name.startswith('Factory ribbed slide') or o.name.startswith('Forend grip rib')):

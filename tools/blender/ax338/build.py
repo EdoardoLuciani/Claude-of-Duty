@@ -16,6 +16,7 @@ from mathutils import Matrix, Vector
 ROOT=Path(__file__).resolve().parents[3]
 INPUT=ROOT/'assets/weapons/ax338'
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+import picatinny
 from ax338.actions import author_actions
 from ax338.export import prepare_export_actions, validate_export
 from ax338.finishes import consolidate_finishes
@@ -286,11 +287,15 @@ def build(output,render=False,quick=False):
         for z in np.arange(hg0-.019,hg0-.130,-.011):
             box('Panel moulded rib',(side*.0295,.044,float(z)),(.0015,.026,.0025),fde,hg,.0006)
         for z in (hg0-.010,hg0-.122):fastener('Panel screw',side*.030,.042,z,.003,hg)
-    # MIL-STD-1913 pitch 10.01 mm; teeth/cross slots modelled, not normal-only.
+    # Shared MIL-STD-1913 profile (picatinny.py): real teeth and cross slots.
     box('Integral rail web',(0,.104,-.252),(.014,.011,.655),black,hg,.0004)
-    box('Continuous top rail',(0,.111,-.252),(.021,.007,.655),black,hg,.0004)
-    for z in np.arange(-.576,.075,.01001):
-        profile('Rail tooth',[(float(z),.113),(float(z),.118),(float(z)+.0052,.118),(float(z)+.0052,.113)],.021,steel,hg,bevel=.00025)
+    for name, outline, spans, mat in [
+        ('Continuous top rail',picatinny.section(.118,.1075,slot=True),[(-.5795,.0755)],black),
+        ('Rail tooth',picatinny.section(.118,.1075),picatinny.lands(-.5795,.0755,-.089),steel),
+    ]:
+        for a,b in spans:
+            vertices,faces=picatinny.prism(outline,-b,-a)
+            mesh(name,[(x,z,-y) for x,y,z in vertices],faces,mat,hg,bevel=0)
     # Barrel external profile and factory high-efficiency open brake.
     turned('27 inch barrel',0,.075,[(breech,.016),(breech-.070,.015),(hg1,.012),(crown,.011)],steel,body,48)
     brake=turned('Factory brake',0,.075,[(crown,.011),(crown-.012,.014),(muzzle+.004,.014),(muzzle,.012)],steel,muzzle_device,48)
@@ -335,9 +340,9 @@ def build(output,render=False,quick=False):
                      ('MOUNT_optic',(0,.118,-.089)),('MOUNT_muzzle',(0,.075,crown)),('MOUNT_rail',(.038,.075,-.455))]:empty(name,pos,rig)
     # TOR Mini's body is below its local seat: +Z points into this side rail.
     bpy.data.objects['MOUNT_rail'].rotation_euler=(0,-math.pi/2,0)
-    box('Laser rail adapter web',(.031,.075,-.455),(.010,.014,.055),black,hg,.0004)
-    for i in range(5):
-        box('Laser rail adapter tooth',(.036,.075,-.475+i*.010),(.004,.020,.0052),steel,hg,.0003)
+    box('Laser rail adapter web',(.0304,.075,-.455),(.0088,.014,.055),black,hg,.0004)
+    bpy.context.view_layer.update()
+    picatinny.build_rail('Laser rail adapter',bpy.data.objects['MOUNT_rail'].matrix_world@Matrix.Rotation(math.pi,4,'Y'),-.0226,.0226,steel,hg,asset)
     for z in (-.475,-.435):
         cyl('Laser rail adapter screw',(.0358,.075,z),.002,.004,steel,hg,'X',24)
 

@@ -2,6 +2,7 @@
 Geometry, seeded maps and per-component UVs preserve the former AX338 assembly.
 """
 from pathlib import Path
+import sys
 import math
 import bpy
 import numpy as np
@@ -9,6 +10,8 @@ from mathutils import Matrix, Vector
 
 ROOT=Path(__file__).resolve().parents[3]
 OUT=ROOT/'assets/attachments/schmidt-bender-pm-ii'
+sys.path.insert(0,str(ROOT/'tools/blender'))
+import picatinny
 
 
 def build():
@@ -132,6 +135,10 @@ def build():
             box('Ring clamp ear',(side*.020,axis,z),(.007,.014,.023),black,optic,.0007)
             fastener('Ring clamp screw',side*.024,axis,z,.0028,optic)
     box('AI mount base',(0,.126,-.089),(.040,.011,.177),black,optic,.0007)
+    for z in (-.024,-.154):
+        box('Mount rail clamp',(0,.11825,z),(.031,.0045,.025),black,optic,.0001)
+    picatinny.cut_channel([o for o in optic.children if o.name.startswith(('AI mount base','AI one-piece ring pedestal','Mount rail clamp'))],
+                          Matrix.Translation((0,.089,.1205)),-.090,.090)
     for side in (-1,1):
         for z in (-.024,-.154):fastener('Mount rail nut',side*.021,.125,z,.004,optic)
     cyl('Elevation drum',(0,axis+.022,-.087),.020,.035,black,optic,'Y',48)

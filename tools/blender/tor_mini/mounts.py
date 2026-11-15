@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import attachment_source
 # Only mating rail surfaces may contact the clamp, inside the local seat patch.
 PROFILES = {
+    'm4': ('M4_RIG', 'M4A1 | authored components', 'handguard', ('RIS II 1 tooth',)),
     'p320': ('P320_RIG', 'P320 | high bake source (not exported)', 'frame', ('Frame |',)),
     'evolys': ('EVOLYS_RIG', 'EVOLYS | authored components', 'handguard', ('handguard_mesh',)),
     'm590': ('M590_RIG', 'M590 | authored components', 'receiver', ('Laser rail adapter tooth',)),
@@ -93,7 +94,7 @@ def check_laser_mount(weapon):
     optic_objects = []
     if weapon not in ('mcx', 'mpx'):
         for optic in attachment_source.OPTICS:
-            objects = attachment_source.seat(optic, bpy.data.objects['MOUNT_optic'])
+            objects = attachment_source.seat(optic, bpy.data.objects['MOUNT_optic'], weapon=weapon)
             optics.extend(o for o in objects if o.type == 'MESH')
             optic_objects.extend(objects)
     clips = json.loads(scene['clips'])
