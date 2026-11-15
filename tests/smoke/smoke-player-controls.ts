@@ -204,10 +204,11 @@ for (const [code, stance] of [
   Object.assign(player.movement.climbMotion, { active: true, y: 2, y0: 0, y1: 10 });
   frame({ steps: 0, down: ['Space'], up: ['Space'] });
   frame({ steps: 0 });
-  frame({ steps: 3 });
+  frame({ steps: 1 });
   assert.equal(player.movement.climbMotion.active, false, 'buffered ladder jump leaves the ladder');
-  assert(player.movement.velocity.y > 0, 'jump-off rise survives subsequent substeps');
   assert.equal(player.movement.cmd.jump, false, 'ladder early return consumes the request');
+  frame({ steps: 2 });
+  assert(player.movement.velocity.y > 0, 'jump-off rise survives subsequent substeps');
 }
 {
   const { player, input, frame } = fixture();
