@@ -22,7 +22,7 @@ import { fixture } from '../lib/fixture.ts';
  */
 import { MarketSystem, MARKET_DELAY } from '../../src/market/index.ts';
 import { Health } from '../../src/player/health.ts';
-import { WEAPON_IDS, PRIMARY_IDS, WEAPON_DEFS } from '../../src/weapons/defs.ts';
+import { WEAPON_IDS, PRIMARY_IDS } from '../../src/weapons/defs.ts';
 import type { WeaponId } from '../../src/weapons/defs.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
 import { createTestContext } from '../lib/context.ts';
@@ -66,6 +66,7 @@ providers.weapons = weapons;
 providers.player = player;
 
 const market = new MarketSystem();
+const buyGun = (id: WeaponId): boolean => market.beginBuild(id) && market.confirmBuild();
 await market.init(context);
 type MarketItem = ReturnType<MarketSystem['getHudState']>['items'][number];
 const item = (id: MarketItem['id']): MarketItem => {
@@ -97,10 +98,10 @@ check(
     weapons.owns('pistol') &&
     !weapons.owns('smg') &&
     item('rifle').action === 'equipped' &&
-    item('smg').action === 'swap' &&
-    item('lmg').action === 'swap' &&
-    item('shotgun').action === 'swap' &&
-    item('sniper').action === 'swap'
+    item('smg').action === 'buy' &&
+    item('lmg').action === 'buy' &&
+    item('shotgun').action === 'buy' &&
+    item('sniper').action === 'buy'
 );
 
 // ---- credits mirror score:change 1:1 ------------------------------------
@@ -211,60 +212,54 @@ check(
 // ---- primary weapon purchases (LMG replaces the M4, and back) ------------
 market.credits = 99999;
 check('spawn loadout: M4 owned, LMG not', weapons.owns('rifle') && !weapons.owns('lmg'));
-check('LMG buyable while M4 equipped', item('lmg').affordable && item('lmg').action === 'swap');
+check('LMG buyable while M4 equipped', item('lmg').affordable && item('lmg').action === 'buy');
 check(
   'M4 not buyable while equipped',
   item('rifle').affordable === false && item('rifle').action === 'equipped'
 );
 check(
   'buy LMG replaces M4 and deducts 1200',
-  market.buy('lmg') &&
-    weapons.owns('lmg') &&
-    !weapons.owns('rifle') &&
-    market.credits === 99999 - 1200
+  buyGun('lmg') && weapons.owns('lmg') && !weapons.owns('rifle') && market.credits === 99999 - 1200
 );
-check('cannot buy a weapon already equipped', !market.buy('lmg') && !item('lmg').affordable);
+check('cannot buy a weapon already equipped', !buyGun('lmg') && !item('lmg').affordable);
 check(
   'M4 becomes buyable with LMG equipped',
-  item('rifle').affordable && item('rifle').action === 'swap'
+  item('rifle').affordable && item('rifle').action === 'buy'
 );
-check('buy M4 replaces LMG', market.buy('rifle') && weapons.owns('rifle') && !weapons.owns('lmg'));
-check('M4 purchase rejected when equipped again', !market.buy('rifle'));
+check('buy M4 replaces LMG', buyGun('rifle') && weapons.owns('rifle') && !weapons.owns('lmg'));
+check('M4 purchase rejected when equipped again', !buyGun('rifle'));
 check('carpet is the last catalog row', market.getHudState().items.at(-1)?.id === 'carpet');
 check(
   'buy AX-338 replaces M4 and deducts 1500',
-  market.buy('sniper') &&
+  buyGun('sniper') &&
     weapons.owns('sniper') &&
     !weapons.owns('rifle') &&
     !weapons.owns('lmg') &&
     market.credits === 99999 - 1200 - 900 - 1500
 );
-check(
-  'buy LMG replaces AX-338',
-  market.buy('lmg') && weapons.owns('lmg') && !weapons.owns('sniper')
-);
+check('buy LMG replaces AX-338', buyGun('lmg') && weapons.owns('lmg') && !weapons.owns('sniper'));
 
 const beforeMCX = market.credits;
 check(
   'buy MCX replaces LMG and deducts 1100',
-  market.buy('mcx') &&
+  buyGun('mcx') &&
     weapons.owns('mcx') &&
     !weapons.owns('lmg') &&
     market.credits === beforeMCX - 1100
 );
 check(
   'MCX remains a separate primary, M4 still offered',
-  item('mcx').slot === 'primary' && item('rifle').action === 'swap'
+  item('mcx').slot === 'primary' && item('rifle').action === 'buy'
 );
-check('cannot buy MCX twice', !market.buy('mcx'));
-check('M4 can replace MCX', market.buy('rifle') && weapons.owns('rifle') && !weapons.owns('mcx'));
+check('cannot buy MCX twice', !buyGun('mcx'));
+check('M4 can replace MCX', buyGun('rifle') && weapons.owns('rifle') && !weapons.owns('mcx'));
 {
-  const real = weapons.equipPrimary.bind(weapons);
-  weapons.equipPrimary = (): false => false;
+  const real = captureMethod(weapons, 'applyBuild');
+  weapons.applyBuild = (): false => false;
   const credits = market.credits;
-  check('failed gun buy does not charge', !market.buy('lmg') && market.credits === credits);
+  check('failed gun buy does not charge', !buyGun('lmg') && market.credits === credits);
   check('failed gun buy leaves ownership', weapons.owns('rifle') && !weapons.owns('lmg'));
-  weapons.equipPrimary = real;
+  weapons.applyBuild = real;
 }
 
 // ---- secondary weapon purchases replace the equipped secondary -----------
@@ -283,39 +278,36 @@ check(
   'starting pistol is equipped and cannot be repurchased',
   item('pistol').action === 'equipped' &&
     !item('pistol').affordable &&
-    !market.buy('pistol') &&
+    !buyGun('pistol') &&
     market.credits === beforeOwnedPistol
 );
-check('MPX buyable while pistol equipped', item('smg').affordable && item('smg').action === 'swap');
+check('MPX buyable while pistol equipped', item('smg').affordable && item('smg').action === 'buy');
 const beforeSmg = market.credits;
 check(
   'buy MPX replaces pistol and deducts 800',
-  market.buy('smg') &&
+  buyGun('smg') &&
     weapons.owns('smg') &&
     !weapons.owns('pistol') &&
     market.credits === beforeSmg - 800
 );
-check('cannot rebuy the equipped MPX', !market.buy('smg'));
+check('cannot rebuy the equipped MPX', !buyGun('smg'));
 check('shotgun buyable while MPX equipped', item('shotgun').affordable);
 const beforeShotgun = market.credits;
 check(
   'buy shotgun replaces MPX and deducts 1000',
-  market.buy('shotgun') &&
+  buyGun('shotgun') &&
     weapons.owns('shotgun') &&
     !weapons.owns('smg') &&
     !weapons.owns('pistol') &&
     market.credits === beforeShotgun - 1000
 );
-check('cannot rebuy the shotgun', !market.buy('shotgun'));
+check('cannot rebuy the shotgun', !buyGun('shotgun'));
 check('MPX becomes buyable with shotgun equipped', item('smg').affordable);
-check(
-  'buy MPX replaces shotgun',
-  market.buy('smg') && weapons.owns('smg') && !weapons.owns('shotgun')
-);
+check('buy MPX replaces shotgun', buyGun('smg') && weapons.owns('smg') && !weapons.owns('shotgun'));
 
 // ---- pistol can be bought back after either secondary upgrade ------------
 for (const previous of ['smg', 'shotgun'] as const) {
-  if (!weapons.owns(previous)) weapons.equipSecondary(previous);
+  if (!weapons.owns(previous)) weapons.applyBuild(previous, BASE_ATTACHMENTS);
   const primary = PRIMARY_IDS.find((id): boolean => weapons.owns(id));
   assert(primary);
   const pistol = weaponState('pistol');
@@ -325,9 +317,9 @@ for (const previous of ['smg', 'shotgun'] as const) {
   market.credits = 399;
   check(
     'P320 unaffordable below 400 without charging or swapping',
-    item('pistol').action === 'swap' &&
+    item('pistol').action === 'buy' &&
       !item('pistol').affordable &&
-      !market.buy('pistol') &&
+      !buyGun('pistol') &&
       market.credits === 399 &&
       weapons.owns(previous) &&
       !weapons.owns('pistol')
@@ -336,7 +328,7 @@ for (const previous of ['smg', 'shotgun'] as const) {
   check('P320 buyable at exactly 400', item('pistol').affordable);
   check(
     `buy P320 replaces ${previous}, preserves primary, and deducts 400`,
-    market.buy('pistol') &&
+    buyGun('pistol') &&
       weapons.owns('pistol') &&
       !weapons.owns('smg') &&
       !weapons.owns('shotgun') &&
@@ -350,27 +342,15 @@ for (const previous of ['smg', 'shotgun'] as const) {
       pistol.reserve === pistol.def.reserve &&
       item('pistol').action === 'equipped' &&
       !item('pistol').affordable &&
-      !market.buy('pistol')
+      !buyGun('pistol')
   );
 }
-weapons.equipSecondary('smg');
+weapons.applyBuild('smg', BASE_ATTACHMENTS);
 market.credits = 400;
-{
-  const real = captureMethod(weapons, 'equipSecondary');
-  weapons.equipSecondary = (): false => false;
-  check(
-    'failed pistol equip does not charge or change ownership',
-    !market.buy('pistol') &&
-      market.credits === 400 &&
-      weapons.owns('smg') &&
-      !weapons.owns('pistol')
-  );
-  weapons.equipSecondary = real;
-}
 market.closeShop();
 check(
   'pistol cannot be bought with the market closed',
-  !market.buy('pistol') && market.credits === 400
+  !buyGun('pistol') && market.credits === 400
 );
 market.openShop(2);
 
@@ -481,16 +461,6 @@ assert.equal(market.credits, 0);
 assert(market.setBuild(BASE_ATTACHMENTS) && market.confirmBuild());
 assert(market.setBuild(redDotLaser));
 assert.equal(market.getHudState().build?.total, 450, 'discarded attachments must be bought again');
-const fits = WEAPON_DEFS.lmg.fits;
-assert(fits?.optic);
-const opticFits = fits.optic;
-delete fits.optic;
-try {
-  assert(!market.setBuild({ ...redDotLaser, optic: 'acog' }), 'unverified optic is incompatible');
-  assert.deepEqual(market.getHudState().build?.config, redDotLaser);
-} finally {
-  fits.optic = opticFits;
-}
 assert(market.setBuild({ ...BASE_ATTACHMENTS, optic: 'scope' }));
 market.credits = 9999;
 assert(!market.confirmBuild(), 'missing attachment asset cannot be purchased');

@@ -13,3 +13,9 @@ export const ATTACHMENT_CATALOG = [
   label: string;
   cost: number;
 }[];
+
+/** Catalog entry by attachment id, for pricing a slot change. */
+export const ATTACHMENT_OFFERS = new Map<
+  NonNullable<AttachmentConfig[keyof AttachmentConfig]>,
+  (typeof ATTACHMENT_CATALOG)[number]
+>(ATTACHMENT_CATALOG.map((entry): [typeof entry.id, typeof entry] => [entry.id, entry]));
