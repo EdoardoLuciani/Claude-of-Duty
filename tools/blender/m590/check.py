@@ -278,7 +278,7 @@ pose('Idle')
 # Mount checks append actual shared source optics only after the original
 # mechanism/skin gates, so they cannot alter those source selections.
 from m590.mounts import check_mounts
-check_mounts(ROOT,manifest,rig,meshes,review,pose,tree,point,CI)
+check_mounts(manifest,rig,meshes,review,pose,tree,point,CI)
 print('M590_SOURCE_OK:',len(meshes),'editable component meshes;',len(controls),'native controls;',poses,'120Hz mechanism/contact poses;',len(seen),'distinct strokes;',skin_poses,'actual deformed glove clearance poses; rear clearance',minimum*1000,'mm; wrist/shell drift',max_drift*1000,'mm')
 
 # Actual shared rail attachment, independent of the optic catalog.
@@ -288,4 +288,4 @@ check_laser_mount('m590')
 
 # Dedicated large-bore can; independent of the receiver's optic/rail fit seam.
 from m590.muzzle import check_muzzle
-check_muzzle(ROOT,manifest,rig,meshes,review,pose,tree,point,CI)
+check_muzzle(manifest,rig,meshes,review,pose,tree,point,CI)

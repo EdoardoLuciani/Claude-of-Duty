@@ -1,39 +1,20 @@
-"""Standalone SRD762Ti exterior; no generated MCX input.
-
-Native metres. Runtime mount is origin, bore forward -Z, up +Y.
-"""
-import json
+"""Standalone SRD762Ti exterior. Native metres; authored on +X, then turned to the
+shared can frame (runtime mount at origin, bore forward -Z, up +Y)."""
 import math
-import struct
 import sys
 from pathlib import Path
+
 import bpy
-from mathutils import Matrix, Vector
-from mathutils.bvhtree import BVHTree
+from mathutils import Matrix
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from suppressor.geometry import build_suppressor
+import can
 
-ROOT = Path(__file__).resolve().parents[3]
-OUT = ROOT/'assets/attachments/sig-srd762ti'
-OUT.mkdir(parents=True, exist_ok=True)
-bpy.ops.wm.read_factory_settings(use_empty=True)
-bpy.context.scene.unit_settings.system = 'METRIC'
+root, out = can.begin('SUPPRESSOR', 'assets/attachments/sig-srd762ti')
 asset = bpy.context.collection
-
-
-def material(name, color, roughness):
-    m = bpy.data.materials.new(name)
-    m.use_nodes = True
-    p = m.node_tree.nodes.get('Principled BSDF')
-    p.inputs['Base Color'].default_value = (*color, 1)
-    p.inputs['Roughness'].default_value = roughness
-    return m
-
-
-ceramic = material('06 | suppressor graphite ceramic', (.045, .046, .049), .76)
-rubber = material('05 | bore shadow', (.008, .009, .010), .95)
-mark = material('09 | laser markings', (.60, .57, .47), .88)
+ceramic = can.material('06 | suppressor graphite ceramic', (.045, .046, .049), .76)
+rubber = can.material('05 | bore shadow', (.008, .009, .010), .95)
+mark = can.material('09 | laser markings', (.60, .57, .47), .88)
 
 
 def active(o):
@@ -42,27 +23,15 @@ def active(o):
     bpy.context.view_layer.objects.active = o
 
 
-def finish(o, name, mat, bevel=0):
+def finish(o, name, mat):
     o.name = name
     o.data.materials.append(mat)
     active(o)
     bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-    if bevel:
-        mod = o.modifiers.new('Machined edges', 'BEVEL')
-        mod.width = bevel
-        mod.segments = 2
-        bpy.ops.object.modifier_apply(modifier=mod.name)
     return o
 
 
-def cylinder(name, loc, radius, depth, mat, vertices=48, bevel=.00035):
-    bpy.ops.mesh.primitive_cylinder_add(vertices=vertices, radius=radius, depth=depth, location=loc)
-    o = bpy.context.object
-    o.rotation_euler.y = math.pi/2
-    return finish(o, name, mat, bevel)
-
-
-def opening(o, loc, dims, radius=0):
+def opening(o, loc, dims):
     bpy.ops.mesh.primitive_cube_add(size=1, location=loc)
     cutter = bpy.context.object
     cutter.dimensions = dims
@@ -104,44 +73,46 @@ def text(label, loc, size):
     return finish(o, 'Mark | '+label, mark)
 
 
-build_suppressor(asset, cylinder, opening, finish, tube, text, ceramic, rubber)
+# SRD762Ti direct-thread exterior: 236 mm overall / 44 mm diameter.
+# Subtle circumferential seams, no invented cooling flutes or QD locking rings.
+mount = tube('Suppressor mount', (.282, 0, 0), .013, .0095, .016, ceramic)
+for side in (-1, 1):
+    opening(mount, (.280, side*.015, 0), (.012, .008, .030))
+profile_rings = [(.288, .013), (.290, .0205), (.294, .022), (.326, .022), (.328, .0215)]
+for x in (.345, .369, .393, .417, .441, .465, .489):
+    profile_rings.extend([(x-.0005, .0215), (x, .02165), (x+.0005, .0215)])
+profile_rings.extend([(.504, .0215), (.508, .0208)])
+verts = [(x, math.cos(i*math.tau/64)*r, math.sin(i*math.tau/64)*r)
+         for x, r in profile_rings for i in range(64)]
+faces = [(j*64+i, j*64+(i+1)%64, (j+1)*64+(i+1)%64, (j+1)*64+i)
+         for j in range(len(profile_rings)-1) for i in range(64)]
+mesh = bpy.data.meshes.new('SRD762Ti exterior')
+mesh.from_pydata(verts, [], faces)
+mesh.update()
+body = bpy.data.objects.new('Suppressor body', mesh)
+asset.objects.link(body)
+for polygon in mesh.polygons:
+    polygon.use_smooth = True
+finish(body, body.name, ceramic)
+# Universal 9mm-clear game-fit endcap; exterior only, not SRD762Ti certification.
+tube('Recessed suppressor endcap', (.508, 0, 0), .0208, .0052, .004, ceramic)
+tube('Muzzle interior shadow', (.502, 0, 0), .0205, .0052, .001, rubber)
+text('SIG SAUER', (.302, -.0222, .003), .0028)
+text('SRD762Ti', (.302, -.0222, -.001), .0028)
+
 # Original MCX +X-forward geometry: move its rear seating plane to zero,
 # rotate to Blender +Y forward (glTF -Z), retaining physical dimensions.
 transform = Matrix(((0, -1, 0, 0), (1, 0, 0, -.274), (0, 0, 1, 0), (0, 0, 0, 1)))
-for o in list(asset.objects):
+meshes = [o for o in asset.objects if o.type == 'MESH']
+for o in meshes:
     o.matrix_world = transform @ o.matrix_world
-
-root = bpy.data.objects.new('SUPPRESSOR', None)
-asset.objects.link(root)
-for name, loc in [('SOCKET_mount', (0, 0, 0)), ('SOCKET_muzzle', (0, .236, 0))]:
-    o = bpy.data.objects.new(name, None)
-    asset.objects.link(o)
-    o.parent = root
-    o.location = loc
-# Mesh ends at x=.510 (recessed endcap); exit sits at that forward face.
-objects = [o for o in asset.objects if o.type == 'MESH']
-active(objects[0])
-for o in objects:
+active(meshes[0])
+for o in meshes:
     o.select_set(True)
 bpy.ops.object.join()
 o = bpy.context.object
 o.name = 'suppressor_mesh'
 o.parent = root
-bpy.context.view_layer.update()
 # 10.2mm clear gauge: a 9mm projectile plus at least .6mm radial margin.
-# This verifies the authored endcap/shadow/mount only, not physical baffles.
-vertices = [o.matrix_world @ v.co for v in o.data.vertices]
-bore = BVHTree.FromPolygons(vertices, [tuple(p.vertices) for p in o.data.polygons])
-offsets = [(0, 0)] + [(r*math.cos(i*math.tau/32), r*math.sin(i*math.tau/32))
-                      for r in (.0025, .0045, .0051) for i in range(32)]
-for x, z in offsets:
-    assert bore.ray_cast(Vector((x, .237, z)), Vector((0,-1,0)), .238)[0] is None, 'universal game-fit bore obstructed'
-bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'suppressor.blend'))
-bpy.ops.export_scene.gltf(filepath=str(OUT/'suppressor.glb'), export_format='GLB',
-                          export_animations=False, export_extras=True, export_yup=True)
-# Guard the exported frame, not only the Blender scene: Blender +Y becomes glTF -Z.
-raw = (OUT/'suppressor.glb').read_bytes()
-length = struct.unpack_from('<I', raw, 12)[0]
-nodes = json.loads(raw[20:20+length])['nodes']
-exit = next(n for n in nodes if n.get('name') == 'SOCKET_muzzle')['translation']
-assert (Vector(exit)-Vector((0, 0, -.236))).length < 1e-6, 'suppressor exit must face forward in glTF'
+can.assert_clear('SRD762Ti', (0, .0025, .0045, .0051), .236)
+can.export(root, out, 'suppressor', .236)

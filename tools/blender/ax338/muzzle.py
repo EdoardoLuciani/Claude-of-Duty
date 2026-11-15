@@ -5,13 +5,16 @@ No bipod exists in this source: this does not certify a future bipod fit.
 """
 import json
 import math
+import sys
 from pathlib import Path
 
 import bpy
 from mathutils import Matrix, Vector
 from mathutils.bvhtree import BVHTree
 
-ROOT = Path(__file__).resolve().parents[3]
+# Also runnable standalone on the saved AX338 scene.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import attachment_source
 
 
 def check_muzzle():
@@ -49,26 +52,19 @@ def check_muzzle():
                 ev.to_mesh_clear()
         return BVHTree.FromPolygons(vertices, faces)
 
-    def attachment(path, base_name, weapon_mount):
-        assert path.exists(), f'Build attachment first: {path}'
-        with bpy.data.libraries.load(str(path)) as (source, target):
-            target.objects = source.objects
-        objects = [obj for obj in target.objects if obj]
-        for obj in objects:
-            scene.collection.objects.link(obj)
-        bpy.context.view_layer.update()
-        base = next(obj for obj in objects if obj.name.split('.')[0] == base_name)
+    def attachment(id, weapon_mount):
+        objects, base = attachment_source.load(id)
         transform = rig.matrix_world.inverted() @ weapon_mount.matrix_world @ base.matrix_world.inverted()
         return surface([obj for obj in objects if obj.type == 'MESH'], transform)
 
     select('Idle', 0)
-    can = attachment(ROOT/'assets/attachments/suppressor-338/suppressor338.blend', 'SOCKET_mount', mount)
+    can = attachment('suppressor338', mount)
     fixed_targets = []
-    for optic, folder in [('rmr', 'trijicon-rmr'), ('acog', 'trijicon-acog'), ('scope', 'schmidt-bender-pm-ii')]:
-        target = attachment(ROOT/'assets/attachments'/folder/(optic+'.blend'), 'MOUNT_base', bpy.data.objects['MOUNT_optic'])
+    for optic in attachment_source.OPTICS:
+        target = attachment(optic, bpy.data.objects['MOUNT_optic'])
         assert not can.overlap(target), (optic, 'can intersects optic')
         fixed_targets.append(target)
-    laser = attachment(ROOT/'assets/attachments/steiner-tor-mini/tor-mini.blend', 'SOCKET_mount', bpy.data.objects['MOUNT_rail'])
+    laser = attachment('laser', bpy.data.objects['MOUNT_rail'])
     assert not can.overlap(laser), 'can intersects TOR Mini'
     adapter_meshes = [obj for obj in adapter.children_recursive if obj.type == 'MESH']
     inverse = rig.matrix_world.inverted()

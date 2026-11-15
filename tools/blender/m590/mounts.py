@@ -8,8 +8,10 @@ import math
 import bpy
 from mathutils import Matrix, Vector
 
+import attachment_source
 
-def check_mounts(root, manifest, rig, meshes, review, pose, tree, point, basis):
+
+def check_mounts(manifest, rig, meshes, review, pose, tree, point, basis):
     pose('Idle')
     mounts = {slot: bpy.data.objects['MOUNT_' + slot] for slot in manifest['mounts']}
     for slot, data in manifest['mounts'].items():
@@ -105,38 +107,19 @@ def check_mounts(root, manifest, rig, meshes, review, pose, tree, point, basis):
     # that frame throughout every clip, while the laser rail stays on the fixed magazine-tube clamps.
     receiver_mount = rig.matrix_world.inverted() @ mounts['optic'].matrix_world
     optics = {}
-    for optic, directory, stations in (
-        ('rmr', 'trijicon-rmr', (6, 9)),
-        ('acog', 'trijicon-acog', (4, 11)),
-        ('scope', 'schmidt-bender-pm-ii', (0, 2, 13, 15)),
-    ):
-        source = root / 'assets/attachments' / directory / (optic + '.blend')
-        assert source.exists(), f'Rebuild the shared {optic} source before M590 checks: {source}'
-        with bpy.data.libraries.load(str(source), link=False) as (available, loaded):
-            loaded.objects = available.objects
+    for optic, stations in (('rmr', (6, 9)), ('acog', (4, 11)), ('scope', (0, 2, 13, 15))):
+        objects = attachment_source.seat(optic, mounts['optic'])
+        # The muzzle check reads each mounted optic back from this collection.
         collection = bpy.data.collections.new('M590 check | mounted ' + optic)
         bpy.context.scene.collection.children.link(collection)
-        for obj in loaded.objects:
+        for obj in objects:
             collection.objects.link(obj)
-        bpy.context.view_layer.update()
-        base = next(o for o in loaded.objects if o.name.startswith('MOUNT_base'))
-        sight = next(o for o in loaded.objects if o.name.startswith('SOCKET_sight'))
-        relative_sight = base.matrix_world.inverted() @ sight.matrix_world.translation
-        wrapper = bpy.data.objects.new('M590 check | ' + optic, None)
-        collection.objects.link(wrapper)
-        wrapper.parent = mounts['optic']
-        wrapper.matrix_basis = base.matrix_world.inverted()
-        for obj in loaded.objects:
-            if obj.parent is None:
-                obj.parent = wrapper
-        bpy.context.view_layer.update()
-        surfaces = [o for o in loaded.objects if o.type == 'MESH']
+        sight = attachment_source.named(objects, 'SOCKET_sight')
+        surfaces = [o for o in objects if o.type == 'MESH']
         optic_tree = tree(surfaces)
         # Only mating teeth may contact an optic; the receiver base,
         # integrated sight and remaining body must stay clear.
         assert not optic_tree.overlap(tree([o for o in meshes if o not in seating_teeth])), (optic, 'fixed irons/body/rail support conflict')
-        expected_sight = mounts['optic'].matrix_world @ relative_sight
-        assert (sight.matrix_world.translation - expected_sight).length < 1e-7
         # Probe both feet at two actual rail teeth, not a broad bounding box.
         gaps = []
         rail_tree = tree(rail)

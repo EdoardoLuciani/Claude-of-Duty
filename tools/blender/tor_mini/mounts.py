@@ -13,7 +13,8 @@ import bpy
 from mathutils import Matrix, Vector
 from mathutils.bvhtree import BVHTree
 
-ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import attachment_source
 # Only mating rail surfaces may contact the clamp, inside the local seat patch.
 PROFILES = {
     'p320': ('P320_RIG', 'P320 | high bake source (not exported)', 'frame', ('Frame |',)),
@@ -74,16 +75,9 @@ def check_laser_mount(weapon):
         hardware_vertices.extend(points)
         hardware_faces.extend(tuple(offset + i for i in triangle) for triangle in triangles)
     hardware = tree(hardware_vertices, hardware_faces) if hardware_faces else None
-    path = ROOT / 'assets/attachments/steiner-tor-mini/tor-mini.blend'
-    assert path.exists(), f'Build shared TOR Mini first: {path}'
-    with bpy.data.libraries.load(str(path), link=False) as (source, loaded):
-        loaded.objects = [n for n in source.objects if n in ('ATTACHMENT_tor_mini', 'TOR_MINI_body', 'SOCKET_mount', 'SOCKET_laser')]
-    for obj in loaded.objects:
-        scene.collection.objects.link(obj)
-    bpy.context.view_layer.update()
-    base = next(o for o in loaded.objects if o.name.startswith('SOCKET_mount'))
-    body = next(o for o in loaded.objects if o.name.startswith('TOR_MINI_body'))
-    emitter = next(o for o in loaded.objects if o.name.startswith('SOCKET_laser'))
+    loaded, base = attachment_source.load('laser', ('ATTACHMENT_tor_mini', 'TOR_MINI_body', 'SOCKET_mount', 'SOCKET_laser'))
+    body = attachment_source.named(loaded, 'TOR_MINI_body')
+    emitter = attachment_source.named(loaded, 'SOCKET_laser')
     vertices, faces = geometry(body, base.matrix_world.inverted())
     laser = tree(vertices, faces)
     emission = base.matrix_world.inverted() @ emitter.matrix_world.translation
@@ -98,23 +92,10 @@ def check_laser_mount(weapon):
     optics = []
     optic_objects = []
     if weapon not in ('mcx', 'mpx'):
-        for optic, folder in (('rmr', 'trijicon-rmr'), ('acog', 'trijicon-acog'), ('scope', 'schmidt-bender-pm-ii')):
-            source_path = ROOT / 'assets/attachments' / folder / (optic + '.blend')
-            assert source_path.exists(), f'Build shared optic first: {source_path}'
-            with bpy.data.libraries.load(str(source_path), link=False) as (source, target):
-                target.objects = source.objects
-            for obj in target.objects:
-                scene.collection.objects.link(obj)
-            bpy.context.view_layer.update()
-            optic_base = next(o for o in target.objects if o.name.startswith('MOUNT_base'))
-            transform = bpy.data.objects['MOUNT_optic'].matrix_world @ optic_base.matrix_world.inverted()
-            roots = [o for o in target.objects if o.parent is None]
-            for obj in roots:
-                matrix = transform @ obj.matrix_world
-                obj.parent = bpy.data.objects['MOUNT_optic']
-                obj.matrix_world = matrix
-            optics.extend(o for o in optic_base.parent.children_recursive if o.type == 'MESH')
-            optic_objects.extend(target.objects)
+        for optic in attachment_source.OPTICS:
+            objects = attachment_source.seat(optic, bpy.data.objects['MOUNT_optic'])
+            optics.extend(o for o in objects if o.type == 'MESH')
+            optic_objects.extend(objects)
     clips = json.loads(scene['clips'])
     if weapon == 'mcx':
         from mcx.review_hands import review_tracks, select_review_clip
@@ -190,7 +171,7 @@ def check_laser_mount(weapon):
                         assert not mounted.overlap(tree(points, triangles)), (weapon, angle, obj.name, 'fold hits laser')
         assert contact, (weapon, 'no actual rail/clamp contact')
     finally:
-        for obj in loaded.objects + optic_objects:
+        for obj in loaded + optic_objects:
             bpy.data.objects.remove(obj, do_unlink=True)
         for o in scene.objects:
             if o.animation_data:

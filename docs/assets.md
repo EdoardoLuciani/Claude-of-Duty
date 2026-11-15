@@ -109,8 +109,10 @@ independent of the optional laser on fixed magazine-tube clamps (#686).
 
 The dedicated [.338 suppressor](../assets/attachments/suppressor-338/README.md)
 is authored in `tools/blender/suppressor338/`, with its own `suppressor338`
-cook/catalog ID and AX338-only muzzle fit. Its saved bore/socket checks and
+cook id and AX338-only can model. Its build-time bore gauge and
 `tools/blender/ax338/muzzle.py` clearance sweep are separate from the shared SRD762Ti.
+All four cans share scene, lathe, bore-gauge and export helpers in `tools/blender/can.py`;
+weapon fit checks load built attachments through `tools/blender/attachment_source.py`.
 
 Normal `bun run dev` / `bun run build` (and `bun run assets`) run
 `tools/build-assets.ts`: arms and bandage, each weapon and its cook, standalone
