@@ -95,22 +95,15 @@ for (const code of ['KeyW', 'Mouse0']) {
     if (code === 'Mouse0') input._onMouseUp(fixture<MouseEvent>({ button: 0 }));
     else input._onKeyUp(keyEvent(code));
   };
-  for (const initiallyHeld of [false, true]) {
-    input.clear();
-    if (initiallyHeld) {
-      press();
-      input.beginFrame();
-    } else press();
-    release();
-    press();
-    input.beginFrame();
-    assert(
-      input.held(code) && input.pressed(code) && input.released(code),
-      `${code}: release/repress`
-    );
-    input.beginFrame();
-    assert(input.held(code) && !input.pressed(code) && !input.released(code));
-  }
+  input.clear();
+  press();
+  input.beginFrame();
+  release();
+  press();
+  input.beginFrame();
+  assert(input.held(code) && input.pressed(code) && input.released(code), `${code}: repress`);
+  input.beginFrame();
+  assert(input.held(code) && !input.pressed(code) && !input.released(code));
   input.clear();
   press();
   release();

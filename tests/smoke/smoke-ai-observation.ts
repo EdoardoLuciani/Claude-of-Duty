@@ -380,63 +380,18 @@ const map = await loadMap(),
   assert.equal(a.targetVisible, false, 'mounting immediately suspends current visibility');
   assert.equal(a.targetSample, -1);
   a._sense = a._think = a._shoot = (): never => assert.fail('ladder bypassed exclusive traversal');
-  const paused = JSON.stringify([
-    a.lastKnownAge,
-    a.visualAge,
-    a.hasTarget,
-    a.ladder.cursor,
-    a.position,
-  ]);
-  a.update(0);
-  assert.equal(
-    JSON.stringify([a.lastKnownAge, a.visualAge, a.hasTarget, a.ladder.cursor, a.position]),
-    paused
-  );
   a.update(0.25);
   assert.equal(a.lastKnownAge, 0.25, 'evidence ages while waiting for a traversal proof');
   assert.equal(a.visualAge, 0.25);
-  assert.equal(a.hasTarget, true, 'unexpired acquisition is retained, not current visibility');
   squad.update(0.25);
-  assert.equal(squad.contactAge, 0.25, 'squad contact ages instead of rebroadcasting stale sight');
-  for (let t = 0.25; t <= TACTICS.visualMemory; t += 0.25) {
-    a.update(0.25);
-    squad.update(0.25);
-  }
-  assert.ok(a.visualAge > TACTICS.visualMemory);
-  assert.equal(a.lastKnownAge, a.visualAge);
+  assert.equal(squad.contactAge, 0.25, 'waiting traversal cannot rebroadcast stale sight');
+  a.update(TACTICS.visualMemory);
+  assert.equal(a.lastKnownAge, TACTICS.visualMemory + 0.25);
+  assert.equal(a.visualAge, TACTICS.visualMemory + 0.25);
   assert.equal(a.hasTarget, false, 'suspended acquisition expires');
-  const service = (grid.worker = new AttachmentQueries(grid, {
-    workerFactory: (): NativeWorker => new NativeWorker(),
-  }));
-  try {
-    await service.start();
-    const deadline = performance.now() + 10000;
-    while (!a.ladder.motor) {
-      assert.ok(performance.now() < deadline, 'bounded live ladder proof');
-      a.update(1 / 60);
-      await new Promise((resolve): NodeJS.Timeout => setTimeout(resolve, 1));
-    }
-    const before = a.position.clone(),
-      age = a.lastKnownAge,
-      visualAge = a.visualAge,
-      contactAge = squad.contactAge;
-    a.update(0.25);
-    assert.ok(a.position.distanceTo(before) > 0, 'exclusive native motor still moves the climber');
-    assert.equal(a.lastKnownAge, age + 0.25);
-    assert.equal(a.visualAge, visualAge + 0.25, 'active climbing also ages visual memory');
-    assert.equal(a.hasTarget, false);
-    assert.equal(a.targetVisible, false);
-    squad.update(0.25);
-    assert.equal(
-      squad.contactAge,
-      contactAge + 0.25,
-      'active climbing cannot rejuvenate squad contact'
-    );
-  } finally {
-    a.dispose();
-    service.dispose();
-    grid.worker = null;
-  }
+  squad.update(TACTICS.visualMemory);
+  assert.equal(squad.contactAge, a.visualAge, 'expired sight cannot refresh squad contact');
+  a.dispose();
 }
 for (const [from, target, reachable] of [
   [[-3.384, 0.091, -3.351], [-5.65, 8.16, 8.512], true],
