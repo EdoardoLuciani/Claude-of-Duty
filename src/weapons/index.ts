@@ -241,6 +241,8 @@ export class WeaponSystem {
   _shotSeeds: number[] = [];
   // Deferred shell ejections (a case leaves the port a few ms after the shot).
   _shellQueue: Array<{ t: number; weapon: WeaponId | null }> = [];
+  /** Authored bolt progress survives replacement of its presentation clip. */
+  _boltCycles = new Map<WeaponId, number>();
   _droppedMags: DroppedMagazine[] = [];
   _grenades: LiveGrenade[] = []; // live thrown grenades: { body, mesh, fuse }
   grenades: number = GRENADES_PER_LIFE;
@@ -618,9 +620,14 @@ export class WeaponSystem {
     if (!slot.includes(id) || this.owned.has(id)) return false;
     if (!this._hasMesh(id)) return false;
     if (config && !this._configureAttachments(id, config)) return false;
-    for (const weapon of slot)
-      if (weapon !== id && this.owned.delete(weapon)) this._resetAttachments(weapon);
+    for (const weapon of slot) {
+      if (weapon !== id && this.owned.delete(weapon)) {
+        this._resetAttachments(weapon);
+        this._boltCycles.delete(weapon);
+      }
+    }
     this.owned.add(id);
+    this._boltCycles.delete(id);
     const s = this.states.get(id);
     if (s) {
       s.mag = s.def.magSize;
@@ -770,6 +777,7 @@ export class WeaponSystem {
       s.modeIndex = 0;
       s.mode = s.def.modes[0];
     }
+    this._boltCycles.clear();
     this.disabled = false;
     this._fireTimer = 0;
     this._burstLeft = 0;
@@ -856,6 +864,7 @@ export class WeaponSystem {
     if (this.disabled || !s || this.reloading || this.switching || this.cycling) return false;
     if (this.cooking || this.grenadeEquipped || this.radioEquipped || this.healing) return false;
     if (this.pumping) return false;
+    if (this._boltCycles.has(this.activeId)) return this._resumeBoltCycle();
     if (s.reserve <= 0) return false;
     if (s.chambered && s.mag >= s.def.magSize) return false;
     this.viewmodel.stopClip();
@@ -924,7 +933,7 @@ export class WeaponSystem {
   canFire(): boolean {
     const s = this.state;
     if (this.disabled || this.player?.dead === true || !s) return false;
-    if (this.switching || this.pumping) return false;
+    if (this.switching || this.pumping || this._boltCycles.has(this.activeId)) return false;
     if (this.reloading && s.def.reloadStyle !== 'tube') return false;
     if (this.cooking || this.grenadeEquipped || this.radioEquipped || this.healing) return false;
     if (this._fireTimer > 0) return false;
@@ -935,7 +944,13 @@ export class WeaponSystem {
   tryFire(): boolean {
     const s = this.state;
     if (this.disabled || this.player?.dead === true || !s) return false;
-    if (this.switching || this.pumping || this._fireTimer > 0) return false;
+    if (
+      this.switching ||
+      this.pumping ||
+      this._fireTimer > 0 ||
+      this._boltCycles.has(this.activeId)
+    )
+      return false;
     if (this.reloading && s.def.reloadStyle !== 'tube') return false;
     this._interruptHeal('fire');
     if (this.grenadeEquipped || this.radioEquipped || this.healing) return false;
@@ -1046,8 +1061,10 @@ export class WeaponSystem {
 
     if (boltAction) {
       this._fireTimer = def.boltTime ?? 1.1;
-      if (s.mag > 0) this.viewmodel.play('cycle');
-      else this._queueShell(0.05);
+      if (s.mag > 0) {
+        this._boltCycles.set(this.activeId, 0);
+        this.viewmodel.play('cycle');
+      } else this._queueShell(0.05);
     } else if (def.action === 'pump') {
       this._fireTimer = 60 / def.rpm;
       this.viewmodel.play('pump');
@@ -1148,6 +1165,7 @@ export class WeaponSystem {
         this.ui?.clearPrompt();
         break;
       case 'end':
+        if (clipName === 'cycle') this._boltCycles.delete(this.activeId);
         if (isReload) {
           this._emitReload('end');
           if (this._tubeLoop) this._continueTubeReload();
@@ -1399,6 +1417,7 @@ export class WeaponSystem {
     if (this.grenades <= 0) return;
     const type = action === 'ads' ? 'short' : 'long';
     this.cooking = true;
+    this._throwReleased = false;
     this._throwType = type;
     this._cookAction = action;
     this._cookTime = 0;
@@ -1677,6 +1696,7 @@ export class WeaponSystem {
 
     // ---- input -----------------------------------------------------------
     if (live) {
+      this._resumeBoltCycle();
       if (input.actionPressed('reload')) this.reload();
       if (input.actionPressed('fireMode')) this.cycleFireMode();
       if (input.actionPressed('inspect')) this.inspect();
@@ -1782,12 +1802,38 @@ export class WeaponSystem {
     return base;
   }
 
+  _resumeBoltCycle(): boolean {
+    const time = this._boltCycles.get(this.activeId);
+    const vm = this._viewmodel;
+    if (
+      time === undefined ||
+      !vm ||
+      vm.clipName ||
+      this.grenadeEquipped ||
+      this.radioEquipped ||
+      this.healing ||
+      this.switching
+    )
+      return false;
+    const duration = vm.play('cycle');
+    if (!duration) return false;
+    vm.clipT = time;
+    vm.clipPrevT = time === 0 ? -1 : time;
+    this._fireTimer = Math.max(this._fireTimer, duration - time);
+    return true;
+  }
+
   lateUpdate(dt: number, ctx: EngineContext): void {
     const vm = this._viewmodel;
     if (!vm) return;
     // Input may fire after update gathered the pose state. Supply the belt's
     // post-shot count, including the final departing cartridge, this frame.
     if (this.state?.def.id === 'lmg') this._syncAmmoState(this.state);
+    if (vm.clipName === 'cycle' && this._boltCycles.has(this.activeId)) {
+      // Match Viewmodel's bounded step before it can replace cycle with draw
+      // at grenade completion. Resuming skips beats already delivered.
+      this._boltCycles.set(this.activeId, vm.clipT + Math.min(0.1, Math.max(0, dt)));
+    }
     vm.update(dt, this._state);
 
     // ---- muzzle flash / audio, now that the pose is final ---------------
@@ -1906,6 +1952,7 @@ export class WeaponSystem {
 
     const s = this.state;
     if (s) {
+      this._boltCycles.delete(this.activeId);
       s.mag = kind === 'fire' ? 22 : s.def.magSize;
       s.chambered = true;
       s.reserve = s.def.reserve;

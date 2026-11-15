@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
+import ax338Manifest from '../../assets/weapons/ax338/manifest.json' with { type: 'json' };
+import m590Manifest from '../../assets/weapons/m590/manifest.json' with { type: 'json' };
 import { bindingLabel } from '../../src/core/bindings.ts';
 import { Input } from '../../src/core/input.ts';
 import { EventBus } from '../../src/core/registry.ts';
@@ -19,12 +21,12 @@ import type { UiSystem } from '../../src/ui/index.ts';
 import { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
 import { BASE_ATTACHMENTS, makeOpticModel } from '../../src/weapons/attachments.ts';
 import { ProjectileSim } from '../../src/weapons/ballistics.ts';
-import { Clip } from '../../src/weapons/clips.ts';
+import { buildManifestClips, Clip } from '../../src/weapons/clips.ts';
 import { WEAPON_IDS } from '../../src/weapons/defs.ts';
 import type { WeaponId } from '../../src/weapons/defs.ts';
 import { GRENADE_FUSE, MAX_SHOTS_PER_FRAME } from '../../src/weapons/index.ts';
 import type { WeaponEntry, WeaponModelRecord } from '../../src/weapons/runtime-types.ts';
-import type { Viewmodel } from '../../src/weapons/viewmodel.ts';
+import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { ArmedWeaponSystem, weaponState } from '../lib/ballistics-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
 import { fixture } from '../lib/fixture.ts';
@@ -249,19 +251,178 @@ for (const [equip, first, second] of [
   assert.equal(shots.fired, 8, 'one shotgun shell spawns eight pellets');
   assert.equal(wp._pendingShots, 1, 'pellets still produce one accepted-shot event');
 }
-{
-  const { wp } = makeHarness();
-  assert(wp.equipPrimary('sniper') && wp.tryFire());
+// Exercise actual clip cursors and grenade timelines, without loading meshes/IK.
+function timelineHarness(): CadenceHarness {
+  const h = cadenceHarness('rifle');
+  const { wp } = h;
+  const sockets = wp.viewmodel;
+  const vm = new Viewmodel(wp.ctx, wp.mats);
+  vm.armAsset = sockets.armAsset;
+  vm._solveHands = (): void => {};
+  for (const method of [
+    'muzzleWorld',
+    'boreDir',
+    'ejectWorld',
+    'ejectVelocity',
+    'grenadeReleaseWorld',
+  ] as const)
+    vm[method] = sockets[method];
+  vm.addRecoil = (): void => {};
+  vm.setActive = (id): WeaponEntry | null => {
+    vm.active = vm.weapons.get(id) ?? null;
+    return vm.active;
+  };
+  for (const id of WEAPON_IDS) {
+    const clips =
+      id === 'sniper'
+        ? buildManifestClips(
+            { cycle: 'Bolt_Cycle', draw: 'Draw', holster: 'Holster' },
+            ax338Manifest.clips
+          )
+        : id === 'shotgun'
+          ? buildManifestClips(m590Manifest.aliases, m590Manifest.clips)
+          : {
+              draw: new Clip('draw', 0.2, {}),
+              holster: new Clip('holster', 0.2, { events: [{ t: 0.199, name: 'end' }] }),
+            };
+    vm.weapons.set(
+      id,
+      fixture<WeaponEntry>(
+        {
+          id,
+          def: weaponState(wp, id).def,
+          group: new THREE.Group(),
+          clips,
+          optic: null,
+          sight: new THREE.Vector3(),
+          laserEmitter: null,
+          model: fixture<WeaponModelRecord>({}),
+          animation: fixture<WeaponEntry['animation']>({ reset(): void {}, update(): void {} }),
+        },
+        ['shell']
+      )
+    );
+  }
+  wp.viewmodel = vm;
+  vm.onClipEvent = (name, clip): void => wp._onClipEvent(name, clip);
+  vm.setActive('rifle');
+  return h;
+}
+
+// Interrupted bolts resume authored time, including the shell beat, with no reserve.
+for (const interrupt of [
+  'short throw',
+  'purchase before eject',
+  'purchase after eject',
+  'purchase after chamber',
+  'reload',
+] as const) {
+  const { wp, step, events } = timelineHarness();
+  let boltTime = 0;
+  const chamberTimes: number[] = [];
+  const update = wp.viewmodel.update.bind(wp.viewmodel);
+  wp.viewmodel.update = (dt, state): void => {
+    if (wp.viewmodel.clipName === 'cycle') boltTime += dt;
+    update(dt, state);
+  };
+  wp.viewmodel.onClipEvent = (name, clip): void => {
+    if (clip === 'cycle' && name === 'chamber') chamberTimes.push(boltTime);
+    wp._onClipEvent(name, clip);
+  };
+  assert(wp.equipPrimary('sniper'));
+  wp.state.reserve = 0;
+  const mag = wp.state.mag;
+  assert(wp.tryFire());
+  assert(!wp.state.chambered && !wp.tryFire() && !wp.setWeapon('pistol'));
+  if (interrupt === 'short throw') {
+    step({ down: ['KeyG'], up: ['KeyG'] });
+    step({ down: ['Mouse2'] });
+    step({ up: ['Mouse2'] });
+    for (let i = 0; i < 120 && wp._throwing; i++) step();
+    assert(!wp._throwing);
+    assert(!wp.state.chambered, 'the short throw replaced cycle before its chamber beat');
+  } else if (interrupt === 'reload') {
+    for (let i = 0; i < 17; i++) step();
+    wp.viewmodel.stopClip();
+    assert(wp.reload(), 'reload can resume a loaded bolt without reserve');
+    assert.equal(wp.viewmodel.clipName, 'cycle');
+  } else {
+    const steps =
+      interrupt === 'purchase after chamber' ? 40 : interrupt === 'purchase after eject' ? 17 : 0;
+    for (let i = 0; i < steps; i++) step();
+    assert(wp.equipSecondary('smg'));
+    for (let i = 0; i < 10; i++) step();
+    assert(wp.setWeapon('sniper'));
+    for (let i = 0; i < 60 && wp.activeId !== 'sniper'; i++) step();
+    assert.equal(wp.activeId, 'sniper');
+    assert(!wp.tryFire(), 'returning cannot bypass the unfinished mechanical action');
+  }
+  for (let i = 0; i < 120 && !wp.canFire(); i++) step();
+  assert(wp.canFire(), `${interrupt}: the loaded rifle recovers`);
+  assert.equal(wp.state.mag, mag - 1, 'one cartridge feeds the chamber');
+  assert.equal(wp.state.reserve, 0);
+  assert.equal(events.shell, 1, 'the interrupted shot ejects exactly once');
+  assert.equal(chamberTimes.length, 1, 'one authored chamber beat');
+  const chamberBeat = ax338Manifest.clips.Bolt_Cycle.events.find(
+    (e): boolean => e.event === 'chamber'
+  )!;
   assert(
-    !wp.state.chambered && !wp.tryFire() && !wp.setWeapon('pistol'),
-    'bolt cycle blocks fire/switch'
+    chamberTimes[0] >= chamberBeat.time && chamberTimes[0] < chamberBeat.time + 1 / 60,
+    'interruption preserves elapsed authored bolt time'
   );
-  wp.viewmodel.stopClip();
-  wp._fireTimer = 0;
-  assert(wp.reload(), 'interrupted bolt cycle can reload a full box with empty chamber');
-  assert.equal(wp.viewmodel.clipName, 'reloadEmpty');
-  wp._completeReload(true);
-  assert(wp.state.chambered && wp.state.mag === wp.current.magSize - 1);
+  assert(wp.tryFire(), 'a fresh shot succeeds after the authored cycle');
+}
+
+// No completion is injected for a cancelled grenade: the next transaction owns its release.
+for (const afterRelease of [false, true]) {
+  const { wp, step, bodies } = timelineHarness();
+  const commit = (): void => {
+    step({ down: ['KeyG'], up: ['KeyG'] });
+    step({ down: ['Mouse2'] });
+    step({ up: ['Mouse2'] });
+    assert(wp._throwing);
+  };
+  commit();
+  if (afterRelease) {
+    for (let i = 0; i < 60 && !wp._throwReleased; i++) step();
+    assert(wp._throwReleased);
+  }
+  assert(wp.setWeaponImmediate('pistol'));
+  assert.equal(bodies.length, 1);
+  for (let i = 0; i < 40; i++) step();
+  commit();
+  for (let i = 0; i < 120 && wp._throwing; i++) step();
+  assert(!wp._throwing);
+  assert.equal(bodies.length, 2, 'both spent grenades launch exactly once');
+  assert.equal(wp.grenades, 0, 'each transaction spends one grenade');
+}
+
+// Repeated tactical reloads reuse the same Clip, including empty-to-tactical chaining.
+for (const [label, nextDt] of FRAME_SOURCES.filter(([name]): boolean =>
+  ['30', '60', 'jitter'].includes(name)
+)) {
+  for (const empty of [false, true]) {
+    const { wp, step } = timelineHarness();
+    assert(wp.equipSecondary('shotgun'));
+    wp.state.mag = 0;
+    wp.state.chambered = !empty;
+    wp.state.reserve = 4;
+    const phases: string[] = [];
+    wp.ctx.events.on('weapon:reload', ({ phase }): void => {
+      phases.push(phase);
+    });
+    assert(wp.reload());
+    for (let i = 0; i < 1000 && wp.reloading; i++) step({ dt: nextDt() });
+    assert(!wp.reloading, `${label}: reload terminates`);
+    for (const phase of ['start', 'shellin', 'end'])
+      assert.equal(
+        phases.filter((p): boolean => p === phase).length,
+        4,
+        `${label}: one ${phase} per shell`
+      );
+    assert.equal(wp.ammo.mag, empty ? 4 : 5);
+    assert.equal(wp.state.reserve, 0, 'each shell transfers exactly once');
+  }
 }
 
 // Same-frame operations retain their order, independent of physical event order.
