@@ -67,6 +67,7 @@ system.rng = new Rng(1);
 system.rng.signed = (): never => assert.fail('warmup consumed gameplay RNG');
 const graph = fixture<NonNullable<RenderSystem['_graph']>>({});
 const render = fixture<RenderSystem>({
+  _warmAbort: new AbortController(),
   _graph: graph,
   patchMaterials(): void {},
   prewarmLightShadow(light): ReturnType<RenderSystem['_warmGraph']> {
@@ -184,6 +185,7 @@ for (const [provider, ok] of cases) {
   const summary = await prewarm(
     fixture<Engine>({
       error: null,
+      disposed: false,
       camera: new THREE.PerspectiveCamera(),
       scene,
       viewScene,

@@ -32,7 +32,11 @@ coupling `ai` → `weapons` is an exception.
 Each system declares `static id`, `static deps`, and implements needed hooks:
 `async init(ctx)`, `fixedUpdate(h, ctx)` (120 Hz), `update(dt, ctx)`,
 `lateUpdate(dt, ctx)`, `resize(w, h, ctx)`, `async dispose()`.
-Teardown is reverse-order and failure-isolated.
+Teardown is reverse-order and failure-isolated. Boot/HMR owns one idempotent cleanup:
+cancel native warm-frame waits, drain active prewarm hooks and restoration, then
+release subsystem resources. Failed init/prewarm preserves the original error and
+native terminal UI; gameplay failures after presentation starts freeze simulation
+but retain rendering until explicit disposal.
 
 `ctx`: `scene/camera` (world), `viewScene/viewCamera` (separate first person),
 `canvas`, `config`, `events`, `input`, `time`, `rng`, `get/peek/has(id)`.
@@ -190,6 +194,9 @@ Public render surface:
 - `renderer`: initialized strict-WebGPU renderer.
 - `registerPass({ order, asNode(color, exposure), resize, dispose })`.
 - `addLight(light)`, `prewarmLightShadow(light)`.
+- `cancelPrewarm()`: permanently cancel native warm-frame waits during cleanup,
+  without releasing resources still used by an active hook; drain the coordinator
+  before subsystem teardown.
 - `viewLightLevel`; borrowed `sunDir` (never mutate).
 - `screenSize`; `depthTexture` (positive view-space metres),
   `velocityTexture`, `hdrTexture` (world only).

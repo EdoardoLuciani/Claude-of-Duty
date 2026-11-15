@@ -86,9 +86,9 @@ export class IntelSystem {
     priority: 0.5,
   };
   declare _kit: ReturnType<typeof makeKit>;
-  declare _pool: IntelCache[];
+  _pool: IntelCache[] = [];
   _off: Array<() => void> = [];
-  declare _holding: IntelCache | null;
+  _holding: IntelCache | null = null;
   declare _hold: number;
   declare _sparkAt: number;
   declare _noiseAt: number;
@@ -97,7 +97,7 @@ export class IntelSystem {
   declare _hitFrame: number;
   declare _lastWave: number;
   declare _awaitRelease: boolean;
-  declare _prompting: boolean;
+  _prompting = false;
   declare secured: number;
   declare budget: number;
 
@@ -479,7 +479,8 @@ export class IntelSystem {
     this._clearPrompt();
     for (const cache of this._pool) cache.group.removeFromParent();
     this._alive.length = 0;
-    this._kit.dispose();
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- init may have been skipped
+    this._kit?.dispose();
     for (const off of this._off) off();
     this._off.length = 0;
   }

@@ -57,30 +57,6 @@ engine.onFirstRender = (): void => {
   engine.ctx.get('ui').startGate?.ready();
 };
 
-// Registration order is irrelevant — Registry topo-sorts on static deps.
-engine
-  .add(ModelSystem)
-  .add(RenderSystem)
-  .add(MaterialSystem)
-  .add(SkySystem)
-  .add(WorldSystem)
-  .add(PhysicsSystem)
-  .add(PlayerSystem)
-  .add(WeaponSystem)
-  .add(FxSystem)
-  .add(AiSystem)
-  .add(GameSystem)
-  .add(MarketSystem)
-  .add(RadioSystem)
-  .add(UiSystem)
-  .add(IntelSystem)
-  .add(AudioSystem);
-
-if (params.get('telemetry') === '1') {
-  const { TelemetrySystem } = await import('./dev/telemetry.ts');
-  engine.add(TelemetrySystem);
-}
-
 function showFailure(message: string): void {
   const panel = document.createElement('dialog');
   panel.id = 'engine-failure';
@@ -107,98 +83,169 @@ engine.events.on('engine:error', ({ system, method, message }): void => {
   showFailure(`ENGINE FAILURE — ${system}.${method}\n${message}`);
 });
 
-// Model prefetch begins here, overlapping renderer/system initialization; later
-// hooks await those resources. Do not imply downloads are a separate phase.
-window.__STARTUP__.stage('Loading world and assets…');
-try {
-  await engine.init();
-} catch (err) {
-  console.error('[boot] init failed', err);
-  if (!engine.error) {
-    const message = err instanceof Error ? (err.stack ?? err.message) : String(err);
-    showFailure(`BOOT FAILURE\n${message}`);
-  }
-  throw err;
-}
-
-// Debug/capture configuration is narrowed once, before native material warmup.
-if (
-  params.has('attachmentOptic') ||
-  params.has('attachmentRail') ||
-  params.has('attachmentMuzzle')
-) {
-  const id = params.get('attachmentWeapon') ?? 'rifle';
-  const optic = params.get('attachmentOptic') ?? 'none';
-  const rail = params.get('attachmentRail') ?? 'none';
-  const muzzle = params.get('attachmentMuzzle') ?? 'none';
-  const config = {
-    optic: optic === 'none' ? null : optic,
-    muzzle: muzzle === 'none' ? null : muzzle,
-    rail: rail === 'none' ? null : rail,
-  };
-  if (
-    !isWeaponId(id) ||
-    !isAttachmentConfig(config, id) ||
-    !engine.ctx.get('weapons').setAttachments(id, config)
-  )
-    console.warn(
-      `[weapons] invalid/unavailable attachment configuration: optic=${optic}, rail=${rail}, muzzle=${muzzle}`
-    );
-}
-
-// Capture tooling is not part of the normal game path. Loading it only on
-// request also prevents its telemetry rAF from running during ordinary play.
-const shotApi = capture
-  ? (await import('./dev/shots.ts')).installShotApi(engine, { capture: true, lockstep })
-  : null;
-
-// Warm native variants before starting gameplay; see src/core/prewarm.ts.
-// Diagnostics can opt out explicitly with ?prewarm=0.
-window.__STARTUP__.stage('Preparing graphics…');
-const warmup =
-  params.get('prewarm') === '0'
-    ? { ok: false, reason: 'disabled by ?prewarm=0' }
-    : await prewarm(engine);
-// Publish the same report on failure too; readiness remains strictly gated below.
-window.__PREWARM__ = warmup;
-if (!warmup.ok && params.get('prewarm') !== '0' && !engine.error)
-  engine.fail('boot', 'prewarm', new Error('Native material warmup failed; reload required'));
-if (engine.error) throw new Error(engine.error.message);
-console.info('[boot] prewarm', warmup);
-engine.ctx.peek('telemetry')?.start();
-
-if (!capture) engine.ctx.get('ui').installStartGate();
-engine.start();
-
-// Capture harness handshake: only flag ready once a frame has actually landed.
-//
-// BOOT_FRAMES is deliberately a frame COUNT, not a rAF race. In lockstep mode the
-// engine has no loop of its own, so we hand-pump exactly this many frames and only
-// then raise __READY__; the shot is therefore always applied at engine frame 3, no
-// matter how long boot (or pre-warm) took in wall-clock terms.
-const BOOT_FRAMES = 3;
-if (lockstep && shotApi) {
-  await shotApi.pump(BOOT_FRAMES);
-  window.__READY__ = true;
-} else {
-  let warm = 0;
-  const readyProbe = (): void => {
-    if (engine.error) return;
-    if (++warm >= BOOT_FRAMES) {
-      window.__READY__ = true;
-      return;
-    }
-    requestAnimationFrame(readyProbe);
-  };
-  requestAnimationFrame(readyProbe);
-}
-
+let shotApi: ReturnType<(typeof import('./dev/shots.ts'))['installShotApi']> | null = null;
+let disposed = false;
+let cleanup: Promise<void> | null = null;
+let readyFrame: number | null = null;
+let warmupTask: ReturnType<typeof prewarm> | null = null;
+const warmupAbort = new AbortController();
+let presentationStarted = false;
 window.__ENGINE__ = engine;
-
+delete window.__READY__;
+delete window.__PREWARM__;
+function dispose(): Promise<void> {
+  if (cleanup) return cleanup;
+  disposed = true;
+  if (readyFrame !== null) cancelAnimationFrame(readyFrame);
+  engine.onFirstRender = null;
+  shotApi?.dispose();
+  if (window.__ENGINE__ === engine) {
+    delete window.__ENGINE__;
+    delete window.__READY__;
+  }
+  warmupAbort.abort(new Error('Boot disposed during warmup'));
+  engine.ctx.peek('render')?.cancelPrewarm();
+  cleanup = (async (): Promise<void> => {
+    // Native compiles cannot be cancelled. Keep their owners alive until the
+    // active hook and coordinator have restored all borrowed render state.
+    await warmupTask?.catch((): void => {});
+    await engine.dispose();
+  })();
+  return cleanup;
+}
+function isDisposed(): boolean {
+  return disposed;
+}
+function checkBoot(): void {
+  if (isDisposed()) throw new Error('Boot disposed');
+  if (engine.error) throw new Error(engine.error.message);
+}
 if (import.meta.hot) {
   import.meta.hot.dispose((): Promise<void> =>
-    engine
-      .dispose()
-      .catch((error: unknown): void => console.error('[engine] HMR disposal failed', error))
+    dispose().catch((error: unknown): void => console.error('[engine] HMR disposal failed', error))
   );
+}
+
+try {
+  // Registration order is irrelevant — Registry topo-sorts on static deps.
+  engine
+    .add(ModelSystem)
+    .add(RenderSystem)
+    .add(MaterialSystem)
+    .add(SkySystem)
+    .add(WorldSystem)
+    .add(PhysicsSystem)
+    .add(PlayerSystem)
+    .add(WeaponSystem)
+    .add(FxSystem)
+    .add(AiSystem)
+    .add(GameSystem)
+    .add(MarketSystem)
+    .add(RadioSystem)
+    .add(UiSystem)
+    .add(IntelSystem)
+    .add(AudioSystem);
+
+  if (params.get('telemetry') === '1') {
+    const { TelemetrySystem } = await import('./dev/telemetry.ts');
+    checkBoot();
+    engine.add(TelemetrySystem);
+  }
+
+  checkBoot();
+  // Model prefetch begins here, overlapping renderer/system initialization; later
+  // hooks await those resources. Do not imply downloads are a separate phase.
+  window.__STARTUP__.stage('Loading world and assets…');
+  await engine.init();
+  checkBoot();
+
+  // Debug/capture configuration is narrowed once, before native material warmup.
+  if (
+    params.has('attachmentOptic') ||
+    params.has('attachmentRail') ||
+    params.has('attachmentMuzzle')
+  ) {
+    const id = params.get('attachmentWeapon') ?? 'rifle';
+    const optic = params.get('attachmentOptic') ?? 'none';
+    const rail = params.get('attachmentRail') ?? 'none';
+    const muzzle = params.get('attachmentMuzzle') ?? 'none';
+    const config = {
+      optic: optic === 'none' ? null : optic,
+      muzzle: muzzle === 'none' ? null : muzzle,
+      rail: rail === 'none' ? null : rail,
+    };
+    if (
+      !isWeaponId(id) ||
+      !isAttachmentConfig(config, id) ||
+      !engine.ctx.get('weapons').setAttachments(id, config)
+    )
+      console.warn(
+        `[weapons] invalid/unavailable attachment configuration: optic=${optic}, rail=${rail}, muzzle=${muzzle}`
+      );
+  }
+
+  // Capture tooling is not part of the normal game path. Loading it only on
+  // request also prevents its telemetry rAF from running during ordinary play.
+  if (capture) {
+    const { installShotApi } = await import('./dev/shots.ts');
+    checkBoot();
+    shotApi = installShotApi(engine, { capture: true, lockstep });
+  }
+
+  // Warm native variants before starting gameplay; see src/core/prewarm.ts.
+  // Diagnostics can opt out explicitly with ?prewarm=0.
+  window.__STARTUP__.stage('Preparing graphics…');
+  const warmup =
+    params.get('prewarm') === '0'
+      ? { ok: false, reason: 'disabled by ?prewarm=0' }
+      : await (warmupTask = prewarm(engine, { signal: warmupAbort.signal }));
+  // Publish the same report on failure too; readiness remains strictly gated below.
+  if (isDisposed()) throw new Error('Boot disposed');
+  window.__PREWARM__ = warmup;
+  if (!warmup.ok && params.get('prewarm') !== '0' && !engine.error)
+    engine.fail('boot', 'prewarm', new Error('Native material warmup failed; reload required'));
+  checkBoot();
+  console.info('[boot] prewarm', warmup);
+  engine.ctx.peek('telemetry')?.start();
+
+  if (!capture) engine.ctx.get('ui').installStartGate();
+  engine.start();
+  presentationStarted = true;
+
+  // Capture harness handshake: only flag ready once a frame has actually landed.
+  //
+  // BOOT_FRAMES is deliberately a frame COUNT, not a rAF race. In lockstep mode the
+  // engine has no loop of its own, so we hand-pump exactly this many frames and only
+  // then raise __READY__; the shot is therefore always applied at engine frame 3, no
+  // matter how long boot (or pre-warm) took in wall-clock terms.
+  const BOOT_FRAMES = 3;
+  if (lockstep && shotApi) {
+    await shotApi.pump(BOOT_FRAMES);
+    checkBoot();
+    window.__READY__ = true;
+  } else {
+    let warm = 0;
+    const readyProbe = (): void => {
+      if (disposed || engine.error) return;
+      if (++warm >= BOOT_FRAMES) {
+        window.__READY__ = true;
+        return;
+      }
+      readyFrame = requestAnimationFrame(readyProbe);
+    };
+    readyFrame = requestAnimationFrame(readyProbe);
+  }
+} catch (error) {
+  console.error('[boot] failed', error);
+  if (!isDisposed() && !engine.error) {
+    const message = error instanceof Error ? (error.stack ?? error.message) : String(error);
+    showFailure(`BOOT FAILURE\n${message}`);
+  }
+  // A terminal gameplay error in the initial capture pump is already a
+  // runtime failure: freeze simulation, but retain presentation until HMR/reload.
+  if (!presentationStarted || !engine.error || isDisposed())
+    await dispose().catch((failure: unknown): void =>
+      console.error('[boot] disposal failed', failure)
+    );
+  throw error;
 }

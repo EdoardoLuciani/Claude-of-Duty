@@ -113,8 +113,19 @@ export class MaterialSystemNode {
     this._quality = quality === 'low' ? 0.5 : quality === 'medium' ? 0.75 : 1;
     this._anisotropy = q?.anisotropy ?? 8;
     const detail = bakeDetail(this.renderer, this._size(1024));
-    const macro = bakeMacro(this.renderer, 256);
-    this._targets.push(detail.albedo, detail.normal, macro);
+    this._targets.push(detail.albedo, detail.normal);
+    let macro;
+    try {
+      macro = bakeMacro(this.renderer, 256);
+    } catch (error) {
+      try {
+        this.dispose();
+      } catch (cleanupError) {
+        console.error('[materials] failed-init disposal failed', cleanupError);
+      }
+      throw error;
+    }
+    this._targets.push(macro);
     this._shared = {
       detailNormal: detail.normal.texture,
       detailAlbedo: detail.albedo.texture,

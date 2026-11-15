@@ -524,6 +524,7 @@ export class WeaponSystem {
     try {
       // Deferred assets must finish before the loading screen is released.
       await this._restTask;
+      render._warmAbort.signal.throwIfAborted();
       // The owned source retains warm shader variants between mounted instances.
       for (const asset of Object.values(this._attachments)) {
         attachments.push(asset.scene);

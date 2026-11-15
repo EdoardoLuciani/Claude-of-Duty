@@ -52,6 +52,9 @@ export class Engine {
     scale: 1,
     frame: 0,
   };
+  private _disposed = false;
+  private _initTask: Promise<this> | null = null;
+  private _disposeTask: Promise<void> | null = null;
   _accum: number = 0;
   _last: number = 0;
   _running: boolean = false;
@@ -103,11 +106,24 @@ export class Engine {
   }
 
   async init(): Promise<this> {
+    if (this._disposed) throw new Error('Engine disposed');
+    this._initTask = this._initialize();
+    try {
+      return await this._initTask;
+    } catch (error) {
+      // Cleanup must never replace the initialization failure.
+      await this.dispose().catch((): void => {});
+      throw error;
+    }
+  }
+
+  private async _initialize(): Promise<this> {
     const order = this.registry.resolve();
     for (const sys of order) {
       const t0 = performance.now();
       await sys.init?.(this.ctx);
       if (this.error) throw new Error(this.error.message);
+      if (this._disposed) throw new Error('Engine disposed during initialization');
       const ms = performance.now() - t0;
       if (ms > 50) console.info(`[engine] ${describeSystem(sys).id} init ${ms.toFixed(0)}ms`);
     }
@@ -117,12 +133,16 @@ export class Engine {
     return this;
   }
 
+  get disposed(): boolean {
+    return this._disposed;
+  }
+
   private hasError(): boolean {
     return this.error !== null;
   }
 
   resize(): void {
-    if (this.hasError()) return;
+    if (this._disposed || this.hasError()) return;
     const w = Math.max(1, this.canvas.clientWidth || innerWidth);
     const h = Math.max(1, this.canvas.clientHeight || innerHeight);
     this.camera.aspect = w / h;
@@ -144,7 +164,7 @@ export class Engine {
   }
 
   start(): void {
-    if (this._running || this.error) return;
+    if (this._disposed || this._running || this.error) return;
     this._running = true;
     this._last = performance.now();
     requestAnimationFrame(this._loop);
@@ -174,6 +194,7 @@ export class Engine {
 
   /** Advance one frame. Exposed so the capture harness can pump frames by hand. */
   step(now = performance.now()): void {
+    if (this._disposed) return;
     const t = this.time;
     // Clamp so a tab-switch or a breakpoint doesn't teleport the simulation.
     const rawDt = Math.min(0.1, Math.max(0, (now - this._last) / 1000));
@@ -251,8 +272,19 @@ export class Engine {
     this.events.emit('engine:error', this.error);
   }
 
-  async dispose(): Promise<void> {
+  dispose(): Promise<void> {
+    if (this._disposeTask) return this._disposeTask;
+    this._disposed = true;
     this.stop();
+    this.onFirstRender = null;
+    this._disposeTask = this._dispose();
+    return this._disposeTask;
+  }
+
+  private async _dispose(): Promise<void> {
+    // An in-flight init may still acquire resources. Stop at its next await
+    // boundary, then release those resources exactly once.
+    await this._initTask?.catch((): void => {});
     removeEventListener('resize', this._onResize);
     this.input.detach();
     const errors = [];

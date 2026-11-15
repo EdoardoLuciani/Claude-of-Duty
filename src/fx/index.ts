@@ -329,6 +329,7 @@ export class FxSystem {
     const renderer = this.render?.renderer;
     if (!renderer) return { ok: false, reason: 'no renderer' };
     const ctx = this.ctx;
+    this.render?._warmAbort.signal.throwIfAborted();
 
     // Reaching the viewmodel layers means attaching them; see the note in init().
     if (!this._viewAttached && this._viewmodelPresent()) this._attachView();
@@ -338,6 +339,7 @@ export class FxSystem {
       meshes: Array<THREE.Object3D | null | undefined>,
       camera: THREE.Camera
     ): Promise<void> => {
+      this.render?._warmAbort.signal.throwIfAborted();
       scratch.children.length = 0;
       for (const m of meshes) if (m) scratch.children.push(m);
       if (!scratch.children.length) return;
@@ -359,8 +361,10 @@ export class FxSystem {
       ],
       ctx.camera
     );
+    this.render?._warmAbort.signal.throwIfAborted();
     if (this._viewAttached) {
       await compile([this.viewAdd.mesh, this.viewLit.mesh], ctx.viewCamera);
+      this.render?._warmAbort.signal.throwIfAborted();
     }
     // The refraction sprites live in the haze system's own private scene, which
     // no scene-graph walk from outside can reach.
@@ -1251,24 +1255,27 @@ export class FxSystem {
     for (const off of this._off ?? []) off();
     this._off = [];
     for (const l of [this.lit, this.add, this.motes, this.viewAdd, this.viewLit]) {
-      l.mesh.parent?.remove(l.mesh);
+      if (!l) continue;
+      l.mesh.removeFromParent();
       l.dispose();
     }
-    this.decals.mesh.parent?.remove(this.decals.mesh);
-    this.decals.dispose();
+    if (this.decals) {
+      this.decals.mesh.removeFromParent();
+      this.decals.dispose();
+    }
     if (this.shells) {
       this.shells.mesh.parent?.remove(this.shells.mesh);
       this.shells.hullMesh.parent?.remove(this.shells.hullMesh);
       this.shells.dispose();
     }
-    this.hazeSys.dispose();
-    this.lights.dispose();
+    this.hazeSys?.dispose();
+    this.lights?.dispose();
     this.viewLights?.dispose();
     this.viewLights = null;
-    this._atlas.texture.dispose();
-    this._decalAtlas.albedo.dispose();
-    this._decalAtlas.normal.dispose();
-    this._decalAtlas.orm.dispose();
+    this._atlas?.texture.dispose();
+    this._decalAtlas?.albedo.dispose();
+    this._decalAtlas?.normal.dispose();
+    this._decalAtlas?.orm.dispose();
     disposeQuadSource();
   }
   /* oxlint-enable typescript/no-unnecessary-condition */
