@@ -112,6 +112,13 @@ export async function advanceClipTo({ name, at }: { name: string; at: number }):
   if (!weapons || !window.__LOCKSTEP__ || !pump)
     throw new Error('clip capture requires a ready lockstep game and capture pump');
   const vm = weapons.viewmodel;
+  const assertWeaponPose = (): void => {
+    if (vm._grenadeState || vm._radioState || vm._bandageState)
+      throw new Error(
+        'Cannot capture a weapon clip during an accessory pose; use --shot=weapon or --shot=ads'
+      );
+  };
+  assertWeaponPose();
   const weapon = weapons.activeId;
   const duration = vm.play(name);
   const clip = vm.clip;
@@ -124,6 +131,7 @@ export async function advanceClipTo({ name, at }: { name: string; at: number }):
     // Even --at=0 needs a stepped pose: play() initially resets the adapter to Idle.
     await pump(1);
     frames++;
+    assertWeaponPose();
     if (weapons.activeId !== weapon || vm.clip !== clip || vm.clipName !== name)
       throw new Error(
         `Clip ${name} ended or changed before capture at ${at}s (active: ${vm.clipName ?? 'none'})`

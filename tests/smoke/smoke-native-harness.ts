@@ -199,6 +199,9 @@ try {
   let frames = 0;
   let mode: 'playing' | 'ended' | 'stalled' = 'playing';
   const vm = {
+    _grenadeState: 0,
+    _radioState: 0,
+    _bandageState: 0,
     clip: null as { name: string; duration: number } | null,
     clipName: null as string | null,
     clipT: 0,
@@ -238,6 +241,12 @@ try {
   assert(vm.clipT >= at && vm.clipT < at + Math.max(...deltas));
   await advance(0);
   assert.equal(frames, 1, 'zero requests the first stepped clip pose, not the adapter reset');
+  for (const state of ['_grenadeState', '_radioState', '_bandageState'] as const) {
+    vm[state] = 1;
+    await assert.rejects(advance(0.1), /accessory pose/);
+    assert.equal(vm[state], 1, 'reject the capture without clearing the requested accessory pose');
+    vm[state] = 0;
+  }
   mode = 'ended';
   await assert.rejects(advance(0.1), /ended or changed before capture/);
   mode = 'stalled';

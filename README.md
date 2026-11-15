@@ -186,7 +186,8 @@ Tests are not final human visual acceptance; see each asset's remaining limits.
   It steps the real clip clock to the first sampled pose at/after `--at`, reports
   requested/actual seconds and stepped frames, and fails if the clip stops,
   changes or its clock stalls. The target must be inside the clip; `--at=0`
-  captures its first stepped pose. Do not combine with `--reload` or `--list`.
+  captures its first stepped pose. Grenade, radio and bandage poses are rejected;
+  use a weapon shot instead. Do not combine with `--reload` or `--list`.
 - `bun tools/profile.ts`: sustained living-combat frame/CPU percentiles and hitches.
   GPU timestamps are unavailable; node-builder activity is not GPU compilation time.
   Compare matched runs only; there is no cross-hardware frame-time threshold.
