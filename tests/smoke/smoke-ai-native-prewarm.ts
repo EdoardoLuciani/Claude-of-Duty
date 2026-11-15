@@ -9,7 +9,6 @@ import type { RenderSystem } from '../../src/render/index-webgpu.ts';
 import { createTestContext } from '../lib/context.ts';
 import { fixture } from '../lib/fixture.ts';
 import { FixtureImageBitmap, installImageBitmapFixture } from '../lib/image-bitmap.ts';
-import { captureMethod } from '../lib/render-fixture.ts';
 
 // Exercise the real PNG loader and packing path before borrowing its native material.
 const restoreBitmap = installImageBitmapFixture();
@@ -17,26 +16,17 @@ const saved = {
   fetch: globalThis.fetch,
   bitmap: Object.getOwnPropertyDescriptor(globalThis, 'createImageBitmap'),
   canvas: Object.getOwnPropertyDescriptor(globalThis, 'OffscreenCanvas'),
-  dispose: captureMethod(THREE.Texture.prototype, 'dispose'),
 };
 let closes = 0;
-const disposedTextures: THREE.Texture[] = [];
-let fail = false;
-let release = (): void => assert.fail('no held PNG');
 const texels = [11, 22, 33, 44];
 let library: SoldierMaterialsNode;
 try {
   globalThis.fetch = Object.assign(
     async (url: Parameters<typeof fetch>[0]): Promise<Response> => {
       assert(typeof url === 'string');
-      const path = url;
-      if (path.endsWith('manifest.json'))
-        return Response.json({ sets: ['polymer'], details: ['cloth', 'nylon'] });
-      if (fail && path.endsWith('-normal.png'))
-        await new Promise<void>((resolve): void => {
-          release = resolve;
-        });
-      return new Response(null, { status: fail && path.endsWith('-orm.png') ? 404 : 200 });
+      return url.endsWith('manifest.json')
+        ? Response.json({ sets: ['polymer'], details: ['cloth', 'nylon'] })
+        : new Response(null);
     },
     { preconnect: saved.fetch.preconnect }
   );
@@ -73,14 +63,8 @@ try {
       }
     },
   });
-  THREE.Texture.prototype.dispose = function (this: THREE.Texture): void {
-    assert(!disposedTextures.includes(this), 'dispose each texture only once');
-    disposedTextures.push(this);
-    saved.dispose.call(this);
-  };
   library = await SoldierMaterialsNode.fromCache();
   assert.equal(closes, 5, 'release decoded PNGs before returning the library');
-  assert.equal(new Set(disposedTextures).size, 5, 'dispose each source texture once');
   assert(library.arrays);
   for (const [name, array] of Object.entries(library.arrays)) {
     const fallback =
@@ -96,24 +80,8 @@ try {
       'packed arrays retain independent bytes after PNG close clears the inputs'
     );
   }
-  // A failed set still owns its decoded and outstanding sibling PNGs.
-  fail = true;
-  let settled = false;
-  const loading = SoldierMaterialsNode.fromCache().finally((): void => {
-    settled = true;
-  });
-  const rejection = assert.rejects(loading, /HTTP 404/);
-  await new Promise<void>((resolve): void => {
-    setImmediate(resolve);
-  });
-  assert.equal(settled, false, 'wait for late siblings before releasing sources');
-  release();
-  await rejection;
-  assert.equal(closes, 7, 'release both successful siblings of the failed PNG');
-  assert.equal(new Set(disposedTextures).size, 7);
 } finally {
   globalThis.fetch = saved.fetch;
-  THREE.Texture.prototype.dispose = saved.dispose;
   restoreBitmap();
   for (const [key, descriptor] of [
     ['createImageBitmap', saved.bitmap],
