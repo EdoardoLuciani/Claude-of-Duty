@@ -22,7 +22,7 @@ import {
   type AttachmentConfig,
 } from '../../src/weapons/attachments.ts';
 import { authoredModel, checkAuthoredDuration } from '../../src/weapons/authored-model.ts';
-import { WEAPON_DEFS, WEAPON_IDS } from '../../src/weapons/defs.ts';
+import { PICATINNY_PITCH, WEAPON_DEFS, WEAPON_IDS } from '../../src/weapons/defs.ts';
 import { WeaponLaser } from '../../src/weapons/laser.ts';
 import { ReticleMaterials } from '../../src/weapons/materials-tsl.ts';
 import { makeMCXModel } from '../../src/weapons/mcx.ts';
@@ -127,9 +127,9 @@ for (const id of ['rmr', 'acog', 'scope', 'exps3'] as const) {
   assert.equal(lens.material.depthWrite, false);
   asset.dispose();
 }
-// Only physically checked fits are selectable; future base conversions stay rejected.
+// Only physically checked EXPS3 fits are selectable.
 for (const id of ['rifle', 'mcx', 'pistol', 'lmg', 'smg', 'shotgun', 'sniper'] as const)
-  assert.equal(isAttachmentConfig({ ...BASE_ATTACHMENTS, optic: 'exps3' }, id), id === 'sniper');
+  assert(isAttachmentConfig({ ...BASE_ATTACHMENTS, optic: 'exps3' }, id));
 // Repeated mount/remove borrows one asset, restores base datums/tuning and
 // leaves no orphan glass/socket.
 {
@@ -202,7 +202,14 @@ for (const id of ['rifle', 'mcx', 'pistol', 'lmg', 'smg', 'shotgun', 'sniper'] a
     assert.equal(entry.attachmentGroup.parent, socket, 'instance follows its authored mount');
     assert.equal(irons.visible, false, 'a mounted optic replaces the removable irons');
     assert(ironsRemoved.visible);
-    assert(entry.sight.distanceTo(new THREE.Vector3(0, 0.1461072, -0.085)) < 1e-8);
+    const forward = (WEAPON_DEFS.rifle.fits?.optic?.[optic]?.railSlots ?? 0) * PICATINNY_PITCH;
+    assert.equal(entry.attachmentGroup.position.z, -forward);
+    assert(entry.sight.distanceTo(new THREE.Vector3(0, 0.1461072, -0.085 - forward)) < 1e-8);
+    const preview = weaponScene.clone(true).getObjectByName('optic_attachment');
+    assert(
+      preview?.position.equals(entry.attachmentGroup.position),
+      'preview retains rail-slot placement'
+    );
     assert.deepEqual(entry.optic?.center, entry.sight.toArray());
     assert.equal(entry.def.eyeRelief, WEAPON_DEFS.rifle.fits?.optic?.[optic]?.eyeRelief);
     assert.equal(entry.def.adsFovScale, optic === 'rmr' ? 0.62 : optic === 'acog' ? 0.28 : 0.25);
@@ -609,14 +616,11 @@ for (const id of ['rifle', 'mcx', 'pistol', 'lmg', 'smg', 'shotgun', 'sniper'] a
     }),
     def: { ...WEAPON_DEFS.sniper },
   });
-  configureWeaponAttachments(
-    sniper,
-    { ...BASE_ATTACHMENTS, optic: 'exps3', ironSights: false },
-    optics
-  );
+  configureWeaponAttachments(sniper, { ...BASE_ATTACHMENTS, optic: 'exps3' }, optics);
   assert.equal(sniper.def.adsFovScale, 1, 'EXPS3 does not magnify the world');
   assert.equal(sniper.def.adsSensScale, 1);
-  assert.equal(sniper.optic?.dotMoa, 1);
+  assert(sniper.optic, 'EXPS3 configuration installs the live optic');
+  assert.equal(sniper.optic.dotMoa, 1);
   assert.equal(sniper.optic.ringMoa, 68);
   viewmodel.rig.position.set(0, 0, -sniper.def.eyeRelief).sub(sniper.sight);
   viewmodel._updateScope(sniper, 1);
@@ -635,12 +639,8 @@ for (const id of ['rifle', 'mcx', 'pistol', 'lmg', 'smg', 'shotgun', 'sniper'] a
   assert.equal(viewmodel.reticle.visible, false, 'no floating EXPS3 ring outside the lens');
   root.position.x = 0;
   root.updateMatrix();
-  configureWeaponAttachments(sniper, { ...BASE_ATTACHMENTS, ironSights: false }, optics);
-  assert.equal(
-    irons.visible,
-    false,
-    'removing EXPS3 does not reinstall independently removed irons'
-  );
+  configureWeaponAttachments(sniper, BASE_ATTACHMENTS, optics);
+  assert(irons.visible, 'removing EXPS3 restores the base irons');
   assert.equal(sniper.optic, null);
   assert.equal(sniper.def.eyeRelief, WEAPON_DEFS.sniper.eyeRelief);
   configureWeaponAttachments(entry, config, optics);

@@ -9,6 +9,7 @@ import bpy
 from mathutils import Matrix, Vector
 import numpy as np
 from mcx.primitives import create_primitives
+import picatinny
 
 def build_geometry(materials):
     asset = bpy.data.collections.new("MCX VIRTUS | authored components")
@@ -184,11 +185,13 @@ def build_geometry(materials):
         cylinder('Barrel under vented guard',(.162,0,0),.0087,.224,steel)
         cylinder('Gas system silhouette',(.146,0,.022),.0036,.168,steel)
         box('Gas block silhouette',(.233,0,.006),(.014,.023,.029),steel)
-        # Rail pitches/land shapes are visual reference details, not machinable rail data.
-        profile('Continuous top rail foot',[(-.17,.035),(.247,.035),(.247,.041),(-.17,.041)],.022,coating)
-        for i in range(42):
-            x=-.168+i*.010
-            profile('Picatinny rail tooth',[(x,.040),(x+.0012,.046),(x+.006,.046),(x+.0072,.040)],.027,coating,bevel=.00035)
+        # Same across/up interface as every weapon; this rifle remains +X forward.
+        for name, outline, spans in [
+            ('Continuous top rail foot', picatinny.section(.046,.035,slot=True), [(-.170,.247)]),
+            ('Picatinny rail tooth', picatinny.section(.046,.035), picatinny.lands(-.170,.247,-.036)),
+        ]:
+            for a,b in spans:
+                loft(name,[[(y,x,z) for x,z in outline] for y in (a,b)],coating,bevel=0)
         for x in (-.15,.232):
             box('Backup sight base',(x,0,.049),(.030,.030,.007),steel)
             cylinder('Backup sight hinge',(x+.004,0,.055),.006,.034,steel,'Y')
@@ -359,14 +362,14 @@ def build_geometry(materials):
     offset = Vector((0,0,.010))
     rail = empty('MOUNT_rail', roll @ Vector((.221,-.038,0)) + offset, body)
     rail.rotation_euler = (roll @ Matrix(((0,1,0),(0,0,1),(1,0,0)))).to_euler()
-    box('Laser rail adapter web',(.221,-.031,0),(.055,.010,.014),coating)
-    for i in range(5):
-        box('Laser rail adapter tooth',(.201+i*.010,-.036,0),(.0052,.004,.020),anodized)
+    box('Laser rail adapter web',(.221,-.0304,0),(.055,.0088,.014),coating)
     for x in (.201,.241):
         cylinder('Laser rail adapter screw',(x,-.0358,0),.002,.004,steel,'Y')
     for obj in asset.objects:
         if obj.type == 'MESH' and obj.name.startswith('Laser rail '):
             obj.location = roll @ obj.location + offset
             obj.rotation_euler = roll.to_euler()
+    bpy.context.view_layer.update()
+    picatinny.build_rail('Laser rail adapter',rail.matrix_world@Matrix.Rotation(math.pi,4,'Y'),-.0226,.0226,anodized,body,asset)
 
     return asset, [rig, mag, spare, bolt, handle, trigger, cover, stock, case, release]

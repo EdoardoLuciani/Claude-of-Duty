@@ -93,19 +93,25 @@ zeroing or emitter-occlusion semantics change. Gameplay and market inspection
 use the same solver and borrowed asset; there is no weapon-specific renderer.
 
 `MOUNT_rail` positions below are in runtime metres (+Y up, −Z forward).
+Rails and channels now use the [common Picatinny profile](../../../tools/blender/README.md#common-picatinny-interface).
+The recoil key is centred on the mount's groove. The non-bearing upper inner jaw
+corners are chamfered to clear adjacent rail shoulders, while retaining the external
+bar height, rail purchase and nominal manufacturer envelope. The M4's mount is
+sixteen grooves forward of its former seat to clear the actual support glove.
+
 The module body is **below** its local mount: local +Y points **into** the seat,
 not out of the weapon. Side mounts therefore retain forward −Z but turn the
 body outward. These are authored game-fit adaptations, not certified hardware.
 
 | Weapon | Availability | Rail seat | Owner / physical support |
 | --- | --- | --- | --- |
-| M4A1 | Enabled | `[.0285, .075, −.250]` | Existing right RIS II rail; fit unchanged |
+| M4A1 | Enabled | `[.028321, .075, −.4101216]` | Actual right RIS II contact plane; sixteen forward grooves clear the support hand |
 | P320 | Enabled | `[0, .002, −.122]` | Frame bone, not slide; integral game-fit rail extended 14 mm with fifth slot |
 | EVOLYS | Enabled | `[0, .0165924, −.363725]` | Handguard; direct reference-backed underside Picatinny rail, no side bracket |
 | M590 | Enabled | `[0, .009, −.575]` | Receiver; two fixed magazine-tube clamps ahead of the entire pump stroke, clear of cap fluting/barrel lug |
 | AX338 | Enabled | `[.038, .075, −.455]` | Fixed right KeySlot/Picatinny adapter, ahead of hand/bolt/folding stock |
-| MCX VIRTUS | Enabled | `[.03064, .10247, −.361]` | Receiver; upper-right chamfer adapter, integrated ACOG/SRD762Ti retained |
-| SIG MPX | Enabled | `[.037, 0, −.295]` | Receiver; four-tooth right adapter, two anchors in the last M-LOK slot, ROMEO4T/SRD9 retained |
+| MCX VIRTUS | Enabled | `[.03064, .10247, −.361]` | Receiver; upper-right chamfer adapter, shared optics and removable SRD762Ti |
+| SIG MPX | Enabled | `[.037, 0, −.295]` | Receiver; four-tooth right adapter, two anchors in the last M-LOK slot, shared optics and removable suppressor |
 
 P320's rail extension is an explicit deviation from the Compact factory frame.
 The module nose sits a few millimetres ahead of its barrel exit, below the bore;
@@ -153,15 +159,14 @@ bun tools/capture.ts --port=5186 --weapon=smg --rail=laser --shot=weapon --out=/
 # Also use --shot=ads, --reload, and the existing market inspection controls.
 ```
 
-The authored MCX/MPX integrations do not depend on their open base-conversion issues #662/#663.
-Their existing integrated suppressors are included in native fit checks. Other
-weapons' `MOUNT_muzzle` datums do **not** certify any future suppressor (#670):
-there is no standalone muzzle catalog/asset to fit, and future geometry must be
-rechecked rather than inferred from an estimated cylinder or an empty datum.
+MCX/MPX are now iron-sight bases with shared optics and removable suppressors.
+All seven weapons have calibre-specific shared-catalog suppressor fits; the
+current source checks include combined configurations. Any future attachment
+geometry still needs actual mesh/motion checks, not an estimated cylinder or empty datum.
 
 ## Review standard
 
-Strict native browser receipts remain failed on two TSL inline `Fn()` return
+Historical initial-integration native browser receipts failed on two TSL inline `Fn()` return
 errors. The `rail: null` M4 control ran on the **changed branch**, not unmodified
 `7cb4fbf`; it establishes reproduction without an installed laser only, not
 baseline attribution or a harmless-error waiver. No unmodified-base control was

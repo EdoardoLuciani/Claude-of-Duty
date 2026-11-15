@@ -55,7 +55,7 @@ def check_mounts(manifest, rig, meshes, review, pose, tree, point, basis):
     fasteners = [o for o in rail if o.name.startswith(('Optic rail mounting screw', 'Optic rail screw shank'))]
     seating_teeth = [o for o in rail if o.name.startswith('Optic Picatinny lug')]
     rear_sight = [o for o in fixed if o.name.startswith(('Ghost ring', 'Rear sight'))]
-    assert len(base) == 1 and len(fasteners) == 8 and len(seating_teeth) == 17, 'extended sixteen-slot rail hardware'
+    assert len(base) == 1 and len(fasteners) == 8 and len(seating_teeth) == 18, 'extended seventeen-slot rail hardware'
     assert not tree(seating_teeth).overlap(tree(fixed)), 'rail teeth cross fixed weapon/irons'
     barrel = [o for o in fixed if o.name.startswith(('Heavy barrel', 'Barrel crown'))]
     assert not tree(adapter).overlap(tree([o for o in fixed if o not in barrel])), 'adapter crosses non-seating surfaces'
@@ -64,7 +64,7 @@ def check_mounts(manifest, rig, meshes, review, pose, tree, point, basis):
     receiver_tree = tree(receiver)
     base_tree = tree(base)
     gaps = []
-    for x in (-.008, 0, .008):
+    for x in (-.007, 0, .007):
         for z in (-.182, -.130, -.048):
             underside = base_tree.ray_cast(Vector((x, .080, z)), Vector((0, 1, 0)), .02)[0]
             roof = receiver_tree.ray_cast(Vector((x, .100, z)), Vector((0, -1, 0)), .03)[0]
@@ -72,11 +72,11 @@ def check_mounts(manifest, rig, meshes, review, pose, tree, point, basis):
             gap = underside.y - roof.y
             assert -.00015 < gap < .00015, 'receiver rail base not seated'
             gaps.append(gap)
-    print('M590_INTEGRATED_RAIL_OK: sixteen slots; four modeled fasteners; nine continuous-base seating rays; gaps mm', [g * 1000 for g in gaps])
+    print('M590_INTEGRATED_RAIL_OK: seventeen slots; four modeled fasteners; nine continuous-base seating rays; gaps mm', [g * 1000 for g in gaps])
     barrel_tree = tree(barrel)
     barrel_gaps = []
     for z in (-.245, -.225, -.200):
-        for x in (-.008, 0, .008):
+        for x in (-.007, 0, .007):
             underside = base_tree.ray_cast(Vector((x, .081, z)), Vector((0, 1, 0)), .01)[0]
             crown = barrel_tree.ray_cast(Vector((x, .090, z)), Vector((0, -1, 0)), .03)[0]
             assert underside is not None and crown is not None, ('cantilever/barrel surface missing', x, z)
@@ -89,7 +89,7 @@ def check_mounts(manifest, rig, meshes, review, pose, tree, point, basis):
         z = [(basis @ rig.matrix_world.inverted() @ tooth.matrix_world @ v.co).z for v in tooth.data.vertices]
         tooth_z.append((min(z) + max(z)) / 2)
     tooth_z.sort()
-    assert all(abs(b - a - .010008) < 1e-7 for a, b in zip(tooth_z, tooth_z[1:])), 'rail slot pitch'
+    assert all(abs(b - a - .0100076) < 1e-7 for a, b in zip(tooth_z, tooth_z[1:])), 'rail slot pitch'
     # Preserve the whole ghost-ring opening, including four off-axis rays.
     irons_and_rail = tree(rail + rear_sight)
     for x, dy in ((0, 0), (.004, 0), (-.004, 0), (0, .004), (0, -.004)):
@@ -107,7 +107,7 @@ def check_mounts(manifest, rig, meshes, review, pose, tree, point, basis):
     # that frame throughout every clip, while the laser rail stays on the fixed magazine-tube clamps.
     receiver_mount = rig.matrix_world.inverted() @ mounts['optic'].matrix_world
     optics = {}
-    for optic, stations in (('rmr', (6, 9)), ('acog', (4, 11)), ('scope', (0, 2, 13, 15))):
+    for optic, stations in (('rmr', (7, 10)), ('acog', (5, 12)), ('scope', (1, 3, 14, 16)), ('exps3', (7, 10))):
         objects = attachment_source.seat(optic, mounts['optic'])
         # The muzzle check reads each mounted optic back from this collection.
         collection = bpy.data.collections.new('M590 check | mounted ' + optic)
@@ -127,7 +127,7 @@ def check_mounts(manifest, rig, meshes, review, pose, tree, point, basis):
             z = tooth_z[station]
             for x in (-.009, .009):
                 top = rail_tree.ray_cast(Vector((x, .098, z)), Vector((0, -1, 0)), .02)[0]
-                bottom = optic_tree.ray_cast(Vector((x, .087, z)), Vector((0, 1, 0)), .02)[0]
+                bottom = optic_tree.ray_cast(Vector((x, .0905, z)), Vector((0, 1, 0)), .02)[0]
                 assert top is not None and bottom is not None, (optic, 'unsupported foot', station, x)
                 gap = bottom.y - top.y
                 assert -.0006 < gap < .00015, (optic, 'unseated foot', gap)

@@ -37,7 +37,7 @@ AX338 keeps full geometry where simplification damaged panel detail.
 M590 keeps its shell separate from the mechanical skin, with exact STEP visibility;
 its source checker narrowly bounds one approved shared-glove contact below 30 µm.
 EXPS3 uses a tighter error limit to preserve its optical
-opening; its cooked attachment is not yet wired into gameplay. TOR Mini preserves
-its native geometry without simplification and also remains standalone; see its
+opening; it loads through the shared optic catalog on all seven weapons. TOR Mini preserves
+its native geometry without simplification and uses their shared laser slot; see its
 [asset review/commands](../assets/attachments/steiner-tor-mini/README.md). Other models
 are not converted by these profiles.

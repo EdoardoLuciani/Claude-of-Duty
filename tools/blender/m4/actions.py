@@ -112,7 +112,10 @@ def author_actions(root,asset,rig,parts,mag,spare,bolt,head,handle,trigger,cover
             for k,z in [(0,0),(.86,0),(.90,.082),(.917,0),(1,0)]:key(handle,k*d,(0,0,z))
             charging=ref['charging'];cq=Quaternion((charging['quaternion'][3],*charging['quaternion'][:3]))
             cp=charging['pose'];wrist=Vector(charging['pos'])
-            pose('left',.82*d,[-.16,.14,.035],cq,relaxed('left'))
+            # Route the free approach outside a rail-mounted sight before lifting
+            # the palm. The old diagonal passed through the EXPS3 housing.
+            pose('left',.79*d,[-.18,-.06,.035],cq,cp)
+            pose('left',.82*d,[-.18,.14,.035],cq,cp)
             pose('left',.84*d,[-.15,.14,wrist.z],cq,cp)
             pose('left',.86*d,wrist,cq,cp)
             # Follow the evaluated handle stroke, not a reused magazine grip.
@@ -120,7 +123,9 @@ def author_actions(root,asset,rig,parts,mag,spare,bolt,head,handle,trigger,cover
                 scene.frame_set(f);pose('left',f/FPS,wrist+CI@handle.location,cq,cp)
             pose('left',.90*d,wrist+Vector((0,0,.082)),cq,cp)
             pose('left',.917*d,[-.18,.15,wrist.z+.082],cq,cp)
-            pose('left',.935*d,[-.17,.13,.04],cq,relaxed('left'))
+            pose('left',.935*d,[-.18,.13,.04],cq,cp)
+            pose('left',.95*d,[-.18,-.06,.035],cq,cp)
+            pose('left',.965*d,[-.14,-.04,-.18],cq,relaxed('left'))
         pose('left',.98*d)
         for k in (0,1):key(cover,k*d,rot=(0,0,-115))
         clips[name]['events']=[{'time':.02*d,'event':'start'},{'time':out*d,'event':'magout'},{'time':drop*d,'event':'magdrop'},{'time':insert*d,'event':'magin'}]

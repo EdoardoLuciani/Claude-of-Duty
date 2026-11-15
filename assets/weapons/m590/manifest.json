@@ -7,11 +7,11 @@
   "runtimeBasis": "-Z forward / +Y up / +X right; no adapter basis transform",
   "source": "tools/blender/m590/build.py + tools/blender/m590/ + tools/blender/m590/actions.py + tools/blender/m590/hand-reference.ts",
   "stats": {
-    "triangleInstances": 79334,
+    "triangleInstances": 66274,
     "primitives": 2,
     "materials": 1,
     "images": 3,
-    "bytes": 12560180
+    "bytes": 11028548
   },
   "clips": {
     "Idle": {

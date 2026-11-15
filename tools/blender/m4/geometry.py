@@ -3,6 +3,7 @@ import math
 import bpy
 import numpy as np
 from mathutils import Vector, Matrix
+import picatinny
 
 def build_geometry(materials):
     scene=bpy.context.scene
@@ -232,39 +233,28 @@ def build_geometry(materials):
     # Six-bolt mounting flange and barrel nut sit within the nominal rail envelope.
     flange=tube('RIS II bolt-up flange',(0,BORE,HG_REAR-.004),.026,.014605,.008,fde)
     cut(flange,box('CUT',(0,.091,HG_REAR-.004),(.0045,.0042,.016),None,None,0))
+    # The flange is also the rail's support at this joint. Relieve its shoulders
+    # below the standard neck so a clamp lip does not cut into the circular rim.
+    for side in (-1,1):
+        cut(flange,box('CUT rail shoulder relief',(side*.017,BORE+.0286-picatinny.NECK_DEPTH-.0002+.005,HG_REAR-.004),
+                      (.019,.010,.010),None,None,0))
     for i in range(6):
         a=math.tau*i/6+.20;x=math.cos(a)*.0218;y=BORE+math.sin(a)*.0218
         screw=cyl('RIS II mounting screw',(x,y,HG_REAR-.0025),.0032,.005,steel,axis='Z',sides=24)
         cut(screw,cyl('CUT',(x,y,HG_REAR+.0005),.00145,.002,None,None,'Z',6,0))
-    # Rails use physical Picatinny spacing; the FSP cutout removes top teeth only.
+    # Identical rail profile on top/bottom/sides; rotate, never scale its head.
     def rail(name,z0,z1,side='top',mat=fde):
-        center=(z0+z1)/2
-        if side=='top':
-            y,height=(.1004,.0048) if name=='Upper receiver rail' else (.0972,.0055)
-            base=box(name+' web',(0,y,center),(.016,height,z1-z0),mat)
-        elif side=='bottom':base=box(name+' web',(0,.052,center),(.020,.007,z1-z0),mat)
-        else:base=box(name+' web',(side*.023,BORE,center),(.008,.020,z1-z0),mat)
-        count=int((z1-z0)/.0100076)
-        for i in range(count):
-            z=z0+.0025+i*.0100076
-            if name.startswith('RIS II') and side=='top' and -.330<z<-.265:continue
-            section=[(-.0079,.0210),(.0079,.0210),(.0079,.0240),(.0106045,.0266),(.0086,.0286),(-.0086,.0286),(-.0106045,.0266),(-.0079,.0240)]
-            angle=0 if side=='top' else math.pi if side=='bottom' else -side*math.pi/2
-            radial=1 if side=='top' else .02855/.0286 if side=='bottom' else .028321/.0286
-            # Model the small cross-section radii directly, instead of a bevel
-            # modifier multiplying every tiny tooth edge into hundreds of faces.
-            rounded=[]
-            for j,point in enumerate(section):
-                q=Vector(point);a=q+(Vector(section[j-1])-q).normalized()*.0002;b=q+(Vector(section[(j+1)%len(section)])-q).normalized()*.0002
-                for step in range(3):
-                    t=step/2;rounded.append(a*(1-t)**2+q*2*t*(1-t)+b*t*t)
-            rings=[]
-            for dz in (-.0023876,.0023876):
-                ring=[]
-                for x,y in rounded:
-                    ring.append((x*math.cos(angle)-y*radial*math.sin(angle),BORE+x*math.sin(angle)+y*radial*math.cos(angle),z+dz))
-                rings.append(ring)
-            loft(name+' tooth',rings,mat,bevel=0,rounded=True)
+        angle=0 if side=='top' else math.pi if side=='bottom' else -side*math.pi/2
+        radius=.0286 if side=='top' else .02855 if side=='bottom' else .028321
+        origin=-.067 if name=='Upper receiver rail' else -.250
+        def rings(outline,a,b):
+            return [[(x*math.cos(angle)-y*math.sin(angle),
+                      BORE+x*math.sin(angle)+y*math.cos(angle),z)
+                     for x,y in outline] for z in (a,b)]
+        base=loft(name+' web',rings(picatinny.section(radius,radius-.0056,slot=True),z0,z1),mat,bevel=0,rounded=False)
+        for a,b in picatinny.lands(z0,z1,origin):
+            if name.startswith('RIS II') and side=='top' and -.330<(a+b)/2<-.265:continue
+            loft(name+' tooth',rings(picatinny.section(radius,radius-.0056),a,b),mat,bevel=0,rounded=False)
         if name.startswith('RIS II') and side=='top':cut(base,box('CUT',(0,.102,-.297),(.031,.055,.065),None,None,0))
     rail('Upper receiver rail',-.136,.055,'top',anodized)
     for side in ('top','bottom',-1,1):rail('RIS II '+str(side),HG_FRONT,HG_REAR,side)
@@ -466,7 +456,8 @@ def build_geometry(materials):
             clone=o.copy();clone.data=o.data;asset.objects.link(clone);clone.parent=spare if o.parent==mag else round_spare;clone.name=o.name+' | spare'
     # Right RIS II rail: TOR Mini channel bed, rotated so the body sits outboard.
     # Place ahead of the support hand and behind the FSP; forward stays -Z.
-    rail_mount=empty('MOUNT_rail',(.0285,BORE,-.250),guard_root)
+    # Keep the TOR Mini ahead of the actual wraparound support hand.
+    rail_mount=empty('MOUNT_rail',(.028321,BORE,-.250-16*picatinny.PITCH),guard_root)
     rail_mount.rotation_euler.y=-math.pi/2
     parts=[rig,bolt,head,handle,trigger,cover,release,mag,spare,case,round_live,round_spare]
     parents=[body,muzzle_device,muzzle_adapter,guard_root,stock_root,irons_root,low_block,bolt,head,handle,trigger,cover,release,mag,spare,case,round_live,round_spare]

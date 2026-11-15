@@ -2,6 +2,8 @@
 import math
 import bpy
 from mcx.primitives import create_primitives
+from mathutils import Matrix
+import picatinny
 
 def build_acog(asset, body, materials):
     anodized = materials['anodized']
@@ -23,12 +25,12 @@ def build_acog(asset, body, materials):
     # 151.89 mm optic length; width includes the windage cap. Our height check
     # uses optic/foot, excluding TA51 shoe/knobs; Trijicon's exact datum is unverified.
     body['optic'] = 'ACOG 4x32 (TA31F / TA51)'
-    # Seat the shoe into the foot and rail by 0.1 mm at each interface. Its
-    # unpublished height is fit-inferred; optic envelope and sight axis stay fixed.
+    # Keep the optical envelope; machine a proper common rail channel into the shoe.
     box('ACOG rail shoe',(-.081,0,.0530),(.096,.030,.0142),anodized,bevel=.0008)
     profile('ACOG integral mounting foot',[(-.128,.060),(-.026,.060),(-.026,.064),(-.039,.069),(-.047,.075),(-.096,.076),(-.109,.065),(-.127,.064)],.023,anodized,bevel=.001)
     for side in (-1,1):
-        box('ACOG rail clamp',(-.081,side*.016,.051),(.094,.004,.009),anodized,bevel=.0008)
+        outline=[(side*y,z) for y,z in [(.0077,.042),(.018,.042),(.018,.057),(.014,.057),(.014,.046),(.0077,.046)]]
+        loft('ACOG rail clamp',[[(x,y,z) for y,z in outline] for x in (-.128,-.034)],anodized,bevel=.0001)
     for x in (-.113,-.049):
         cylinder('ACOG mount crossbolt',(x,0,.051),.0027,.042,steel,'Y')
         knob = cylinder('ACOG slotted thumbscrew',(x,.0225,.051),.0078,.0055,anodized,'Y',vertices=48)
@@ -36,6 +38,8 @@ def build_acog(asset, body, materials):
         for i in range(24):
             a=i*math.tau/24
             cylinder('ACOG thumbscrew knurl',(x+math.cos(a)*.0074,.0225,.051+math.sin(a)*.0074),.00035,.0038,anodized,'Y',vertices=6,bevel=0)
+    frame=Matrix(((0,1,0,-.081),(-1,0,0,0),(0,0,1,.046),(0,0,0,1)))
+    picatinny.cut_channel([o for o in asset.objects if o.type=='MESH'],frame,-.049,.049)
     # Hollow forged housing: varying oval sections and swept front hood. The
     # front bell has a tall outer shoulder, unlike a rotationally symmetric cone.
     sections=[(-.129,.0168,.0168,0),(-.117,.0175,.017,0),(-.103,.0175,.018,0),(-.092,.018,.020,0),(-.071,.0185,.0205,0),(-.045,.0215,.0255,0),(-.017,.022,.0265,0),(-.00511,.022,.0265,.006)]

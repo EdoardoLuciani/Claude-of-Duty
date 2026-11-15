@@ -16,6 +16,7 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import picatinny
 from mpx.actions import author_actions
 from mpx.animations import prepare_export_actions
 from mpx.finishes import consolidate_finishes
@@ -402,11 +403,13 @@ def build(output, render=False, quick=False):
     mod = hg.modifiers.new('Weighted shell normals', 'WEIGHTED_NORMAL'); mod.keep_sharp=True
     for side in (-1,1):
         screw((.105,side*.025,-.006), .003)
-    # Continuous top rail: base plus true separated lugs with edge bevels.
-    box('Picatinny spine', (.098,0,.0385), (.412,.022,.003), alloy, bevel=.0005)
-    for x in np.arange(-.103,.300,.010):
-        profile('Picatinny rail tooth', [(x-.003,.040),(x+.003,.040),(x+.003,.044),
-                                      (x-.003,.044)], .021, alloy, bevel=.00035)
+    # Canonical Picatinny head/neck, with a groove centred on MOUNT_optic.
+    for name, outline, spans in [
+        ('Picatinny spine', picatinny.section(.044,.034,slot=True), [(-.108,.304)]),
+        ('Picatinny rail tooth', picatinny.section(.044,.034), picatinny.lands(-.108,.304,.025)),
+    ]:
+        for a,b in spans:
+            loft(name,[[(y,x,z) for x,z in outline] for y in (a,b)],alloy,bevel=0)
     # Full 8-inch exterior including the formerly hidden, open 9mm crown.
     breech = .109
     barrel_end = breech+.2032
@@ -562,9 +565,9 @@ def build(output, render=False, quick=False):
     rail.rotation_euler = Matrix(((0,1,0),(0,0,1),(1,0,0))).to_euler()
     # The TOR's clamp starts at x=.2855: the former rear tooth/flange added no
     # clamp support and crossed the departing glove. Keep four supported teeth.
-    box('Laser rail adapter web',(.30075,-.0295,0),(.0435,.011,.014),alloy)
-    for i in range(4):
-        box('Laser rail adapter tooth',(.285+i*.010,-.035,0),(.0052,.004,.020),steel)
+    box('Laser rail adapter web',(.30075,-.0289,0),(.0435,.0098,.014),alloy)
+    bpy.context.view_layer.update()
+    picatinny.build_rail('Laser rail adapter',rail.matrix_world@Matrix.Rotation(math.pi,4,'Y'),-.0126,.0226,steel,body,asset)
     # Both anchors stay inside the last real M-LOK slot, not past the guard end.
     for x in (.282,.289):
         cyl('Laser rail adapter screw',(x,-.0348,0),.002,.004,steel,'Y')

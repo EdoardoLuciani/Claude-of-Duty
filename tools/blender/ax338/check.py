@@ -223,11 +223,7 @@ for optic_id in attachment_source.OPTICS:
         fixed=[o for o in body_meshes if not o.name.startswith('Rail tooth')]
         assert not mounted[optic_id].overlap(surface(fixed)),'EXPS3 crosses non-mating body'
     else:
-        foot_name={'rmr':'Riser side','acog':'ACOG rail shoe','scope':'AI mount base'}[optic_id]
-        feet=[o for o in meshes if o.name.startswith(foot_name)]
-        assert feet,(optic_id,'missing mount foot')
-        v,_=geometry(feet,transform)
-        assert abs(min(p.z for p in v)-.118)<.00011,(optic_id,'optic not seated on rail')
+        attachment_source.check_seating(mounted[optic_id],mount)
     print('AX338_OPTIC_FIT',optic_id,'iron triangle contacts',len(hits))
 
 bolt_parts=[o for o in bpy.data.objects if o.type=='MESH' and o.parent==bolt]

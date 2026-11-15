@@ -14,6 +14,7 @@ from mathutils import Matrix, Vector
 
 ROOT=Path(__file__).resolve().parents[3]
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+import picatinny
 from evolys.actions import author_actions
 from evolys.export import consolidate_static_surfaces, prepare_export_actions, validate_export
 from evolys.finish_atlas import bake_finish_atlas
@@ -176,11 +177,14 @@ def build(output, render=False, quick=False):
         profile('Recessed grip stipple',traced([(716,389),(765,407),(721,509),(705,533),(645,516),(687,436)]),.0012,rubber,x=side*.017,bevel=.001,smooth=True)
     profile('Curved trigger',traced([(824,357),(847,357),(861,380),(876,399),(879,411),(868,409),(850,401),(837,386),(826,369)]),.006,steel,trigger,bevel=.0006)
     # Full-length rail: standard slot spacing, real gap geometry.
-    rail_y=.075+(219-123)*S
-    box('Continuous Picatinny spine',(0,rail_y-.006,-.140),(.025,.009,.501),fde)
-    for i in range(50):
-        z=.105-i*.01005
-        profile('Rail tooth',[(z-.003,rail_y-.004),(z+.003,rail_y-.004),(z+.003,rail_y+.002),(z-.003,rail_y+.002)],.0212,fde,bevel=.0003)
+    rail_y=.075+(219-123)*S+.0055  # Raise the supported neck to clear the guard/closed feed cover.
+    for name, outline, spans in [
+        ('Continuous Picatinny spine',picatinny.section(rail_y+.002,rail_y-.0105,slot=True),[(-.3905,.1105)]),
+        ('Rail tooth',picatinny.section(rail_y+.002,rail_y-.0105),picatinny.lands(-.3905,.1105,.105-30*.01005)),
+    ]:
+        for a,b in spans:
+            vertices,faces=picatinny.prism(outline,-b,-a)
+            mesh(name,[(x,z,-y) for x,y,z in vertices],faces,fde,bevel=0)
     # Handguard shell with the alternating triangular openings visible in photos.
     hg_shell=profile('Truss handguard',traced([(1250,127),(1557,127),(1616,188),(1606,262),(1560,322),(1250,322)]),.047,fde,hg,bevel=.0011)
     # Open central volume plus actual through-side vents.
@@ -292,15 +296,9 @@ def build(output, render=False, quick=False):
     empty('MOUNT_optic',(0,rail_top,.105-30*.01005),rig)
     # FN's studio profile shows a direct underside rail below the molded covers.
     lower_y=zy(0,336)[1]
-    box('Lower Picatinny spine',(0,lower_y+.007,-.300375),(.016,.008,.15595),fde,hg,.0002)
-    section=[(-.008,lower_y+.003),(.008,lower_y+.003),(.0106,lower_y+.001),
-             (.0106,lower_y),(-.0106,lower_y),(-.0106,lower_y+.001)]
-    for i in range(16):
-        z=-.225-i*.01005
-        vertices=[(x,y,z+side*.0026) for side in (-1,1) for x,y in section]
-        faces=[tuple(range(5,-1,-1)),tuple(range(6,12))]
-        faces.extend((j,(j+1)%6,(j+1)%6+6,j+6) for j in range(6))
-        mesh('Lower Picatinny tooth',vertices,faces,fde,hg,.0002)
+    box('Lower Picatinny spine',(0,lower_y+.007,-.3072),(picatinny.NECK_HALF*2,.008,.1696),fde,hg,.0002)
+    frame_matrix=Matrix.Translation(C@Vector((0,lower_y,-.363725)))@Matrix.Rotation(math.pi,4,'Y')
+    picatinny.build_rail('Lower Picatinny',frame_matrix,-.141325,.028275,fde,hg,asset)
     empty('MOUNT_muzzle',(0,.075,barrel_end),rig)
     # Identity keeps the emitter forward and the body below its contact datum.
     empty('MOUNT_rail',(0,lower_y,-.363725),hg)

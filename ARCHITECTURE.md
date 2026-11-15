@@ -386,7 +386,7 @@ strings with `isWeaponId` at entry. Authored models carry literal adapter IDs,
 and the loader table checks complete ID coverage and per-ID adapter returns.
 `WeaponState.attachments` is an immutable `{ optic, muzzle, rail }` snapshot; null slots
 retain the authored base weapon, and `optic: null` aims through its iron sights. `src/weapons/attachments.ts` owns
-the finite catalog (`rmr | acog | scope` optics, TOR Mini `laser`, one `suppressor`),
+the finite catalog (`rmr | acog | scope | exps3` optics, TOR Mini `laser`, one `suppressor`),
 boundary validation, asset loading and the common gameplay/inspection mount solver.
 `src/market/attachments.ts` owns attachment prices, not compatibility. Market holds one
 unconfirmed build; begin/edit/cancel never mutate gameplay. `getHudState()` pools its
@@ -396,8 +396,9 @@ New weapons are configured before replacing ownership; existing weapons only cha
 attachments. Unchanged attachments are free, removal/replacement gives no refund, and
 closing/restart discards the draft.
 `WeaponDef.fits` has one shape per slot: a partial record keyed by attachment id whose
-entry enables that verified fit and holds its data (`fits.optic[id].eyeRelief`,
-`fits.muzzle.suppressor.model` naming the weapon's calibre can; rail entries are empty).
+entry enables that verified fit and holds its data: `fits.optic[id].eyeRelief`,
+optional `railSlots` selecting whole forward grooves at `PICATINNY_PITCH`, and
+`fits.muzzle.suppressor.model` naming the weapon's calibre can; rail entries are empty.
 The player-facing id stays `suppressor` on every weapon; assets are keyed by can model
 (`srd762ti`, `suppressor9mm`, `suppressor338`, `suppressor12g`). `isAttachmentConfig()` is the single compatibility rule for
 gameplay, URL/debug input and capture tooling; unverified fits are rejected, never silently
@@ -438,10 +439,14 @@ Per-weapon mount datums, clearances and fitting decisions live in each weapon's
 `assets/weapons/*/README.md` and each attachment's `assets/attachments/*/README.md`;
 Blender sources are under `tools/blender/` (`rmr/`, `acog/`, `scope/`, `tor_mini/`, and the
 `suppressor*/` cans sharing `can.py`); weapon fit checks load built attachments through
-`attachment_source.py`.
+`attachment_source.py`. `picatinny.py` owns the common nominal rail head/neck,
+45° flanks and recoil grooves; weapon sources retain rail supports/lengths and
+attachment sources machine their channels before bake/export. `check_picatinny.py`
+measures actual rails and checks actual clamps against an inset slotted gauge.
+EXPS3 uses the live-axis 68 MOA ring / 1 MOA dot path at 1x world FOV/sensitivity.
 
 Debug URL input is narrowed in `main.ts`: `attachmentWeapon` (default M4) must pass
-`isWeaponId` plus compatibility/ownership checks; `attachmentOptic=rmr|acog|scope|none`,
+`isWeaponId` plus compatibility/ownership checks; `attachmentOptic=rmr|acog|scope|exps3|none`,
 `attachmentRail=laser|none` and `attachmentMuzzle=suppressor|none` select each slot
 independently. `tools/capture.ts` uses the same validator.
 Weapons own one retained world mesh for the green beam and surface dot (one draw,

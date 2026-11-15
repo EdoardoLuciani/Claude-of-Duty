@@ -27,6 +27,34 @@ build/check commands, declared inputs, references and acceptance limits:
 Standalone attachments: [EXPS3-0](../../assets/attachments/eotech-exps3-0/README.md),
 [TOR Mini laser](../../assets/attachments/steiner-tor-mini/README.md).
 
+## Common Picatinny interface
+
+`picatinny.py` owns the nominal MIL-STD-1913 profile (1999 Figure 1 / Figure 2):
+19.0 mm top flat, 21.209 mm maximum head width, 15.672 mm neck, 45° flanks,
+5.2324 mm recoil grooves at 10.0076 mm pitch and 2.9972 mm groove depth.
+The basic .108-inch flank dimension is not the rail's overall height. These
+are shared game-art dimensions, not a manufacturing-tolerance certificate.
+Weapon sources own orientation, support, length and mount location; do not scale
+the profile or add vertical runtime seating offsets. A mount origin is a groove centre.
+`fits.optic[id].railSlots` may select whole forward grooves (default zero); gameplay,
+inspection, rest/live ADS datums and the M4 source check share that physical choice.
+Optic/laser sources machine the matching channel before UV/bake/export, retaining
+exact saddle contact and 0.1 mm transverse assembly clearance on the flanks.
+
+After `bun run assets`, run:
+
+```sh
+blender -b -t 2 --python-exit-code 1 --python tools/blender/check_picatinny.py
+```
+
+This reads the actual generated meshes: fourteen weapon interfaces, five clamp
+assemblies, independent profile/pitch/depth rays and an inset slotted solid that
+rejects penetration rather than exempting the entire mating rail. Then run each
+weapon's `check.py` for surrounding geometry, mechanisms, hands and combined slots.
+Finite source samples and browser captures do not replace final human approval.
+
+## Rebuild discipline
+
 - Build factory-empty into an absolute `--output` scratch directory first.
   `--render` is optional; `--quick` changes preview samples/resolution only.
 - Shared review-arm appearance and versioned hand calibration are read-only

@@ -538,25 +538,26 @@ def build_geometry(mats):
         sleeve.rotation_euler = (b-a).to_track_quat('Z','Y').to_euler()
         active(sleeve)
         bpy.ops.object.transform_apply(location=False,rotation=True,scale=True)
+    # Raised QD mount; all internal purchase surfaces use the common rail gauge.
+    import picatinny
     # Raised quick-detach mount with real open rail channel and clamp shoulders.
     deck = [(-22.5,1.7),(-22.5,6.7),(22.5,6.7),(22.5,1.7),(10.6,1.7),
             (9,4.2),(8,4.8),(-8,4.8),(-9,4.2),(-10.6,1.7)]
-    prism('7mm raised mount deck with open channel',deck,-34,33,mats['mount'],root,'Y',.3)
+    prism('7mm raised mount deck with open channel',deck,-34,33,mats['mount'],root,'Y',.2)
     for sign in (-1,1):
-        jaw = [(sign*x,z) for x,z in [(10.6,1.7),(10.6,-1.8),(12.4,-4.5),(15,-5.5),
-                                     (22,-5.5),(22,3.5)]]
+        jaw = [(sign*x,z) for x,z in [(10.6,3.5),(7.6,0),(22,0),(22,3.5)]]
         prism('Picatinny clamp jaw '+str(sign), jaw, -34, 33, mats['mount'], root, 'Y', .25)
     lever = [(-34,-1.5),(-34,2.5),(-31,4.5),(17,4.5),(25,3),(28,1.5),
              (28,-1.5),(23,-2.5),(-30,-2.5)]
     prism('QD closed contoured lever',lever,-29.2,-25,mats['mount'],root,bevel=.65)
-    cylinder('QD lever pivot', (-27.2,25,1), 4.2, 3.2, mats['mount'], root)
+    cylinder('QD lever pivot', (-27.2,25,1), 4.2, 3.2, mats['mount'], root, sides=16 if LOW_POLY else 48)
     box('QD locking catch', (-27.7,20,4.5), (2.5,9,4), mats['body'], root, .5)
     oval = [(13+y,z) for y,z in rounded_rect(31,9,4.2)]
     pad = prism('QD oval tension pad',oval,22.25,23.05,mats['mount'],root,bevel=.12)
     inset = [(13+y,z) for y,z in rounded_rect(28.6,7.3,3.4)]
     subtract(prism('QD oval inset cutter',inset,22.4,23.5,mats['mount'],root,bevel=0),pad)
     cylinder('Crossbolt adjustment washer', (23,13,0), 5, 1.3, mats['steel'], root)
-    nut = cylinder('QD slotted tension nut', (24,13,0), 4.3, 2, mats['edge'], root)
+    nut = cylinder('QD slotted tension nut', (24,13,0), 4.3, 2, mats['edge'], root, sides=16 if LOW_POLY else 48)
     subtract(box('Tension nut tool slot cutter',(25,13,0),(1,8.2,.8),mats['edge'],root,0),nut)
     subtract(cylinder('Crossbolt bore cutter',(24.7,13,0),1.8,1.6,mats['edge'],root,bevel=0),nut)
     surface_normals(cylinder('Crossbolt recessed floor',(23.915,13,0),1.78,.02,mats['ink'],root,bevel=0))
@@ -663,6 +664,12 @@ def build_geometry(mats):
         stripe = [(5.2+r*math.cos(a+d),31.5+r*math.sin(a+d))
                   for r,d in [(0.7,-.04),(1.5,-.04),(1.5,.04),(0.7,.04)]]
         prism('Laser warning ray '+str(i), stripe, -26.68,-26.66, mats['ink'], root, bevel=0)
+    # The channel also passes through the low rear casting; clearing only the
+    # separate jaws left the cover intruding into a real rail's upper shoulders.
+    bpy.context.view_layer.update()
+    low_parts=[o for o in root.children_recursive if o.type=='MESH' and
+               min((o.matrix_world@Vector(p)).z for p in o.bound_box)<RAIL_TOP_Z*MM]
+    picatinny.cut_channel(low_parts,Matrix.Translation((0,0,RAIL_TOP_Z*MM)),-.040,.070)
     return root
 
 

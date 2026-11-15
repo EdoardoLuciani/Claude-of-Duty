@@ -53,7 +53,7 @@ def check_attachment_fits():
     hands = [o for o in bpy.data.collections['MCX | authored hands (shared appearance)'].objects if o.type == 'MESH']
     attachments = []
     loaded = []
-    for id, slot in [('rmr','optic'),('acog','optic'),('scope','optic'),('srd762ti','muzzle'),('laser','rail')]:
+    for id, slot in [('rmr','optic'),('acog','optic'),('scope','optic'),('exps3','optic'),('srd762ti','muzzle'),('laser','rail')]:
         objects = attachment_source.seat(id, bpy.data.objects['MOUNT_'+slot])
         loaded.extend(objects)
         meshes = [o for o in objects if o.type == 'MESH' and
@@ -79,14 +79,8 @@ def check_attachment_fits():
             clashes = bool(surface.overlap(tree(list(installed.children),inverse)))
             assert clashes == (id == 'scope'), (id,'unexpected installed-iron fit',clashes)
             assert not surface.overlap(tree(list(folded.children),inverse)), (id,'folded leaf collision')
-            # Contact spans the physical foot, not a single accidental corner.
-            teeth = [o for o in fixed if o.name.startswith('Picatinny rail tooth')]
-            contacts = [o for o in teeth if surface.overlap(tree([o],inverse))]
-            assert len(contacts) >= {'rmr':3,'acog':8,'scope':6}[id], (id,'insufficient rail support',len(contacts))
-            stations = [sum(p.x for p in geometry(o,inverse)[0])/len(geometry(o,inverse)[0]) for o in contacts]
-            span = max(stations)-min(stations)
-            assert span >= {'rmr':.019,'acog':.069,'scope':.119}[id], (id,'unsupported mount span',span)
-            print('MCX_OPTIC_SEAT:',id,len(contacts),'actual tooth contacts; span',span,'m')
+            attachment_source.check_seating(surface,inverse @ bpy.data.objects['MOUNT_optic'].matrix_world)
+            print('MCX_OPTIC_SEAT:',id,'four actual saddle rays; shared rail gauge checked separately')
         elif slot == 'muzzle':
             assert not surface.overlap(tree(list(installed.children),inverse)), 'can clips irons'
             exit = attachment_source.named(objects, 'SOCKET_muzzle')
