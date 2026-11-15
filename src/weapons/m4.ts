@@ -34,7 +34,6 @@ export function makeM4Model(gltf: GLTF): M4Model {
     reactiveFire: true,
     handPoses: { left: handReference.sides.left.grip, right: handReference.sides.right.grip },
     nodes: {
-      eject: point('SOCKET_ejection'),
       sight: point('SOCKET_sight'),
       ejectDir: [0.86, 0.44, 0.26],
     },

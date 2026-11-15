@@ -544,7 +544,6 @@ export class Viewmodel {
       clips: animation.clips(),
       // the sight point and its axis, in weapon space
       sight: new THREE.Vector3().fromArray(model.nodes.sight),
-      eject: new THREE.Vector3().fromArray(model.nodes.eject),
       ejectDir: new THREE.Vector3().fromArray(model.nodes.ejectDir).normalize(),
       magLen: model.magSize.len,
       shell: model.shell,

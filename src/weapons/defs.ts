@@ -92,7 +92,6 @@ export interface WeaponDef {
   lowReadyRot: TuningVector;
   swayScale: number;
   bobScale: number;
-  magLen?: number;
   firingShoulderZ?: number;
   adsFiringShoulderZ?: number;
   supportShoulderZ?: number;
@@ -174,7 +173,6 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     lowReadyRot: [-0.46, 0.125, -0.09],
     swayScale: 0.85,
     bobScale: 0.95,
-    magLen: 0.18,
   },
   rifle: {
     id: 'rifle',
@@ -331,7 +329,6 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     lowReadyRot: [-0.44, 0.125, -0.085],
     swayScale: 0.92,
     bobScale: 0.95,
-    magLen: 0.192,
   },
 
   lmg: {
@@ -403,7 +400,6 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     lowReadyRot: [-0.48, 0.12, -0.09],
     swayScale: 0.9,
     bobScale: 0.95,
-    magLen: 0.135,
   },
 
   pistol: {
@@ -474,7 +470,6 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     lowReadyRot: [-0.44, 0.105, -0.07],
     swayScale: 1.15,
     bobScale: 1.1,
-    magLen: 0.108,
   },
 
   shotgun: {
@@ -549,7 +544,6 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     lowReadyRot: [-0.48, 0.12, -0.09],
     swayScale: 1.05,
     bobScale: 1.05,
-    magLen: 0.07,
   },
 
   sniper: {
@@ -613,7 +607,6 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     lowReadyRot: [-0.52, 0.12, -0.09],
     swayScale: 1.22,
     bobScale: 1.1,
-    magLen: 0.118,
   },
 };
 

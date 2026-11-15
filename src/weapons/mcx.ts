@@ -42,7 +42,6 @@ export function makeMCXModel(gltf: GLTF): MCXModel {
     animations,
     handPoses: { left: handReference.sides.left.grip, right: handReference.sides.right.grip },
     nodes: {
-      eject: point('SOCKET_ejection'),
       sight: point('SOCKET_sight'),
       ejectDir: [1, 0.35, 0.35] as [number, number, number],
     },

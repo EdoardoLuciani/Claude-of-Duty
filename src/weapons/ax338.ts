@@ -34,7 +34,6 @@ export function makeAX338Model(gltf: GLTF): AX338Model {
     reactiveFire: true,
     handPoses: { left: handReference.sides.left.grip, right: handReference.sides.right.grip },
     nodes: {
-      eject: point('SOCKET_ejection'),
       sight: point('SOCKET_sight'),
       ejectDir: [0.88, 0.4, 0.22],
     },
