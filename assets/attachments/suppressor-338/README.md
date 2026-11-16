@@ -33,5 +33,8 @@ bun tools/capture.ts --weapon=sniper --optic=scope --rail=laser \
   --muzzle=suppressor --shot=weapon --out=/tmp/ax338-suppressed.png
 ```
 
+The editable `.blend` keeps the individual parts; GLB export joins the rigid
+assembly into material groups without changing the mount or exit sockets.
+
 The builder accepts `-- --output /tmp/suppressor338-review`. Runtime URL:
 `/models/attachments/suppressor338.runtime.glb`.

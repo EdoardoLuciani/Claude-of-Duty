@@ -31,4 +31,5 @@ bun tools/capture.ts --weapon=pistol --muzzle=suppressor --shot=ads \
   --out=/tmp/p320-can-irons.png
 ```
 
-The cook preserves geometry without simplification.
+The editable `.blend` keeps the individual parts. GLB export joins the rigid
+assembly into material groups; the cook preserves geometry without simplification.

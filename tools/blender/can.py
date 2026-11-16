@@ -125,8 +125,8 @@ def assert_clear(label, radii, length, rays=32, half_angle=0):
 
 
 def export(root, out, stem, length):
-    """Add the mount/exit sockets, save `<stem>.blend` and `<stem>.glb`, and verify the
-    exported exit faces glTF -Z at `length` with unit, unrotated sockets."""
+    """Save editable parts in `<stem>.blend`, join the rigid meshes for export and
+    verify the glTF -Z exit at `length` with unit, unrotated sockets."""
     for name, y in (('SOCKET_mount', 0), ('SOCKET_muzzle', length)):
         node = bpy.data.objects.new(name, None)
         bpy.context.collection.objects.link(node)
@@ -138,6 +138,17 @@ def export(root, out, stem, length):
             assert (node.matrix_world.to_scale()-Vector((1, 1, 1))).length < 1e-7
             assert node.matrix_world.to_quaternion().angle < 1e-7
     bpy.ops.wm.save_as_mainfile(filepath=str(out/f'{stem}.blend'))
+    # Join only after saving the editable scene. glTF groups faces by material.
+    # Bake part transforms first so the joined node never inherits a marking's frame.
+    meshes = [node for node in root.children if node.type == 'MESH']
+    if len(meshes) > 1:
+        bpy.ops.object.select_all(action='DESELECT')
+        for node in meshes:
+            node.select_set(True)
+        bpy.context.view_layer.objects.active = meshes[0]
+        bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+        bpy.ops.object.join()
+        bpy.context.object.name = f'{stem}_mesh'
     bpy.ops.export_scene.gltf(filepath=str(out/f'{stem}.glb'), export_format='GLB',
                               export_animations=False, export_extras=True, export_yup=True)
     raw = (out/f'{stem}.glb').read_bytes()
