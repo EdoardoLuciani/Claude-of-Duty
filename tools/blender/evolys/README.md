@@ -20,7 +20,7 @@ preserve held endpoint samples, matching NLA names and TRS resets.
 Receiver/handguard join as static surfaces. `IRON_sights` remains independently
 removable; there is no integrated optic or lens. `SOCKET_sight` owns the rear
 aperture centre, aligned with `SOCKET_front_post`. `MOUNT_optic` is the rail-contact
-frame; per-optic groove selections keep larger bodies ahead of the charging hand.
+frame for the RMR; larger optics seat whole grooves forward of the charging hand.
 `MOUNT_muzzle` seats the unchanged SRD762Ti at the barrel crown.
 `MUZZLE_device` removes the original hider/shoulder and
 `MUZZLE_device_removed` supplies the open game-fit sleeve. `MOUNT_rail` seats TOR Mini directly
