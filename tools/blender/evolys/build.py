@@ -292,8 +292,8 @@ def build(output, render=False, quick=False):
     for side in (-1,1):
         box('Front protective ear',(side*.007,rail_top+.017,front_z),(.003,.026,.006),black,irons,.0007)
     empty('SOCKET_front_post',(0,sight_y,front_z),rig)
-    # Identity rail-contact frame; optics supply their own riser/base and sight.
-    empty('MOUNT_optic',(0,rail_top,.105-30*.01005),rig)
+    # Rearward whole-groove seat; optics supply their own riser/base and sight.
+    empty('MOUNT_optic',(0,rail_top,.105-30*.01005+6*picatinny.PITCH),rig)
     # FN's studio profile shows a direct underside rail below the molded covers.
     lower_y=zy(0,336)[1]
     box('Lower Picatinny spine',(0,lower_y+.007,-.3072),(picatinny.NECK_HALF*2,.008,.1696),fde,hg,.0002)

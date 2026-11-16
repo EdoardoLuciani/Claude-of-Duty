@@ -131,7 +131,9 @@ def author_actions(root,asset,rig,parts,mag,spare,slide,barrel,trigger,catch,rou
         magpose=copy.deepcopy(ref['magazine']['pose'])
         # Wrist rotations are genuine keyframed quaternions, not runtime offsets.
         mq=Quaternion((ref['magazine']['quaternion'][3],*ref['magazine']['quaternion'][:3]))
-        sequence=[(10,[-.048,-.075,.066],None,relaxed('left')),
+        # Peel away outboard before opening the fingers beside the compact laser seat.
+        sequence=[(4,[-.067,-.065,.072],None,ref['sides']['left']['grip']),
+                  (10,[-.075,-.095,.072],None,relaxed('left')),
                   (19,[-.046,-.104,.042],mq,magpose),
                   (28,[-.046,-.126,.047],mq,magpose),
                   (43,[-.058,-.254,.072],mq,magpose),
@@ -141,12 +143,13 @@ def author_actions(root,asset,rig,parts,mag,spare,slide,barrel,trigger,catch,rou
                   (94,[-.051,-.139,.053],mq,magpose),
                   (103,[-.046,-.091,.042],mq,magpose),
                   (109,[-.048,-.102,.048],mq,magpose),
+                  (114 if empty_reload else end-18,[-.075,-.095,.072],None,ref['sides']['left']['grip']),
                   (end-12,ref['grips']['left']['pos'],None,ref['sides']['left']['grip'])]
         if empty_reload:
             key(round_live,0,scale=0);key(round_live,end-1,scale=0);key(round_live,end)
             # Old mag falls without the support hand; hand retrieves the fresh one.
-            sequence[1]=(19,[-.090,-.16,.13],None,relaxed('left'))
-            sequence[2]=(28,[-.090,-.27,.14],mq,relaxed('left'))
+            sequence[2]=(19,[-.090,-.16,.13],None,relaxed('left'))
+            sequence[3]=(28,[-.090,-.27,.14],mq,relaxed('left'))
             sequence += [(120,ref['grips']['left']['pos'],None,ref['sides']['left']['release']),
                          (128,ref['grips']['left']['pos'],None,ref['sides']['left']['release']),
                          (138,ref['grips']['left']['pos'],None,ref['sides']['left']['grip'])]
