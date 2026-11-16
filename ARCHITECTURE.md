@@ -277,8 +277,9 @@ while simulation is paused. Model failures affect only that selection; renderer
 failures disable 3D inspection, never purchases. Supply artwork is mapped in
 `src/ui/market-art.ts`; its offline sources live in `assets/ui/market/`.
 
-`WeaponState.attachments` is an immutable `{ optic, muzzle, rail }` snapshot;
-null slots retain the base weapon, and `optic: null` uses irons.
+`WeaponState.attachments` is the gun's one stored build, an immutable
+`{ optic, muzzle, rail }` snapshot; null slots retain the base weapon, and
+`optic: null` uses irons. Viewmodel entries hold only the mounted instances.
 `src/weapons/attachments.ts` owns the finite catalog (`rmr | acog | scope | exps3`
 optics, TOR Mini `laser`, one `suppressor`), validation, loading and the shared
 gameplay/inspection mount solver. `src/market/attachments.ts` owns prices, not
@@ -307,10 +308,12 @@ changes an owned, loaded weapon synchronously outside the frame loop.
 `MOUNT_optic`/`MOUNT_rail`/`MOUNT_muzzle` and switching base parts via
 `replacedNodes()`. Instances follow authored parents/animation, never a baked live
 pose; ADS uses the rest-pose optic datum in the weapon frame, while the reticle
-follows the live mount. The commit resolves sight/`OpticData`, laser emitter, muzzle
-socket and the effective private definition (eye relief, ADS FOV/sensitivity,
-`suppressed`) consumed by firing audio/FX. Attachments change no ballistic/handling
-stats. Frame-time reticle, ADS, laser and fire consumers allocate nothing.
+follows the live mount. The mount commit resolves the sight datum, eye relief,
+`OpticData`, laser emitter and muzzle socket on the viewmodel entry. Separately,
+`WeaponSystem` applies `buildStats()` to the gun's private runtime definition:
+`suppressed` for firing audio/FX and the optic's ADS FOV/sensitivity (undefined
+defers to player config). These are never authored on `WeaponDef`, and attachments
+change no ballistic/handling stats. Frame-time reticle, ADS, laser and fire consumers allocate nothing.
 
 Optics define `MOUNT_base` and `SOCKET_sight`; rigid attachments define
 `SOCKET_mount` plus `SOCKET_laser` or `SOCKET_muzzle`, in metres, -Z forward,

@@ -1,7 +1,7 @@
 import type * as THREE from 'three';
 
 import type { EngineContext, EngineSystems } from '../core/context.ts';
-import type { AttachmentConfig } from './attachments.ts';
+import type { AttachmentConfig, BuildStats } from './attachments.ts';
 import type { loadAX338 } from './ax338.ts';
 import type { Clip } from './clips.ts';
 import type { WeaponDef, WeaponId, WeaponMode } from './defs.ts';
@@ -14,7 +14,9 @@ import type { loadMPX } from './mpx.ts';
 import type { loadP320 } from './p320.ts';
 
 export interface WeaponState {
-  def: WeaponDef;
+  /** Private copy of the authored definition plus the stored build's stats. */
+  def: WeaponDef & BuildStats;
+  /** The gun's one stored build; its viewmodel entry only holds the mounted instances. */
   attachments: AttachmentConfig;
   laserEnabled: boolean;
   pattern: Float32Array;
@@ -46,7 +48,6 @@ export interface OpticData {
 export type WeaponModelRecord = AuthoredWeaponModel;
 export interface WeaponEntry {
   id: WeaponId;
-  attachments: AttachmentConfig;
   attachmentGroup: THREE.Group;
   railGroup: THREE.Group;
   muzzleGroup: THREE.Group;
@@ -64,6 +65,8 @@ export interface WeaponEntry {
   animation: WeaponAnimation;
   clips: Record<string, Clip>;
   sight: THREE.Vector3;
+  /** ADS eye distance for the mounted optic, else the authored iron-sight value. */
+  eyeRelief: number;
   ejectDir: THREE.Vector3;
   magLen: number;
   shell?: { caseLen: number; rimR: number };

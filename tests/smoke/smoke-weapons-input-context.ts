@@ -274,8 +274,10 @@ for (const [primary, first, second] of [
     assert(wp.setAttachments('rifle', { ...config, optic: 'rmr' }));
     assert(wp.state.laserEnabled);
     assert(!irons.visible, 'a mounted optic replaces the removable irons');
+    assert(wp.state.def.adsFovScale !== undefined, 'the stored build drives ADS magnification');
     drop();
     assert.equal(weaponState(wp, 'rifle').attachments, BASE_ATTACHMENTS);
+    assert.equal(weaponState(wp, 'rifle').def.adsFovScale, undefined, 'drop/restart unzooms');
     assert(!weaponState(wp, 'rifle').laserEnabled, 'drop/restart clears the switch');
     assert(irons.visible, 'the mounted build is reset, not only the stored config');
   }

@@ -106,7 +106,7 @@ function expectedBanks(profile: WeaponProfile, distance: number): string[] {
 for (const [id, key] of fixtureEntries(expected)) {
   const def = WEAPON_DEFS[id],
     original = JSON.stringify(def);
-  const weapon = { ...def };
+  const weapon = { ...def, suppressed: false };
   for (const distance of [0, 20, 45, 70, 140, 300]) {
     for (const suppressed of [false, true, false]) {
       weapon.suppressed = suppressed;

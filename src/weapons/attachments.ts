@@ -352,8 +352,25 @@ export function mountAttachments(
   };
 }
 
-/** Commit a fully staged mount atomically. The effective definition is shared by
- * handling, FOV/sensitivity and fire events (audio/FX suppression). */
+/** Build-resolved fields of a weapon's private runtime definition; never authored.
+ * Undefined ADS scales defer to the player's configured iron-sight values. */
+export interface BuildStats {
+  suppressed: boolean;
+  adsFovScale: number | undefined;
+  adsSensScale: number | undefined;
+}
+
+/** Stats a build gives the weapon's fire events (audio/FX suppression) and ADS camera. */
+export function buildStats(config: AttachmentConfig): BuildStats {
+  const optic = config.optic === null ? undefined : OPTICS[config.optic];
+  return {
+    suppressed: config.muzzle !== null,
+    adsFovScale: optic?.adsFovScale,
+    adsSensScale: optic?.adsSensScale,
+  };
+}
+
+/** Commit a fully staged mount atomically: instances, sockets and the ADS datum. */
 export function configureWeaponAttachments(
   entry: WeaponEntry,
   config: AttachmentConfig,
@@ -369,19 +386,7 @@ export function configureWeaponAttachments(
   // weapon socket's name and precedes it under MOUNT_muzzle) is released.
   entry.muzzleSocket = mounted.muzzleSocket ?? requiredNode(entry.model.root, 'SOCKET_muzzle');
   entry.mountedOptic = mounted.mountedOptic;
-  entry.attachments = Object.freeze({ ...config });
   entry.sight.copy(mounted.sight);
-  const base = WEAPON_DEFS[entry.id];
-  const attached = config.optic === null ? null : OPTICS[config.optic];
-  entry.def.eyeRelief =
-    config.optic === null
-      ? base.eyeRelief
-      : (base.fits?.optic?.[config.optic]?.eyeRelief ?? base.eyeRelief);
-  entry.def.suppressed = config.muzzle !== null;
-  const fov = attached ? attached.adsFovScale : base.adsFovScale;
-  const sensitivity = attached ? attached.adsSensScale : base.adsSensScale;
-  if (fov === undefined) delete entry.def.adsFovScale;
-  else entry.def.adsFovScale = fov;
-  if (sensitivity === undefined) delete entry.def.adsSensScale;
-  else entry.def.adsSensScale = sensitivity;
+  const base = WEAPON_DEFS[entry.model.id];
+  entry.eyeRelief = (config.optic && base.fits?.optic?.[config.optic]?.eyeRelief) ?? base.eyeRelief;
 }
