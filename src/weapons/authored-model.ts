@@ -149,7 +149,6 @@ export interface AuthoredModelData<Id extends WeaponId> extends WeaponSceneMater
 }
 
 interface AuthoredNodes {
-  eject: [number, number, number];
   sight: [number, number, number];
   ejectDir: number[];
 }

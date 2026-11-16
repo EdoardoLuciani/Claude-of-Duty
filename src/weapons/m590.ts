@@ -50,7 +50,6 @@ export function makeM590Model(gltf: GLTF): M590Model {
     reactiveFire: true,
     handPoses: { left: handReference.sides.left.grip, right: handReference.sides.right.grip },
     nodes: {
-      eject: point('SOCKET_ejection'),
       sight: point('SOCKET_sight'),
       ejectDir: manifest.ejectionDirection,
     },

@@ -64,7 +64,6 @@ export interface WeaponEntry {
   animation: WeaponAnimation;
   clips: Record<string, Clip>;
   sight: THREE.Vector3;
-  eject: THREE.Vector3;
   ejectDir: THREE.Vector3;
   magLen: number;
   shell?: { caseLen: number; rimR: number };
