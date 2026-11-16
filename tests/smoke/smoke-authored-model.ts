@@ -181,7 +181,7 @@ assert.throws(
     const shift = entry.attachmentGroup.position.z;
     assert.equal(shift < 0, Boolean(WEAPON_DEFS.rifle.fits?.optic?.[optic]?.railSlots));
     assert(entry.sight.distanceTo(new THREE.Vector3(0, 0.1461072, -0.085 + shift)) < 1e-8);
-    assert.equal(entry.def.eyeRelief, WEAPON_DEFS.rifle.fits?.optic?.[optic]?.eyeRelief);
+    assert.equal(entry.eyeRelief, WEAPON_DEFS.rifle.fits?.optic?.[optic]?.eyeRelief);
     const mountedLens = entry.attachmentGroup.children[0].children[2];
     assert(mountedLens instanceof THREE.Mesh);
     assert.equal(mountedLens.geometry, geometry);
@@ -194,10 +194,7 @@ assert.throws(
     assert(irons.visible);
     assert.equal(ironsRemoved.visible, false);
     assert.deepEqual(entry.sight.toArray(), model.nodes.sight);
-    assert.equal(entry.def.eyeRelief, WEAPON_DEFS.rifle.eyeRelief);
-    assert.equal(entry.def.adsFovScale, undefined);
-    assert.equal(entry.def.adsSensScale, undefined);
-    assert.equal(entry.def.suppressed, false);
+    assert.equal(entry.eyeRelief, WEAPON_DEFS.rifle.eyeRelief);
     assert.equal(disposed, 0, 'instances must not dispose borrowed geometry');
   }
   const railMount = new THREE.Object3D();
@@ -477,7 +474,6 @@ assert.throws(
     configureWeaponAttachments(entry, suppressed, { ...optics, srd762ti: can });
     assert.equal(baseDevice.visible, false);
     assert.equal(entry.muzzleGroup.parent, muzzleMount);
-    assert(entry.def.suppressed, 'a mounted can suppresses the effective definition');
     root.rotation.x += 0.1;
     muzzleMount.position.z -= 0.01;
     muzzleMount.updateWorldMatrix(true, false);
@@ -493,7 +489,6 @@ assert.throws(
     assert.equal(installed.children.length, 0);
     assert.equal(muzzleMount.children.length, 0);
     assert.equal(entry.muzzleSocket, baseSocket, 'removal restores the weapon bore exit');
-    assert.equal(entry.def.suppressed, false, 'removal restores the unsuppressed M4');
     assert(baseDevice.visible);
     assert.equal(canDisposed, 0, 'removal never disposes borrowed geometry');
   }
@@ -521,13 +516,12 @@ assert.throws(
     assert(hasAttachmentAssets(id, suppressed, cans), `${id}: ${fit.model} resolves`);
     configureWeaponAttachments(weapon, suppressed, cans);
     const removable = WEAPON_DEFS[id].removableMuzzleDevice === true;
-    assert.deepEqual(weapon.def, { ...WEAPON_DEFS[id], suppressed: true }, id);
     assert.equal(baseDevice.visible, !removable, `${id}: base device`);
     assert.equal(exposed.visible, removable, `${id}: removed stand-in`);
     const exit = canExit.position.clone().applyMatrix4(muzzleMount.matrixWorld);
     assert(viewmodel.muzzleWorld(new THREE.Vector3()).distanceTo(exit) < 1e-10);
     configureWeaponAttachments(weapon, BASE_ATTACHMENTS, {});
-    assert(baseDevice.visible && !exposed.visible && !weapon.def.suppressed);
+    assert(baseDevice.visible && !exposed.visible);
     assert.equal(muzzleMount.children.length, 0, `${id}: removal leaves no muzzle instance`);
   }
   // A removable device missing from the authored model fails before anything mounts.
@@ -560,7 +554,7 @@ assert.throws(
   }
   // The EXPS3 ring is drawn only while it fits inside the lens.
   configureWeaponAttachments(entry, { ...BASE_ATTACHMENTS, optic: 'exps3' }, optics);
-  viewmodel.rig.position.set(0, 0, -entry.def.eyeRelief).sub(entry.sight);
+  viewmodel.rig.position.set(0, 0, -entry.eyeRelief).sub(entry.sight);
   viewmodel._updateReticle(entry, 1);
   assert(viewmodel.reticle.visible && viewmodel.reticleRing.visible);
   root.position.x = 0.1;
@@ -570,7 +564,7 @@ assert.throws(
   root.position.x = 0;
   root.updateMatrix();
   configureWeaponAttachments(entry, config, optics);
-  viewmodel.rig.position.set(0, 0, -entry.def.eyeRelief).sub(entry.sight);
+  viewmodel.rig.position.set(0, 0, -entry.eyeRelief).sub(entry.sight);
   viewmodel._updateReticle(entry, 1);
   assert(viewmodel.reticle.visible, 'settled mounted optic shows its dot');
   assert.equal(viewmodel.reticleRing.visible, false, 'a dot-only optic hides the ring');
@@ -585,7 +579,7 @@ assert.throws(
   weaponScene.updateMatrixWorld(true);
   const liveSight = sight.position.clone().applyMatrix4(socket.matrixWorld);
   const liveAxis = new THREE.Vector3(0, 0, -1).transformDirection(socket.matrixWorld);
-  const liveDot = liveAxis.clone().multiplyScalar(entry.def.eyeRelief);
+  const liveDot = liveAxis.clone().multiplyScalar(entry.eyeRelief);
   viewmodel.rig.position.copy(liveDot).sub(liveSight);
   viewmodel._updateReticle(entry, 1);
   assert(viewmodel.reticle.visible, 'dot follows the animated slide and rotated rig');

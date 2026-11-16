@@ -19,8 +19,6 @@ export interface WeaponDef {
   class: WeaponClass;
   caliber: string;
   audio?: string;
-  /** Resolved on the private runtime definition from a mounted suppressor; never authored. */
-  suppressed?: boolean;
   rpm: number;
   modes: [WeaponMode, ...WeaponMode[]];
   burstCount?: number;
@@ -64,8 +62,6 @@ export interface WeaponDef {
   };
   fireVibe: { amp: number; duration: number; adsScale: number };
   adsTime: number;
-  adsFovScale?: number;
-  adsSensScale?: number;
   viewFov: number;
   drawTime: number;
   holsterTime: number;

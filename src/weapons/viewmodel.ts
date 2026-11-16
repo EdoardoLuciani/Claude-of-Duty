@@ -7,7 +7,6 @@ import { Spring, TAU, clamp, clamp01, damp, lerp, smootherstep } from '../core/m
 import { loadArmAsset } from './arm-asset.ts';
 import { createWeaponMaterial } from './asset-material.ts';
 import {
-  BASE_ATTACHMENTS,
   configureWeaponAttachments,
   releaseAttachmentMounts,
   type AttachmentConfig,
@@ -529,7 +528,6 @@ export class Viewmodel {
 
     const entry: WeaponEntry = {
       id: model.id,
-      attachments: BASE_ATTACHMENTS,
       attachmentGroup: new THREE.Group(),
       railGroup: new THREE.Group(),
       muzzleGroup: new THREE.Group(),
@@ -547,6 +545,7 @@ export class Viewmodel {
       clips: animation.clips(),
       // the sight point and its axis, in weapon space
       sight: new THREE.Vector3().fromArray(model.nodes.sight),
+      eyeRelief: def.eyeRelief,
       ejectDir: new THREE.Vector3().fromArray(model.nodes.ejectDir).normalize(),
       magLen: model.magSize.len,
       shell: model.shell,
@@ -1074,7 +1073,7 @@ export class Viewmodel {
       this._adsQuat.setFromEuler(_e);
       // sight point in rig space, then the translation that lands it on axis
       this._sightLocal.copy(w.sight).applyQuaternion(this._adsQuat);
-      this._adsPos.set(0, 0, -def.eyeRelief).sub(this._sightLocal);
+      this._adsPos.set(0, 0, -w.eyeRelief).sub(this._sightLocal);
       this._basePos.lerp(this._adsPos, ads);
       this._baseQuat.slerp(this._adsQuat, ads);
     }

@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 
-import { BASE_ATTACHMENTS, type AttachmentAssets } from '../../src/weapons/attachments.ts';
+import type { AttachmentAssets } from '../../src/weapons/attachments.ts';
 import { requiredNode } from '../../src/weapons/authored-model.ts';
-import type { WeaponId } from '../../src/weapons/defs.ts';
+import { WEAPON_DEFS, type WeaponId } from '../../src/weapons/defs.ts';
 import type { WeaponEntry, WeaponModelRecord } from '../../src/weapons/runtime-types.ts';
 import { fixture } from './fixture.ts';
 
@@ -40,7 +40,7 @@ export function mountableWeapon(
 ): Pick<
   WeaponEntry,
   | 'model'
-  | 'attachments'
+  | 'eyeRelief'
   | 'attachmentGroup'
   | 'railGroup'
   | 'muzzleGroup'
@@ -68,7 +68,7 @@ export function mountableWeapon(
   model.id = id;
   return {
     model,
-    attachments: BASE_ATTACHMENTS,
+    eyeRelief: WEAPON_DEFS[id].eyeRelief,
     attachmentGroup: new THREE.Group(),
     railGroup: new THREE.Group(),
     muzzleGroup: new THREE.Group(),
