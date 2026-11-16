@@ -110,14 +110,14 @@
     }
   },
   "stats": {
-    "triangles": 21882,
-    "vertices": 43117,
+    "triangles": 21840,
+    "vertices": 43306,
     "meshes": 3,
     "primitives": 3,
     "materials": 1,
     "textureImages": 4,
     "joints": 9,
-    "bytes": 5332084
+    "bytes": 5426924
   },
   "textureResolutions": {
     "base": 1024,
@@ -145,7 +145,7 @@
       "position": [
         0,
         0.002,
-        -0.11199239999999999
+        -0.097
       ],
       "status": "TOR Mini on a compact game-fit frame rail behind the dust-cover nose"
     }

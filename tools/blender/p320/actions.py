@@ -89,9 +89,11 @@ def author_actions(root,asset,rig,parts,mag,spare,slide,barrel,trigger,catch,rou
         p['thumb']=[.12,.20]
         return p
     # Trigger finger is visibly indexed during handling rather than welded to blade.
-    def indexed():
+    def indexed(folded=False):
         p=copy.deepcopy(ref['sides']['right']['grip'])
-        p['fingers'][0]=[-.05,.10,.15];p['fingerSpread'][0]=.32
+        p['fingers'][0][0]=-.6 if folded else -.25
+        if not folded:
+            p['fingers'][0][1:]=[.05,.08];p['fingerSpread'][0]=.32
         return p
     begin('Idle',0)  # single rest pose; procedural sway owns idle motion
     finish('Idle',0)
@@ -125,6 +127,8 @@ def author_actions(root,asset,rig,parts,mag,spare,slide,barrel,trigger,catch,rou
         key(spare,end,scale=0);key(mag,end)
         # Keep the right thumb in its normal grip for the entire reload.
         # Only the trigger finger changes pose; no magazine-release gesture.
+        # Lift the still-curled index before extending it above the rearward pad.
+        for f in [4,end-10]:pose('right',f,p=indexed(folded=True))
         for f in [10,20,27,38,65,100,end-20]:pose('right',f,p=indexed())
         # Support wrist wraps the magazine below its base, with fingers curling
         # around its body instead of an open hand following a floating magazine.
@@ -172,6 +176,7 @@ def author_actions(root,asset,rig,parts,mag,spare,slide,barrel,trigger,catch,rou
     begin('Inspect',198)
     for f,loc,rot in [(28,(.0,-.025,.012),(8,-30,10)),(65,(.0,-.025,.012),(8,-30,10)),
                       (110,(-.015,-.020,.020),(-3,35,-8)),(151,(-.015,-.020,.020),(-3,35,-8)),(186,(0,0,0),(0,0,0))]:key(rig,f,loc,rot)
+    for f in [6,182]:pose('right',f,p=indexed(folded=True))
     for f in [15,45,100,165]:pose('right',f,p=indexed())
     for f,pos in [(18,[-.068,-.11,.09]),(45,[-.09,-.18,.10]),(145,[-.09,-.18,.10]),(180,ref['grips']['left']['pos'])]:pose('left',f,pos,p=relaxed('left') if f<180 else None)
     finish('Inspect',198)
@@ -182,6 +187,7 @@ def author_actions(root,asset,rig,parts,mag,spare,slide,barrel,trigger,catch,rou
             pos=Vector(ref['grips']['left']['pos'])+Vector((-.065*k,-.075*k,.02*k))
             pose('left',f,pos,p=relaxed('left') if k>.2 else None)
             pose('right',f,p=indexed() if k>.2 else None)
+        pose('right',15 if drawing else 12,p=indexed(folded=True))
         finish(name,end)
 
     # Append the original glove/sleeve appearance and pose its real skin in

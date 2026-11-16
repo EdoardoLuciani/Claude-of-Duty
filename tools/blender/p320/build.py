@@ -9,7 +9,6 @@ import sys
 import bpy
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import picatinny
 from p320.animations import select_clip
 from p320.actions import author_actions
 from p320.export import export_asset
@@ -80,7 +79,7 @@ def build(output, render=False, quick=False):
      'attachments':{
       'muzzle':{'mount':'MOUNT_muzzle','parent':'barrel','position':[0,.037,-.132],
                 'status':'Compact 9mm booster fit; suppressor9mm; thread protector/exposed thread switch'},
-      'rail':{'mount':'MOUNT_rail','parent':'frame','position':[0,.002,-(.122-picatinny.PITCH)],
+      'rail':{'mount':'MOUNT_rail','parent':'frame','position':[0,.002,-.097],
               'status':'TOR Mini on a compact game-fit frame rail behind the dust-cover nose'}},
      'notes':['Original non-functional game art, not a dimensionally exact replica.','No downloaded models or textures.','No endorsement by SIG SAUER.']}
     (output/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')

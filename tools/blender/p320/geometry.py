@@ -187,11 +187,11 @@ def build_geometry(asset):
     cut(guard,inner)
     for z in [-.001,-.004,-.007,-.010,-.013]:
         rounded_cut(guard,(0,.0686,z),(.021,.0015,.0010),.0003)
-    # Keep the accessory rail inside the dust-cover nose and seat the laser
-    # one whole groove rearward, closer to the trigger guard.
-    rail_y=.122-picatinny.PITCH
+    # Compact rail and rearward seat put the activation pad beside the guard,
+    # rather than leaving the module hanging from the dust-cover nose.
+    rail_y=.097
     frame_matrix=Matrix.Translation((0,rail_y,.002))@Matrix.Rotation(math.pi,4,'Y')
-    rail_parts=picatinny.build_rail('Frame | integral accessory rail',frame_matrix,.069-rail_y,.127-rail_y,polymer,body,asset,bottom=-.012)
+    rail_parts=picatinny.build_rail('Frame | integral accessory rail',frame_matrix,.069-rail_y,.117-rail_y,polymer,body,asset,bottom=-.012)
     for side in (-1,1):
         text('SIGSAUER',(side*.0161,-.004 if side==-1 else -.028,-.036),.0042,side,body,polymer,.00012)
         # Compact-medium molding under the dust cover, not a bright white label.
