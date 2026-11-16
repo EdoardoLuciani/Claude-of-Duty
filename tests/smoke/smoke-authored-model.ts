@@ -455,8 +455,8 @@ assert.throws(
   muzzleMount.name = 'MOUNT_muzzle';
   muzzleMount.position.set(0, 0.075, -0.44);
   muzzleMount.rotation.y = 0.13;
-  // Re-append the base socket after MOUNT_muzzle, as authored rigs order them, so a
-  // stale can endcap (same name, under the mount) would be found first.
+  // Re-append the base socket after MOUNT_muzzle, as authored rigs order them: a by-name
+  // lookup on a mounted rig finds the can endcap (same name, under the mount) first.
   root.add(muzzleMount, baseSocket);
   const canScene = datums('SOCKET_mount', 'SOCKET_muzzle');
   const canExit = requiredNode(canScene, 'SOCKET_muzzle');

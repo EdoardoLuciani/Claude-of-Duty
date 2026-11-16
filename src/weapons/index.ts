@@ -30,7 +30,7 @@ import {
   SPREAD_MODS,
   isWeaponId,
 } from './defs.ts';
-import type { WeaponId, WeaponMode } from './defs.ts';
+import type { WeaponDef, WeaponId, WeaponMode } from './defs.ts';
 import { grenadeMesh } from './grenade-mesh.ts';
 import { createWeaponInspection } from './inspection.ts';
 import { WeaponLaser } from './laser.ts';
@@ -117,9 +117,6 @@ interface LiveGrenade {
   fuse: number;
 }
 
-/** Pooled payload placeholder until an emit assigns the live definition. */
-const PAYLOAD_DEF = { ...WEAPON_DEFS.rifle, ...buildStats(BASE_ATTACHMENTS) };
-
 /** Weapons, loadout, handling, authored animation and timed projectile flight.
  * Asset adapters own meshes/mechanisms; shared arms and viewmodel own IK and procedural motion.
  * Fire-mode changes require a fresh press; missed releases while paused must not retain the latch.
@@ -198,19 +195,19 @@ export class WeaponSystem {
   _disc: { x: number; y: number } = { x: 0, y: 0 };
   _firePayload: {
     actor: string;
-    weapon: WeaponState['def'];
+    weapon: WeaponDef;
     origin: THREE.Vector3;
     dir: THREE.Vector3;
     seed: number;
   } = {
     actor: 'player',
-    weapon: PAYLOAD_DEF,
+    weapon: WEAPON_DEFS.rifle,
     origin: new THREE.Vector3(),
     dir: new THREE.Vector3(),
     seed: 0,
   };
-  _reloadPayload: { weapon: WeaponState['def']; phase: ReloadPhase; retained: boolean } = {
-    weapon: PAYLOAD_DEF,
+  _reloadPayload: { weapon: WeaponDef; phase: ReloadPhase; retained: boolean } = {
+    weapon: WEAPON_DEFS.rifle,
     phase: 'start',
     retained: false,
   };
@@ -220,7 +217,7 @@ export class WeaponSystem {
   _shellPayload: {
     position: THREE.Vector3;
     velocity: THREE.Vector3;
-    weapon: WeaponState['def'];
+    weapon: WeaponDef;
     fxClass: string;
     caseLen: number;
     caseRadius: number;
@@ -228,7 +225,7 @@ export class WeaponSystem {
   } = {
     position: new THREE.Vector3(),
     velocity: new THREE.Vector3(),
-    weapon: PAYLOAD_DEF,
+    weapon: WEAPON_DEFS.rifle,
     fxClass: 'rifle',
     caseLen: 0.0446,
     caseRadius: 0.00495,
@@ -406,7 +403,7 @@ export class WeaponSystem {
   /** Read-only market inspection; never mounts or animates the equipped model. */
   async createInspectionModel(
     id: WeaponId,
-    config: AttachmentConfig = this._requireState(id).attachments
+    config: AttachmentConfig
   ): Promise<ReturnType<typeof createWeaponInspection>> {
     await this._restTask;
     const entry = this.viewmodel.weapons.get(id);
@@ -458,8 +455,7 @@ export class WeaponSystem {
     if (!entry) return false;
     configureWeaponAttachments(entry, config, this._attachments);
     if (config.rail !== state.attachments.rail) state.laserEnabled = config.rail === 'laser';
-    state.attachments = Object.freeze({ ...config });
-    Object.assign(state.def, buildStats(config));
+    this._storeBuild(state, Object.freeze({ ...config }));
     if (this.activeId === id) {
       this.viewmodel.reticle.visible = false;
       this.viewmodel.scopeOverlay.visible = false;
@@ -468,13 +464,18 @@ export class WeaponSystem {
     return true;
   }
 
+  /** The stored build and the stats it gives the gun's private definition change together. */
+  _storeBuild(state: WeaponState, attachments: AttachmentConfig): void {
+    state.attachments = attachments;
+    Object.assign(state.def, buildStats(attachments));
+  }
+
   /** Attachments belong to the gun: dropping it or restarting returns the base build. */
   _resetAttachments(id: WeaponId): void {
     const state = this._requireState(id);
     state.laserEnabled = false;
     if (state.attachments === BASE_ATTACHMENTS) return;
-    state.attachments = BASE_ATTACHMENTS;
-    Object.assign(state.def, buildStats(BASE_ATTACHMENTS));
+    this._storeBuild(state, BASE_ATTACHMENTS);
     const entry = this._viewmodel?.weapons.get(id);
     if (entry) configureWeaponAttachments(entry, BASE_ATTACHMENTS, this._attachments);
     if (id === this.activeId && this._laser) this._laser.mesh.visible = false;

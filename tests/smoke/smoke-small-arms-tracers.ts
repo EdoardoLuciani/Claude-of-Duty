@@ -13,9 +13,8 @@ import type { EngineEventMap, EngineEventName } from '../../src/core/events.ts';
 import { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
-import { BASE_ATTACHMENTS, buildStats } from '../../src/weapons/attachments.ts';
 import { ProjectileSim } from '../../src/weapons/ballistics.ts';
-import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
+import { WEAPON_DEFS, WEAPON_IDS } from '../../src/weapons/defs.ts';
 import type { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { makeAgent } from '../lib/agent-fixture.ts';
 import { ArmedWeaponSystem } from '../lib/ballistics-fixture.ts';
@@ -55,18 +54,7 @@ function makeRifle(seed: number): ArmedWeaponSystem {
   wp.rng = new Rng(seed);
   wp.stats = { tris: 0, drawCalls: 0, live: 0, fired: 0 };
   wp.viewmodel = vm;
-  const def = { ...WEAPON_DEFS.rifle, ...buildStats(BASE_ATTACHMENTS) };
-  wp.states.set('rifle', {
-    def,
-    attachments: BASE_ATTACHMENTS,
-    laserEnabled: false,
-    pattern: buildRecoilPattern(def, Rng),
-    mag: def.magSize,
-    chambered: true,
-    reserve: def.reserve,
-    mode: def.modes[0],
-    modeIndex: 0,
-  });
+  wp.states.set('rifle', wp._makeState('rifle'));
   return wp;
 }
 
