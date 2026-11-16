@@ -219,7 +219,7 @@ export const SLOTS = [
 
 /** Mounted instance groups, one per slot; an empty group has no parent. */
 interface AttachmentMounts {
-  attachmentGroup: THREE.Group;
+  opticGroup: THREE.Group;
   railGroup: THREE.Group;
   muzzleGroup: THREE.Group;
 }
@@ -232,7 +232,7 @@ function releaseAttachmentMount(group: THREE.Group): void {
 
 /** Release instance transforms only; geometry/finishes stay with the owned assets. */
 export function releaseAttachmentMounts(mounts: AttachmentMounts): void {
-  releaseAttachmentMount(mounts.attachmentGroup);
+  releaseAttachmentMount(mounts.opticGroup);
   releaseAttachmentMount(mounts.railGroup);
   releaseAttachmentMount(mounts.muzzleGroup);
 }
@@ -342,7 +342,7 @@ export function mountAttachments(
     if (nodes.removed) nodes.removed.visible = config[slot] !== null;
   }
   return {
-    attachmentGroup: opticSlot.group,
+    opticGroup: opticSlot.group,
     railGroup: rail.group,
     muzzleGroup: muzzle.group,
     laserEmitter: rail.socket,
@@ -378,7 +378,7 @@ export function configureWeaponAttachments(
 ): void {
   const mounted = mountAttachments(entry.model, config, assets);
   releaseAttachmentMounts(entry);
-  entry.attachmentGroup = mounted.attachmentGroup;
+  entry.opticGroup = mounted.opticGroup;
   entry.railGroup = mounted.railGroup;
   entry.muzzleGroup = mounted.muzzleGroup;
   entry.laserEmitter = mounted.laserEmitter;

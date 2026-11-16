@@ -37,8 +37,8 @@ export type AuthoredModels = {
 };
 export type AuthoredWeaponModel = AuthoredModels[WeaponId];
 export interface OpticData {
-  kind?: string;
-  reticle?: string;
+  kind?: 'scope';
+  reticle?: 'chevron' | 'p4fl';
   apertureR?: number;
   dotMoa?: number;
   ringMoa?: number;
@@ -48,7 +48,7 @@ export interface OpticData {
 export type WeaponModelRecord = AuthoredWeaponModel;
 export interface WeaponEntry {
   id: WeaponId;
-  attachmentGroup: THREE.Group;
+  opticGroup: THREE.Group;
   railGroup: THREE.Group;
   muzzleGroup: THREE.Group;
   /** The weapon's own `SOCKET_muzzle`, resolved before any can (whose endcap shares

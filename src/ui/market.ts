@@ -299,14 +299,7 @@ export class MarketOverlay {
     const item = state.items.find((it): boolean => it.id === id);
     if (!item) return;
     for (const row of this.cards) setClass(row.card, 'inspecting', row.card.dataset.item === id);
-    // A weapon without a draft previews its stored build. Pass it explicitly: inspection
-    // dedupes by config identity, and a fresh draft starts from this same object.
-    const config =
-      state.build?.id === item.id
-        ? state.build.config
-        : isWeaponId(item.id)
-          ? this.inspection.weapons.getAttachments(item.id)
-          : undefined;
+    const config = state.build?.id === item.id ? state.build.config : undefined;
     void this.inspection.select(item.id, item.label, config);
   }
 

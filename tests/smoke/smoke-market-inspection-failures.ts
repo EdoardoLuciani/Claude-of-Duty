@@ -16,6 +16,7 @@ interface TrackedModel extends InspectionModel {
 // Real controllers/scenes; only GPU work and asset loading are fixture overrides.
 function fixture(createInspectionModel: WeaponSystem['createInspectionModel']): MarketInspection {
   const weapons = new WeaponSystem();
+  weapons.getAttachments = (): AttachmentConfig => BASE_ATTACHMENTS;
   weapons.createInspectionModel = createInspectionModel;
   const preview = new MarketInspection(document.createElement('div'), weapons);
   preview.active = true;
@@ -108,8 +109,18 @@ try {
   );
   await configured.select('rifle', 'Rifle', config);
   assert.equal(requests.length, 2, 'unchanged draft does not rebuild');
-  configured.hide();
+  await configured.select('rifle', 'Rifle', { ...config });
+  assert.equal(requests.length, 2, 'equivalent draft does not rebuild');
+  assert.equal(redDot.disposed, 0, 'equivalent draft preserves the current clone');
+  configured.weapons.getAttachments = (): AttachmentConfig => ({ ...config });
+  await configured.select('rifle', 'Rifle');
+  assert.equal(requests.length, 2, 'stored and explicit builds share value-based deduplication');
+  configured.weapons.getAttachments = (): AttachmentConfig => BASE_ATTACHMENTS;
+  await configured.select('rifle', 'Rifle');
+  assert.equal(requests.length, 3, 'omitted config resolves the latest stored build');
   assert.equal(redDot.disposed, 1);
+  configured.hide();
+  assert.equal(configured.model, null);
 
   let finish: (value: TrackedModel) => void = (): never => {
     throw Error('not initialized');
