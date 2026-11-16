@@ -317,7 +317,9 @@ Optics define `MOUNT_base` and `SOCKET_sight`; rigid attachments define
 +Y up, unit scale. Catalog `OpticData` owns magnification, sensitivity, reticle,
 glass and scope presentation, not weapon class. Mounting resolves the active bore
 exit (a can's endcap, else the weapon's `SOCKET_muzzle`) once; `viewmodel.muzzleWorld()`
-reads it for ballistics/FX; ejection stays at `SOCKET_ejection`.
+reads it for ballistics/FX; ejection stays at `SOCKET_ejection`. A can's endcap shares
+the `SOCKET_muzzle` name, so the weapon's own socket is held from load as
+`baseMuzzleSocket`, never looked up by name on a mounted rig.
 Prewarm covers every loaded attachment and both iron/muzzle base states.
 
 Per-weapon datums/clearances live in `assets/weapons/*/README.md` and
