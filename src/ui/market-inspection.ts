@@ -214,7 +214,8 @@ export class MarketInspection {
     }
     if (this.disposed || revision !== this.revision || this.failed) return;
     try {
-      const model = await this.weapons.createInspectionModel(id, config);
+      // Resolved to the stored build above for every weapon.
+      const model = await this.weapons.createInspectionModel(id, config!);
       if (this.disposed || revision !== this.revision || !this.active) {
         model.dispose();
         return;

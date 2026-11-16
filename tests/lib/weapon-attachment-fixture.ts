@@ -64,6 +64,7 @@ export function mountableWeapon(
     opticMountRest: new THREE.Matrix4(),
     nodes: fixture<WeaponModelRecord['nodes']>({ sight: [0, 0.14, 0.03] }),
   });
+  const muzzleSocket = requiredNode(scene, 'SOCKET_muzzle');
   // The record union rejects a WeaponId-typed literal; assign it on the fixture instead.
   model.id = id;
   return {
@@ -72,8 +73,8 @@ export function mountableWeapon(
     opticGroup: new THREE.Group(),
     railGroup: new THREE.Group(),
     muzzleGroup: new THREE.Group(),
-    baseMuzzleSocket: requiredNode(scene, 'SOCKET_muzzle'),
-    muzzleSocket: requiredNode(scene, 'SOCKET_muzzle'),
+    baseMuzzleSocket: muzzleSocket,
+    muzzleSocket,
     laserEmitter: null,
     mountedOptic: null,
     sight: new THREE.Vector3(),

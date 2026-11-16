@@ -385,6 +385,6 @@ export function configureWeaponAttachments(
   entry.muzzleSocket = mounted.muzzleSocket ?? entry.baseMuzzleSocket;
   entry.mountedOptic = mounted.mountedOptic;
   entry.sight.copy(mounted.sight);
-  const base = WEAPON_DEFS[entry.model.id];
-  entry.eyeRelief = (config.optic && base.fits?.optic?.[config.optic]?.eyeRelief) ?? base.eyeRelief;
+  const { def } = entry;
+  entry.eyeRelief = (config.optic && def.fits?.optic?.[config.optic]?.eyeRelief) ?? def.eyeRelief;
 }

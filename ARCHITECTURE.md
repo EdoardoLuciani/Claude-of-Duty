@@ -268,7 +268,7 @@ shares one Basis transcoder per renderer during boot, released at boot end, fail
 or teardown. Static map clones are shared only when source, UV, color space and
 sampler match.
 
-`weapons.createInspectionModel(id, config?)` returns an independent rest-pose clone
+`weapons.createInspectionModel(id, config)` returns an independent rest-pose clone
 with `dispose()` for the market's demand-rendered WebGPU studio. Inspection owns
 transforms, skeletons and mixers; geometry, materials and maps are borrowed.
 UI releases clones on selection, close/restart/error, preserves the inspection
@@ -281,7 +281,8 @@ artwork is mapped in `src/ui/market-art.ts`; its offline sources live in
 
 `WeaponState.attachments` is the gun's one stored build, an immutable
 `{ optic, muzzle, rail }` snapshot; null slots retain the base weapon, and
-`optic: null` uses irons. Viewmodel entries hold only the mounted instances.
+`optic: null` uses irons. Viewmodel entries hold the mounted instances and their
+resolved data, never a copy of the build.
 `src/weapons/attachments.ts` owns the finite catalog (`rmr | acog | scope | exps3`
 optics, TOR Mini `laser`, one `suppressor`), validation, loading and the shared
 gameplay/inspection mount solver. `src/market/attachments.ts` owns prices, not
@@ -315,7 +316,8 @@ follows the live mount. The mount commit resolves the sight datum, eye relief,
 `WeaponSystem` applies `buildStats()` to the gun's private runtime definition:
 `suppressed` for firing audio/FX and the optic's ADS FOV/sensitivity (undefined
 defers to player config). These are never authored on `WeaponDef`, and attachments
-change no ballistic/handling stats. Frame-time reticle, ADS, laser and fire consumers allocate nothing.
+change no ballistic/handling stats. Frame-time reticle, ADS, laser and fire
+consumers allocate nothing.
 
 Optics define `MOUNT_base` and `SOCKET_sight`; rigid attachments define
 `SOCKET_mount` plus `SOCKET_laser` or `SOCKET_muzzle`, in metres, -Z forward,
