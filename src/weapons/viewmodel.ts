@@ -528,7 +528,7 @@ export class Viewmodel {
 
     const entry: WeaponEntry = {
       id: model.id,
-      attachmentGroup: new THREE.Group(),
+      opticGroup: new THREE.Group(),
       railGroup: new THREE.Group(),
       muzzleGroup: new THREE.Group(),
       baseMuzzleSocket: muzzleSocket,

@@ -174,22 +174,22 @@ assert.throws(
     root.rotation.x = i * 0.1;
     configureWeaponAttachments(entry, config, optics);
     assert.equal(root.children.length, 5, 'empty slot groups stay detached');
-    assert.equal(entry.attachmentGroup.parent, socket, 'instance follows its authored mount');
+    assert.equal(entry.opticGroup.parent, socket, 'instance follows its authored mount');
     assert.equal(irons.visible, false, 'a mounted optic replaces the removable irons');
     assert(ironsRemoved.visible);
     // Rail slots move the optic forward along its mount; the sight datum follows.
-    const shift = entry.attachmentGroup.position.z;
+    const shift = entry.opticGroup.position.z;
     assert.equal(shift < 0, Boolean(WEAPON_DEFS.rifle.fits?.optic?.[optic]?.railSlots));
     assert(entry.sight.distanceTo(new THREE.Vector3(0, 0.1461072, -0.085 + shift)) < 1e-8);
     assert.equal(entry.eyeRelief, WEAPON_DEFS.rifle.fits?.optic?.[optic]?.eyeRelief);
-    const mountedLens = entry.attachmentGroup.children[0].children[2];
+    const mountedLens = entry.opticGroup.children[0].children[2];
     assert(mountedLens instanceof THREE.Mesh);
     assert.equal(mountedLens.geometry, geometry);
-    const oldMount = entry.attachmentGroup;
+    const oldMount = entry.opticGroup;
     configureWeaponAttachments(entry, BASE_ATTACHMENTS, optics);
     assert.equal(oldMount.parent, null);
     assert.equal(oldMount.children.length, 0);
-    assert.equal(entry.attachmentGroup.children.length, 0);
+    assert.equal(entry.opticGroup.children.length, 0);
     assert.equal(entry.mountedOptic, null);
     assert(irons.visible);
     assert.equal(ironsRemoved.visible, false);
@@ -219,7 +219,7 @@ assert.throws(
   );
   railMount.position.z -= 0.089;
   configureWeaponAttachments(entry, { ...laserConfig, optic: 'rmr' }, { ...optics, laser });
-  assert.equal(entry.attachmentGroup.parent, socket, 'optic and rail coexist');
+  assert.equal(entry.opticGroup.parent, socket, 'optic and rail coexist');
   assert.equal(entry.railGroup.parent, railMount);
   configureWeaponAttachments(entry, BASE_ATTACHMENTS, optics);
   assert.equal(entry.laserEmitter, null);
@@ -361,7 +361,7 @@ assert.throws(
   mcxRoot.rotation.y = 0.3;
   const mcxPosed = mountAttachments(nativeMCX, config, optics);
   assert(mcxPosed.sight.distanceTo(mcxExpected) < 1e-10, 'MCX remount preserves rest ADS');
-  assert.equal(mcxPosed.attachmentGroup.parent, mcxMount, 'MCX art still follows the live rig');
+  assert.equal(mcxPosed.opticGroup.parent, mcxMount, 'MCX art still follows the live rig');
   releaseAttachmentMounts(mcxPosed);
   // MPX rebases native +X geometry, but shared attachments keep canonical locals.
   const nativeScene = new THREE.Group(),
@@ -542,10 +542,10 @@ assert.throws(
     assert.equal(weaponScene.visible, false, 'mounted scope hides the gun at full ADS');
     assert.equal(viewmodel.maskUniforms.uSniper.value, optic === 'scope' ? 1 : 0);
     assert.equal(viewmodel.reticleUniforms.uChevron.value, optic === 'acog' ? 1 : 0);
-    const mount = entry.attachmentGroup;
+    const mount = entry.opticGroup;
     const liveOptic = entry.mountedOptic;
     assert.throws((): void => configureWeaponAttachments(entry, config, {}), /unavailable/);
-    assert.equal(entry.attachmentGroup, mount, 'failed staging preserves the current optic');
+    assert.equal(entry.opticGroup, mount, 'failed staging preserves the current optic');
     assert.equal(entry.mountedOptic, liveOptic, 'failed staging preserves the live reticle datum');
     configureWeaponAttachments(entry, BASE_ATTACHMENTS, optics);
     viewmodel._updateScope(entry, 1);
@@ -591,7 +591,7 @@ assert.throws(
   assert(entry.sight.equals(restSight), 'attaching while locked open retains the rest ADS datum');
   slide.position.z = 0;
   weaponScene.updateMatrixWorld(true);
-  const instanceSight = entry.attachmentGroup.getObjectByName('SOCKET_sight');
+  const instanceSight = entry.opticGroup.getObjectByName('SOCKET_sight');
   assert(instanceSight);
   assert(instanceSight.getWorldPosition(new THREE.Vector3()).distanceTo(liveSight) < 1e-10);
   const clone = weaponScene.clone(true);

@@ -272,10 +272,12 @@ sampler match.
 with `dispose()` for the market's demand-rendered WebGPU studio. Inspection owns
 transforms, skeletons and mixers; geometry, materials and maps are borrowed.
 UI releases clones on selection, close/restart/error, preserves the inspection
-angle on attachment changes and disposes stale async results. DOM controls work
-while simulation is paused. Model failures affect only that selection; renderer
-failures disable 3D inspection, never purchases. Supply artwork is mapped in
-`src/ui/market-art.ts`; its offline sources live in `assets/ui/market/`.
+angle on attachment changes and disposes stale async results. Inspection resolves
+omitted configs to the stored build and deduplicates by weapon ID and attachment
+values. DOM controls work while simulation is paused. Model failures affect only
+that selection; renderer failures disable 3D inspection, never purchases. Supply
+artwork is mapped in `src/ui/market-art.ts`; its offline sources live in
+`assets/ui/market/`.
 
 `WeaponState.attachments` is the gun's one stored build, an immutable
 `{ optic, muzzle, rail }` snapshot; null slots retain the base weapon, and
@@ -293,8 +295,8 @@ enables a verified fit and holds its data (`fits.optic[id].eyeRelief`, optional
 `railSlots` at `PICATINNY_PITCH`, `fits.muzzle.suppressor.model`; rail entries
 are empty). The player-facing muzzle ID is always `suppressor`; assets are keyed by
 can model. `isAttachmentConfig()` is the shared compatibility rule for gameplay,
-URL/debug input (narrowed once in `main.ts`) and `tools/capture.ts`; reject
-unverified fits, never silently change them.
+URL/debug input (narrowed once in `src/dev/attachments.ts` before prewarm) and
+`tools/capture.ts`; reject unverified fits, never silently change them.
 `removableIrons` swaps required `IRON_sights` for optional `IRON_sights_removed`
 with any optic; fixed irons stay and must clear it. `removableMuzzleDevice` similarly
 swaps required `MUZZLE_device` for optional `MUZZLE_device_removed`; permanent

@@ -3,7 +3,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import * as THREE from 'three/webgpu';
 
 import { isMesh } from '../core/three-guards.ts';
-import type { AttachmentConfig } from '../weapons/attachments.ts';
+import { SLOTS, type AttachmentConfig } from '../weapons/attachments.ts';
 import { isWeaponId } from '../weapons/defs.ts';
 import type { WeaponSystem } from '../weapons/index.ts';
 import { MARKET_ART, type MarketItemId } from './market-art.ts';
@@ -156,7 +156,13 @@ export class MarketInspection {
   // Each await may race dispose(), a newer selection or a failure; re-read state after it.
   /* oxlint-disable typescript/no-unnecessary-condition */
   async select(id: MarketItemId, label: string, config?: AttachmentConfig): Promise<void> {
-    if (!this.active || this.disposed || (id === this.activeId && config === this.activeConfig))
+    if (!this.active || this.disposed) return;
+    const weapon = isWeaponId(id);
+    if (weapon) config ??= this.weapons.getAttachments(id);
+    if (
+      id === this.activeId &&
+      SLOTS.every((slot): boolean => config?.[slot] === this.activeConfig?.[slot])
+    )
       return;
     const sameWeapon = id === this.activeId && this.model !== null;
     this.activeId = id;
@@ -165,7 +171,6 @@ export class MarketInspection {
     this.clearModel();
     this.clearImage();
     setText(this.title, label);
-    const weapon = isWeaponId(id);
     this.canvas.hidden = true;
     this.threeControls.hidden = !weapon;
     this.controls.enabled = weapon && !this.failed;

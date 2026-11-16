@@ -5,6 +5,7 @@ import { Engine } from './core/engine.ts';
 import { hasOwn } from './core/guards.ts';
 import { ModelSystem } from './core/models.ts';
 import { prewarm } from './core/prewarm.ts';
+import { applyDebugAttachments } from './dev/attachments.ts';
 import { FxSystem } from './fx/index.ts';
 import { GameSystem } from './game/index.ts';
 import { IntelSystem } from './intel/index.ts';
@@ -16,8 +17,6 @@ import { RadioSystem } from './radio/index.ts';
 import { RenderSystem } from './render/index-webgpu.ts';
 import { SkySystem } from './sky/index.ts';
 import { UiSystem } from './ui/index.ts';
-import { isAttachmentConfig } from './weapons/attachments.ts';
-import { isWeaponId } from './weapons/defs.ts';
 import { WeaponSystem } from './weapons/index.ts';
 import { WorldSystem } from './world/index.ts';
 
@@ -121,30 +120,8 @@ try {
   throw err;
 }
 
-// Debug/capture configuration is narrowed once, before native material warmup.
-if (
-  params.has('attachmentOptic') ||
-  params.has('attachmentRail') ||
-  params.has('attachmentMuzzle')
-) {
-  const id = params.get('attachmentWeapon') ?? 'rifle';
-  const optic = params.get('attachmentOptic') ?? 'none';
-  const rail = params.get('attachmentRail') ?? 'none';
-  const muzzle = params.get('attachmentMuzzle') ?? 'none';
-  const config = {
-    optic: optic === 'none' ? null : optic,
-    muzzle: muzzle === 'none' ? null : muzzle,
-    rail: rail === 'none' ? null : rail,
-  };
-  if (
-    !isWeaponId(id) ||
-    !isAttachmentConfig(config, id) ||
-    !engine.ctx.get('weapons').setAttachments(id, config)
-  )
-    console.warn(
-      `[weapons] invalid/unavailable attachment configuration: optic=${optic}, rail=${rail}, muzzle=${muzzle}`
-    );
-}
+// Apply debug/capture attachments after assets load and before native material warmup.
+applyDebugAttachments(params, engine.ctx.get('weapons'));
 
 // Capture tooling is not part of the normal game path. Loading it only on
 // request also prevents its telemetry rAF from running during ordinary play.

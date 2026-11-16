@@ -41,7 +41,7 @@ export function mountableWeapon(
   WeaponEntry,
   | 'model'
   | 'eyeRelief'
-  | 'attachmentGroup'
+  | 'opticGroup'
   | 'railGroup'
   | 'muzzleGroup'
   | 'baseMuzzleSocket'
@@ -69,7 +69,7 @@ export function mountableWeapon(
   return {
     model,
     eyeRelief: WEAPON_DEFS[id].eyeRelief,
-    attachmentGroup: new THREE.Group(),
+    opticGroup: new THREE.Group(),
     railGroup: new THREE.Group(),
     muzzleGroup: new THREE.Group(),
     baseMuzzleSocket: requiredNode(scene, 'SOCKET_muzzle'),
