@@ -26,7 +26,7 @@ SOURCES = {
 }
 # Whole forward grooves per weapon fit; mirrors `fits.optic[id].railSlots` in
 # src/weapons/defs.ts, which places the same optic at runtime.
-RAIL_SLOTS = {'m4': {'scope': 7}}
+RAIL_SLOTS = {'m4': {'scope': 7}, 'evolys': {'exps3': 3, 'acog': 6, 'scope': 6}}
 
 
 def surface(objects, transform):

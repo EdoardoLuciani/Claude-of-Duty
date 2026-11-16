@@ -384,7 +384,14 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     adsCant: [0, 0, 0.004],
     eyeRelief: 0.03,
     fits: {
-      optic: OPTIC_FITS,
+      optic: {
+        ...OPTIC_FITS,
+        // MOUNT_optic is the rearmost (RMR) seat; larger bodies sit whole
+        // grooves forward, clear of the charging-hand sweep.
+        exps3: { eyeRelief: 0.16, railSlots: 3 },
+        acog: { ...OPTIC_FITS.acog, railSlots: 6 },
+        scope: { ...OPTIC_FITS.scope, railSlots: 6 },
+      },
       muzzle: { suppressor: { model: 'srd762ti' } },
       rail: { laser: {} },
     },

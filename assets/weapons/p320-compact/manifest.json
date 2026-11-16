@@ -110,14 +110,14 @@
     }
   },
   "stats": {
-    "triangles": 21910,
-    "vertices": 43441,
+    "triangles": 21840,
+    "vertices": 43306,
     "meshes": 3,
     "primitives": 3,
     "materials": 1,
     "textureImages": 4,
     "joints": 9,
-    "bytes": 5377136
+    "bytes": 5426924
   },
   "textureResolutions": {
     "base": 1024,
@@ -145,9 +145,9 @@
       "position": [
         0,
         0.002,
-        -0.122
+        -0.097
       ],
-      "status": "TOR Mini on a 14 mm extended game-fit frame rail; fifth slot supports the forward seat"
+      "status": "TOR Mini on a compact game-fit frame rail behind the dust-cover nose"
     }
   },
   "notes": [

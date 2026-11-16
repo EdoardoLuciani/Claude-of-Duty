@@ -2,7 +2,7 @@
 
 Nitron Compact game base, curved trigger, fixed SIGLITE irons, threaded barrel
 and flush 15-round magazine. The bare slide retains fixed SIGLITE iron sights;
-optic customization is unsupported. The extended under-barrel laser seat and
+optic customization is unsupported. The compact under-barrel laser seat and
 threaded barrel are game-fit adaptations, not a certified factory replica.
 
 [Shared workflow](../../../tools/blender/README.md) ·
@@ -49,8 +49,9 @@ opening clears barrel tilt. SIGLITE rings and luminous insets are baked onto the
 sight faces in the shared atlas; the checker samples green emission at the inset
 centres, a neutral rear housing and front-facing upper-ring normals.
 
-The TOR Mini seats on an extended game-fit integral frame rail with one extra
-cross-slot (not the factory Compact frame). Its nose stays below the bore/slide
+The TOR Mini seats on a shortened game-fit integral frame rail (not the factory
+Compact frame), with its activation pads immediately ahead of the trigger guard.
+Reload and handling hand paths clear the module, which stays below the bore/slide
 path and never follows the slide. See the
 [shared laser mount contract](../../attachments/steiner-tor-mini/README.md#weapon-mounting).
 

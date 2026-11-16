@@ -84,7 +84,7 @@ assert rear_tree.ray_cast(C@Vector((0,front.y-.0002,front.z+.01)),C@Vector((0,0,
 mount=bpy.data.objects['MOUNT_optic']
 assert mount.parent==bpy.data.objects['EVOLYS_RIG']
 mp=CI@mount.matrix_world.translation
-assert abs(mp.x)<1e-6 and abs(mp.y-rail_top)<1e-6 and abs(mp.z-(.105-30*.01005))<1e-6
+assert abs(mp.x)<1e-6 and abs(mp.y-rail_top)<1e-6 and abs(mp.z-(.105-30*.01005+6*picatinny.PITCH))<1e-6
 assert Vector(mount.rotation_euler).length<1e-6,'optic mount orientation'
 # Rear seating plane at the barrel crown, distinct from the base hider exit.
 muzzle_mount=bpy.data.objects['MOUNT_muzzle']
@@ -180,7 +180,7 @@ fixed_irons=rig_tree([irons]);rail_tree=rig_tree([bpy.data.objects['receiver_mes
 bpy.data.objects['MUZZLE_device_removed'].hide_viewport=False
 bpy.context.view_layer.update()
 for attachment_id,seat in [('rmr',mount),('acog',mount),('scope',mount),('exps3',mount),('srd762ti',muzzle_mount),('laser',rail)]:
-    objects=attachment_source.seat(attachment_id,seat)
+    objects=attachment_source.seat(attachment_id,seat,weapon='evolys')
     meshes=[o for o in objects if o.type=='MESH']
     attachments[attachment_id]=rig_tree(meshes)
     if attachment_id in attachment_source.OPTICS:

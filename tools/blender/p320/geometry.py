@@ -187,10 +187,11 @@ def build_geometry(asset):
     cut(guard,inner)
     for z in [-.001,-.004,-.007,-.010,-.013]:
         rounded_cut(guard,(0,.0686,z),(.021,.0015,.0010),.0003)
-    # Game-fit accessory rail: 14 mm forward extension and a fifth slot
-    # support the TOR Mini ahead of the reload hand; not a factory frame.
-    frame_matrix=Matrix.Translation((0,.122,.002))@Matrix.Rotation(math.pi,4,'Y')
-    rail_parts=picatinny.build_rail('Frame | integral accessory rail',frame_matrix,-.053,.019,polymer,body,asset,bottom=-.012)
+    # Compact rail and rearward seat put the activation pad beside the guard,
+    # rather than leaving the module hanging from the dust-cover nose.
+    rail_y=.097
+    frame_matrix=Matrix.Translation((0,rail_y,.002))@Matrix.Rotation(math.pi,4,'Y')
+    rail_parts=picatinny.build_rail('Frame | integral accessory rail',frame_matrix,.069-rail_y,.117-rail_y,polymer,body,asset,bottom=-.012)
     for side in (-1,1):
         text('SIGSAUER',(side*.0161,-.004 if side==-1 else -.028,-.036),.0042,side,body,polymer,.00012)
         # Compact-medium molding under the dust cover, not a bright white label.
@@ -299,7 +300,7 @@ def build_geometry(asset):
     for name,pos,parent in [('SOCKET_muzzle',(0,.1445,.037),barrel),('SOCKET_ejection',(.015,.048,.042),slide),
                             ('SOCKET_sight',(0,-.033,.0537),rig),
                             ('MOUNT_muzzle',(0,.132,.037),barrel),
-                            ('MOUNT_rail',(0,.122,.002),body)]:
+                            ('MOUNT_rail',(0,rail_y,.002),body)]:
         # Keep authored world coordinates under offset pivots.
         o=empty(name,parent=parent);o.matrix_parent_inverse=parent.matrix_world.inverted();o.location=pos
         # Identity muzzle frame: native +Y forward becomes glTF -Z forward.

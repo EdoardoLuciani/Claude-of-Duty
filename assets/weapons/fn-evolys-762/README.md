@@ -16,9 +16,10 @@ Refit intentionally with `bun tools/blender/evolys/hand-reference.ts`.
 `IRON_sights` owns both iron assemblies; `SOCKET_sight` is the rear aperture centre, aligned with the
 front post tip. A mounted optic hides them, leaving the bare rail without replacement parts.
 
-`MOUNT_optic` is an identity rail-contact frame forward of the calibrated
-charging-hand sweep. RMR and ACOG clear the irons; the PM II crosses the front sight.
-Any mounted optic hides the irons at runtime.
+`MOUNT_optic` is the rearmost identity rail-contact frame, where the RMR seats.
+Larger optics sit whole grooves farther forward (`fits.optic[id].railSlots`) to
+clear the calibrated charging-hand sweep. RMR and ACOG clear the irons; the PM II
+crosses the front sight. Any mounted optic hides the irons at runtime.
 
 `MOUNT_muzzle` seats the shared SRD762Ti at the barrel crown (+Y up, -Z forward,
 unit scale). `MUZZLE_device` owns the original slotted flash hider and its shoulder;

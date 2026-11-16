@@ -29,6 +29,10 @@ assert len(surface.data.materials)==1
 assert len(surface.data.uv_layers)==2
 assert surface.data.uv_layers[1].name=='BaseColorUV'
 assert s['p320_color_panels']==13
+# The integral accessory rail must not protrude ahead of the loaded slide nose.
+frame=bpy.data.objects['Frame | continuous compact medium polymer shell']
+slide=bpy.data.objects['Slide | chamfered Nitron shell']
+assert max((frame.matrix_world@v.co).y for v in frame.data.vertices)<=max((slide.matrix_world@v.co).y for v in slide.data.vertices), 'accessory rail extends past slide nose'
 color_uv=surface.data.uv_layers['BaseColorUV'].data
 panels=surface.data.attributes['color_panel'].data
 marked_area=total_area=0
