@@ -162,6 +162,8 @@ assert.throws(
     id: 'rifle',
     model,
     group: weaponScene,
+    baseMuzzleSocket: baseSocket,
+    muzzleSocket: baseSocket,
     def: { ...WEAPON_DEFS.rifle },
   });
   const config: AttachmentConfig = { ...BASE_ATTACHMENTS, optic: 'rmr' };

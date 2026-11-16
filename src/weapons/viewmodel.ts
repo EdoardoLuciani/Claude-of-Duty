@@ -524,6 +524,8 @@ export class Viewmodel {
     });
     // Adapters expose only detachable, cartridge-free magazine shells here.
     const parts = { magazine: animation.magazineBody };
+    // Before any can mounts: its endcap shares this name under MOUNT_muzzle.
+    const muzzleSocket = requiredNode(model.root, 'SOCKET_muzzle');
 
     const entry: WeaponEntry = {
       id: model.id,
@@ -531,7 +533,8 @@ export class Viewmodel {
       attachmentGroup: new THREE.Group(),
       railGroup: new THREE.Group(),
       muzzleGroup: new THREE.Group(),
-      muzzleSocket: requiredNode(model.root, 'SOCKET_muzzle'),
+      baseMuzzleSocket: muzzleSocket,
+      muzzleSocket,
       laserEmitter: null,
       mountedOptic: null,
       def,

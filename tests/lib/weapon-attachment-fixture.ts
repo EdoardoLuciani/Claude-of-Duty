@@ -44,6 +44,7 @@ export function mountableWeapon(
   | 'attachmentGroup'
   | 'railGroup'
   | 'muzzleGroup'
+  | 'baseMuzzleSocket'
   | 'muzzleSocket'
   | 'laserEmitter'
   | 'mountedOptic'
@@ -71,6 +72,7 @@ export function mountableWeapon(
     attachmentGroup: new THREE.Group(),
     railGroup: new THREE.Group(),
     muzzleGroup: new THREE.Group(),
+    baseMuzzleSocket: requiredNode(scene, 'SOCKET_muzzle'),
     muzzleSocket: requiredNode(scene, 'SOCKET_muzzle'),
     laserEmitter: null,
     mountedOptic: null,
