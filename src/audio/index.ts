@@ -37,6 +37,10 @@ const GESTURES = ['pointerdown', 'mousedown', 'keydown', 'touchstart', 'wheel', 
 const AI_STEP_RANGE = 32;
 const AI_STEP_FADE = 12;
 const CALLOUT_BLOCK = { pause: 1, shop: 2, death: 4, error: 8 } as const;
+/** The mix is balanced at this rate; the browser resamples to the device. Chromium's HRTF
+ * panner gain rises with context rate, so a device-rate graph would lift every spatial
+ * source against head-locked anchors. */
+const CONTEXT_RATE = 48000;
 
 type Vec3Like = { x: number; y: number; z: number };
 interface AudioOptions {
@@ -319,7 +323,7 @@ export class AudioSystem {
     try {
       const AC = (globalThis as Partial<typeof globalThis>).AudioContext;
       if (!AC) throw new Error('no AudioContext');
-      const actx = new AC({ latencyHint: 'interactive' });
+      const actx = new AC({ latencyHint: 'interactive', sampleRate: CONTEXT_RATE });
       this.actx = actx;
 
       await Mixer.prepare(actx);
