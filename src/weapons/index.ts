@@ -7,6 +7,19 @@ import { DEG, lerp } from '../core/math.ts';
 import { Rng } from '../core/rng.ts';
 import { AmmoPickups } from './ammo-pickups.ts';
 import { disposeWeaponLoader } from './asset-loader.ts';
+import {
+  BASE_ATTACHMENTS,
+  buildStats,
+  configureWeaponAttachments,
+  REPLACED_SLOTS,
+  replacedNodes,
+  isAttachmentConfig,
+  hasAttachmentAssets,
+  SLOTS,
+  loadAttachments,
+  type AttachmentConfig,
+  type AttachmentAssets,
+} from './attachments.ts';
 import { ProjectileSim, dropAt } from './ballistics.ts';
 import {
   WEAPON_DEFS,
@@ -17,15 +30,10 @@ import {
   SPREAD_MODS,
   isWeaponId,
 } from './defs.ts';
-import type {
-  WeaponId,
-  WeaponDef,
-  WeaponMode,
-  PrimaryWeaponId,
-  SecondaryWeaponId,
-} from './defs.ts';
+import type { WeaponDef, WeaponId, WeaponMode } from './defs.ts';
 import { grenadeMesh } from './grenade-mesh.ts';
 import { createWeaponInspection } from './inspection.ts';
+import { WeaponLaser } from './laser.ts';
 import { loadWeapon } from './loaders.ts';
 import { ReticleMaterials } from './materials-tsl.ts';
 import { MCX_EJECT_DELAY } from './mcx.ts';
@@ -142,6 +150,8 @@ export class WeaponSystem {
   set pickups(value: AmmoPickups | null) {
     this._pickups = value;
   }
+  private _attachments: AttachmentAssets = {};
+  private _laser: WeaponLaser | null = null;
   _restTask: Promise<void> | null = null;
   declare player: EngineSystems['player'] | null;
   declare fx: EngineSystems['fx'] | null;
@@ -185,7 +195,7 @@ export class WeaponSystem {
   _disc: { x: number; y: number } = { x: 0, y: 0 };
   _firePayload: {
     actor: string;
-    weapon: WeaponState['def'];
+    weapon: WeaponDef;
     origin: THREE.Vector3;
     dir: THREE.Vector3;
     seed: number;
@@ -196,7 +206,7 @@ export class WeaponSystem {
     dir: new THREE.Vector3(),
     seed: 0,
   };
-  _reloadPayload: { weapon: WeaponState['def']; phase: ReloadPhase; retained: boolean } = {
+  _reloadPayload: { weapon: WeaponDef; phase: ReloadPhase; retained: boolean } = {
     weapon: WEAPON_DEFS.rifle,
     phase: 'start',
     retained: false,
@@ -207,7 +217,7 @@ export class WeaponSystem {
   _shellPayload: {
     position: THREE.Vector3;
     velocity: THREE.Vector3;
-    weapon: WeaponState['def'];
+    weapon: WeaponDef;
     fxClass: string;
     caseLen: number;
     caseRadius: number;
@@ -254,7 +264,6 @@ export class WeaponSystem {
     speed: 0,
     crouch: false,
     airborne: false,
-    trigger: false,
     empty: false,
     magazineLoaded: true,
     remainingRounds: 0,
@@ -300,10 +309,23 @@ export class WeaponSystem {
     let tris = 0;
     const renderer = ctx.get('render').renderer;
     const load = (id: WeaponId): Promise<WeaponModelRecord> => loadWeapon(id, renderer);
+    // Attachments load alongside the spawn weapons. A failed asset only makes that
+    // attachment unavailable; the base weapons and their irons remain usable.
+    this._laser = new WeaponLaser(ctx.scene);
+    // Stored before init settles (see catch) so dispose() releases them even if a spawn weapon fails.
+    const attachments = loadAttachments(renderer).then((assets): void => {
+      this._attachments = assets;
+    });
     try {
       const records = await Promise.all(spawn.map(load));
+      await attachments;
       for (let i = 0; i < spawn.length; i++) {
-        tris += this.viewmodel.addWeapon(records[i], this._requireState(spawn[i]).def).tris;
+        tris += this.viewmodel.addWeapon(
+          records[i],
+          this._requireState(spawn[i]).def,
+          this._requireState(spawn[i]).attachments,
+          this._attachments
+        ).tris;
       }
       this._restTask = (async (): Promise<void> => {
         try {
@@ -313,6 +335,8 @@ export class WeaponSystem {
         }
       })();
     } catch (error) {
+      // Never rejects; settle it so a following dispose() owns every loaded asset.
+      await attachments;
       await disposeWeaponLoader(renderer);
       throw error;
     }
@@ -362,9 +386,11 @@ export class WeaponSystem {
   }
 
   _makeState(id: WeaponId): WeaponState {
-    const def = { ...WEAPON_DEFS[id] };
+    const def = { ...WEAPON_DEFS[id], ...buildStats(BASE_ATTACHMENTS) };
     return {
       def,
+      attachments: BASE_ATTACHMENTS,
+      laserEnabled: false,
       pattern: buildRecoilPattern(def, Rng),
       mag: def.magSize,
       chambered: true,
@@ -375,11 +401,84 @@ export class WeaponSystem {
   }
 
   /** Read-only market inspection; never mounts or animates the equipped model. */
-  async createInspectionModel(id: WeaponId): Promise<ReturnType<typeof createWeaponInspection>> {
+  async createInspectionModel(
+    id: WeaponId,
+    config: AttachmentConfig
+  ): Promise<ReturnType<typeof createWeaponInspection>> {
     await this._restTask;
     const entry = this.viewmodel.weapons.get(id);
     if (!entry) throw new Error(`[weapons] inspection unavailable: ${id}`);
-    return createWeaponInspection(entry);
+    return createWeaponInspection(entry, config, this._attachments);
+  }
+
+  getAttachments(id: WeaponId): AttachmentConfig {
+    return this._requireState(id).attachments;
+  }
+
+  /** Includes asset readiness, not just the authored fit. Also works for unowned guns. */
+  canConfigure(id: WeaponId, config: AttachmentConfig): boolean {
+    return (
+      isAttachmentConfig(config, id) &&
+      this._hasMesh(id) &&
+      hasAttachmentAssets(id, config, this._attachments)
+    );
+  }
+
+  /** Market: change an owned gun's attachments, or buy `id` fitted with `config`, replacing
+   * the gun in its slot and refreshing ammo. A new gun is fitted before ownership changes,
+   * so a rejected build never drops the old gun. */
+  applyBuild(id: WeaponId, config: AttachmentConfig): boolean {
+    if (this.owns(id)) return this.setAttachments(id, config);
+    if (!this._configureAttachments(id, config)) return false;
+    const state = this._requireState(id);
+    const primary: readonly WeaponId[] = PRIMARY_IDS;
+    for (const weapon of primary.includes(id) ? PRIMARY_IDS : SECONDARY_IDS)
+      if (weapon !== id && this.owned.delete(weapon)) this._resetAttachments(weapon);
+    this.owned.add(id);
+    state.mag = state.def.magSize;
+    state.chambered = true;
+    state.reserve = state.def.reserve;
+    this.setWeaponImmediate(id);
+    return true;
+  }
+
+  /** Synchronous, outside the frame loop; reject changes to unowned/unloaded guns. */
+  setAttachments(id: WeaponId, config: AttachmentConfig): boolean {
+    return this.owned.has(id) && this._configureAttachments(id, config);
+  }
+
+  _configureAttachments(id: WeaponId, config: AttachmentConfig): boolean {
+    if (!this.canConfigure(id, config)) return false;
+    const state = this._requireState(id);
+    if (SLOTS.every((slot): boolean => config[slot] === state.attachments[slot])) return true;
+    const entry = this._viewmodel?.weapons.get(id);
+    if (!entry) return false;
+    configureWeaponAttachments(entry, config, this._attachments);
+    if (config.rail !== state.attachments.rail) state.laserEnabled = config.rail === 'laser';
+    this._storeBuild(state, Object.freeze({ ...config }));
+    if (this.activeId === id) {
+      this.viewmodel.reticle.visible = false;
+      this.viewmodel.scopeOverlay.visible = false;
+      if (this._laser) this._laser.mesh.visible = false;
+    }
+    return true;
+  }
+
+  /** The stored build and the stats it gives the gun's private definition change together. */
+  _storeBuild(state: WeaponState, attachments: AttachmentConfig): void {
+    state.attachments = attachments;
+    Object.assign(state.def, buildStats(attachments));
+  }
+
+  /** Attachments belong to the gun: dropping it or restarting returns the base build. */
+  _resetAttachments(id: WeaponId): void {
+    const state = this._requireState(id);
+    state.laserEnabled = false;
+    if (state.attachments === BASE_ATTACHMENTS) return;
+    this._storeBuild(state, BASE_ATTACHMENTS);
+    const entry = this._viewmodel?.weapons.get(id);
+    if (entry) configureWeaponAttachments(entry, BASE_ATTACHMENTS, this._attachments);
+    if (id === this.activeId && this._laser) this._laser.mesh.visible = false;
   }
 
   _hasMesh(id: WeaponId): boolean {
@@ -405,7 +504,12 @@ export class WeaponSystem {
     for (let i = 0; i < ids.length; i++) {
       const record = records[i];
       if (!record) continue;
-      tris += this.viewmodel.addWeapon(record, this._requireState(ids[i]).def).tris;
+      tris += this.viewmodel.addWeapon(
+        record,
+        this._requireState(ids[i]).def,
+        this._requireState(ids[i]).attachments,
+        this._attachments
+      ).tris;
     }
     this.stats.tris += tris;
   }
@@ -425,16 +529,39 @@ export class WeaponSystem {
   private async _prewarmMaterials(render: EngineSystems['render']): Promise<WeaponWarmupReport> {
     const visible: Array<[THREE.Object3D, boolean]> = [];
     let pickup;
+    const attachments: THREE.Group[] = [];
     try {
       // Deferred assets must finish before the loading screen is released.
       await this._restTask;
+      // The owned source retains warm shader variants between mounted instances.
+      for (const asset of Object.values(this._attachments)) {
+        attachments.push(asset.scene);
+        this.viewmodel.rig.add(asset.scene);
+      }
+      if (this._laser) {
+        visible.push([this._laser.mesh, this._laser.mesh.visible]);
+        this._laser.mesh.visible = true;
+      }
+      // Both removable iron/muzzle states must be warm before runtime swaps.
+      for (const w of this.viewmodel.weapons.values()) {
+        for (const slot of REPLACED_SLOTS) {
+          const nodes = replacedNodes(w.model, slot);
+          for (const node of nodes ? [nodes.installed, nodes.removed] : []) {
+            if (!node) continue;
+            visible.push([node, node.visible]);
+            node.visible = true;
+          }
+        }
+      }
       const groups = [...this.viewmodel.weapons.values()].map((w): THREE.Object3D => w.group);
       groups.push(
         this.viewmodel.radio,
         this.viewmodel.grenade,
         this.viewmodel.reticle,
+        this.viewmodel.reticleRing,
         this.viewmodel.scopeOverlay
       );
+      groups.push(...attachments);
       for (const group of groups) {
         visible.push([group, group.visible]);
         group.visible = true;
@@ -464,6 +591,7 @@ export class WeaponSystem {
     } finally {
       for (const [group, value] of visible) group.visible = value;
       pickup?.removeFromParent();
+      for (const attachment of attachments) attachment.removeFromParent();
     }
   }
 
@@ -477,7 +605,7 @@ export class WeaponSystem {
     return this.states.get(this.activeId);
   }
 
-  get current(): WeaponDef | null {
+  get current(): WeaponState['def'] | null {
     return this.state?.def ?? null;
   }
 
@@ -493,31 +621,6 @@ export class WeaponSystem {
   /** True when the player owns `id` — non-owned weapons can't be drawn. */
   owns(id: WeaponId): boolean {
     return this.owned.has(id);
-  }
-
-  /** Market: buy a primary weapon, replacing the others in the primary slot. */
-  equipPrimary(id: PrimaryWeaponId): boolean {
-    return this._equipSlot(id, PRIMARY_IDS);
-  }
-
-  /** Market: buy into a weapon slot, replacing the old gun and refreshing ammo. */
-  _equipSlot(id: WeaponId, slot: readonly WeaponId[]): boolean {
-    if (!slot.includes(id) || this.owned.has(id)) return false;
-    if (!this._hasMesh(id)) return false;
-    for (const weapon of slot) if (weapon !== id) this.owned.delete(weapon);
-    this.owned.add(id);
-    const s = this.states.get(id);
-    if (s) {
-      s.mag = s.def.magSize;
-      s.chambered = true;
-      s.reserve = s.def.reserve;
-    }
-    this.setWeaponImmediate(id);
-    return true;
-  }
-
-  equipSecondary(id: SecondaryWeaponId): boolean {
-    return this._equipSlot(id, SECONDARY_IDS);
   }
 
   /** Fraction 0..1 of total reserve ammo left across owned weapons (market). */
@@ -647,7 +750,8 @@ export class WeaponSystem {
   /** Reset the complete loadout and transient combat state for a fresh run. */
   resetForNewGame(): void {
     this._viewmodel?.armAsset.blood.setHealthFraction(1);
-    for (const s of this.states.values()) {
+    for (const [id, s] of this.states) {
+      this._resetAttachments(id);
       s.mag = s.def.magSize;
       s.chambered = true;
       s.reserve = s.def.reserve;
@@ -1195,7 +1299,6 @@ export class WeaponSystem {
       this._triggerLatched = false;
       this._pendingShots = 0;
       this._state.ads = false;
-      this._state.trigger = false;
       this.viewmodel.stopClip();
     }
   }
@@ -1283,6 +1386,7 @@ export class WeaponSystem {
     if (this.grenades <= 0) return;
     const type = action === 'ads' ? 'short' : 'long';
     this.cooking = true;
+    this._throwReleased = false;
     this._throwType = type;
     this._cookAction = action;
     this._cookTime = 0;
@@ -1398,6 +1502,8 @@ export class WeaponSystem {
    *  a stowed one stays safe in the pouch. Never `endGrenade()` a committed
    *  throw without releasing it — the release beat must fire exactly once. */
   _onPlayerDeath(): void {
+    for (const state of this.states.values()) state.laserEnabled = false;
+    if (this._laser) this._laser.mesh.visible = false;
     // A live grenade in your hand is a live grenade: it drops and cooks.
     this._dropCookedGrenade();
     // A committed throw must not be cancelled: if the release beat had not
@@ -1561,6 +1667,14 @@ export class WeaponSystem {
 
     // ---- input -----------------------------------------------------------
     if (live) {
+      if (
+        input.actionPressed('laser') &&
+        s.attachments.rail === 'laser' &&
+        !this.grenadeEquipped &&
+        !this.radioEquipped &&
+        !this.healing
+      )
+        s.laserEnabled = !s.laserEnabled;
       if (input.actionPressed('reload')) this.reload();
       if (input.actionPressed('fireMode')) this.cycleFireMode();
       if (input.actionPressed('inspect')) this.inspect();
@@ -1577,14 +1691,10 @@ export class WeaponSystem {
       if (input.actionPressed('cycleWeapon')) this.nextWeapon();
       if (input.wheel) this.nextWeapon();
       this._runTrigger(input.fire, input.firePressed, def, s);
-      st.trigger = input.fire && this.canFire();
       // Auto-reload on a dry trigger pull, like every modern shooter.
       if (input.firePressed && st.empty) this.reload();
     } else if (this.debugMode && !this.disabled && player?.dead !== true) {
       this._runDebug();
-      st.trigger = this._sinceShot < 0.09;
-    } else {
-      st.trigger = false;
     }
     // A cooldown that ran out this frame may credit its overshoot only to a
     // round fired in this same frame; idle or gated time never banks shots.
@@ -1711,7 +1821,36 @@ export class WeaponSystem {
       ctx.events.emit('weapon:shell', this._shellPayload);
     }
 
+    const laser = this._laser;
+    const emitter = vm.active?.laserEmitter;
+    const def = this.current;
+    const physics = this.physics;
+    const showLaser =
+      laser &&
+      emitter &&
+      def &&
+      physics &&
+      this.state?.laserEnabled &&
+      !this.disabled &&
+      !this.player?.dead &&
+      !this.grenadeEquipped &&
+      !this.radioEquipped &&
+      !this.healing;
+    if (laser) laser.mesh.visible = false;
+
     this.player?.applyFireVibe(vm.anchor);
+
+    if (showLaser) {
+      laser.update(
+        ctx.camera,
+        ctx.viewCamera,
+        emitter,
+        physics,
+        this.player,
+        ctx.get('render').screenSize.height,
+        def.maxRange
+      );
+    }
 
     // ---- retire dropped magazines --------------------------------------
     if (this._droppedMags.length) {
@@ -1773,7 +1912,6 @@ export class WeaponSystem {
     }
     this._state.sprint = false;
     this._state.speed = 0;
-    this._state.trigger = false;
     // At the harness's fixed 60 Hz, early rounds populate smoke, brass and tracers.
     // A two-frame tail overlaps flash lifetimes across the uncertain grab window:
     // --settle controls grabFrame, but harness rAF and screenshot RPC can drift.
@@ -1860,6 +1998,10 @@ export class WeaponSystem {
     this._pickups?.dispose();
     this._pickups = null;
     this._viewmodel?.dispose();
+    this._laser?.dispose();
+    this._laser = null;
+    for (const asset of Object.values(this._attachments)) asset.dispose();
+    this._attachments = {};
     this.mats?.dispose();
   }
   /* oxlint-enable typescript/no-unnecessary-condition */

@@ -3,6 +3,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import * as THREE from 'three/webgpu';
 
 import { isMesh } from '../core/three-guards.ts';
+import { SLOTS, type AttachmentConfig } from '../weapons/attachments.ts';
 import { isWeaponId } from '../weapons/defs.ts';
 import type { WeaponSystem } from '../weapons/index.ts';
 import { MARKET_ART, type MarketItemId } from './market-art.ts';
@@ -26,6 +27,7 @@ export class MarketInspection {
   model: InspectionModel | null = null;
   ready: Promise<void> | null = null;
   activeId: MarketItemId | null = null;
+  activeConfig: AttachmentConfig | undefined = undefined;
   active = false;
   disposed = false;
   failed = false;
@@ -72,18 +74,11 @@ export class MarketInspection {
     button('ZOOM IN', (): void => this.zoom(0.8));
     button('ZOOM OUT', (): void => this.zoom(1.25));
     button('RESET', (): void => this.reset());
-    el('p', 'ow-market-inspect-help', this.threeControls, 'Drag to rotate · Scroll to zoom');
     el(
       'p',
       'ow-market-inspect-help',
       this.threeControls,
-      'Keyboard: arrows rotate · + / − zoom · Home reset'
-    );
-    el(
-      'p',
-      'ow-market-inspect-help',
-      this.root,
-      'Click any card to keep it selected. Only BUY / SWAP spends credits.'
+      'Drag / arrows rotate · Scroll / + / − zoom · Home resets'
     );
 
     this.controls = new OrbitControls(this.camera, this.canvas);
@@ -160,14 +155,22 @@ export class MarketInspection {
 
   // Each await may race dispose(), a newer selection or a failure; re-read state after it.
   /* oxlint-disable typescript/no-unnecessary-condition */
-  async select(id: MarketItemId, label: string): Promise<void> {
-    if (!this.active || this.disposed || id === this.activeId) return;
+  async select(id: MarketItemId, label: string, config?: AttachmentConfig): Promise<void> {
+    if (!this.active || this.disposed) return;
+    const weapon = isWeaponId(id);
+    if (weapon) config ??= this.weapons.getAttachments(id);
+    if (
+      id === this.activeId &&
+      SLOTS.every((slot): boolean => config?.[slot] === this.activeConfig?.[slot])
+    )
+      return;
+    const sameWeapon = id === this.activeId && this.model !== null;
     this.activeId = id;
+    this.activeConfig = config;
     const revision = ++this.revision;
     this.clearModel();
     this.clearImage();
     setText(this.title, label);
-    const weapon = isWeaponId(id);
     this.canvas.hidden = true;
     this.threeControls.hidden = !weapon;
     this.controls.enabled = weapon && !this.failed;
@@ -211,7 +214,8 @@ export class MarketInspection {
     }
     if (this.disposed || revision !== this.revision || this.failed) return;
     try {
-      const model = await this.weapons.createInspectionModel(id);
+      // Resolved to the stored build above for every weapon.
+      const model = await this.weapons.createInspectionModel(id, config!);
       if (this.disposed || revision !== this.revision || !this.active) {
         model.dispose();
         return;
@@ -236,9 +240,14 @@ export class MarketInspection {
       this.controls.minDistance = radius * 0.65;
       this.camera.near = radius * 0.01;
       this.canvas.hidden = false;
-      this.reset();
+      if (!sameWeapon) this.reset();
+      else {
+        this.camera.updateProjectionMatrix();
+        this.controls.update();
+        this.dirty = true;
+      }
       this.update();
-      if (!this.failed) setText(this.status, 'Preview only · current weapon configuration');
+      if (!this.failed) setText(this.status, 'Preview only · no credits spent until confirmation');
     } catch (error) {
       if (this.disposed || revision !== this.revision) return;
       console.warn(`[market] inspection unavailable for ${id}`, error);
@@ -343,6 +352,7 @@ export class MarketInspection {
     this.active = false;
     this.controls.enabled = false;
     this.activeId = null;
+    this.activeConfig = undefined;
     ++this.revision;
     this.clearModel();
     this.clearImage();

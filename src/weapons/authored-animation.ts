@@ -3,7 +3,7 @@ import type { WeaponDef } from './defs.ts';
 import { createEvolysAnimation } from './evolys.ts';
 import { createM4Animation } from './m4.ts';
 import { createM590Animation } from './m590.ts';
-import { MCXAnimation } from './mcx.ts';
+import { createMCXAnimation } from './mcx.ts';
 import { createMPXAnimation } from './mpx.ts';
 import { createP320Animation } from './p320.ts';
 import type { WeaponAnimation, WeaponModelRecord } from './runtime-types.ts';
@@ -24,6 +24,6 @@ export function createWeaponAnimation(model: WeaponModelRecord, def: WeaponDef):
     case 'shotgun':
       return createM590Animation(model);
     case 'mcx':
-      return new MCXAnimation(model, def);
+      return createMCXAnimation(model, def);
   }
 }

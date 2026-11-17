@@ -8,7 +8,7 @@
 - `export.py`: 120 Hz lattice, exact endpoints, STEP resets and static joins.
 - `finish_atlas.py`: base/ORM on UV1; original normal detail stays on UV0.
 
-Hand calibration and shared review arms are read-only. Refit intentionally with
+Ordinary rebuilds treat hand calibration and shared review arms as inputs. Refit intentionally with
 `bun tools/blender/evolys/hand-reference.ts`, never during ordinary rebuilds.
 [`../review_hands.py`](../review_hands.py) owns shared review-arm baking for EVOLYS
 and MPX.
@@ -17,11 +17,30 @@ preserve held endpoint samples, matching NLA names and TRS resets.
 
 ## Ordinary rigid export (current)
 
-Receiver/handguard/optic join as static surfaces. Stock, bolt, handle, feed cover
+Receiver/handguard join as static surfaces. `IRON_sights` remains independently
+removable; there is no integrated optic or lens. `SOCKET_sight` owns the rear
+aperture centre, aligned with `SOCKET_front_post`. `MOUNT_optic` is the rail-contact
+frame for the RMR; larger optics seat whole grooves forward of the charging hand.
+`MOUNT_muzzle` seats the unchanged SRD762Ti at the barrel crown.
+`MUZZLE_device` removes the original hider/shoulder and
+`MUZZLE_device_removed` supplies the open game-fit sleeve. `MOUNT_rail` seats TOR Mini directly
+on the reference underside Picatinny rail. The intentionally rearward support
+hold and staged release/regrip clear the rail and module without a side bracket.
+Stock, bolt, handle, feed cover
 and trigger remain ordinary meshes in their original local/control frames.
 Only the eight-joint belt is skinned; both pouches have independent STEP ownership.
 Keep 12.7 mm belt pitch, separate finish tiles and persistent runtime round masks.
 The registered cook uses shared gltfpack flags without added simplification.
+`check.py` requires freshly generated shared optic blends and checks actual
+mounted RMR/ACOG/PM II surfaces against irons and animated cover, charging handle,
+stock, belt and deformed shared hands at 120 Hz. PM II crosses the front iron;
+RMR/ACOG retain both irons. The common TOR Mini checker adds all-clip 120 Hz
+laser/hand/emitter checks and lower-rail hardware versus evaluated hands.
+The same sweep checks the actual shared SRD762Ti, its 7.8 mm through-bore gauge,
+fixed handguard/adapter clearance and coexistence with every optic and TOR Mini.
+There is no bipod geometry/control: bipod clearance is N/A, not certified.
+Sprint follows the same rigid viewmodel mount; no authored sprint or stock-fold
+clip exists.
 
 ## Approved UV precision exception
 

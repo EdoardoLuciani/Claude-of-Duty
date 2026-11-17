@@ -3,6 +3,8 @@ blender -b assets/weapons/sig-mpx/mpx.blend --python-exit-code 1 --python tools/
 """
 import json
 import math
+import sys
+from pathlib import Path
 import bpy
 from mathutils import Vector, Matrix
 from mathutils.bvhtree import BVHTree
@@ -55,10 +57,26 @@ EPS = 1e-6
 assert abs(point('barrel_crown').x-point('breech').x-.2032) < EPS
 barrel = bpy.data.objects['External barrel'].evaluated_get(deps)
 assert abs(barrel.dimensions.x-.2032) < EPS, 'actual barrel mesh, not manifest alone'
-can = bpy.data.objects['SRD9 MPX titanium exterior'].evaluated_get(deps)
-assert abs(can.dimensions.x-.175) < EPS
-assert abs(can.dimensions.y-.035) < EPS
-assert abs(point('sight').z-(.044+.035814)) < EPS
+assert not any('ROMEO4T' in o.name or 'SRD9' in o.name or 'lens_cap' in o.name for o in scene.objects)
+assert abs(point('sight').z-.074) < EPS
+assert (point('front_post')-point('sight')).cross(Vector((1,0,0))).length < EPS
+assert abs(point('muzzle').x-point('barrel_crown').x-.006) < EPS
+for name in ('IRON_sights', 'IRON_sights_removed', 'MUZZLE_device', 'MUZZLE_device_removed'):
+    assert bpy.data.objects[name].parent.name == 'receiver', (name,'lost rigid assembly ownership')
+for name,loc in [('optic',(.025,0,.044)),('muzzle',(.3162,0,0))]:
+    mount = bpy.data.objects['MOUNT_'+name]
+    assert mount.parent.name == 'receiver'
+    assert (mount.matrix_world.translation-Vector(loc)).length < EPS
+    assert (mount.matrix_world.to_3x3()@Vector((0,1,0))-Vector((1,0,0))).length < EPS
+# Open crown and both interchangeable external muzzle parts retain a 9mm bore.
+for name in ('External barrel','Muzzle thread protector','MPX suppressor adapter sleeve'):
+    assert tree(name).ray_cast(Vector((.34,0,0)),Vector((-1,0,0)),.05)[0] is None, (name,'blocked crown')
+rear = tree('Rear iron aperture')
+for y,z in ((0,0),(.0016,0),(-.0016,0),(0,.0016),(0,-.0016)):
+    assert rear.ray_cast(point('sight')+Vector((-.02,y,z)),Vector((1,0,0)),.04)[0] is None, 'blocked iron aperture'
+assert rear.ray_cast(point('sight')+Vector((-.02,.002,0)),Vector((1,0,0)),.04)[0] is not None, 'missing rear peep rim'
+post = bpy.data.objects['Front iron post'].evaluated_get(deps)
+assert abs(max((post.matrix_world@Vector(p)).z for p in post.bound_box)-point('sight').z) < EPS
 assert point('ejection').y < -.02
 # Through-side slots must not be black painted rectangles.
 hg = tree('Hollow five-slot M-LOK handguard')
@@ -66,6 +84,19 @@ for x in (.119,.148,.190,.232,.274):
     assert hg.ray_cast(Vector((x,-.06,-.001)),Vector((0,1,0)),.12)[0] is None, (x,'closed M-LOK slot')
 # Solid lands between slots still exist; test at a web with two distinct walls.
 assert hg.ray_cast(Vector((.129,-.06,-.001)),Vector((0,1,0)),.12)[0] is not None
+# Both adapter anchors pass through a real slot, with the backing actually
+# seated on its upper/lower wall lands (not screws/rail floating past the guard).
+backing = tree('Laser rail adapter web')
+anchors = [o for o in scene.objects if o.name.startswith('Laser rail adapter screw')]
+assert len(anchors) == 2, 'laser adapter requires both anchors'
+for screw in anchors:
+    p = screw.matrix_world.translation
+    assert hg.ray_cast(Vector((p.x,-.06,p.z)),Vector((0,1,0)),.12)[0] is None, ('laser anchor outside slot opening',screw.name)
+    for z in (p.z-.006,p.z+.006):
+        guard_hit = hg.ray_cast(Vector((p.x,-.04,z)),Vector((0,1,0)),.02)[0]
+        plate_hit = backing.ray_cast(Vector((p.x,0,z)),Vector((0,-1,0)),.06)[0]
+        assert guard_hit is not None and plate_hit is not None, ('unsupported laser adapter',screw.name,z)
+        assert -.001 < guard_hit.y-plate_hit.y <= .0001, ('laser backing not seated',screw.name,z,guard_hit.y-plate_hit.y)
 # Regression: the previous full-ellipse upper left a visible flank seam gap.
 upper = tree('MPX continuous rounded upper')
 lower = tree('Lower receiver shoulder')
@@ -122,65 +153,6 @@ for o in scene.objects:
             hit = surface.ray_cast(p+Vector((0,side*.05,0)),Vector((0,-side,0)),.10)[0]
             assert hit is not None, (o.name,'glyph falls outside gun surface')
             assert abs(hit.y-p.y) <= .0004, (o.name,'floating/buried glyph')
-# Original ROMEO4T overall dimension includes closed covers. Measure a virtual
-# closed pose without changing the maintained open-cover transforms.
-closed_x=[]
-for tag,side in [('rear',-1),('front',1)]:
-    pivot = bpy.data.objects['lens_cap_'+tag]
-    pin = bpy.data.objects['Fixed '+tag+' lens hinge pin']
-    barrel = bpy.data.objects[tag+' lens cap hinge barrel']
-    assert (pin.matrix_world.translation-pivot.matrix_world.translation).length < EPS
-    assert (barrel.matrix_world.translation-pivot.matrix_world.translation).length < EPS
-    collar = 'Threaded cover mounting collar' + ('.001' if side==1 else '')
-    assert tree(pin.name).overlap(tree(collar)), (tag,'hinge floats clear of cover mounting collar')
-    for child in pivot.children:
-        if child.type != 'MESH': continue
-        o = child.evaluated_get(deps)
-        closed = pivot.parent.matrix_world@pivot.matrix_parent_inverse@Matrix.Translation(pivot.location)@o.matrix_parent_inverse@o.matrix_basis
-        closed_x += [(closed@v.co).x for v in o.data.vertices]
-    assert abs(pivot.rotation_euler.y-side*math.radians(120)) < EPS, (tag,'approved open angle changed')
-    assert tree(tag+' lens cap hinge bridge').overlap(tree('Open '+tag+' lens cap rim')), (tag,'cover disconnected from hinge bridge')
-    cap = bpy.data.objects['Open '+tag+' lens cap rim'].evaluated_get(deps)
-    high = max((cap.matrix_world@Vector(p)).z for p in cap.bound_box)
-    assert high < point('sight').z-.010, (tag,'open cover obstructs optic aperture')
-assert abs(max(closed_x)-min(closed_x)-.0855) < EPS, 'overall length must include closed covers'
-planes=[bpy.data.objects[n].matrix_world@bpy.data.objects[n].data.vertices[0].co for n in ['Coated optical lens','Coated optical lens.001']]
-assert abs(abs(planes[1].x-planes[0].x)-.064) < EPS, 'inferred lens seats must match staged source datums'
-for name in ['Objective and ocular rim','Objective and ocular rim.001']:
-    o=bpy.data.objects[name].evaluated_get(deps)
-    ys=[(o.matrix_world@v.co).y for v in o.data.vertices]
-    assert abs(max(ys)-min(ys)-.027) < EPS, 'drawing-supported rim diameter'
-cap=bpy.data.objects['ROMEO4T battery cap'].evaluated_get(deps)
-cap_points=[cap.matrix_world@v.co for v in cap.data.vertices]
-assert abs(max(p.x for p in cap_points)-min(p.x for p in cap_points)-.026) < EPS, 'preserve drawing-supported cap diameter'
-assert abs(max(p.y for p in cap_points)-min(p.y for p in cap_points)-.006) < EPS, 'cap is a thin rim, not a 12.4mm drum'
-assert abs(min(p.y for p in cap_points)+.0269) < EPS, 'preserve outer face/overall width'
-assert tree('ROMEO4T battery cap neck').overlap(tree('ROMEO4T main housing')), 'battery neck must attach to body'
-assert tree('ROMEO4T battery cap neck').overlap(tree('ROMEO4T battery cap')), 'battery cap must attach to neck'
-# Optical sheets must not become closed alpha-blended discs again. Boolean
-# cutters can leave an empty material slot: check faces, not just material names.
-for name in ['Coated optical lens','Coated optical lens.001']:
-    o = bpy.data.objects[name]
-    xs = [v.co.x for v in o.data.vertices]
-    assert max(xs)-min(xs) < EPS, (name,'stacked front/back optical surfaces')
-for tag in ['front', 'rear']:
-    lid = bpy.data.objects['Open '+tag+' solid lens cap']
-    assert lid.parent == bpy.data.objects['lens_cap_'+tag], (tag, 'solid lid lost hinge ownership')
-    assert len(lid.data.materials) == 1 and lid.data.materials[0].name == '03 | black moulded polymer'
-    xs = [v.co.x for v in lid.data.vertices]
-    assert abs(max(xs)-min(xs)-.0015) < EPS, (tag, 'solid lid must retain 1.5mm thickness')
-    assert any(p.normal.x > .99 for p in lid.data.polygons) and any(p.normal.x < -.99 for p in lid.data.polygons), (tag, 'solid lid needs real front and back faces')
-    edges = {}
-    for face in lid.data.polygons:
-        for edge in face.edge_keys:
-            edges[edge] = edges.get(edge, 0) + 1
-    assert edges and all(count == 2 for count in edges.values()), (tag, 'lid must be a closed solid')
-for name in ['ROMEO4T main housing','Objective and ocular rim','Objective and ocular rim.001','Open front lens cap rim','Open rear lens cap rim','Threaded cover mounting collar','Threaded cover mounting collar.001']:
-    o = bpy.data.objects[name]
-    expected = '03 | black moulded polymer' if name.startswith(('Open ','Threaded ')) else '15 | light-absorbing optic interior'
-    inward = [p for p in o.data.polygons if p.normal.dot(Vector((0,p.center.y,p.center.z))) < -1e-6]
-    assert inward, (name,'missing inner wall')
-    assert all(o.data.materials[p.material_index] and o.data.materials[p.material_index].name == expected for p in inward), (name,'unassigned/reflective interior faces')
 # Geometry/UV finite and editable without dependency on generated export copies.
 for o in scene.objects:
     if o.type != 'MESH':
@@ -188,4 +160,109 @@ for o in scene.objects:
     assert o.data.uv_layers, o.name
     for vertex in o.data.vertices:
         assert all(math.isfinite(v) for v in vertex.co), o.name
-print('MPX saved source: maps/datums/slots/seams/port, mounted trigger, reference-mag silhouette, decals, attached solid polymer optic covers, eight native control/shared-review-arm clips and retained/empty reload events verified; human animation/gameplay approval pending')
+print('MPX saved source: maps/datums/slots/seams/port, mounted trigger, reference-mag silhouette, decals, open crown/removable deployed irons, eight native control/shared-review-arm clips and retained/empty reload events verified; human animation/gameplay approval pending')
+
+# Actual shared rail attachment, independent of the optic catalog.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from tor_mini.mounts import check_laser_mount
+check_laser_mount('mpx')
+
+# Mount every actual shared asset; do not substitute proxy attachment bounds.
+rig = bpy.data.objects['MPX_RIG']
+weapon = [o for o in bpy.data.collections['MPX | editable exterior components'].objects if o.type == 'MESH']
+hands = [o for o in scene.objects if o.type == 'MESH' and any('authored hands' in c.name for c in o.users_collection)]
+assert hands, 'missing deformed review skins'
+import attachment_source
+from attachment_source import surface
+
+
+def select(name, time=0):
+    for obj in scene.objects:
+        if obj.animation_data:
+            obj.animation_data.action = None
+            for track in obj.animation_data.nla_tracks:
+                track.mute = track.name != name
+    frame = time*scene.render.fps
+    scene.frame_set(math.floor(frame),subframe=frame%1)
+    bpy.context.view_layer.update()
+
+select('Idle')
+# Hidden replacement geometry is evaluated for checks, but not shown in source review.
+for name in ('IRON_sights_removed','MUZZLE_device_removed'):
+    bpy.data.objects[name].hide_viewport = False
+bpy.context.view_layer.update()
+mounted = {}
+loaded = []
+for id,slot in [('rmr','optic'),('acog','optic'),('scope','optic'),('exps3','optic'),('srd762ti','muzzle'),('laser','rail')]:
+    objects,base = attachment_source.load(id)
+    mesh = [o for o in objects if o.type == 'MESH']
+    transform = rig.matrix_world.inverted() @ bpy.data.objects['MOUNT_'+slot].matrix_world @ base.matrix_world.inverted()
+    mounted[id] = surface(mesh,transform)
+    if slot == 'optic':
+        irons = surface([o for o in bpy.data.objects['IRON_sights'].children if o.type=='MESH'],rig.matrix_world.inverted())
+        clash = bool(mounted[id].overlap(irons))
+        assert clash == (id == 'scope'), (id,'opticClashes mismatch',clash)
+        folded = [o for o in bpy.data.objects['IRON_sights_removed'].children if o.type == 'MESH']
+        assert not mounted[id].overlap(surface(folded,rig.matrix_world.inverted())), (id,'hits folded removed state')
+    loaded.extend(objects)
+
+# Check each enabled state against fixed receiver/guard and moving mechanisms.
+# Deliberate rail-foot mating is the only optic contact exemption.
+fixed = [o for o in weapon if o.parent and o.parent.name == 'receiver' and not o.name.startswith('Picatinny')]
+for id,target in mounted.items():
+    for obj in fixed:
+        if id=='laser' and obj.name.startswith('Laser rail adapter tooth'): continue  # precise contact checked above
+        assert not target.overlap(surface([obj],rig.matrix_world.inverted())), (id,obj.name,'attachment hits base weapon')
+    if id == 'srd762ti':
+        assert not target.overlap(surface(list(bpy.data.objects['MUZZLE_device_removed'].children),rig.matrix_world.inverted())), 'suppressor hits adapter'
+        # A 9mm round plus .6mm radial margin must pass the actual endcap/shadow.
+        for i in range(32):
+            a=i*math.tau/32
+            assert target.ray_cast(Vector((.56,.0051*math.cos(a),.0051*math.sin(a))),Vector((-1,0,0)),.24)[0] is None, 'suppressor bore obstructed'
+
+# Catalog slots coexist: compare optics against the mounted laser and can,
+# plus rail/muzzle against each other (never compare alternative optics).
+for optic in attachment_source.OPTICS:
+    for other in ('laser','srd762ti'):
+        assert not mounted[optic].overlap(mounted[other]), (optic,other,'slot attachments intersect')
+assert not mounted['laser'].overlap(mounted['srd762ti']), 'rail/muzzle intersection'
+for name in ('IRON_sights','IRON_sights_removed'):
+    parts=[o for o in bpy.data.objects[name].children if o.type=='MESH']
+    mounted[name]=surface(parts,rig.matrix_world.inverted())
+
+poses=0
+moving = [o for o in weapon if o.parent and o.parent.name in ('bolt','charging_handle','magazine','magazine_spare','magazine_rounds','magazine_spare_rounds','trigger','bolt_release','magazine_catch')]
+for name,info in clips.items():
+    for sample in range(math.ceil(info['duration']*120)+1):
+        select(name,min(sample/120,info['duration']))
+        inverse = rig.matrix_world.inverted()
+        for obj in moving+hands:
+            moving_surface=None
+            if min(obj.scale)<.001: continue
+            evaluated=obj.evaluated_get(bpy.context.evaluated_depsgraph_get())
+            bounds=[inverse@evaluated.matrix_world@Vector(p) for p in evaluated.bound_box]
+            for id,target in mounted.items():
+                # Broad phase excludes objects clearly below the optic rail or behind the muzzle.
+                if id=='srd762ti':
+                    if max(p.x for p in bounds)<.316: continue
+                elif id!='laser' and (max(p.z for p in bounds)<.041 or max(p.x for p in bounds)<-.16): continue
+                elif id=='laser': continue  # separate 120Hz TOR sweep includes precise mating/emitter checks
+                if moving_surface is None: moving_surface=surface([obj],inverse)
+                assert not target.overlap(moving_surface), (name,sample,id,obj.name,'mechanism/hand hits attachment')
+        poses+=1
+select('Idle')
+# No fold or charging clip exists. Independently sweep the actual stock hinge
+# and non-reciprocating handle through 180 degrees / 38mm respectively.
+stock=[o for o in weapon if o.parent and o.parent.name=='stock_hinge']
+handle=[o for o in weapon if o.parent and o.parent.name=='charging_handle']
+pivot=Vector((-.122,.015,.004))
+for angle in range(181):
+    transform=Matrix.Translation(pivot)@Matrix.Rotation(math.radians(angle),4,'Z')@Matrix.Translation(-pivot)
+    for id,target in mounted.items():
+        assert not target.overlap(surface(stock,transform)), (angle,id,'stock fold hits attachment')
+for sample in range(39):
+    transform=Matrix.Translation((-.001*sample,0,0))
+    for id,target in mounted.items():
+        assert not target.overlap(surface(handle,transform)), (sample,id,'charging handle hits attachment')
+for obj in loaded: bpy.data.objects.remove(obj,do_unlink=True)
+print('MPX_ATTACHMENT_CLEARANCE_OK:',poses,'120Hz mechanism/deformed-hand poses; 181 fold and 39 charging poses; all catalog fits, optic seating, folded/deployed iron clashes, 9mm muzzle clearance')

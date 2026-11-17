@@ -8,8 +8,13 @@ import { Rng } from '../../src/core/rng.ts';
 import { AUDIO_BANKS } from '../lib/audio-banks.ts';
 import { FixtureAudioBuffer, createAudioContext } from '../lib/audio-fixture.ts';
 
-const total = 39 + AUDIO_BANKS.reduce((n, [, count]): number => n + count, 0);
-const failedUrls = ['smg-1', ...AUDIO_BANKS.map(([banks]): string => Object.values(banks)[0][0])];
+const total = 79 + AUDIO_BANKS.reduce((n, [, count]): number => n + count, 0);
+const failedUrls = [
+  'smg-1',
+  'rifle-suppressed-1',
+  'mcx-distant-1',
+  ...AUDIO_BANKS.map(([banks]): string => Object.values(banks)[0][0]),
+];
 const fetch = globalThis.fetch;
 try {
   for (const failure of [null, ...failedUrls, 'decode']) {

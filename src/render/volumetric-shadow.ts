@@ -162,8 +162,10 @@ export function createVolumetricShadow(render: CascadeRender): {
       let branch;
       for (const layer of layers) {
         const condition = distance.lessThan(layer.split);
-        const body = (): VarNode<'float', ConstNode<'float', number>> =>
+        // A void body: returning the assign node would emit `return` in this inline Fn().
+        const body = (): void => {
           result.assign(sample(layer, point, phi));
+        };
         branch = branch ? branch.ElseIf(condition, body) : If(condition, body);
       }
       return result;

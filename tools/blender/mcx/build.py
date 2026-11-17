@@ -19,6 +19,7 @@ from mcx.export import export_asset, prepare_surfaces
 from mcx.geometry import build_geometry
 from mcx.finishes import FINISH_LOOKUP_SIZE
 from mcx.materials import TEXTURE_SIZE, build_materials
+from mcx.hands import RUNTIME_ORIGIN, author_hands, bake_export_actions
 from mcx.studio import build_studio
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -41,7 +42,13 @@ def build(output, render=False, quick=False):
     asset, parts = build_geometry(materials)
     prepare_surfaces(asset)
     rest, clips = build_animations(parts)
-    cameras = build_studio(quick)
+    select_clip(parts, clips, 'Idle')
+    controls = author_hands(ROOT,asset,parts,clips)
+    parts += controls
+    select_clip(parts, clips, 'Idle')
+    for obj in controls:
+        rest[obj.name] = (obj.location.copy(),obj.rotation_quaternion.copy(),obj.scale.copy())
+    cameras = [(name,camera.name) for name,camera in build_studio(quick)]
 
     scene['clips'] = json.dumps(clips)
     scene['README'] = (
@@ -56,22 +63,18 @@ def build(output, render=False, quick=False):
     select_clip(parts, clips, 'Idle')
     bpy.ops.wm.save_as_mainfile(filepath=str(output / 'mcx-virtus.blend'))
 
-    if render:
-        for name, camera in cameras:
-            scene.camera = camera
-            scene.render.filepath = str(output / 'renders' / (name + '.png'))
-            bpy.ops.render.render(write_still=True)
-
+    bake_export_actions(parts, clips)
     restore_rest(parts, rest)
     stats = export_asset(asset, parts, output)
     manifest = {
         'asset': 'MCX VIRTUS .300 BLK',
-        'optic': bpy.data.objects['receiver']['optic'],
+        'optic': 'removable iron sights',
         'units': 'metres',
         'blender_forward': '+X',
         'gltf_up': '+Y',
         'gltf_forward': '+X',
         'gltf_ejection': '+Z',
+        'runtime_origin': RUNTIME_ORIGIN,
         'clips': clips,
         'stats': stats,
         'textures': {
@@ -83,13 +86,20 @@ def build(output, render=False, quick=False):
         'notes': [
             'Generated from tools/blender/mcx/. Python is the authoring authority.',
             'Reference-backed visual exterior, not manufacturing geometry or licensed SIG art.',
-            'Named sockets and rigid-part clips; hands, audio and live casing physics are runtime-owned.',
-            'Visibility is authored CONSTANT; motion LINEAR at 60 Hz. Stock Actions export, no GLB rewriting.',
+            'Named sockets, mechanisms and wrist/finger controls are Blender-authored; shared arm IK, audio and casing physics are runtime-owned.',
+            'Shared review-only arm skins are excluded from the weapon GLB.',
+            'Visibility is authored CONSTANT; mechanism and wrist/finger motion use native LINEAR Actions. No GLB rewriting.',
             'Export-only corner pigment and scalar finish lookup; UV0 albedo/normal detail retained. Roughness grain reduced to its mean.',
-            'One opaque material; MCX adapter selects exact fine/polymer/rubber/fiber normal strengths and fiber emission from UV1 finish identity. Lens remains separate.',
+            'One opaque material; MCX adapter selects exact fine/polymer/rubber normal strengths from stable UV1 finish identity. No integrated glass or suppressor.',
         ],
     }
     (output / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+    if render:
+        scene = bpy.context.scene
+        for name,camera in cameras:
+            scene.camera = bpy.data.objects[camera]
+            scene.render.filepath = str(output/'renders'/(name+'.png'))
+            bpy.ops.render.render(write_still=True)
     print('MCX_EXPORT_COMPLETE', json.dumps(stats))
 
 

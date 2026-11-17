@@ -6,8 +6,10 @@ local to build_geometry; importing this module creates no scene objects.
 import math
 
 import bpy
-from mathutils import Vector
+from mathutils import Matrix, Vector
 import numpy as np
+from mcx.primitives import create_primitives
+import picatinny
 
 def build_geometry(materials):
     asset = bpy.data.collections.new("MCX VIRTUS | authored components")
@@ -25,19 +27,6 @@ def build_geometry(materials):
     glass = materials['glass']
     fiber = materials['fiber']
     coating = materials['coating']
-
-    def move_to(obj, collection=asset):
-        for c in list(obj.users_collection):
-            c.objects.unlink(obj)
-        collection.objects.link(obj)
-        return obj
-
-
-    def active(obj):
-        bpy.ops.object.select_all(action='DESELECT')
-        obj.select_set(True)
-        bpy.context.view_layer.objects.active = obj
-
 
     def empty(name, loc=(0, 0, 0), parent=None):
         obj = bpy.data.objects.new(name, None)
@@ -62,168 +51,11 @@ def build_geometry(materials):
     stock = empty('stock_hinge', (-.183, .016, .007), rig)
     case = empty('spent_case', parent=rig)
     release = empty('bolt_release', (-.072, .027, -.045), rig)
+    irons = empty('IRON_sights', parent=body)
+    folded = empty('IRON_sights_removed', parent=body)
+    muzzle = empty('MUZZLE_device', parent=body)
 
-    def finish(obj, name, mat, parent=body, bevel=.0006):
-        obj.name = name
-        move_to(obj)
-        if mat:
-            obj.data.materials.append(mat)
-        # Shapes are authored in asset coordinates; keep world pose under each pivot.
-        if parent:
-            obj.parent = parent
-            obj.matrix_parent_inverse = parent.matrix_world.inverted()
-        if bevel:
-            mod = obj.modifiers.new('Machined edge radius', 'BEVEL')
-            # Sub-millimetre machined chamfers need one segment; the large
-            # rounded forging/grip transitions override this below.
-            mod.width = bevel; mod.segments = 1
-            if mat == anodized:
-                obj.data.materials.append(edge); mod.material = 1
-            mod = obj.modifiers.new('Weighted corner normals', 'WEIGHTED_NORMAL')
-            mod.keep_sharp = True; mod.weight = 40
-        return obj
-
-
-    def box(name, loc, dims, mat=anodized, parent=body, bevel=.0006):
-        bpy.ops.mesh.primitive_cube_add(size=1, location=loc)
-        obj = bpy.context.object
-        obj.dimensions = dims
-        bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-        return finish(obj, name, mat, parent, bevel)
-
-
-    def profile(name, points, width, mat=anodized, parent=body, bevel=.0008, y=0, rounded=False):
-        # Outline extrusions are two-ring lofts; ordinary plates remain flat-shaded.
-        rings = [[(x, y+s*width/2, z) for x, z in points] for s in (-1, 1)]
-        return loft(name, rings, mat, parent, bevel, rounded)
-
-
-    def loft(name, rings, mat, parent=body, bevel=.001, rounded=True):
-        # Explicit cross-sections: continuous shoulders, not raised plate overlays.
-        n = len(rings[0])
-        verts = [point for ring in rings for point in ring]
-        faces = [tuple(range(n-1, -1, -1)), tuple(range((len(rings)-1)*n, len(rings)*n))]
-        faces += [(j*n+i, j*n+(i+1)%n, (j+1)*n+(i+1)%n, (j+1)*n+i)
-                  for j in range(len(rings)-1) for i in range(n)]
-        mesh = bpy.data.meshes.new(name); mesh.from_pydata(verts, [], faces); mesh.update()
-        obj = bpy.data.objects.new(name, mesh); asset.objects.link(obj)
-        active(obj); bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
-        bpy.ops.mesh.normals_make_consistent(inside=False); bpy.ops.object.mode_set(mode='OBJECT')
-        for polygon in mesh.polygons: polygon.use_smooth = rounded and len(polygon.vertices) == 4
-        finish(obj, name, mat, parent, bevel)
-        if bevel and rounded:
-            mod = obj.modifiers.get('Machined edge radius')
-            mod.segments = 4; mod.harden_normals = True
-        return obj
-
-
-    def forging(name, sections):
-        rings = []
-        for x, bottom, top, w in sections:
-            r = min(.007, (top-bottom)/3)
-            yz = [(-w*.48,top),(w*.48,top),(w*.82,top-r*.5),(w,top-r*1.5),
-                  (w,bottom+r),(w*.9,bottom+r*.25),(w*.7,bottom),
-                  (-w*.7,bottom),(-w*.9,bottom+r*.25),(-w,bottom+r),
-                  (-w,top-r*1.5),(-w*.82,top-r*.5)]
-            rings.append([(x,y,z) for y,z in yz])
-        return loft(name, rings, coating)
-
-
-    def cylinder(name, loc, radius, depth, mat=steel, axis='X', parent=body, vertices=24, bevel=.00035):
-        bpy.ops.mesh.primitive_cylinder_add(vertices=vertices, radius=radius, depth=depth, location=loc)
-        obj = bpy.context.object
-        if axis == 'X': obj.rotation_euler[1] = math.pi/2
-        if axis == 'Y': obj.rotation_euler[0] = math.pi/2
-        bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
-        for p in obj.data.polygons: p.use_smooth = len(p.vertices) == 4
-        return finish(obj, name, mat, parent, bevel)
-
-
-    def ellipsoid(name, loc, radii, mat, parent, segments=20, rings=10):
-        # Explicit latitude rings keep face order stable across Blender processes.
-        # The generated preview and exporter receive the same ordinary mesh.
-        vertices = [(0, 0, radii[2])]
-        for ring in range(1, rings):
-            latitude = math.pi * ring / rings
-            for column in range(segments):
-                longitude = math.tau * column / segments
-                vertices.append((
-                    radii[0] * math.sin(latitude) * math.cos(longitude),
-                    radii[1] * math.sin(latitude) * math.sin(longitude),
-                    radii[2] * math.cos(latitude),
-                ))
-        bottom = len(vertices)
-        vertices.append((0, 0, -radii[2]))
-        faces = [(0, 1 + column, 1 + (column + 1) % segments)
-                 for column in range(segments)]
-        for ring in range(rings - 2):
-            start = 1 + ring * segments
-            for column in range(segments):
-                a = start + column
-                b = start + (column + 1) % segments
-                faces.append((a, a + segments, b + segments, b))
-        last = 1 + (rings - 2) * segments
-        faces.extend((last + column, bottom, last + (column + 1) % segments)
-                     for column in range(segments))
-        mesh = bpy.data.meshes.new(name)
-        mesh.from_pydata(vertices, [], faces)
-        mesh.update()
-        obj = bpy.data.objects.new(name, mesh)
-        asset.objects.link(obj)
-        obj.location = loc
-        return finish(obj, name, mat, parent, bevel=0)
-
-    def cut(obj, cutter):
-        active(obj)
-        mod = obj.modifiers.new('Actual opening', 'BOOLEAN')
-        mod.operation = 'DIFFERENCE'; mod.solver = 'EXACT'; mod.object = cutter
-        # Apply boolean before the bevel, so opening rims also catch light.
-        bpy.ops.object.modifier_move_up(modifier=mod.name)
-        if len(obj.modifiers) > 1: bpy.ops.object.modifier_move_up(modifier=mod.name)
-        bpy.ops.object.modifier_apply(modifier=mod.name)
-        bpy.data.objects.remove(cutter, do_unlink=True)
-
-
-    def opening(obj, loc, dims, radius=.0018):
-        cutter = box('CUT', loc, dims, None, None, 0)
-        mod = cutter.modifiers.new('Rounded slot', 'BEVEL'); mod.width = radius; mod.segments = 4
-        active(cutter); bpy.ops.object.modifier_apply(modifier=mod.name)
-        cut(obj, cutter)
-
-
-    def tube(name, loc, radius, inner, length, mat=steel, parent=body):
-        obj = cylinder(name, loc, radius, length, mat, parent=parent, vertices=48)
-        cut(obj, cylinder('CUT', loc, inner, length+.005, None, parent=None, vertices=48, bevel=0))
-        return obj
-
-
-    def cord(name, points, radius, mat):
-        curve = bpy.data.curves.new(name, 'CURVE')
-        curve.dimensions = '3D'; curve.resolution_u = 12
-        curve.bevel_depth = radius; curve.bevel_resolution = 3; curve.use_fill_caps = True
-        spline = curve.splines.new('BEZIER'); spline.bezier_points.add(len(points)-1)
-        for point, co in zip(spline.bezier_points, points):
-            point.co = co; point.handle_left_type = 'AUTO'; point.handle_right_type = 'AUTO'
-        obj = bpy.data.objects.new(name, curve); asset.objects.link(obj)
-        active(obj); bpy.ops.object.convert(target='MESH')
-        return finish(obj, name, mat, bevel=0)
-
-
-    def screw(x, y, z, radius=.0028, parent=body):
-        cylinder('Recessed fastener seat', (x, y, z), radius*1.32, .0008, polymer, 'Y', parent)
-        cap = cylinder('Torx-style fastener', (x, y*1.015, z), radius, .0012, steel, 'Y', parent)
-        cut(cap, cylinder('CUT', (x, y*1.03, z), radius*.43, .006, None, 'Y', None, 6, 0))
-
-
-    def text(label, loc, size=.006, side=-1, parent=body, mat=marking):
-        curve = bpy.data.curves.new(label, 'FONT'); curve.body = label
-        curve.size = size; curve.extrude = 0; curve.resolution_u = 3
-        obj = bpy.data.objects.new('Mark | ' + label, curve); asset.objects.link(obj)
-        obj.location = loc
-        obj.rotation_euler = (math.pi/2, 0, 0) if side == -1 else (math.pi/2, 0, math.pi)
-        curve.materials.append(mat)
-        obj.parent = parent; obj.matrix_parent_inverse = parent.matrix_world.inverted()
-        return obj
+    active, finish, box, profile, loft, forging, cylinder, ellipsoid, cut, opening, tube, cord, screw, text = create_primitives(asset, body, materials)
 
     def build_receiver():
         # Exterior profiles traced against the gray 9-inch VIRTUS SBR photographs.
@@ -349,119 +181,32 @@ def build_geometry(materials):
             tube_obj = cylinder('QD sling socket',(.067,side*.027,-.004),.0065,.003,steel,'Y')
             cut(tube_obj,cylinder('CUT',(.067,side*.027,-.004),.0044,.008,None,'Y',None,24,0))
         # Barrel/gas exterior silhouettes only. The accessory is not a functional model.
-        cylinder('Barrel under vented guard',(.1643,0,0),.0087,.2286,steel)
+        # Full 228.6 mm exterior includes the 4.6 mm threaded end below.
+        cylinder('Barrel under vented guard',(.162,0,0),.0087,.224,steel)
         cylinder('Gas system silhouette',(.146,0,.022),.0036,.168,steel)
         box('Gas block silhouette',(.233,0,.006),(.014,.023,.029),steel)
-        # Rail pitches/land shapes are visual reference details, not machinable rail data.
-        profile('Continuous top rail foot',[(-.17,.035),(.247,.035),(.247,.041),(-.17,.041)],.022,coating)
-        for i in range(42):
-            x=-.168+i*.010
-            profile('Picatinny rail tooth',[(x,.040),(x+.0012,.046),(x+.006,.046),(x+.0072,.040)],.027,coating,bevel=.00035)
+        # Same across/up interface as every weapon; this rifle remains +X forward.
+        for name, outline, spans in [
+            ('Continuous top rail foot', picatinny.section(.046,.035,slot=True), [(-.170,.247)]),
+            ('Picatinny rail tooth', picatinny.section(.046,.035), picatinny.lands(-.170,.247,-.036)),
+        ]:
+            for a,b in spans:
+                loft(name,[[(y,x,z) for x,z in outline] for y in (a,b)],coating,bevel=0)
         for x in (-.15,.232):
-            box('Folded backup sight base',(x,0,.049),(.030,.030,.007),steel)
+            box('Backup sight base',(x,0,.049),(.030,.030,.007),steel)
             cylinder('Backup sight hinge',(x+.004,0,.055),.006,.034,steel,'Y')
-            box('Folded backup sight leaf',(x-.006,0,.056),(.019,.014,.004),polymer)
+            box('Folded backup sight leaf',(x-.006,0,.056),(.019,.014,.004),polymer,folded)
+            if x < 0:
+                # Hinge-supported aperture leaf: an actual open bore, not glass.
+                box('Rear sight leaf stalk',(x+.004,0,.063),(.004,.010,.017),polymer,irons)
+                tube('Rear sight aperture',(x+.004,0,.077),.007,.0025,.003,steel,irons)
+            else:
+                box('Front sight leaf',(x+.004,0,.063),(.004,.014,.017),polymer,irons)
+                box('Front sight post',(x+.004,0,.073),(.002,.0018,.008),steel,irons,bevel=.0001)
+                for side in (-1,1):
+                    box('Front sight protective ear',(x+.004,side*.008,.074),(.004,.003,.020),polymer,irons)
+
             for side in (-1,1): screw(x+.004,side*.018,.055,.003)
-
-    def build_optic():
-        # TA31F/TA51 exterior from Trijicon's side/top/oblique product photographs.
-        # 151.89 mm optic length; width includes the windage cap. Our height check
-        # uses optic/foot, excluding TA51 shoe/knobs; Trijicon's exact datum is unverified.
-        body['optic'] = 'ACOG 4x32 (TA31F / TA51)'
-        # Seat the shoe into the foot and rail by 0.1 mm at each interface. Its
-        # unpublished height is fit-inferred; optic envelope and sight axis stay fixed.
-        box('ACOG rail shoe',(-.081,0,.0530),(.096,.030,.0142),anodized,bevel=.0008)
-        profile('ACOG integral mounting foot',[(-.128,.060),(-.026,.060),(-.026,.064),(-.039,.069),(-.047,.075),(-.096,.076),(-.109,.065),(-.127,.064)],.023,anodized,bevel=.001)
-        for side in (-1,1):
-            box('ACOG rail clamp',(-.081,side*.016,.051),(.094,.004,.009),anodized,bevel=.0008)
-        for x in (-.113,-.049):
-            cylinder('ACOG mount crossbolt',(x,0,.051),.0027,.042,steel,'Y')
-            knob = cylinder('ACOG slotted thumbscrew',(x,.0225,.051),.0078,.0055,anodized,'Y',vertices=48)
-            opening(knob,(x,.026,.051),(.011,.003,.0016),.0003)
-            for i in range(24):
-                a=i*math.tau/24
-                cylinder('ACOG thumbscrew knurl',(x+math.cos(a)*.0074,.0225,.051+math.sin(a)*.0074),.00035,.0038,anodized,'Y',vertices=6,bevel=0)
-        # Hollow forged housing: varying oval sections and swept front hood. The
-        # front bell has a tall outer shoulder, unlike a rotationally symmetric cone.
-        sections=[(-.129,.0168,.0168,0),(-.117,.0175,.017,0),(-.103,.0175,.018,0),(-.092,.018,.020,0),(-.071,.0185,.0205,0),(-.045,.0215,.0255,0),(-.017,.022,.0265,0),(-.00511,.022,.0265,.006)]
-        segments=48; count=len(sections); verts=[]
-        for wall in (0,.002):
-            for x,ry,rz,skew in sections:
-                for i in range(segments):
-                    a=i*math.tau/segments
-                    verts.append((x+math.sin(a)*skew,math.cos(a)*(ry-wall),.087+math.sin(a)*(rz-wall)))
-        faces=[]
-        for wall in range(2):
-            offset=wall*count*segments
-            for j in range(count-1):
-                for i in range(segments):
-                    a=offset+j*segments+i; b=offset+j*segments+(i+1)%segments
-                    face=(a,b,b+segments,a+segments)
-                    faces.append(face if wall==0 else face[::-1])
-        for j in (0,count-1):
-            for i in range(segments):
-                a=j*segments+i; b=j*segments+(i+1)%segments
-                faces.append((a,a+count*segments,b+count*segments,b))
-        mesh=bpy.data.meshes.new('ACOG hollow forging');mesh.from_pydata(verts,[],faces);mesh.update()
-        obj=bpy.data.objects.new('ACOG tapered prism housing',mesh);asset.objects.link(obj)
-        active(obj);bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT');bpy.ops.mesh.normals_make_consistent(inside=False);bpy.ops.object.mode_set(mode='OBJECT')
-        for p in mesh.polygons: p.use_smooth=True
-        finish(obj,obj.name,anodized,bevel=.00045)
-        # Short ocular and 32 mm objective behind the slanted protective hood.
-        tube('ACOG ocular',(-.139,0,.087),.0168,.0138,.022,anodized)
-        tube('ACOG ocular rubber rim',(-.148,0,.087),.0177,.0138,.006,rubber)
-        tube('ACOG objective retaining ring',(-.011,0,.087),.0183,.016,.003,anodized)
-        for x,r in [(-.149,.0137),(-.013,.016)]:
-            cylinder('ACOG coated optical glass',(x,0,.087),r,.0007,glass,vertices=48,bevel=0)
-        # The lateral forging ridge and ocular collar break up the top-view silhouette.
-        for side in (-1,1):
-            profile('ACOG prism side facet',[(-.114,.080),(-.093,.070),(-.045,.068),(-.020,.072),(-.013,.085),(-.035,.106),(-.073,.109),(-.092,.097)],.0024,anodized,bevel=.001,y=side*.017)
-            for z in (.073,.101):
-                box('ACOG ocular collar lug',(-.126,side*.013,z),(.012,.010,.006),anodized,bevel=.001)
-                screw(-.126,side*.019,z,.0018)
-        cylinder('ACOG elevation boss',(-.099,0,.107),.0083,.012,anodized,'Z')
-        cylinder('ACOG elevation cap',(-.099,0,.11542),.0092,.006,anodized,'Z',vertices=48)
-        cylinder('ACOG windage boss',(-.099,-.021,.087),.0079,.010,anodized,'Y')
-        cylinder('ACOG windage cap',(-.099,-.0273,.087),.0087,.003,anodized,'Y',vertices=48)
-        # The small prism access cover is on the opposite side from the windage knob.
-        cylinder('ACOG prism access boss',(-.104,.0178,.087),.0058,.006,anodized,'Y')
-        cylinder('ACOG prism access cover',(-.104,.0212,.087),.006,.0016,anodized,'Y',vertices=32)
-        for i in range(32):
-            a=i*math.tau/32
-            cylinder('ACOG elevation knurl',(-.099+math.cos(a)*.0088,math.sin(a)*.0088,.11542),.0003,.0045,anodized,'Z',vertices=6,bevel=0)
-            cylinder('ACOG windage knurl',(-.099+math.cos(a)*.0083,-.0273,.087+math.sin(a)*.0083),.0003,.002,anodized,'Y',vertices=6,bevel=0)
-        # Clear protective collector cover and a thin internal red fiber, with a
-        # diagonal cradle running from the adjustment shoulder to the objective hood.
-        profile('ACOG collector cradle',[(-.090,.101),(-.080,.104),(-.037,.109),(-.007,.112),(-.005,.114),(-.036,.113),(-.080,.108),(-.091,.105)],.007,anodized,bevel=.0006)
-        collector=[(-.088,0,.106),(-.077,0,.108),(-.040,0,.113),(-.010,0,.115)]
-        cord('ACOG collector cover',collector,.002,glass)
-        cord('ACOG red fiber collector',collector,.0011,fiber)
-        cord('ACOG cap retaining tether',[(-.098,-.006,.114),(-.115,-.011,.106),(-.115,-.025,.094),(-.099,-.027,.091)],.00035,polymer)
-        text('Trijicon',(-.056,-.0228,.084),.0032)
-        text('ACOG',(-.052,-.0228,.079),.0032)
-        text('MADE IN USA',(-.054,-.0117,.063),.0019)
-        text('Trijicon',(-.026,.022,.086),.003,1)
-
-    def build_suppressor():
-        # SRD762Ti direct-thread exterior: 236 mm overall / 44 mm diameter.
-        # Subtle circumferential seams, no invented cooling flutes or QD locking rings.
-        mount = cylinder('Suppressor mount',(.282,0,0),.013,.016,ceramic,vertices=48)
-        for side in (-1,1):
-            opening(mount,(.280,side*.015,0),(.012,.008,.030),.0004)
-        profile_rings=[(.288,.013),(.290,.0205),(.294,.022),(.326,.022),(.328,.0215)]
-        for x in (.345,.369,.393,.417,.441,.465,.489):
-            profile_rings.extend([(x-.0005,.0215),(x,.02165),(x+.0005,.0215)])
-        profile_rings.extend([(.504,.0215),(.508,.0208)])
-        verts=[(x,math.cos(i*math.tau/64)*r,math.sin(i*math.tau/64)*r) for x,r in profile_rings for i in range(64)]
-        faces=[(j*64+i,j*64+(i+1)%64,(j+1)*64+(i+1)%64,(j+1)*64+i) for j in range(len(profile_rings)-1) for i in range(64)]
-        mesh=bpy.data.meshes.new('SRD762Ti exterior');mesh.from_pydata(verts,[],faces);mesh.update()
-        obj=bpy.data.objects.new('Suppressor body',mesh);asset.objects.link(obj)
-        for polygon in mesh.polygons: polygon.use_smooth=True
-        finish(obj,obj.name,ceramic,bevel=0)
-        tube('Recessed suppressor endcap',(.508,0,0),.0208,.0047,.004,ceramic)
-        cylinder('Muzzle interior shadow',(.502,0,0),.0048,.001,rubber,bevel=0)
-        text('SIG SAUER',(.302,-.0222,.003),.0028)
-        text('SRD762Ti',(.302,-.0222,-.001),.0028)
 
     def build_charging_handle():
         # OEM KIT-MCX-CHARGE-HANDLE-SM: swept rear bow, separate hooked small
@@ -585,15 +330,46 @@ def build_geometry(materials):
     bpy.context.view_layer.update()
     build_receiver()
     build_handguard()
-    build_optic()
-    build_suppressor()
+    # The 9-inch barrel ends at its 5/8-24 direct-thread shoulder. An open
+    # three-prong game-fit flash hider replaces the former integrated can.
+    tube('Muzzle thread',(.2763,0,0),.00794,.0041,.0046,steel)
+    tube('Base muzzle collar',(.281,0,0),.0105,.0080,.014,steel,muzzle)
+    tube('Base muzzle throat',(.289,0,0),.0105,.0041,.004,steel,muzzle)
+    for i in range(3):
+        angle = i*math.tau/3
+        prong = box('Base muzzle prong',(.303,math.cos(angle)*.008,math.sin(angle)*.008),
+                    (.028,.004,.005),steel,muzzle,.0005)
+        prong.rotation_euler.x = angle
     build_charging_handle()
     build_stock()
     build_magazines()
     build_casing()
 
     # Named attachment / integration sockets; adapter hand contacts follow the fit.
-    for name,loc,parent in [('SOCKET_muzzle',(.512,0,0),rig),('SOCKET_ejection',(-.018,-.030,.004),rig),('SOCKET_grip_R',(-.139,0,-.099),rig),('SOCKET_grip_L',(.171,0,-.028),rig),('SOCKET_magazine',(.004,0,-.042),mag),('SOCKET_sight',(-.149,0,.087),rig)]:
+    for name,loc,parent in [('SOCKET_muzzle',(.317,0,0),rig),('SOCKET_ejection',(-.018,-.030,.004),rig),('SOCKET_grip_R',(-.139,0,-.099),rig),('SOCKET_grip_L',(.171,0,-.028),rig),('SOCKET_magazine',(.004,0,-.042),mag),('SOCKET_sight',(-.146,0,.077),rig),('SOCKET_front_post',(.236,0,.077),rig)]:
         empty(name,loc,parent)
+
+    # Rail contact frames: attachment Blender +Y maps to rifle +X; +Z stays up.
+    # The optic mount sits forward of the deployed rear leaf so mounted optics clear it.
+    for name, loc in [('MOUNT_optic',(-.036,0,.046)),('MOUNT_muzzle',(.274,0,0))]:
+        mount = empty(name,loc,body)
+        mount.rotation_euler.z = -math.pi/2
+
+    # Game-fit adapter seats on the upper-right handguard chamfer (11:15 slope).
+    # The vertical side seat crossed the live support glove. Rotate the entire
+    # supported adapter, not just the laser; native mechanism timing stays put.
+    roll = Matrix.Rotation(-math.atan2(11,15), 3, 'X')
+    offset = Vector((0,0,.010))
+    rail = empty('MOUNT_rail', roll @ Vector((.221,-.038,0)) + offset, body)
+    rail.rotation_euler = (roll @ Matrix(((0,1,0),(0,0,1),(1,0,0)))).to_euler()
+    box('Laser rail adapter web',(.221,-.0304,0),(.055,.0088,.014),coating)
+    for x in (.201,.241):
+        cylinder('Laser rail adapter screw',(x,-.0358,0),.002,.004,steel,'Y')
+    for obj in asset.objects:
+        if obj.type == 'MESH' and obj.name.startswith('Laser rail '):
+            obj.location = roll @ obj.location + offset
+            obj.rotation_euler = roll.to_euler()
+    bpy.context.view_layer.update()
+    picatinny.build_rail('Laser rail adapter',rail.matrix_world@Matrix.Rotation(math.pi,4,'Y'),-.0226,.0226,anodized,body,asset)
 
     return asset, [rig, mag, spare, bolt, handle, trigger, cover, stock, case, release]

@@ -1,7 +1,8 @@
 import type { Renderer } from 'three/webgpu';
 
+import { requiredNode } from './authored-model.ts';
 import { loadAX338 } from './ax338.ts';
-import { isWeaponId } from './defs.ts';
+import { isWeaponId, WEAPON_DEFS } from './defs.ts';
 import type { WeaponId } from './defs.ts';
 import { loadEvolys } from './evolys.ts';
 import { loadM4 } from './m4.ts';
@@ -24,11 +25,16 @@ const LOADERS: {
 };
 
 /** Gameplay and preview mount the same required authored assets. */
-export function loadWeapon(
+export async function loadWeapon(
   id: string,
   renderer: Pick<Renderer, 'hasFeature'>
 ): Promise<WeaponModelRecord> {
-  return isWeaponId(id)
-    ? LOADERS[id](renderer)
-    : Promise.reject(new Error(`[weapons] unknown weapon ${id}`));
+  if (!isWeaponId(id)) throw new Error(`[weapons] unknown weapon ${id}`);
+  const model = await LOADERS[id](renderer);
+  // Fail this weapon's load, not the batch it is mounted with.
+  requiredNode(model.root, 'SOCKET_muzzle');
+  requiredNode(model.root, 'SOCKET_ejection');
+  for (const slot of Object.keys(WEAPON_DEFS[id].fits ?? {}))
+    requiredNode(model.root, `MOUNT_${slot}`);
+  return model;
 }

@@ -4,11 +4,95 @@ import * as THREE from 'three/webgpu';
 
 import { AiSystem, type AiVariant } from '../../src/ai/index.ts';
 import { VARIANTS } from '../../src/ai/soldier.ts';
+import { SoldierMaterialsNode } from '../../src/ai/textures-tsl.ts';
 import type { RenderSystem } from '../../src/render/index-webgpu.ts';
 import { createTestContext } from '../lib/context.ts';
 import { fixture } from '../lib/fixture.ts';
+import { FixtureImageBitmap, installImageBitmapFixture } from '../lib/image-bitmap.ts';
 
-const material = new THREE.MeshStandardNodeMaterial(),
+// Exercise the real PNG loader and packing path before borrowing its native material.
+const restoreBitmap = installImageBitmapFixture();
+const saved = {
+  fetch: globalThis.fetch,
+  bitmap: Object.getOwnPropertyDescriptor(globalThis, 'createImageBitmap'),
+  canvas: Object.getOwnPropertyDescriptor(globalThis, 'OffscreenCanvas'),
+};
+let closes = 0;
+const texels = [11, 22, 33, 44];
+let library: SoldierMaterialsNode;
+try {
+  globalThis.fetch = Object.assign(
+    async (url: Parameters<typeof fetch>[0]): Promise<Response> => {
+      assert(typeof url === 'string');
+      return url.endsWith('manifest.json')
+        ? Response.json({ sets: ['polymer'], details: ['cloth', 'nylon'] })
+        : new Response(null);
+    },
+    { preconnect: saved.fetch.preconnect }
+  );
+  Object.defineProperty(globalThis, 'createImageBitmap', {
+    configurable: true,
+    value: async (): Promise<ImageBitmap> => {
+      const image = new FixtureImageBitmap({
+        width: 1,
+        height: 1,
+        data: new Uint8ClampedArray(texels),
+      });
+      image.close = (): void => {
+        assert.deepEqual(Array.from(image.data ?? []), texels, 'close each source exactly once');
+        closes++;
+        image.data?.fill(0);
+      };
+      return image;
+    },
+  });
+  Object.defineProperty(globalThis, 'OffscreenCanvas', {
+    configurable: true,
+    value: class {
+      getContext(): object {
+        let image: FixtureImageBitmap;
+        return {
+          clearRect(): void {},
+          drawImage(input: FixtureImageBitmap): void {
+            image = input;
+          },
+          getImageData(): { data: Uint8ClampedArray | undefined } {
+            return { data: image.data };
+          },
+        };
+      }
+    },
+  });
+  library = await SoldierMaterialsNode.fromCache();
+  assert.equal(closes, 5, 'release decoded PNGs before returning the library');
+  assert(library.arrays);
+  for (const [name, array] of Object.entries(library.arrays)) {
+    const fallback =
+      name === 'albedo'
+        ? [255, 255, 255, 255]
+        : name === 'orm'
+          ? [255, 255, 0, 255]
+          : [128, 128, 255, 255];
+    assert(array.image.data);
+    assert.deepEqual(
+      Array.from(array.image.data),
+      [...texels, ...(name === 'detail' ? texels : fallback)],
+      'packed arrays retain independent bytes after PNG close clears the inputs'
+    );
+  }
+} finally {
+  globalThis.fetch = saved.fetch;
+  restoreBitmap();
+  for (const [key, descriptor] of [
+    ['createImageBitmap', saved.bitmap],
+    ['OffscreenCanvas', saved.canvas],
+  ] as const) {
+    if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+    else Reflect.deleteProperty(globalThis, key);
+  }
+}
+const sourceCloses = closes;
+const material = library.soldier('vanguard', ['polymer', 'glass']),
   geometry = new THREE.BoxGeometry();
 let disposed = 0,
   calls = 0;
@@ -72,5 +156,6 @@ assert.match(failed.error, /intentional native warm failure/);
 assert.deepEqual(scene.children, [existing]);
 assert.equal(disposed, 0, 'borrowed assets survive failure');
 geometry.dispose();
-material.dispose();
+library.dispose();
+assert.deepEqual(closes, sourceCloses, 'final disposal never closes PNG inputs again');
 console.log('AI native prewarm readiness, exact geometry ownership and failure cleanup passed');

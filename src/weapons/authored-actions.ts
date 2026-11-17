@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 interface AuthoredActionState {
   mixer: THREE.AnimationMixer;
-  actions: Record<string, THREE.AnimationAction>;
+  actions: Partial<Record<string, THREE.AnimationAction>>;
   name: string | null;
 }
 
@@ -22,12 +22,17 @@ export function createAuthoredActions(
 
 /** Sample authored time without advancing the mixer; mechanism overrides stay in each adapter. */
 export function sampleAuthoredAction(state: AuthoredActionState, name: string, time: number): void {
+  const action = state.actions[name];
+  if (!action) throw new Error(`[weapons] missing authored action '${name}'`);
   if (name !== state.name) {
-    if (state.name) state.actions[state.name].stop();
-    state.actions[name].reset().play();
+    if (state.name) {
+      const previous = state.actions[state.name];
+      if (!previous) throw new Error(`[weapons] missing authored action '${state.name}'`);
+      previous.stop();
+    }
+    action.reset().play();
     state.name = name;
   }
-  const action = state.actions[name];
   action.paused = false;
   action.time = Math.min(time, action.getClip().duration);
   state.mixer.update(0);

@@ -5,6 +5,7 @@ import bpy
 import bmesh
 from mathutils import Vector, Matrix
 from .materials import build_source_materials
+import picatinny
 
 def build_geometry(asset):
     def active(o):
@@ -121,6 +122,8 @@ def build_geometry(asset):
     rounded_cut(shroud,(0,.036,.022),(.022,.165,.035),.0015)
     # Front face has independent barrel and guide rod openings, not a black decal.
     cut(shroud,cyl('CUT',(0,.127,.037),.00765,.017,None,None,'Y',64,0))
+    # Browning tilt raises the barrel inside the retracted slide's front face.
+    cut(shroud,cyl('CUT',(0,.127,.040),.00765,.017,None,None,'Y',64,0))
     cut(shroud,cyl('CUT',(0,.127,.025),.0044,.017,None,None,'Y',48,0))
     rounded_cut(shroud,(.009,.049,.045),(.023,.032,.021),.0010)
     for side in (-1,1):
@@ -184,9 +187,11 @@ def build_geometry(asset):
     cut(guard,inner)
     for z in [-.001,-.004,-.007,-.010,-.013]:
         rounded_cut(guard,(0,.0686,z),(.021,.0015,.0010),.0003)
-    # Compact accessory rail: lower trapezoid and four slots.
-    rail=profile('Frame | integral accessory rail',[(.069,.014),(.127,.014),(.127,.002),(.071,.002)],.021,polymer,body,.0005)
-    for y in (.081,.093,.105,.117):rounded_cut(rail,(0,y,.0017),(.026,.0042,.006),.0003)
+    # Compact rail and rearward seat put the activation pad beside the guard,
+    # rather than leaving the module hanging from the dust-cover nose.
+    rail_y=.097
+    frame_matrix=Matrix.Translation((0,rail_y,.002))@Matrix.Rotation(math.pi,4,'Y')
+    rail_parts=picatinny.build_rail('Frame | integral accessory rail',frame_matrix,.069-rail_y,.117-rail_y,polymer,body,asset,bottom=-.012)
     for side in (-1,1):
         text('SIGSAUER',(side*.0161,-.004 if side==-1 else -.028,-.036),.0042,side,body,polymer,.00012)
         # Compact-medium molding under the dust cover, not a bright white label.
@@ -209,7 +214,24 @@ def build_geometry(asset):
 
     # Moving barrel and guide rod are visible in both muzzle and open-slide poses.
     tube('Barrel | crowned muzzle',(0,.070,.037),.0068,.0044,.119)
-    tube('Barrel | crown lip',(0,.1298,.037),.00685,.00465,.0010)
+    tube('Barrel | threaded extension',(0,.1365,.037),.00635,.0044,.014)
+    protector = empty('MUZZLE_device', parent=barrel)
+    exposed = empty('MUZZLE_device_removed', parent=barrel)
+    bpy.context.view_layer.update()
+    tube('Thread protector | nitrided sleeve',(0,.1365,.037),.0074,.00705,.014,
+         barrel_mat,protector)
+    # External helical thread is visual game art, not a manufacturing profile.
+    vertices=[];faces=[];steps=240
+    for i in range(steps+1):
+        angle=i*math.tau/20
+        y=.1305+i/steps*.012
+        for radius,dy in ((.00635,-.00035),(.00695,0),(.00635,.00035)):
+            vertices.append((math.cos(angle)*radius,y+dy,.037+math.sin(angle)*radius))
+        if i:
+            for j in range(2):
+                k=(i-1)*3+j;faces.append((k,k+3,k+4,k+1))
+    mesh('Barrel | external muzzle thread',vertices,faces,barrel_mat,exposed,0,True)
+    tube('Barrel | crown lip',(0,.1438,.037),.00635,.00465,.0010)
     box('Barrel | chamber hood',(0,.049,.041),(.019,.031,.013),barrel_mat,barrel,.0007)
     cyl('Guide rod | front cap',(0,.121,.025),.0036,.018,barrel_mat,body,'Y')
     cyl('Guide rod | exposed shaft',(0,.053,.025),.0022,.116,steel,body,'Y')
@@ -275,14 +297,17 @@ def build_geometry(asset):
         cyl('SIGLITE | white annulus',(x,y,z),r,.00016,white,slide,'Y',32,0)
         cyl('SIGLITE | luminous inset',(x,y-.00010,z),r*.43,.0001,tritium,slide,'Y',24,0)
     # Sockets exported in game axes via glTF +Y-up conversion.
-    for name,pos,parent in [('SOCKET_muzzle',(0,.131,.037),barrel),('SOCKET_ejection',(.015,.048,.042),slide),
-                            ('SOCKET_sight',(0,-.033,.0537),rig)]:
+    for name,pos,parent in [('SOCKET_muzzle',(0,.1445,.037),barrel),('SOCKET_ejection',(.015,.048,.042),slide),
+                            ('SOCKET_sight',(0,-.033,.0537),rig),
+                            ('MOUNT_muzzle',(0,.132,.037),barrel),
+                            ('MOUNT_rail',(0,rail_y,.002),body)]:
         # Keep authored world coordinates under offset pivots.
         o=empty(name,parent=parent);o.matrix_parent_inverse=parent.matrix_world.inverted();o.location=pos
+        # Identity muzzle frame: native +Y forward becomes glTF -Z forward.
 
     # Union the molded frame pieces so the grip neck and rail are not visibly
     # assembled from intersecting slabs. Preserve the sculpted grip's smooth faces.
-    for piece in (frame,guard,rail):
+    for piece in (frame,guard,*rail_parts):
         active(grip);mod=grip.modifiers.new('Continuous molded frame','BOOLEAN');mod.operation='UNION';mod.object=piece
         bpy.ops.object.modifier_apply(modifier=mod.name);bpy.data.objects.remove(piece,do_unlink=True)
     grip.name='Frame | continuous compact medium polymer shell'

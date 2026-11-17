@@ -39,7 +39,7 @@ def build(output, render=False, quick=False):
     scene['clips'] = json.dumps(clips)
     notes = bpy.data.texts.new('START HERE')
     notes.write(
-        'M4A1 BLOCK II / IRON-ONLY GAME ART\n'
+        'M4A1 BLOCK II / REMOVABLE IRONS / GAME ART\n'
         'Generated preview. Edit tools/blender/m4/, not this file.\n'
         'Reference-backed visual reconstruction; not manufacturing geometry.\n'
         'Eight synchronized weapon/wrist/finger actions and shared review arm skins.\n'

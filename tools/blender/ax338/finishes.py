@@ -6,12 +6,11 @@ import numpy as np
 def consolidate_finishes(asset, rough, albedo, normal, output):
     """Keep UV0/albedo/normal XYZ; pack only scalar finish detail into UV1.
 
-    Eight 512x256 tiles replace seven opaque material submissions plus glass's
-    roughness factor. Two-pixel guards isolate metallic boundaries under filtering.
+    Seven 512x256 tiles replace seven opaque material submissions. Two-pixel guards isolate metallic boundaries under filtering.
     Vertex colors carry the original linear base-color factors without an atlas.
     """
     materials = sorted({o.data.materials[0] for o in asset.objects if o.type == 'MESH'}, key=lambda m: m.name)
-    assert len(materials) == 8
+    assert len(materials) == 7
     source = np.array(rough.pixels[:], dtype=np.float32).reshape(1024, 1024, 4)[:, :, 1]
     # Bilinear scalar downsampling only; normal/albedo maps are never resampled.
     x = np.linspace(0, 1023, 508); y = np.linspace(0, 1023, 252)
@@ -64,13 +63,8 @@ def consolidate_finishes(asset, rough, albedo, normal, output):
             target.uv = ((i % 2 * 512 + 2.5 + original.uv.x * 507) / 1024,
                          (i // 2 * 256 + 2.5 + original.uv.y * 251) / 1024)
         obj.data.uv_layers.active = uv0
-        if material.name.startswith('10 |'):
-            # Keep authored lens alpha, normal and base-color factors independent.
-            continue
         colors = obj.data.color_attributes.new(name='FinishColor', type='FLOAT_COLOR', domain='CORNER')
         for value in colors.data:
             value.color = color
         obj.data.color_attributes.active_color = colors
         obj.data.materials.clear(); obj.data.materials.append(opaque)
-    glass = next(m for m in materials if m.name.startswith('10 |'))
-    finish_texture(glass)

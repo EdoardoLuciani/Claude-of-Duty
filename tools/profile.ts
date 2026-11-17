@@ -62,10 +62,15 @@ const options = [
   'query-trial',
   'agents',
   'production',
+  'rail',
 ];
 assert(
   Object.keys(args).every((key): boolean => options.includes(key)),
   `Supported options: ${options.join(', ')}`
+);
+assert(
+  args.rail === undefined || args.rail === 'none' || args.rail === 'laser',
+  'rail must be none or laser'
 );
 const port = Number(args.port ?? 8080),
   width = Number(args.w ?? 1280),
@@ -136,7 +141,7 @@ try {
   collectBrowserErrors(page, errors);
   const start = performance.now();
   await page.goto(
-    `http://127.0.0.1:${port}/?capture=1&lockstep=1&q=${quality}${args['worker-profile'] ? '&aiWorkerProfile=1' : ''}`,
+    `http://127.0.0.1:${port}/?capture=1&lockstep=1&q=${quality}&attachmentRail=${args.rail ?? 'none'}${args['worker-profile'] ? '&aiWorkerProfile=1' : ''}`,
     { waitUntil: 'domcontentloaded' }
   );
   await waitForGame(page);
@@ -588,6 +593,7 @@ try {
     dirty,
     browserExecutable: args.executable ?? full ?? 'Playwright default',
     queryTrial: args['query-trial'] ?? null,
+    rail: args.rail ?? 'none',
     frames,
     warmup,
     width,

@@ -3,6 +3,8 @@ blender -b assets/weapons/p320-compact/p320-compact.blend --python-exit-code 1 -
 """
 import json
 import math
+import sys
+from pathlib import Path
 import bpy
 from mathutils import Matrix, Vector
 s=bpy.context.scene;clips=json.loads(s['clips'])
@@ -27,6 +29,10 @@ assert len(surface.data.materials)==1
 assert len(surface.data.uv_layers)==2
 assert surface.data.uv_layers[1].name=='BaseColorUV'
 assert s['p320_color_panels']==13
+# The integral accessory rail must not protrude ahead of the loaded slide nose.
+frame=bpy.data.objects['Frame | continuous compact medium polymer shell']
+slide=bpy.data.objects['Slide | chamfered Nitron shell']
+assert max((frame.matrix_world@v.co).y for v in frame.data.vertices)<=max((slide.matrix_world@v.co).y for v in slide.data.vertices), 'accessory rail extends past slide nose'
 color_uv=surface.data.uv_layers['BaseColorUV'].data
 panels=surface.data.attributes['color_panel'].data
 marked_area=total_area=0
@@ -87,4 +93,15 @@ for o in bpy.data.collections['P320 | editable weapon'].objects:
     if o.type!='MESH':continue
     assert len(o.data.polygons)>0,o.name
     assert max((Vector(o.bound_box[6])-Vector(o.bound_box[0])).length,0)>.00001,o.name
+sys.path[:0] = [str(Path(__file__).resolve().parent), str(Path(__file__).resolve().parents[1])]
+from attachments import check_mounts, check_sight_emission
+check_sight_emission(surface)
+check_mounts(clips)
 print(f'P320_BLENDER_OK: 8 synchronized actions, wrists {maximum*1000:.4f} mm, mechanical skin/source matrix error {skin_error:.9f}, packed atlases, {marked_area/total_area:.1%} lettering UV1, rigid weights and discrete magazines')
+
+# Actual shared rail attachment, independent of the optic catalog.
+from tor_mini.mounts import check_laser_mount
+check_laser_mount('p320')
+
+from p320.suppressor import check_suppressor
+check_suppressor(clips)

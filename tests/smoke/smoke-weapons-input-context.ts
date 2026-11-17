@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import * as THREE from 'three';
 
+import m590Manifest from '../../assets/weapons/m590/manifest.json' with { type: 'json' };
 import { bindingLabel } from '../../src/core/bindings.ts';
 import { Input } from '../../src/core/input.ts';
 import { EventBus } from '../../src/core/registry.ts';
@@ -16,17 +17,19 @@ import { Movement } from '../../src/player/movement.ts';
 import type { RadioSystem } from '../../src/radio/index.ts';
 import type { UiSystem } from '../../src/ui/index.ts';
 import { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
+import { BASE_ATTACHMENTS } from '../../src/weapons/attachments.ts';
 import { ProjectileSim } from '../../src/weapons/ballistics.ts';
-import { Clip } from '../../src/weapons/clips.ts';
+import { buildManifestClips, Clip } from '../../src/weapons/clips.ts';
 import { WEAPON_IDS } from '../../src/weapons/defs.ts';
 import type { WeaponId } from '../../src/weapons/defs.ts';
 import { GRENADE_FUSE, MAX_SHOTS_PER_FRAME } from '../../src/weapons/index.ts';
 import type { WeaponEntry } from '../../src/weapons/runtime-types.ts';
-import type { Viewmodel } from '../../src/weapons/viewmodel.ts';
+import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { ArmedWeaponSystem, weaponState } from '../lib/ballistics-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
 import { fixture } from '../lib/fixture.ts';
 import { FRAME_SOURCES } from '../lib/frame-sources.ts';
+import { mountableWeapon, opticAsset, rigidAsset } from '../lib/weapon-attachment-fixture.ts';
 
 interface FrameOptions {
   down?: string[];
@@ -49,6 +52,7 @@ interface WeaponHarness {
 }
 function makeHarness(): WeaponHarness {
   const input = new Input(fixture<HTMLCanvasElement>({}), { sensitivity: 1, invertY: false });
+  input.pointerLocked = true;
   input._pollGamepad = (): void => {};
   for (const method of ['pressed', 'held', 'released'] as const) {
     input[method] = (): never => {
@@ -132,7 +136,7 @@ function makeHarness(): WeaponHarness {
       this.clip = null;
     },
     play(name): number {
-      this.clip = new Clip(name, 1, {});
+      this.clip = new Clip(name, 1, []);
       clips.push(name);
       return 1;
     },
@@ -152,8 +156,22 @@ function makeHarness(): WeaponHarness {
   });
   for (const id of WEAPON_IDS) wp.states.set(id, wp._makeState(id));
   const frame = ({ down = [], up = [], wheel = 0, dt = 1 / 60 }: FrameOptions = {}): void => {
-    for (const code of down) input._pendingDown.add(code);
-    for (const code of up) input._pendingUp.add(code);
+    for (const code of down) {
+      if (code.startsWith('Mouse'))
+        input._onMouseDown(
+          fixture<MouseEvent>({ target: input.canvas, button: Number(code.slice(5)) })
+        );
+      else
+        input._onKeyDown(
+          fixture<KeyboardEvent>({ code, repeat: false, preventDefault(): void {} })
+        );
+    }
+    for (const code of up) {
+      if (code.startsWith('Mouse'))
+        input._onMouseUp(fixture<MouseEvent>({ button: Number(code.slice(5)) }));
+      else
+        input._onKeyUp(fixture<KeyboardEvent>({ code, repeat: false, preventDefault(): void {} }));
+    }
     input._pendingWheel = wheel;
     input.beginFrame();
     wp.update(dt, wp.ctx);
@@ -164,25 +182,18 @@ function makeHarness(): WeaponHarness {
 }
 
 // Retain the real loadout boundary without separate per-weapon fake rigs.
-for (const [equip, first, second] of [
-  ['equipPrimary', 'lmg', 'sniper'],
-  ['equipSecondary', 'smg', 'shotgun'],
+for (const [primary, first, second] of [
+  [true, 'lmg', 'sniper'],
+  [false, 'smg', 'shotgun'],
 ] as const) {
   const { wp } = makeHarness();
   assert.deepEqual(wp.weaponIds, ['rifle', 'pistol']);
-  assert(
-    (equip === 'equipPrimary' ? wp.equipPrimary(first) : wp.equipSecondary(first)) &&
-      !(equip === 'equipPrimary' ? wp.equipPrimary(first) : wp.equipSecondary(first)),
-    'cannot rebuy the equipped weapon'
-  );
-  assert.deepEqual(wp.weaponIds, equip === 'equipPrimary' ? [first, 'pistol'] : ['rifle', first]);
+  assert(wp.applyBuild(first, BASE_ATTACHMENTS), 'a new gun replaces its own slot');
+  assert.deepEqual(wp.weaponIds, primary ? [first, 'pistol'] : ['rifle', first]);
   wp.state.mag = 1;
   assert(wp.reload());
-  assert(
-    (equip === 'equipPrimary' ? wp.equipPrimary(second) : wp.equipSecondary(second)) &&
-      !wp.owns(first)
-  );
-  assert.deepEqual(wp.weaponIds, equip === 'equipPrimary' ? [second, 'pistol'] : ['rifle', second]);
+  assert(wp.applyBuild(second, BASE_ATTACHMENTS) && !wp.owns(first));
+  assert.deepEqual(wp.weaponIds, primary ? [second, 'pistol'] : ['rifle', second]);
   assert(!wp.reloading && wp.tryFire(), 'mid-reload purchase is immediately usable');
   weaponState(wp, first).reserve = 0;
   wp.state.reserve = 1;
@@ -194,15 +205,92 @@ for (const [equip, first, second] of [
   assert.deepEqual(wp.weaponIds, ['rifle', 'pistol']);
   assert.equal(wp.activeId, 'rifle');
 }
+// Mounted laser switches belong to the gun, not the flashlight or active slot.
+{
+  const { wp, input, tap, frame, player } = makeHarness();
+  Object.assign(wp, { _attachments: { rmr: opticAsset(), laser: rigidAsset('SOCKET_laser') } });
+  Object.assign(wp.viewmodel, {
+    reticle: new THREE.Object3D(),
+    scopeOverlay: new THREE.Object3D(),
+  });
+  const rifle = wp.viewmodel.weapons.get('rifle');
+  assert(rifle);
+  Object.assign(rifle, { def: weaponState(wp, 'rifle').def, ...mountableWeapon('rifle') });
+  const irons = rifle.model.scene.getObjectByName('IRON_sights');
+  assert(irons);
+  const config = { ...BASE_ATTACHMENTS, rail: 'laser' } as const;
+  assert.equal(wp.state.laserEnabled, false);
+  tap('KeyL');
+  assert.equal(wp.state.laserEnabled, false, 'L cannot enable a missing module');
+  assert(wp.setAttachments('rifle', config));
+  assert(wp.state.laserEnabled, 'newly mounted module starts on');
+  tap('KeyF');
+  assert(wp.state.laserEnabled, 'F never toggles the laser');
+  frame({ down: ['KeyL'] });
+  assert(!wp.state.laserEnabled, 'L toggles independently of F');
+  frame();
+  assert(!wp.state.laserEnabled, 'holding L does not repeat');
+  frame({ up: ['KeyL'] });
+  wp.setWeaponImmediate('pistol');
+  tap('KeyL');
+  wp.setWeaponImmediate('rifle');
+  assert(!wp.state.laserEnabled, 'switching away and back preserves the per-gun switch');
+  assert(wp.setAttachments('rifle', { ...config, optic: 'rmr' }));
+  assert(!wp.state.laserEnabled, 'optic changes preserve an off switch');
+  for (const gate of [
+    'frozen',
+    'disabled',
+    'dead',
+    'control',
+    'grenade',
+    'radio',
+    'heal',
+  ] as const) {
+    input.frozen = gate === 'frozen';
+    input.enabled = gate !== 'disabled';
+    player.health.dead = gate === 'dead';
+    player.controlEnabled = gate !== 'control';
+    wp.grenadeEquipped = gate === 'grenade';
+    wp.radioEquipped = gate === 'radio';
+    wp.healing = gate === 'heal';
+    tap('KeyL');
+    assert(!wp.state.laserEnabled, `${gate} ignores L`);
+  }
+  player.controlEnabled = input.enabled = true;
+  input.frozen = player.health.dead = wp.grenadeEquipped = wp.radioEquipped = wp.healing = false;
+  tap('KeyL');
+  assert(wp.state.laserEnabled, 'a fresh live press toggles on');
+  wp._onPlayerDeath();
+  assert(!wp.state.laserEnabled, 'death switches off');
+  wp.disabled = false;
+  assert(wp.setAttachments('rifle', BASE_ATTACHMENTS));
+  assert(!wp.state.laserEnabled, 'removal switches off');
+  assert(wp.setAttachments('rifle', config) && wp.state.laserEnabled, 'remount starts on');
+  for (const drop of [
+    (): boolean => wp.applyBuild('lmg', BASE_ATTACHMENTS),
+    (): void => wp.resetForNewGame(),
+  ]) {
+    wp.resetForNewGame();
+    assert(wp.setAttachments('rifle', { ...config, optic: 'rmr' }));
+    assert(wp.state.laserEnabled);
+    assert(!irons.visible, 'a mounted optic replaces the removable irons');
+    assert(wp.state.def.adsFovScale !== undefined, 'the stored build drives ADS magnification');
+    drop();
+    assert.equal(weaponState(wp, 'rifle').attachments, BASE_ATTACHMENTS);
+    assert.equal(weaponState(wp, 'rifle').def.adsFovScale, undefined, 'drop/restart unzooms');
+    assert(!weaponState(wp, 'rifle').laserEnabled, 'drop/restart clears the switch');
+    assert(irons.visible, 'the mounted build is reset, not only the stored config');
+  }
+}
 {
   const { wp, shots } = makeHarness();
-  assert(wp.equipSecondary('shotgun') && wp.tryFire());
+  assert(wp.applyBuild('shotgun', BASE_ATTACHMENTS) && wp.tryFire());
   assert.equal(shots.fired, 8, 'one shotgun shell spawns eight pellets');
   assert.equal(wp._pendingShots, 1, 'pellets still produce one accepted-shot event');
 }
 {
   const { wp } = makeHarness();
-  assert(wp.equipPrimary('sniper') && wp.tryFire());
+  assert(wp.applyBuild('sniper', BASE_ATTACHMENTS) && wp.tryFire());
   assert(
     !wp.state.chambered && !wp.tryFire() && !wp.setWeapon('pistol'),
     'bolt cycle blocks fire/switch'
@@ -213,6 +301,36 @@ for (const [equip, first, second] of [
   assert.equal(wp.viewmodel.clipName, 'reloadEmpty');
   wp._completeReload(true);
   assert(wp.state.chambered && wp.state.mag === wp.current.magSize - 1);
+}
+
+// A tube reload restarts the same authored Clip from its end callback.
+{
+  const { wp } = makeHarness();
+  assert(wp.applyBuild('shotgun', BASE_ATTACHMENTS));
+  const vm = new Viewmodel(wp.ctx, wp.mats);
+  vm._solveHands = (): void => {};
+  vm.active = fixture<WeaponEntry>({
+    def: wp.current,
+    group: new THREE.Group(),
+    clips: buildManifestClips({ reloadTac: 'Reload_Tactical' }, m590Manifest.clips),
+    sight: new THREE.Vector3(),
+    mountedOptic: null,
+    animation: fixture<WeaponEntry['animation']>({ reset(): void {}, update(): void {} }),
+  });
+  wp.viewmodel = vm;
+  vm.onClipEvent = (name, clip): void => wp._onClipEvent(name, clip);
+  wp.state.mag = 0;
+  wp.state.reserve = 2;
+  const phases: string[] = [];
+  wp.ctx.events.on('weapon:reload', ({ phase }): void => {
+    phases.push(phase);
+  });
+  assert(wp.reload());
+  for (let i = 0; i < 120 && wp.reloading; i++) vm.update(1 / 60, wp._state);
+  assert(!wp.reloading, 'the repeated clip completes');
+  assert.deepEqual(phases, ['start', 'shellin', 'end', 'start', 'shellin', 'end']);
+  assert.equal(wp.ammo.mag, 3, 'both shells transfer alongside the chambered round');
+  assert.equal(wp.state.reserve, 0);
 }
 
 // Same-frame operations retain their order, independent of physical event order.
@@ -759,15 +877,16 @@ for (const [code, other, action, type] of [
   assert(wp.ctx.input.action('ads') && wp._throwing && !wp.cooking);
 }
 
-// A release during a frozen frame cannot advance the fuse/throw; resume still
+// A release queued before a frozen frame cannot advance the fuse/throw; resume still
 // observes the initiating action no longer held after the release edge expires.
 {
   const { wp, input, tap, frame } = makeHarness();
   tap('KeyG');
   frame({ down: ['Mouse0'] });
   const cookTime = wp._cookTime;
+  input._onMouseUp(fixture<MouseEvent>({ button: 0 }));
   input.frozen = true;
-  frame({ up: ['Mouse0'], dt: 1 });
+  frame({ dt: 1 });
   assert(wp.cooking && !wp._throwing && wp._cookTime === cookTime);
   input.frozen = false;
   frame();

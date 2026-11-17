@@ -24,6 +24,7 @@ import {
   rmSync,
   statSync,
   writeFileSync,
+  writeSync,
 } from 'node:fs';
 import { availableParallelism } from 'node:os';
 import { dirname, join, relative, resolve, sep } from 'node:path';
@@ -106,6 +107,7 @@ export const SOLDIER_STEP: AssetStep = {
 
 // Shared authoring sources outside a weapon's own tooling directory.
 const SHARED_TOOLS: Partial<Record<ModelId, string[]>> = {
+  mcx: ['tools/blender/review_hands.py', 'tools/blender/hand-reference.ts'],
   m4: ['tools/blender/hand-reference.ts'],
   p320: ['tools/blender/hand-reference.ts'],
   m590: ['tools/blender/hand-reference.ts'],
@@ -114,6 +116,19 @@ const SHARED_TOOLS: Partial<Record<ModelId, string[]>> = {
   mpx: ['tools/blender/review_hands.py', 'tools/blender/hand-reference.ts'],
 };
 const STANDALONE_TOOLS: Partial<Record<ModelId, string[]>> = {
+  srd762ti: ['tools/blender/suppressor', 'tools/blender/can.py'],
+  suppressor9mm: ['tools/blender/suppressor9mm', 'tools/blender/can.py'],
+  suppressor338: ['tools/blender/suppressor338', 'tools/blender/can.py'],
+  suppressor12g: ['tools/blender/suppressor12g', 'tools/blender/can.py'],
+  acog: [
+    'tools/blender/acog',
+    'tools/blender/mcx/primitives.py',
+    'tools/blender/mcx/materials.py',
+    'tools/blender/mcx/export.py',
+    'tools/blender/mcx/finishes.py',
+  ],
+  scope: ['tools/blender/scope'],
+  rmr: ['tools/blender/rmr'],
   exps3: ['tools/blender/exps3.py', 'tools/blender/exps3_bake.py'],
   tor_mini: ['tools/blender/tor_mini'],
 };
@@ -124,12 +139,17 @@ function cookStep(id: ModelId, salt: string[]): AssetStep {
   const tools = STANDALONE_TOOLS[id] ?? [`tools/blender/${id}`, ...(SHARED_TOOLS[id] ?? [])];
   return {
     id,
-    inputs: [...tools, ...authoredJson(directory)],
+    inputs: [...tools, 'tools/blender/picatinny.py', ...authoredJson(directory)],
     // Only this model's cook settings, so one profile edit rebuilds one model.
     salt: [...salt, JSON.stringify(MODEL_COOKS[id]), ...GLTFPACK_FLAGS, GLTFPACK_VERSION],
-    outputs: [`${directory}/${source}`, output],
+    // The editable .blend is used by authoring and attachment-fit checks.
+    outputs: [
+      `${directory}/${source}`,
+      output,
+      `${directory}/${source.replace(/\.glb$/, '.blend')}`,
+    ],
     commands: [
-      blender(id === 'exps3' ? tools[0] : `tools/blender/${id}/build.py`),
+      blender(tools[0].endsWith('.py') ? tools[0] : `${tools[0]}/build.py`),
       bun('build/models.ts', id),
     ],
   };
@@ -149,13 +169,15 @@ function listFiles(path: string): string[] {
 
 function inputHash(step: AssetStep): string {
   const hash = createHash('sha256').update([RECIPE, step.id, ...(step.salt ?? [])].join('\0'));
-  for (const path of step.inputs.flatMap(listFiles))
-    // CRLF checkouts alone must not trigger a Blender rebuild.
+  for (const path of step.inputs.flatMap(listFiles)) {
+    const bytes = readFileSync(join(ROOT, path));
+    // Normalize text checkouts without decoding the binary Blender dependencies.
     hash
       .update(path)
       .update('\0')
-      .update(canonicalText(readFileSync(join(ROOT, path))))
+      .update(path.endsWith('.blend') ? bytes : canonicalText(bytes))
       .update('\0');
+  }
   return hash.digest('hex');
 }
 
@@ -204,7 +226,26 @@ async function build(step: AssetStep): Promise<void> {
   const fd = openSync(log, 'w');
   let code = 0;
   try {
-    for (const command of step.commands) if ((code = await run(command, ['ignore', fd, fd]))) break;
+    for (const command of step.commands) {
+      const python = command.indexOf('--python');
+      const label =
+        python >= 0
+          ? `Blender ${command[python + 1]}`
+          : command[1] === 'build/models.ts'
+            ? 'gltfpack cook'
+            : (command[1] ?? command[0]);
+      const prefix = `[assets] ${step.id}: ${label}`;
+      const started = `${prefix}: starting`;
+      console.log(started);
+      writeSync(fd, `${started}\n`);
+      const commandStart = performance.now();
+      code = await run(command, ['ignore', fd, fd]);
+      const elapsed = ((performance.now() - commandStart) / 1000).toFixed(2);
+      const finished = `${prefix}: ${code ? `FAILED (exit ${code})` : 'finished'} in ${elapsed}s`;
+      console.log(finished);
+      writeSync(fd, `${finished}\n`);
+      if (code) break;
+    }
   } finally {
     closeSync(fd);
   }

@@ -2,9 +2,9 @@
 import math
 import bpy
 
-# These shallow traction ribs are projected into the normal atlas, not rendered.
+# Shallow details are baked onto their host instead of overlapping it at runtime.
 BAKE_ONLY = ('Mark |', 'Magazine release | ribs', 'Takedown lever | traction',
-             'Slide catch | serration')
+             'Slide catch | serration', 'SIGLITE |')
 
 
 def active(obj):
@@ -35,9 +35,12 @@ def build_surfaces(asset, sources):
             dissolve.angle_limit = math.radians(0.5)
             dissolve.delimit = {'NORMAL', 'MATERIAL'}
             bpy.ops.object.modifier_apply(modifier=dissolve.name)
-            reduce = obj.modifiers.new('Baked bevel reduction', 'DECIMATE')
-            reduce.ratio = 0.45
-            bpy.ops.object.modifier_apply(modifier=reduce.name)
+            # Collapsing this narrow helical ribbon grows its crest beyond
+            # the authored radius and into the booster's receiving sleeve.
+            if not source.name.startswith('Barrel | external muzzle thread'):
+                reduce = obj.modifiers.new('Baked bevel reduction', 'DECIMATE')
+                reduce.ratio = 0.45
+                bpy.ops.object.modifier_apply(modifier=reduce.name)
             low.append(obj)
         active(low[0])
         for obj in low:
@@ -62,7 +65,7 @@ def build_surfaces(asset, sources):
 
 
 def emphasize_marks(surfaces):
-    """Give existing UV islands carrying lettering/ribs extra texel density."""
+    """Preserve lettering/ribs and sub-millimetre SIGLITE insets in the atlas."""
     from mathutils.bvhtree import BVHTree
     for surface, sources in surfaces:
         mesh = surface.data
@@ -91,7 +94,7 @@ def emphasize_marks(surfaces):
         for source in sources:
             if not source.name.startswith(BAKE_ONLY):
                 continue
-            factor = 4
+            factor = 8 if source.name.startswith('SIGLITE |') else 4
             for vertex in source.data.vertices:
                 _, _, face, distance = tree.find_nearest(source.matrix_world @ vertex.co)
                 if face is not None and distance < .004:

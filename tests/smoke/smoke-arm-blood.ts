@@ -2,15 +2,37 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 
 import * as THREE from 'three';
+import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshStandardNodeMaterial, TextureNode, AttributeNode, type Node } from 'three/webgpu';
 import type { NodeBuilder } from 'three/webgpu';
 
 import { EventBus } from '../../src/core/registry.ts';
 import { Health } from '../../src/player/health.ts';
+import { loadArmAsset } from '../../src/weapons/arm-asset.ts';
 import { createArmBlood, addArmBloodCoordinates } from '../../src/weapons/arm-blood.ts';
 import { fixture } from '../lib/fixture.ts';
+import { captureMethod } from '../lib/render-fixture.ts';
 
 const blood = createArmBlood();
+// Invalid exported group references must fail at the asset boundary, not on .visible.
+const invalid = new THREE.SkinnedMesh(new THREE.BufferGeometry(), []);
+invalid.geometry.setIndex([0, 0, 0]);
+invalid.geometry.setAttribute('skinWeight', new THREE.Float32BufferAttribute([1, 0, 0, 0], 4));
+invalid.geometry.setAttribute('skinIndex', new THREE.Uint16BufferAttribute([0, 0, 0, 0], 4));
+invalid.geometry.addGroup(0, 3, 1);
+invalid.skeleton = new THREE.Skeleton([]);
+const scene = new THREE.Group();
+scene.add(invalid);
+const loadAsync = captureMethod(GLTFLoader.prototype, 'loadAsync');
+GLTFLoader.prototype.loadAsync = async (): Promise<GLTF> =>
+  fixture<GLTF & { then?: undefined }>({ scene }, ['then']);
+try {
+  await assert.rejects(loadArmAsset(), /Player arms: missing group material/);
+} finally {
+  GLTFLoader.prototype.loadAsync = loadAsync;
+  invalid.geometry.dispose();
+  invalid.skeleton.dispose();
+}
 const again = createArmBlood();
 assert.equal(blood.amount.value, 0, 'full-health arms start clean');
 assert.deepEqual(blood.texture.image.data, again.texture.image.data, 'mask is deterministic');

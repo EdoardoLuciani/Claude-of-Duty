@@ -8,22 +8,12 @@ import { isSkinnedMesh } from '../core/three-guards.ts';
 import { loadWeaponGLTF } from './asset-loader.ts';
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
 import { disposeAuthoredMixer } from './authored-actions.ts';
-import {
-  authoredModel,
-  requiredNode,
-  type AuthoredModelData,
-  type AuthoredNodes,
-} from './authored-model.ts';
+import { authoredModel, requiredNode, type AuthoredModelData } from './authored-model.ts';
 import { createAuthoredRig, sampleAuthoredPose } from './authored-rig.ts';
 import { buildManifestClips, type Clip } from './clips.ts';
 import type { WeaponAnimation } from './runtime-types.ts';
 
-type M590Model = AuthoredModelData<
-  'shotgun',
-  AuthoredNodes & {
-    opticGlass: null;
-  }
-> & {
+type M590Model = AuthoredModelData<'shotgun'> & {
   label: string;
   fxClass: string;
   reactiveFire: boolean;
@@ -38,12 +28,11 @@ const ALIASES: Record<string, string> = manifest.aliases;
 
 export function makeM590Model(gltf: GLTF): M590Model {
   const scene = gltf.scene;
-  const { root, animations, point } = authoredModel(
+  const { root, opticMountRest, animations, point } = authoredModel(
     gltf,
     'M590_RIG',
     ['Idle', ...Object.values(ALIASES)],
-    manifest.clips,
-    scene
+    manifest.clips
   );
   const converted = convertWeaponScene(scene, (_source, material): void => {
     for (const value of Object.values(material as object)) {
@@ -56,19 +45,13 @@ export function makeM590Model(gltf: GLTF): M590Model {
     fxClass: manifest.fxClass,
     scene,
     root,
+    opticMountRest,
     animations,
     reactiveFire: true,
     handPoses: { left: handReference.sides.left.grip, right: handReference.sides.right.grip },
     nodes: {
-      muzzle: point('SOCKET_muzzle'),
-      eject: point('SOCKET_ejection'),
       sight: point('SOCKET_sight'),
       ejectDir: manifest.ejectionDirection,
-      gripR: handReference.grips.right,
-      gripL: handReference.grips.left,
-      // Legacy below-mouth helper, not a detachable magazine or hull control.
-      magSeat: { pos: [0, -0.039, -0.068], rot: [1.2, 0, 0] },
-      opticGlass: null,
     },
     shell: manifest.shell,
     magSize: { len: manifest.shell.caseLen },

@@ -139,8 +139,7 @@ export function createCombatProfile(
     }),
   ];
   const setKey = (key: string, down: boolean): void => {
-    if (down && !input.down.has(key)) input._pendingDown.add(key);
-    if (!down && input.down.has(key)) input._pendingUp.add(key);
+    if (down !== input.down.has(key)) input._queueTransition(key, down);
   };
   const crossed = (frame: number, mark: number): boolean =>
     Math.floor((frame - mark) / report.cycleFrames) >
@@ -213,8 +212,11 @@ export function createCombatProfile(
       for (const unsubscribe of off) unsubscribe();
       for (const key of ['KeyW', 'KeyS', 'Mouse0', 'KeyR', 'Tab']) {
         input.down.delete(key);
-        input._pendingDown.delete(key);
-        input._pendingUp.delete(key);
+        for (let i = input._pendingCodes.length - 1; i >= 0; i--) {
+          if (input._pendingCodes[i] !== key) continue;
+          input._pendingCodes.splice(i, 1);
+          input._pendingStates.splice(i, 1);
+        }
       }
       input._rawLook.x = input._rawLook.y = 0;
     },

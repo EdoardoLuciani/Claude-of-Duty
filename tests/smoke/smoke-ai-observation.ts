@@ -10,6 +10,7 @@ import type { AiSystem } from '../../src/ai/index.ts';
 import type { BakedCoverPoint } from '../../src/ai/nav-format.ts';
 import { CoverMap, SurfaceNav } from '../../src/ai/nav.ts';
 import type { NavRoute } from '../../src/ai/nav.ts';
+import { Squad } from '../../src/ai/squad.ts';
 import { TACTICS, acquireSeconds } from '../../src/ai/tuning.ts';
 import { EventBus } from '../../src/core/registry.ts';
 import type { PhysicsSystem } from '../../src/physics/index.ts';
@@ -336,6 +337,62 @@ for (const width of [1, 14]) {
 // the second remains disconnected and must retain visible observation alternatives.
 const map = await loadMap(),
   grid = await SurfaceNav.load(map.surfaceRaw, map.physics);
+// A suspended observer cannot keep broadcasting a frozen visual contact.
+{
+  const ai = makeAi(grid),
+    descriptor = grid.ladders[0],
+    a = makeAgent({
+      ai,
+      phys: map.physics,
+      position: v().copy(descriptor.points[0]),
+      state: 'combat',
+      hasTarget: true,
+      targetVisible: true,
+      targetSample: 1,
+      lastKnown: v(0, 1.1, 10),
+      lastKnownKind: 'visual',
+      lastKnownAge: 0,
+      visualAge: 0,
+      animator: brainAnimator({ muzzleWorld: v() }),
+    });
+  ai.agents.push(a);
+  a.controller = map.physics.createCharacter({
+    position: a.position,
+    radius: a.radius,
+    height: a.height,
+  });
+  a.path[0] = v().copy(descriptor.points[0]);
+  a.path[1] = v().copy(descriptor.points[3]);
+  a.pathLen = 2;
+  a.hasMoveTarget = true;
+  a.route.ladderSteps.push({
+    ladderId: descriptor.id,
+    direction: 'up',
+    entryIndex: 0,
+    exitIndex: 1,
+  });
+  const squad = new Squad(a.rng);
+  squad.add(a);
+  squad.update(0);
+  assert.equal(squad.hasContact, true, 'initial personal sighting is shared');
+  a._move(1 / 60);
+  assert.ok(a.ladder, 'mount the real route traversal');
+  assert.equal(a.targetVisible, false, 'mounting immediately suspends current visibility');
+  assert.equal(a.targetSample, -1);
+  a._sense = a._think = a._shoot = (): never => assert.fail('ladder bypassed exclusive traversal');
+  a.update(0.25);
+  assert.equal(a.lastKnownAge, 0.25, 'evidence ages while waiting for a traversal proof');
+  assert.equal(a.visualAge, 0.25);
+  squad.update(0.25);
+  assert.equal(squad.contactAge, 0.25, 'waiting traversal cannot rebroadcast stale sight');
+  a.update(TACTICS.visualMemory);
+  assert.equal(a.lastKnownAge, TACTICS.visualMemory + 0.25);
+  assert.equal(a.visualAge, TACTICS.visualMemory + 0.25);
+  assert.equal(a.hasTarget, false, 'suspended acquisition expires');
+  squad.update(TACTICS.visualMemory);
+  assert.equal(squad.contactAge, a.visualAge, 'expired sight cannot refresh squad contact');
+  a.dispose();
+}
 for (const [from, target, reachable] of [
   [[-3.384, 0.091, -3.351], [-5.65, 8.16, 8.512], true],
   [[-12, 0.074, -17.265], [-12.943, 8.165, -6.762], false],

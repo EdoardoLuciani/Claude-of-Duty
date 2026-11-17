@@ -177,11 +177,10 @@ export function mergePrimitives(meshes: THREE.SkinnedMesh[]): THREE.BufferGeomet
     if (!index || index.count === 0)
       throw new Error('[models] primitive must have a nonempty triangle index');
     validateTriangleGeometry(g, '[models] mergePrimitives');
-    const src = index.array;
     let lo = Infinity;
     let hi = -1;
     for (let i = 0; i < index.count; i++) {
-      const v = src[i];
+      const v = index.getX(i);
       if (v < lo) lo = v;
       if (v > hi) hi = v;
     }
@@ -190,10 +189,8 @@ export function mergePrimitives(meshes: THREE.SkinnedMesh[]): THREE.BufferGeomet
   const totalVerts = parts.reduce((s, p): number => s + p.count, 0);
   const totalIdx = parts.reduce((s, p): number => s + p.index.count, 0);
 
-  const attrNames = Object.keys(first.geometry.attributes);
   const out = new THREE.BufferGeometry();
-  for (const name of attrNames) {
-    const a0 = first.geometry.attributes[name];
+  for (const [name, a0] of Object.entries(first.geometry.attributes)) {
     const itemSize = a0.itemSize;
     if (!Number.isInteger(itemSize) || itemSize < 1)
       throw new Error(
@@ -227,7 +224,7 @@ export function mergePrimitives(meshes: THREE.SkinnedMesh[]): THREE.BufferGeomet
       const n = p.count * itemSize;
       // Copy the primitive's own slice of the shared buffer (indices are
       // absolute, so the used range is [lo, lo+count)).
-      for (let i = 0; i < n; i++) arr[off + i] = a.array[p.lo * itemSize + i];
+      arr.set(a.array.subarray(p.lo * itemSize, (p.lo + p.count) * itemSize), off);
       off += n;
     }
     const attr = new THREE.BufferAttribute(arr, itemSize);
@@ -239,7 +236,7 @@ export function mergePrimitives(meshes: THREE.SkinnedMesh[]): THREE.BufferGeomet
   let voff = 0;
   let ioff = 0;
   for (const p of parts) {
-    for (let i = 0; i < p.index.count; i++) idxArr[ioff + i] = p.index.array[i] - p.lo + voff;
+    for (let i = 0; i < p.index.count; i++) idxArr[ioff + i] = p.index.getX(i) - p.lo + voff;
     ioff += p.index.count;
     voff += p.count;
   }

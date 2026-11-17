@@ -5,7 +5,7 @@ import { validateTriangleGeometry } from '../core/geometry-validation.ts';
 /** Connected collision components, computed offline (or at registration for test meshes). */
 export function solidIds(geometry: BufferGeometry): { ids: Float32Array; count: number } {
   validateTriangleGeometry(geometry, '[physics] solidIds');
-  const p = geometry.attributes.position;
+  const p = geometry.getAttribute('position');
   const parent = new Uint32Array(p.count);
   const welded = new Map<string, number>();
   for (let i = 0; i < p.count; i++) {
@@ -35,8 +35,12 @@ export function solidIds(geometry: BufferGeometry): { ids: Float32Array; count: 
   const ids = new Float32Array(p.count);
   for (let i = 0; i < p.count; i++) {
     const r = root(i);
-    if (!components.has(r)) components.set(r, components.size);
-    ids[i] = components.get(r)!;
+    let component = components.get(r);
+    if (component === undefined) {
+      component = components.size;
+      components.set(r, component);
+    }
+    ids[i] = component;
   }
   return { ids, count: components.size };
 }

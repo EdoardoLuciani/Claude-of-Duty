@@ -31,6 +31,7 @@ import {
 } from '../lib/ui-fixture.ts';
 
 const restoreDocument = installUiDocument();
+
 const game = new THREE.Renderer(
   new THREE.WebGPUBackend({ canvas: document.createElement('canvas') })
 );
@@ -246,7 +247,15 @@ const dprCanvas = dprHud.canvas;
 dprCanvas.width = 1918;
 dprCanvas.height = 1078;
 const dprView = new ViewSystem(dprHud.renderer);
-dprView.init({ canvas: dprCanvas, width: 1918, height: 1078, resolution: 1, autoDensity: true });
+// Keep this CPU-only layout test independent of WebGPU canvas-format discovery.
+dprView.init({
+  canvas: dprCanvas,
+  width: 1918,
+  height: 1078,
+  resolution: 1,
+  autoDensity: true,
+  format: 'bgra8unorm',
+});
 let dprResizes = 0;
 Object.defineProperty(dprHud.renderer, 'resolution', { get: (): number => dprView.resolution });
 Object.defineProperty(dprHud.renderer, 'screen', {
@@ -396,5 +405,4 @@ assert([prompt, banner, feed, score, count].every((m): boolean => !('root' in m)
 console.log(
   'ok mainline HUD: guarded shared device, constructor/init/cleanup isolation, adapter restoration and native-control teardown'
 );
-
 restoreDocument();

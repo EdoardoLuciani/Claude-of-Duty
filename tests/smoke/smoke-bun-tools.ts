@@ -49,7 +49,10 @@ if (args[0] === '-v') {
   assert.equal(flags[2], '-o');
   const scratchOutput = flags[3];
   assert(typeof scratchOutput === 'string');
-  assert.deepEqual(flags.slice(4), [...GLTFPACK_FLAGS, ...MODEL_COOKS.p320.flags]);
+  assert(!GLTFPACK_FLAGS.includes('-tj'), 'cache flags exclude machine-local scheduling');
+  // The thread count is machine-local; only its position is checked.
+  const threads = flags[5 + GLTFPACK_FLAGS.length];
+  assert.deepEqual(flags.slice(4), [...GLTFPACK_FLAGS, '-tj', threads, ...MODEL_COOKS.p320.flags]);
   assert(!existsSync(dirname(scratchOutput)), 'successful cook removes its scratch directory');
 
   const failed = spawnSync(BUN, args, {

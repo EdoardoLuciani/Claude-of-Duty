@@ -8,12 +8,7 @@ import { isSkinnedMesh } from '../core/three-guards.ts';
 import { loadWeaponGLTF } from './asset-loader.ts';
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
 import { sampleAuthoredFire, MAGAZINE_ALIASES, disposeAuthoredMixer } from './authored-actions.ts';
-import {
-  authoredModel,
-  requiredNode,
-  type AuthoredModelData,
-  type AuthoredNodes,
-} from './authored-model.ts';
+import { authoredModel, requiredNode, type AuthoredModelData } from './authored-model.ts';
 import { createAuthoredRig, sampleAuthoredPose } from './authored-rig.ts';
 import { buildMagazineClips, type Clip } from './clips.ts';
 import type { WeaponAnimation } from './runtime-types.ts';
@@ -24,22 +19,23 @@ const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(MAGAZINE_ALIASES
 
 export function makeP320Model(gltf: GLTF): P320Model {
   const scene = gltf.scene;
-  const { root, animations, point } = authoredModel(gltf, 'P320_RIG', REQUIRED, manifest.clips);
+  const { root, opticMountRest, animations, point } = authoredModel(
+    gltf,
+    'P320_RIG',
+    REQUIRED,
+    manifest.clips
+  );
   const model = {
     id: 'pistol' as const,
     label: 'P320 Compact',
     scene,
     root,
+    opticMountRest,
     animations,
     handPoses: { left: handReference.sides.left.grip, right: handReference.sides.right.grip },
     nodes: {
-      muzzle: point('SOCKET_muzzle'),
-      eject: point('SOCKET_ejection'),
       sight: point('SOCKET_sight'),
       ejectDir: [0.82, 0.52, 0.24],
-      gripR: handReference.grips.right,
-      gripL: handReference.grips.left,
-      magSeat: { pos: [0, -0.04, 0.025], rot: [0, 0, 0] },
     },
     shell: { caseLen: 0.0192, rimR: 0.00478 },
     magSize: { len: 0.09 },
@@ -61,7 +57,7 @@ export async function loadP320(
 
 /** Samples the actual Blender curves, including fingers. Upper/forearm IK is
  * the only runtime solve; wrists and finger contact are not reconstructed. */
-type P320Model = AuthoredModelData<'pistol', AuthoredNodes> & {
+type P320Model = AuthoredModelData<'pistol'> & {
   label: string;
   handPoses: {
     left: typeof handReference.sides.left.grip;

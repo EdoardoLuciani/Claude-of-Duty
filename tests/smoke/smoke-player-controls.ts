@@ -40,6 +40,7 @@ function fixture(): PlayerFixture {
     sensitivity: 0.002,
     invertY: false,
   });
+  input.pointerLocked = true;
   const player = new PlayerSystem();
   const events: HealEvent[] = [];
   const weapons = new WeaponSystem();
@@ -80,8 +81,14 @@ function fixture(): PlayerFixture {
   };
   player.movement.character = character;
   function frame({ down = [], up = [], steps = 2, dt = 1 / 60 }: FrameOptions = {}): void {
-    for (const code of down) input._pendingDown.add(code);
-    for (const code of up) input._pendingUp.add(code);
+    for (const code of down)
+      input._onKeyDown(
+        partialFixture<KeyboardEvent>({ code, repeat: false, preventDefault(): void {} })
+      );
+    for (const code of up)
+      input._onKeyUp(
+        partialFixture<KeyboardEvent>({ code, repeat: false, preventDefault(): void {} })
+      );
     ctx.time.frame++;
     ctx.time.elapsed += dt;
     ctx.time.dt = dt;
@@ -95,7 +102,9 @@ function fixture(): PlayerFixture {
 
 for (const steps of [0, 1, 3]) {
   const { input, player, ctx, frame } = fixture();
-  input._pendingDown.add('KeyF');
+  input._onKeyDown(
+    partialFixture<KeyboardEvent>({ code: 'KeyF', repeat: false, preventDefault(): void {} })
+  );
   assert.equal(
     input.actionPressed('flashlight'),
     false,
@@ -177,14 +186,47 @@ for (const steps of [1, 3]) {
   frame({ steps });
   assert.equal(player.stance, 'prone', 'held prone does not retoggle');
 }
+for (const [code, stance] of [
+  ['KeyC', 'crouch'],
+  ['KeyZ', 'prone'],
+] as const) {
+  const { player, frame } = fixture();
+  frame({ steps: 0, down: [code], up: [code] });
+  frame({ steps: 0 });
+  assert.equal(player.stance, 'stand', 'stance waits for physics');
+  frame({ steps: 3 });
+  assert.equal(player.stance, stance, 'zero-step tap survives until physics');
+  frame({ steps: 3 });
+  assert.equal(player.stance, stance, 'request is consumed exactly once');
+}
 {
   const { player, frame } = fixture();
-  frame({ steps: 0, down: ['KeyC'] });
-  assert.equal(player.movement.cmd.crouchPressed, true, 'zero-step update still latches the frame');
-  assert.equal(player.stance, 'stand', 'stance transitions wait for a fixed step');
+  Object.assign(player.movement.climbMotion, { active: true, y: 2, y0: 0, y1: 10 });
+  frame({ steps: 0, down: ['Space'], up: ['Space'] });
   frame({ steps: 0 });
-  assert.equal(player.movement.cmd.crouchPressed, false, 'held union is not a second edge');
+  frame({ steps: 1 });
+  assert.equal(player.movement.climbMotion.active, false, 'buffered ladder jump leaves the ladder');
+  assert.equal(player.movement.cmd.jump, false, 'ladder early return consumes the request');
+  frame({ steps: 2 });
+  assert(player.movement.velocity.y > 0, 'jump-off rise survives subsequent substeps');
 }
+{
+  const { player, input, frame } = fixture();
+  frame({ down: ['KeyC'] });
+  input._onKeyUp(
+    partialFixture<KeyboardEvent>({ code: 'KeyC', repeat: false, preventDefault(): void {} })
+  );
+  frame({ down: ['KeyC'] });
+  assert.equal(player.stance, 'stand', 'release/repress starts a fresh stance union');
+  frame({ steps: 0, down: ['KeyZ', 'Space'] });
+  player.setControlEnabled(false);
+  input.clear();
+  player.setControlEnabled(true);
+  frame();
+  assert.equal(player.stance, 'stand', 'handoff discards pending stance commands');
+  assert.equal(player.airborne, false, 'handoff discards pending jump buffer');
+}
+
 {
   const { player, frame } = fixture();
   frame({ down: ['KeyW', 'ShiftRight'] });

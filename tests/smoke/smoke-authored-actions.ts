@@ -55,13 +55,21 @@ for (const action of Object.values(native.actions)) {
   assert.equal(action.loop, THREE.LoopOnce);
   assert.equal(action.clampWhenFinished, true);
 }
+const fireAction = native.actions.Fire;
+assert(fireAction);
 sampleAuthoredAction(native, 'Fire', 2);
 assert.equal(root.position.x, 2);
-assert.equal(native.actions.Fire.time, 1);
+assert.equal(fireAction.time, 1);
 assert.equal(mixer.time, 0);
+assert.throws(
+  (): void => sampleAuthoredAction(native, 'Reload_Empty', 0),
+  /missing authored action 'Reload_Empty'/
+);
+assert.equal(native.name, 'Fire', 'missing gestures do not interrupt the current action');
+assert.equal(fireAction.isScheduled(), true);
 sampleAuthoredAction(native, 'Idle', 0.25);
 assert.equal(root.position.x, 0.5);
-assert.equal(native.actions.Fire.isRunning(), false);
+assert.equal(fireAction.isRunning(), false);
 disposeAuthoredMixer(native);
 assert.equal(mixer.stats.actions.inUse, 0);
 assert.equal(mixer.stats.actions.total, 0);

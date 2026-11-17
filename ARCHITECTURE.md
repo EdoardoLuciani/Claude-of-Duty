@@ -43,8 +43,8 @@ from their implementations, not handwritten consumer APIs. `Engine.add()` and
 
 `src/core/bindings.ts` owns default bindings, action IDs and labels. Input snapshots
 actions; gameplay consumers own their state machines. `src/ui/controls.ts` builds the
-pause-menu reference from the binding labels. Tab and wheel are cycle requests, not
-guaranteed swaps.
+pause-menu reference from the binding labels. F toggles the flashlight; L independently
+toggles the mounted weapon laser. Tab and wheel are cycle requests, not guaranteed swaps.
 
 Time contains `elapsed, raw, dt, fixed, alpha, scale, frame`; interpolate with
 `alpha`. Respect `config.q` feature flags and particle/decal/shadow budgets.
@@ -248,11 +248,17 @@ weapon-owned adapters in `src/weapons/`. M4/MCX adapters decode packed finish
 metadata. Rigid assemblies use ordinary meshes (EVOLYS skins only its belt); keep
 moving controls and magazines independent. The M590 is a provisional review
 prototype; its event-only clips share one mixer and shell insertion uses adapter-owned
-visibility, while damage and 6+1 accounting stay in the common weapon system.
+visibility, while damage and ammunition accounting stay in the common weapon system.
+All seven weapons export Blender-authored wrist/finger controls and sample them
+through the shared authored rig; upper/forearm IK remains runtime-owned. Editable
+weapon scenes include review-only arm skins, never duplicate weapon-GLB arms.
+Explicit hand-calibration tools update checked-in authoring data; normal builds
+consume that data without executing gameplay or rewriting calibration.
 
 `src/weapons/defs.ts` owns the tuning schema, IDs, slots and fire modes; check data
 against the schema. Key internal state by `WeaponId`; narrow DOM/URL/debug strings
-with `isWeaponId`. `weapons.ammo` always returns a complete snapshot; `mag` includes
+with `isWeaponId`. Adapter IDs and the loader table check complete per-ID coverage.
+`weapons.ammo` always returns a complete snapshot; `mag` includes
 the chamber, `inMag` excludes it. Preserve shared IK, ADS/sway/recoil and pooled
 casings. Weapons force physical materials and borrow source maps; arms use one
 opaque material per skeleton with packed texture arrays.
@@ -262,11 +268,79 @@ shares one Basis transcoder per renderer during boot, released at boot end, fail
 or teardown. Static map clones are shared only when source, UV, color space and
 sampler match.
 
-`weapons.createInspectionModel(id)` returns an independent rest-pose clone with
-`dispose()` for the market's 3D preview; geometry, materials and maps are borrowed.
-Selecting or inspecting never buys: only Buy/Swap changes loadout or credits. Model
-or renderer failures disable 3D inspection only, never purchases. Supply artwork is
-mapped in `src/ui/market-art.ts`; its offline sources live in `assets/ui/market/`.
+`weapons.createInspectionModel(id, config)` returns an independent rest-pose clone
+with `dispose()` for the market's demand-rendered WebGPU studio. Inspection owns
+transforms, skeletons and mixers; geometry, materials and maps are borrowed.
+UI releases clones on selection, close/restart/error, preserves the inspection
+angle on attachment changes and disposes stale async results. Inspection resolves
+omitted configs to the stored build and deduplicates by weapon ID and attachment
+values. DOM controls work while simulation is paused. Model failures affect only
+that selection; renderer failures disable 3D inspection, never purchases. Supply
+artwork is mapped in `src/ui/market-art.ts`; its offline sources live in
+`assets/ui/market/`.
+
+`WeaponState.attachments` is the gun's one stored build, an immutable
+`{ optic, muzzle, rail }` snapshot; null slots retain the base weapon, and
+`optic: null` uses irons. Viewmodel entries hold the mounted instances and their
+resolved data, never a copy of the build.
+`src/weapons/attachments.ts` owns the finite catalog (`rmr | acog | scope | exps3`
+optics, TOR Mini `laser`, one `suppressor`), validation, loading and the shared
+gameplay/inspection mount solver. `src/market/attachments.ts` owns prices, not
+compatibility. Market holds one unconfirmed build; selecting, inspecting or editing
+never changes gameplay or credits. Confirmation rechecks credits, shop state and
+asset readiness, then calls `weapons.applyBuild()` before charging. New weapons are
+configured before replacing ownership, so a rejected build never drops the old gun.
+
+`WeaponDef.fits` is a per-slot partial record keyed by attachment ID: each entry
+enables a verified fit and holds its data (`fits.optic[id].eyeRelief`, optional
+`railSlots` at `PICATINNY_PITCH`, `fits.muzzle.suppressor.model`; rail entries
+are empty). The player-facing muzzle ID is always `suppressor`; assets are keyed by
+can model. `isAttachmentConfig()` is the shared compatibility rule for gameplay,
+URL/debug input (narrowed once in `src/dev/attachments.ts` before prewarm) and
+`tools/capture.ts`; reject unverified fits, never silently change them.
+`removableIrons` swaps required `IRON_sights` for optional `IRON_sights_removed`
+with any optic; fixed irons stay and must clear it. `removableMuzzleDevice` similarly
+swaps required `MUZZLE_device` for optional `MUZZLE_device_removed`; permanent
+hardware stays under the can. Missing required nodes fail loading.
+
+`loadAttachments()` returns assets keyed by optic/rail ID or can model. A failed
+asset disables only that key, never the base weapon. Weapons own shared assets;
+mounts and inspection clones own transforms only. `weapons.setAttachments(id, config)`
+changes an owned, loaded weapon synchronously outside the frame loop.
+`mountAttachments()` validates all assets/datums before attaching groups under
+`MOUNT_optic`/`MOUNT_rail`/`MOUNT_muzzle` and switching base parts via
+`replacedNodes()`. Instances follow authored parents/animation, never a baked live
+pose; ADS uses the rest-pose optic datum in the weapon frame, while the reticle
+follows the live mount. The mount commit resolves the sight datum, eye relief,
+`OpticData`, laser emitter and muzzle socket on the viewmodel entry. Separately,
+`WeaponSystem` applies `buildStats()` to the gun's private runtime definition:
+`suppressed` for firing audio/FX and the optic's ADS FOV/sensitivity (undefined
+defers to player config). These are never authored on `WeaponDef`, and attachments
+change no ballistic/handling stats. Frame-time reticle, ADS, laser and fire
+consumers allocate nothing.
+
+Optics define `MOUNT_base` and `SOCKET_sight`; rigid attachments define
+`SOCKET_mount` plus `SOCKET_laser` or `SOCKET_muzzle`, in metres, -Z forward,
++Y up, unit scale. Catalog `OpticData` owns magnification, sensitivity, reticle,
+glass and scope presentation, not weapon class. Mounting resolves the active bore
+exit (a can's endcap, else the weapon's `SOCKET_muzzle`) once; `viewmodel.muzzleWorld()`
+reads it for ballistics/FX; ejection stays at `SOCKET_ejection`. A can's endcap shares
+the `SOCKET_muzzle` name, so the weapon's own socket is held from load as
+`baseMuzzleSocket`, never looked up by name on a mounted rig.
+Prewarm covers every loaded attachment and both iron/muzzle base states.
+
+Per-weapon datums/clearances live in `assets/weapons/*/README.md` and
+`assets/attachments/*/README.md`. Blender fit checks load built attachments through
+`attachment_source.py`; cans share `can.py`. `picatinny.py` owns common rail
+geometry, and `check_picatinny.py` checks actual rails/clamps against a slotted gauge.
+
+The laser owns one retained beam/dot mesh, no light/decal or per-frame allocation;
+boot warms it even without a module. One pooled bullet-mask query clips the rigid
+-Z emitter ray without damage/effects. Origin and direction share the first-person/world
+FOV mapping and are sampled after firing vibration, without camera-crosshair convergence.
+L toggles per-weapon state across swaps and pause/shop; new mounts start on,
+removal/drop/restart/death switch off. Busy hands hide the beam and block L.
+The laser changes no AI perception; the flashlight keeps separate light ownership.
 
 `tools/blender/soldiers/` builds seeded parametric soldiers; a Bun GLTFExporter cook
 preserves the runtime joint/attribute format. `tools/export-models.ts` validates and
@@ -283,7 +357,10 @@ synthesis is only UI/electronic feedback, healing cues, tinnitus and shop music.
 Requests without a matching recording stay silent. Explosions carry optional
 `kind: 'grenade' | 'bomb'` (default grenade). Radio owns aircraft lifetime; audio
 owns source cleanup. Empty triggers click without a shot, flash or AI hearing
-evidence. Callout provenance is `src/audio/samples/callouts/provenance.json`; there
+evidence. Player firearm reports select explicit suppressed/unsuppressed banks from
+the effective firing definition, never a fixed profile or another weapon's bank.
+Donor/calibre decisions live in `src/audio/samples/weapon-reports-provenance.json`.
+Callout provenance is `src/audio/samples/callouts/provenance.json`; there
 is no runtime TTS or credential access.
 
 ## Prewarm

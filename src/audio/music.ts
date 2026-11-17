@@ -167,6 +167,7 @@ export class TentRadio {
   _gain: GainNode | null = null;
   _lfo: OscillatorNode | null = null;
   playing: boolean = false;
+  private _request: number = 0;
 
   constructor(actx: BaseAudioContext, mixer: TentRadioMixer, rng: Rng) {
     this.actx = actx;
@@ -191,7 +192,9 @@ export class TentRadio {
 
   async start(): Promise<void> {
     if (this.playing) return;
+    const request = this._request;
     if (!this._buf) await this.warm();
+    if (request !== this._request) return;
     // oxlint-disable-next-line typescript/no-unnecessary-condition -- warm() and other callers race across the await
     if (!this._buf || this.playing) return;
     this.playing = true;
@@ -220,6 +223,7 @@ export class TentRadio {
   }
 
   stop(): void {
+    this._request++;
     if (!this.playing) return;
     this.playing = false;
     const t = this.actx.currentTime;

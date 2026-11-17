@@ -18,7 +18,9 @@ bun run models:cook -- p320 /tmp/p320-review
 
 The encoder writes to a temporary directory before replacing the destination.
 Runtime outputs use `.runtime.glb`; their container is still GLB, regardless of
-embedded texture formats.
+embedded texture formats. Textures use UASTC quality 8 at their authored resolutions.
+Each cook gets one quarter of the available CPUs (at least one thread), sharing
+the CPU budget with the asset pipeline's bounded model pool.
 
 To opt in another model, register its source directory, native export, runtime
 output and any model-specific flags in `MODEL_COOKS`. Wire its loader to the
@@ -31,13 +33,13 @@ uses those values alongside the original detail maps. MCX similarly decodes fini
 identity from UV1; ordinary external GLB viewers are not material-fidelity references.
 M4, MPX and AX338 use ordinary rigid meshes; EVOLYS retains only its deforming
 belt skin. Their moving controls remain ordinary transforms rather than full-body
-mechanical skins. MPX body lenses use constant optical factors; solid covers
-retain their ordinary pivots without lens/cap selectors.
+mechanical skins. MPX is a one-material opaque iron-sight base; its deployed/folded irons and
+thread protector/suppressor adapter retain separate rigid visibility owners.
 AX338 keeps full geometry where simplification damaged panel detail.
 M590 keeps its shell separate from the mechanical skin, with exact STEP visibility;
 its source checker narrowly bounds one approved shared-glove contact below 30 µm.
 EXPS3 uses a tighter error limit to preserve its optical
-opening; its cooked attachment is not yet wired into gameplay. TOR Mini preserves
-its native geometry without simplification and also remains standalone; see its
+opening; it loads through the shared optic catalog on all seven weapons. TOR Mini preserves
+its native geometry without simplification and uses their shared laser slot; see its
 [asset review/commands](../assets/attachments/steiner-tor-mini/README.md). Other models
 are not converted by these profiles.

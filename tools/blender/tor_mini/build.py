@@ -21,6 +21,8 @@ ROOT = Path(__file__).resolve().parents[3]
 OUT = ROOT / 'assets/attachments/steiner-tor-mini'
 MM = .001
 HIGH = False
+sys.path.insert(0,str(ROOT/'tools/blender'))
+import picatinny
 
 
 def active(obj):
@@ -258,8 +260,8 @@ def geometry(mats):
     # The upper face is a recessed open rail channel, not an added Picatinny rail.
     base = prism('Mount channel floor',[(-9.5,-4.8),(26.3,-4.8),(26.3,-.15),
         (-.3,-.15),(-7.8,-4.0),(-9.5,-4.0)],-12.3,12.3,mats['mount'],root,bevel=.2)
-    cut(base, box('CUT locking-key pocket', (0,7,-.2), (6,13,1.8), None, root, .8))
-    box('Sliding rail key', (0,7,-.55), (5.3,4.2,1.4), mats['mount'], root, .3)
+    cut(base, box('CUT locking-key pocket', (0,0,-.2), (6,5.0,1.8), None, root, .3))
+    key=box('Sliding rail key', (0,0,.7), (5.3,4.2,3.4), mats['mount'], root, .1)
     for side in (-1,1):
         # Six small rail-bar indexing bores on the inner wall are visible in front-quarter photos.
         jaw_profile = [(-7.8,-6.7),(24.4,-6.7),(24.4,-.5),(26.6,1.8),
@@ -270,6 +272,11 @@ def geometry(mats):
         for i in range(6):
             cut(jaw, cyl('CUT indexing bore', (side*10.4,-.2+i*4.3,4.0), .72, 3.6,
                 None, root, 'X', 0, 24))
+        # Chamfer the non-bearing upper inner shoulder, not the rail purchase.
+        # A square 6.35mm corner crossed the M4's adjacent diagonal handguard face.
+        # Retain the external bar height/manufacturer envelope and the full rail grip.
+        cut(jaw,prism('CUT inner clamp shoulder',[(side*9.9,5.1),(side*9.9,8),(side*12.8,8)],
+                      -8,27,mats['mount'],root,'Y',0))
         # Inward-facing 45-degree rail purchase. Fit datum remains art-inferred.
         prism('Rail purchase '+str(side), [(side*10.2,.9),(side*8.7,2.4),
             (side*10.2,3.9)], .8,23.8,mats['mount'],root,'Y',.06)
@@ -282,6 +289,9 @@ def geometry(mats):
         # Exposed pads in the rail bed, visible in the reference front/rear quarters.
         prism('Rail bed polished pad '+str(y),rounded(-3.45,3.45,y-3.2,y+3.2,.7),
             -.12,.18,mats['silver'],root,'Z',.04)
+    # The underside rail has the same section, turned over about its contact plane.
+    parts=[o for o in root.children_recursive if o.type=='MESH' and o!=key]
+    picatinny.cut_channel(parts,Matrix.Diagonal((1,-1,-1,1)),-.027,.010)
     # Rear boot: gently tapered rounded sections preserve its sculpted silhouette.
     sections = [(-26.6,10.3,-13.5,7.9),(-25.8,13.5,-13.3,9.0),
         (-23.5,15.8,-13.0,10.0),(-18,16.35,-12.9,10.6),

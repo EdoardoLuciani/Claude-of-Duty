@@ -4,6 +4,8 @@ Do not confuse surface contact/support or explicit clearance with factory CAD.
 """
 import json
 import math
+import sys
+from pathlib import Path
 import bpy
 from mathutils import Matrix, Vector
 from mathutils.bvhtree import BVHTree
@@ -109,6 +111,10 @@ assert attached(pick('A2 sculpted grip'),lower),'grip is not supported by receiv
 assert attached(pick('SOPMOD rubber buttpad'),pick('LMT SOPMOD body')),'buttpad is not supported'
 assert attached(pick('Charging handle stem'),pick('Charging T bow')),'charging bow is not supported by stem'
 assert attached(pick('A2 gas boss'),pick('A2 tower casting')),'FSB tower has no gas-boss support'
+assert all(o.parent==bpy.data.objects['IRON_sights'] for o in rear+pick(('A2 gas boss','A2 tower casting','Front sight '))),'removable irons lost assembly ownership'
+assert attached(pick('Low-profile gas collar'),pick('Low-profile gas tube seat')),'replacement gas-block seat is detached'
+assert not tree(pick('Gas tube')).overlap(tree(pick('Low-profile '))),'replacement block obstructs the gas tube'
+assert bounds(pick('Low-profile '))[1][1]<.094,'replacement gas block exceeds the optic clearance envelope'
 assert attached(pick('Brass deflector'),upper),'deflector casting is detached'
 assert attached(pick('Forward assist housing'),upper),'forward-assist housing is detached'
 assert attached(pick('Forward assist housing'),pick('Forward assist paddle')),'forward-assist button is detached'
@@ -146,6 +152,10 @@ assert attached(pick('USGI floorplate'),pick('USGI formed aluminum body')),'maga
 # Include the fasteners in the handguard exterior, not a shell-only envelope.
 guard=pick('RIS II')
 lo,hi=bounds(guard);near(hi[2]-lo[2],.31115);near(hi[0]-lo[0],.056642);near(hi[1]-lo[1],.05715)
+rail=bpy.data.objects['MOUNT_rail']
+assert (CI@rail.matrix_world.translation-Vector((.028321,.075,-.4101216))).length<1e-6,'right-rail contact datum moved'
+assert (CI@(rail.matrix_world.to_3x3()@Vector((0,0,-1)))-Vector((1,0,0))).length<1e-6,'laser body must sit outboard'
+assert (CI@(rail.matrix_world.to_3x3()@Vector((0,1,0)))-Vector((0,0,-1))).length<1e-6,'laser must face forward'
 front=bpy.data.objects['SOCKET_front_post'];sight=bpy.data.objects['SOCKET_sight']
 f=CI@front.matrix_world.translation;s=CI@sight.matrix_world.translation
 near(f.x,s.x,.00001);near(f.y,s.y,.00001)
@@ -168,6 +178,12 @@ face=CI@bpy.data.objects['SOCKET_bolt_face'].matrix_world.translation
 crown=CI@bpy.data.objects['SOCKET_barrel_crown'].matrix_world.translation
 near((face-crown).length,.3683,.00001)
 flash=pick('FH556RC');lo,hi=bounds(flash);near(hi[2]-lo[2],.06604)
+assert all(o.parent.name=='MUZZLE_device' for o in flash),'flash hider must remove as one assembly'
+muzzle=bpy.data.objects['MOUNT_muzzle']
+seat=CI@rig.matrix_world.inverted()@muzzle.matrix_world
+assert (seat.translation-Vector((0,.075,crown.z+.013))).length<1e-6,'muzzle seat must meet the barrel shoulder'
+assert (seat.to_3x3()@Vector((0,1,0))-Vector((0,0,-1))).length<1e-6,'suppressor must point down the bore'
+assert not tree(pick('Muzzle thread')).overlap(tree(pick('M4 thread adapter'))),'adapter must clear barrel threads'
 # The nominal gauge is clear inside the rail. Allow the disclosed polygon chord
 # tolerance (.1 mm diameter), not a silent change to the published 29.210 mm.
 guard_tree=tree(guard);radius=.014555
@@ -187,3 +203,35 @@ for z in (-.430,-.350,-.250,-.155):
         hit,_,_,distance=guard_tree.ray_cast(Vector((0,.075,z)),direction,.06)
         assert hit is None or distance>=radius,f'RIS II 29.210 mm gauge is obstructed at {z}/{i}: {distance}'
 print('M4_GEOMETRY_OK: supported assembly, open aligned irons, 368.300 mm barrel / RIS II complete envelope / 66.040 mm flash hider')
+
+# Actual shared optics, including both deformed hands throughout every native clip.
+# The separate gauge check distinguishes rail seating from penetration.
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+import attachment_source
+pose('Idle')
+mounted={};loaded=[]
+for id in attachment_source.OPTICS:
+    objects=attachment_source.seat(id,bpy.data.objects['MOUNT_optic'],weapon='m4');loaded.extend(objects)
+    mounted[id]=tree([o for o in objects if o.type=='MESH'])
+fixed=tree([o for o in meshes if o.parent.name in ('receiver','handguard','IRON_sights_removed') and
+            not o.name.startswith(('Upper receiver rail','RIS II top tooth','RIS II top web'))])
+for id,target in mounted.items():
+    assert not target.overlap(fixed),(id,'non-mating body intersection')
+hands=[o for o in scene.objects if o.type=='MESH' and any('authored hands' in c.name for c in o.users_collection)]
+moving=[o for o in meshes if o.parent.name not in ('receiver','handguard','IRON_sights','IRON_sights_removed','MUZZLE_device','MUZZLE_device_removed')]
+count=0
+for name,info in clips.items():
+    for frame in range(math.ceil(info['duration']*120)+1):
+        pose(name,min(frame/120,info['duration']))
+        vertices,faces=geometry(hands,evaluated=True)
+        skin=BVHTree.FromPolygons(vertices,faces,all_triangles=True)
+        mechanism=tree([o for o in moving if min(o.scale)>.5])
+        for id,target in mounted.items():
+            assert not target.overlap(skin),(id,name,frame,'optic/hand intersection')
+            assert not target.overlap(mechanism),(id,name,frame,'optic/mechanism intersection')
+        count+=1
+pose('Idle')
+for obj in loaded:bpy.data.objects.remove(obj,do_unlink=True)
+print('M4_OPTIC_CLEARANCE_OK:',count,'120Hz poses; four real optics, both hands and mechanisms; no contact-window exemptions')
+from tor_mini.mounts import check_laser_mount
+check_laser_mount('m4')

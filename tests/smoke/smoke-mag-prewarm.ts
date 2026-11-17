@@ -19,7 +19,17 @@ const geometry = new THREE.BoxGeometry(),
 const magazine = new THREE.Group();
 magazine.add(new THREE.Mesh(geometry, material));
 const group = new THREE.Group();
-group.add(magazine);
+const irons = new THREE.Group();
+irons.name = 'IRON_sights';
+const ironsRemoved = new THREE.Group();
+ironsRemoved.name = 'IRON_sights_removed';
+ironsRemoved.visible = false;
+const muzzleDevice = new THREE.Group();
+muzzleDevice.name = 'MUZZLE_device';
+const muzzleAdapter = new THREE.Group();
+muzzleAdapter.name = 'MUZZLE_device_removed';
+muzzleAdapter.visible = false;
+group.add(magazine, irons, ironsRemoved, muzzleDevice, muzzleAdapter);
 group.visible = false;
 const radio = new THREE.Group();
 radio.visible = false;
@@ -27,6 +37,9 @@ const scopeOverlay = new THREE.Group();
 scopeOverlay.visible = false;
 const reticle = new THREE.Group();
 reticle.visible = false;
+const reticleRing = new THREE.Mesh(new THREE.RingGeometry(0.84, 1), material);
+reticleRing.visible = false;
+reticle.add(reticleRing);
 const grenade = new THREE.Group();
 grenade.visible = false;
 const scene = new THREE.Scene(),
@@ -37,13 +50,20 @@ let calls = 0,
     throw Error('warmup resolver missing');
   };
 const flashlight = new THREE.SpotLight();
-const weapon = fixture<WeaponEntry>({ id: 'rifle', group, parts: { magazine }, magLen: 0.15 });
+const weapon = fixture<WeaponEntry>({
+  id: 'rifle',
+  group,
+  parts: { magazine },
+  magLen: 0.15,
+  model: fixture<WeaponEntry['model']>({ id: 'rifle', scene: group, root: group }),
+});
 const system = new WeaponSystem();
 system._droppedMags = [];
 system.viewmodel = fixture<WeaponSystem['viewmodel']>({
   radio,
   scopeOverlay,
   reticle,
+  reticleRing,
   grenade,
   weapons: new Map([['rifle', weapon]]),
 });
@@ -59,12 +79,14 @@ const render = fixture<RenderSystem>({
   },
   _warmGraph(): ReturnType<RenderSystem['_warmGraph']> {
     calls++;
+    assert(irons.visible && ironsRemoved.visible, 'warm both independent iron-sight variants');
+    assert(muzzleDevice.visible && muzzleAdapter.visible, 'warm both muzzle states');
     assert.equal(scene.children.length, 3);
     assert.equal(system.pickups.items.length, 0);
     assert.equal(system.pickups._nextId, 1);
     assert(scene.children.every((o): boolean => o.visible));
     assert(
-      scopeOverlay.visible && reticle.visible && grenade.visible,
+      scopeOverlay.visible && reticle.visible && reticleRing.visible && grenade.visible,
       'hidden optics/grenade ancestors must be warmed'
     );
     return new Promise<Awaited<ReturnType<RenderSystem['_warmGraph']>>>((resolve): void => {
@@ -102,6 +124,7 @@ assert.equal(scene.children.length, 0);
 loaded();
 await Promise.resolve();
 assert.equal(calls, 1);
+assert.equal(muzzleAdapter.visible, true, 'muzzle adapter remains warm until completion');
 const graphWarm = { ms: 12, geometries: 8, frameUnchanged: true };
 finish(graphWarm);
 const report = await pending;
@@ -110,8 +133,13 @@ assert.equal(system.prewarmMaterials(), pending, 'completed work stays cached');
 assert.equal(calls, 1, 'completion never repeats native warmup');
 assert.equal(radio.visible, false);
 assert.equal(group.visible, false);
+assert(irons.visible);
+assert.equal(ironsRemoved.visible, false);
+assert(muzzleDevice.visible);
+assert.equal(muzzleAdapter.visible, false, 'restore the base muzzle after warmup');
 assert.equal(scopeOverlay.visible || reticle.visible, false);
 assert.equal(grenade.visible, false);
+assert.equal(reticleRing.visible, false);
 assert.equal(scene.children.length, 2, 'temporary ammo visual was removed');
 for (const p of system._droppedMags) {
   assert.equal(p.group.visible, false);
@@ -174,11 +202,14 @@ for (const [provider, ok] of cases) {
   else assert.deepEqual(summary.hooks.weapons, { ok: false, reason: failure.message });
 }
 assert.equal(failures, 1);
+assert(muzzleDevice.visible);
+assert.equal(muzzleAdapter.visible, false, 'failed warmup restores the muzzle too');
 assert.equal(radio.visible, false);
 assert.equal(group.visible, false);
 assert(system._droppedMags.every((p): boolean => !p.group.visible));
 assert.equal(scopeOverlay.visible || reticle.visible, false);
 assert.equal(grenade.visible, false);
+assert.equal(reticleRing.visible, false);
 assert.equal(system._droppedMags[0].body, body);
 assert.equal(scene.children.length, 2);
 assert.equal(system.pickups.items.length, 0);

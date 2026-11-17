@@ -5,7 +5,7 @@ import type { Assembler } from './builder.ts';
 import type { BuildingInfo, RoomKind } from './buildings.ts';
 import { BOX, BOX_FINE, BOX_THIN, IDENT, LL, rubbleMound } from './kit.ts';
 import type { RectXZ } from './util.ts';
-import { clothGeometry, patchGeometry, chamferBox, fillMasks, overlapsRect } from './util.ts';
+import { clothGeometry, chamferBox, fillMasks } from './util.ts';
 
 export interface RoomSpec extends RectXZ {
   kind: RoomKind;
@@ -28,8 +28,6 @@ interface RoomSide {
   len: number;
   yaw: number;
 }
-
-const _box = new THREE.Box3();
 
 function inDoorway(r: Pick<RoomSpec, 'doors'>, x: number, z: number, rad = 1.25): boolean {
   for (const d of r.doors) {
@@ -54,16 +52,6 @@ const overlap = (a0: number, a1: number, b0: number, b1: number): number =>
     0,
     Math.min(Math.max(a0, a1), Math.max(b0, b1)) - Math.max(Math.min(a0, a1), Math.min(b0, b1))
   );
-
-/** Flat patches are cooked collision: any part over a stair void caps the shaft. */
-function patchOverVoid(
-  r: Pick<RoomSpec, 'voids'>,
-  g: THREE.BufferGeometry,
-  matrix: THREE.Matrix4
-): boolean {
-  _box.copy(g.boundingBox!).applyMatrix4(matrix);
-  return (r.voids ?? []).some((v): boolean => overlapsRect(_box, v!));
-}
 
 function inVoid(r: Pick<RoomSpec, 'voids'>, x: number, z: number): boolean {
   for (const v of r.voids ?? []) {
@@ -160,17 +148,7 @@ export function furnishRoom(A: Assembler, rng: Rng, r: RoomSpec): void {
   if (w < 1.2 || d < 1.2) return;
   const cx = (x0 + x1) / 2;
   const cz = (z0 + z1) / 2;
-  // floor dressing everybody gets: dust patches, plaster fall, litter
-  const patches = rng.int(2, 4);
-  for (let i = 0; i < patches; i++) {
-    const g = patchGeometry(rng, rng.range(0.4, 1.1), { lobes: 8, wobble: 0.5 });
-    const px = rng.range(x0 + 0.3, x1 - 0.3);
-    const pz = rng.range(z0 + 0.3, z1 - 0.3);
-    const pry = rng.float() * 6.28;
-    const matrix = LL(IDENT, px, y + 0.012, pz, pry);
-    if (!patchOverVoid(r, g, matrix)) A.addOnce('dirt', g, matrix, { masks: [0.1, 0.8, 0.5] });
-    else g.dispose();
-  }
+  // floor dressing everybody gets: plaster fall, litter
   for (let i = 0; i < rng.int(4, 9); i++) {
     const px = rng.range(x0 + 0.2, x1 - 0.2);
     const pz = rng.range(z0 + 0.2, z1 - 0.2);
@@ -388,14 +366,6 @@ function dressWalls(A: Assembler, rng: Rng, r: RoomSpec): void {
     const nWedge = Math.max(2, Math.round(s.len / 1.5));
     for (let i = 0; i < nWedge; i++) {
       const wt = ((i + rng.range(0.2, 0.8)) / nWedge - 0.5) * s.len;
-      const [wx, wz] = at(s, wt, rng.range(0.05, 0.3));
-      const g = patchGeometry(rng, rng.range(0.3, 0.75), { lobes: 9, wobble: 0.55 });
-      const wry = rng.float() * 6.28;
-      const wsz = rng.range(0.35, 0.6);
-      const matrix = LL(IDENT, wx, y + 0.011, wz, wry, 1, 1, wsz);
-      if (!patchOverVoid(r, g, matrix)) {
-        A.addOnce('dirt', g, matrix, { masks: [0.1, 0.85, 0.55] });
-      } else g.dispose();
       if (rng.float() < 0.7) {
         const [cx2, cz2] = at(s, wt + rng.range(-0.3, 0.3), rng.range(0.06, 0.34));
         if (inDoorway(r, cx2, cz2)) continue;

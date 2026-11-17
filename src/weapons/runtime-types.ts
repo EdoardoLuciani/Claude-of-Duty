@@ -1,8 +1,9 @@
 import type * as THREE from 'three';
 
 import type { EngineContext, EngineSystems } from '../core/context.ts';
+import type { AttachmentConfig, BuildStats } from './attachments.ts';
 import type { loadAX338 } from './ax338.ts';
-import type { Clip, ClipSample } from './clips.ts';
+import type { Clip } from './clips.ts';
 import type { WeaponDef, WeaponId, WeaponMode } from './defs.ts';
 import type { loadEvolys } from './evolys.ts';
 import type { Arm } from './hands.ts';
@@ -13,7 +14,11 @@ import type { loadMPX } from './mpx.ts';
 import type { loadP320 } from './p320.ts';
 
 export interface WeaponState {
-  def: WeaponDef;
+  /** Private copy of the authored definition plus the stored build's stats. */
+  def: WeaponDef & BuildStats;
+  /** The gun's one stored build; its viewmodel entry only holds the mounted instances. */
+  attachments: AttachmentConfig;
+  laserEnabled: boolean;
   pattern: Float32Array;
   mag: number;
   chambered: boolean;
@@ -31,53 +36,29 @@ export type AuthoredModels = {
   shotgun: Awaited<ReturnType<typeof loadM590>>;
 };
 export type AuthoredWeaponModel = AuthoredModels[WeaponId];
-export interface GripData {
-  pos: number[];
-  finger?: number[];
-  back?: number[];
-}
-export interface TransformData {
-  pos: number[];
-  rot?: number[];
-}
-export interface CylinderContact {
-  axis: [number, number, number];
-  dir: [number, number, number];
-  r: number;
-  z0: number;
-  z1: number;
-}
 export interface OpticData {
-  kind?: string;
-  reticle?: string;
-  center: number[];
+  kind?: 'scope';
+  reticle?: 'chevron' | 'p4fl';
   apertureR?: number;
   dotMoa?: number;
+  ringMoa?: number;
   minDotPixels?: number;
   dotOpacity?: number;
-}
-export interface WeaponNodes {
-  sight: number[];
-  muzzle: number[];
-  eject: number[];
-  ejectDir?: number[];
-  opticGlass?: OpticData | null;
-  magSeat: { pos: number[]; rot: number[] };
-  gripR: GripData;
-  gripL: GripData;
-  chargePull?: number[];
-  boltTravel?: number[];
-  triggerPull?: number;
-  chargeRest?: TransformData;
-  boltRest?: TransformData;
-  triggerPivot?: TransformData;
-  selectorPivot?: TransformData;
-  supportContact?: CylinderContact;
-  handguard?: { axis: number[]; dir: number[]; r: number; z0: number; z1: number };
 }
 export type WeaponModelRecord = AuthoredWeaponModel;
 export interface WeaponEntry {
   id: WeaponId;
+  opticGroup: THREE.Group;
+  railGroup: THREE.Group;
+  muzzleGroup: THREE.Group;
+  /** The weapon's own `SOCKET_muzzle`, resolved before any can (whose endcap shares
+   * that name) is mounted. Never look the bore exit up by name afterwards. */
+  readonly baseMuzzleSocket: THREE.Object3D;
+  /** Active bore exit: a mounted can's endcap, else `baseMuzzleSocket`. */
+  muzzleSocket: THREE.Object3D;
+  laserEmitter: THREE.Object3D | null;
+  /** Mounted optic: live parent, mount-local sight datum and catalog presentation. */
+  mountedOptic: { mount: THREE.Object3D; sight: THREE.Vector3; optic: OpticData } | null;
   def: WeaponDef;
   model: WeaponModelRecord;
   group: THREE.Object3D;
@@ -87,12 +68,9 @@ export interface WeaponEntry {
   animation: WeaponAnimation;
   clips: Record<string, Clip>;
   sight: THREE.Vector3;
-  muzzle: THREE.Vector3;
-  eject: THREE.Vector3;
+  /** ADS eye distance for the mounted optic, else the authored iron-sight value. */
+  eyeRelief: number;
   ejectDir: THREE.Vector3;
-  optic: OpticData | null;
-  gripR: GripData;
-  gripL: GripData;
   magLen: number;
   shell?: { caseLen: number; rimR: number };
   lhandPose: string;
@@ -113,9 +91,8 @@ export interface WeaponAnimation {
   dispose(): void;
   magazineBody?: THREE.Object3D;
   poseQ: THREE.Quaternion;
-  handTarget?(side: 'left' | 'right', position: THREE.Vector3, quaternion: THREE.Quaternion): void;
-  leftPose?: string | null;
-  applyHands?(left: Arm, right: Arm): void;
+  handTarget(side: 'left' | 'right', position: THREE.Vector3, quaternion: THREE.Quaternion): void;
+  applyHands(left: Arm, right: Arm): void;
 }
 export interface ViewState {
   ads: boolean;
@@ -124,7 +101,6 @@ export interface ViewState {
   speed: number;
   crouch: boolean;
   airborne: boolean;
-  trigger: boolean;
   empty: boolean;
   magazineLoaded?: boolean;
   remainingRounds?: number;
@@ -142,8 +118,8 @@ export interface ViewPoseKey {
 }
 export type ViewmodelContext = Pick<
   EngineContext,
-  'scene' | 'camera' | 'viewScene' | 'viewCamera' | 'canvas' | 'rng'
+  'scene' | 'camera' | 'viewScene' | 'viewCamera' | 'rng'
 > & {
+  canvas: Pick<HTMLCanvasElement, 'height'>;
   get(id: 'render'): Pick<EngineSystems['render'], 'screenSize'> | null;
 };
-export type ClipResult = ClipSample;

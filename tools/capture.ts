@@ -3,29 +3,57 @@
  * Deterministic native-WebGPU screenshot harness.
  * Usage: bun tools/capture.ts --shot=hero --out=/tmp/hero.png
  *        bun tools/capture.ts --reload --out=/tmp/reload
+ *        bun tools/capture.ts --weapon=mcx --clip=reloadEmpty --at=2.5 --out=/tmp/mcx-charge.png
+ *        bun tools/capture.ts --weapon=pistol --muzzle=suppressor --shot=ads --out=/tmp/p320.png
  */
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
 import type { Engine } from '../src/core/engine.ts';
+import { isAttachmentConfig, type AttachmentConfig } from '../src/weapons/attachments.ts';
+import { isWeaponId } from '../src/weapons/defs.ts';
 import {
   ensureDevServer,
   launchChromium,
   parseArgs,
   stopDevServer,
 } from './lib/browser-harness.ts';
-import { captureNative } from './lib/native-render.ts';
+import { advanceClipTo, captureNative } from './lib/native-render.ts';
 
 const args = parseArgs();
 const PORT = Number(args.port ?? 5173);
 const W = Number(args.w ?? 1920);
 const H = Number(args.h ?? 1080);
 const RELOAD = !!args.reload;
-const SHOT = RELOAD ? 'weapon' : String(args.shot ?? 'default');
+const CLIP = typeof args.clip === 'string' ? args.clip : undefined;
+const AT = Number(args.at);
+if (args.clip !== undefined || args.at !== undefined) {
+  if (!CLIP || typeof args.at !== 'string' || !args.at.trim() || !Number.isFinite(AT) || AT < 0)
+    throw new Error('Use --clip=<gesture> with --at=<non-negative seconds>');
+  if (RELOAD || args.list)
+    throw new Error('--clip/--at cannot be combined with --reload or --list');
+}
+const SHOT = RELOAD ? 'weapon' : String(args.shot ?? (CLIP ? 'weapon' : 'default'));
 const OUT = resolve(String(args.out ?? (RELOAD ? 'shots/reload' : `shots/${SHOT}.png`)));
 const TIMEOUT = Number(args.timeout ?? 90000);
 // Let temporal effects, streaming and LOD settle before capture.
 const SETTLE = Number(args.settle ?? 90);
+const WEAPON = String(args.weapon ?? 'rifle');
+if (!isWeaponId(WEAPON)) throw new Error(`Unknown weapon: ${WEAPON}`);
+const OPTIC = args.optic;
+const RAIL = args.rail;
+const MUZZLE = args.muzzle;
+const requested: unknown = {
+  optic: OPTIC === undefined || OPTIC === 'none' ? null : OPTIC,
+  muzzle: MUZZLE === undefined || MUZZLE === 'none' ? null : MUZZLE,
+  rail: RAIL === undefined || RAIL === 'none' ? null : RAIL,
+};
+// The game's own rule: unknown ids and unverified fits are rejected.
+if (!isAttachmentConfig(requested, WEAPON))
+  throw new Error(
+    `${WEAPON} does not accept optic=${OPTIC ?? 'none'}, rail=${RAIL ?? 'none'}, muzzle=${MUZZLE ?? 'none'}.`
+  );
+const ATTACHMENTS: AttachmentConfig = requested;
 
 // Self-contained functions serialized by Playwright into the browser.
 function pump(frames: number): Promise<number> {
@@ -72,14 +100,32 @@ try {
     logs.push(`[pageerror] ${e.message}\n${e.stack ?? ''}`);
   });
   try {
+    const attachmentQuery =
+      (args.optic ? `&attachmentOptic=${encodeURIComponent(String(args.optic))}` : '') +
+      (RAIL ? `&attachmentRail=${encodeURIComponent(String(RAIL))}` : '') +
+      (MUZZLE ? `&attachmentMuzzle=${encodeURIComponent(String(MUZZLE))}` : '') +
+      `&attachmentWeapon=${encodeURIComponent(WEAPON)}`;
     await page.goto(
-      `http://127.0.0.1:${PORT}/?capture=1&lockstep=1&shot=${encodeURIComponent(SHOT)}`,
+      `http://127.0.0.1:${PORT}/?capture=1&lockstep=1&shot=${encodeURIComponent(SHOT)}${attachmentQuery}`,
       {
         waitUntil: 'domcontentloaded',
         timeout: TIMEOUT,
       }
     );
     await page.waitForFunction('window.__READY__ === true', null, { timeout: TIMEOUT });
+    if (args.weapon || OPTIC || RAIL || MUZZLE)
+      await page.evaluate(
+        ({ id, config }): void => {
+          const weapons = window.__ENGINE__?.ctx.get('weapons');
+          if (!weapons) throw new Error('weapons not ready');
+          // Acquires a non-starting weapon (URL config before warmup rejects unowned ones).
+          if (!weapons.applyBuild(id, config)) throw new Error(`Cannot acquire/configure ${id}`);
+        },
+        {
+          id: WEAPON,
+          config: ATTACHMENTS,
+        }
+      );
     if (args.list) {
       const shots: unknown = await page.evaluate('Object.keys(window.__SHOTS__ ?? {})');
       console.log(JSON.stringify(shots, null, 2));
@@ -98,8 +144,31 @@ try {
         },
         { s: SHOT, settle: SETTLE }
       );
+      if (args.weapon)
+        await page.evaluate(
+          ({ id, shot }): void => {
+            const e = window.__ENGINE__;
+            if (!e) throw new Error('engine not ready');
+            const weapons = e.ctx.get('weapons');
+            // The named debug pose selects the reference rifle; switch afterwards
+            // while retaining its settled hip/ADS state.
+            if (!weapons.setWeaponImmediate(id)) throw new Error(`Cannot equip ${id}`);
+            if (shot === 'ads') {
+              e.camera.fov = e.config.fov * (weapons.current?.adsFovScale ?? e.config.adsFovScale);
+              e.camera.updateProjectionMatrix();
+            }
+          },
+          { id: WEAPON, shot: SHOT }
+        );
       logs.push(`[shot] ${JSON.stringify(applied)}`);
-      if (RELOAD) {
+      if (CLIP) {
+        await page.evaluate(pump, SETTLE);
+        const clip = await page.evaluate(advanceClipTo, { name: CLIP, at: AT });
+        await page.evaluate(present, 2);
+        mkdirSync(dirname(OUT), { recursive: true });
+        await captureNative(page, OUT);
+        console.log(JSON.stringify({ ok: true, out: OUT, shot: SHOT, clip, w: W, h: H }, null, 2));
+      } else if (RELOAD) {
         await page.evaluate(pump, SETTLE);
         const started = await page.evaluate((): ReloadStart => {
           const e = window.__ENGINE__;

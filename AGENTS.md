@@ -60,6 +60,8 @@ Textures/animations are procedural or Blender-authored; runtime meshes are local
 GLBs. World source lives in `tools/worldgen/`; meshoptimizer cooks collision in
 Bun. Dev/build/tests generate missing or stale world assets; products are ignored,
 not committed. Change world source, never hand-edit `public/models/world/**`.
+In a new worktree, copy `public/models/` and `.cache/assets/` from a sibling
+worktree to avoid a full rebake; source hashes still rebuild anything stale.
 
 `AGENTS.md`, `.github/workflows/*` and package manifests need human review: change
 them only when an issue requires it, minimally. Never edit generated or shared paths:

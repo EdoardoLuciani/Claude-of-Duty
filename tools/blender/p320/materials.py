@@ -68,7 +68,6 @@ def bake_atlas(output, asset, weapon_meshes):
     bake.use_clear = False
     bake.margin = 4
     bake.use_selected_to_active = True
-    bake.cage_extrusion = .0012
     bake.max_ray_distance = .0024
     all_mats = {slot.material for obj in weapon_meshes for slot in obj.material_slots if slot.material}
     # High-to-low projection includes the former lettering/traction geometry.
@@ -108,6 +107,8 @@ def bake_atlas(output, asset, weapon_meshes):
                     emit.inputs[0].default_value = tuple(v * strength for v in socket.default_value[:3]) + (1,)
             l.new(emit.outputs[0], out.inputs['Surface'])
         for surface, sources in surfaces:
+            # Cast from outside the rear rings above the slide's sloped sight face.
+            bake.cage_extrusion = .0015 if surface.parent.name == 'slide' else .0012
             mesh = surface.data
             mesh.uv_layers.active_index = mesh.uv_layers.find(COLOR_UV) if name == 'base' else 0
             mesh.uv_layers.active.active_render = True

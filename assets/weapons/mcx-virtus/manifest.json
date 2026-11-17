@@ -1,11 +1,16 @@
 {
   "asset": "MCX VIRTUS .300 BLK",
-  "optic": "ACOG 4x32 (TA31F / TA51)",
+  "optic": "removable iron sights",
   "units": "metres",
   "blender_forward": "+X",
   "gltf_up": "+Y",
   "gltf_forward": "+X",
   "gltf_ejection": "+Z",
+  "runtime_origin": [
+    0,
+    0.07,
+    -0.14
+  ],
   "clips": {
     "Idle": {
       "frames": [
@@ -85,13 +90,29 @@
       ],
       "duration": 2.0,
       "events": []
+    },
+    "Draw": {
+      "frames": [
+        0,
+        37.2
+      ],
+      "duration": 0.62,
+      "events": []
+    },
+    "Holster": {
+      "frames": [
+        0,
+        24.0
+      ],
+      "duration": 0.4,
+      "events": []
     }
   },
   "stats": {
-    "triangles": 59860,
-    "vertices": 32448,
-    "meshes": 4,
-    "material_slots": 8
+    "triangles": 43156,
+    "vertices": 23240,
+    "meshes": 17,
+    "material_slots": 17
   },
   "textures": {
     "resolution": 1024,
@@ -102,9 +123,10 @@
   "notes": [
     "Generated from tools/blender/mcx/. Python is the authoring authority.",
     "Reference-backed visual exterior, not manufacturing geometry or licensed SIG art.",
-    "Named sockets and rigid-part clips; hands, audio and live casing physics are runtime-owned.",
-    "Visibility is authored CONSTANT; motion LINEAR at 60 Hz. Stock Actions export, no GLB rewriting.",
+    "Named sockets, mechanisms and wrist/finger controls are Blender-authored; shared arm IK, audio and casing physics are runtime-owned.",
+    "Shared review-only arm skins are excluded from the weapon GLB.",
+    "Visibility is authored CONSTANT; mechanism and wrist/finger motion use native LINEAR Actions. No GLB rewriting.",
     "Export-only corner pigment and scalar finish lookup; UV0 albedo/normal detail retained. Roughness grain reduced to its mean.",
-    "One opaque material; MCX adapter selects exact fine/polymer/rubber/fiber normal strengths and fiber emission from UV1 finish identity. Lens remains separate."
+    "One opaque material; MCX adapter selects exact fine/polymer/rubber normal strengths from stable UV1 finish identity. No integrated glass or suppressor."
   ]
 }

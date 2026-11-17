@@ -5,6 +5,7 @@ import { Engine } from './core/engine.ts';
 import { hasOwn } from './core/guards.ts';
 import { ModelSystem } from './core/models.ts';
 import { prewarm } from './core/prewarm.ts';
+import { applyDebugAttachments } from './dev/attachments.ts';
 import { FxSystem } from './fx/index.ts';
 import { GameSystem } from './game/index.ts';
 import { IntelSystem } from './intel/index.ts';
@@ -118,6 +119,9 @@ try {
   }
   throw err;
 }
+
+// Apply debug/capture attachments after assets load and before native material warmup.
+applyDebugAttachments(params, engine.ctx.get('weapons'));
 
 // Capture tooling is not part of the normal game path. Loading it only on
 // request also prevents its telemetry rAF from running during ordinary play.

@@ -8,6 +8,7 @@ import { Health } from '../../src/player/health.ts';
 import { PlayerSystem } from '../../src/player/index.ts';
 import { Movement } from '../../src/player/movement.ts';
 import type { ArmAsset } from '../../src/weapons/arm-asset.ts';
+import { BASE_ATTACHMENTS, buildStats } from '../../src/weapons/attachments.ts';
 import { ProjectileSim } from '../../src/weapons/ballistics.ts';
 import { Clip } from '../../src/weapons/clips.ts';
 import { buildRecoilPattern, WEAPON_DEFS, WEAPON_IDS } from '../../src/weapons/defs.ts';
@@ -25,7 +26,7 @@ export function presentationViewmodel(ctx: EngineContext, calls: string[] = []):
     blood: fixture<ArmAsset['blood']>({ setHealthFraction(): void {} }),
   });
   vm.play = (name: string): number => {
-    vm.clip = new Clip(name, 1, {});
+    vm.clip = new Clip(name, 1, []);
     vm.clipT = 0;
     return 1;
   };
@@ -75,9 +76,11 @@ export function initializeWeaponStates(
   // These state-machine tests intentionally do not load authored model assets.
   weapons._hasMesh = (): boolean => true;
   for (const id of WEAPON_IDS) {
-    const def: WeaponDef = { ...WEAPON_DEFS[id], ...patch };
+    const def = { ...WEAPON_DEFS[id], ...patch, ...buildStats(BASE_ATTACHMENTS) };
     weapons.states.set(id, {
       def,
+      attachments: BASE_ATTACHMENTS,
+      laserEnabled: false,
       pattern: buildRecoilPattern(def, Rng),
       mag: def.magSize,
       chambered: true,

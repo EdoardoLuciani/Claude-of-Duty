@@ -2,11 +2,22 @@ import * as THREE from 'three';
 import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 import { isGroup } from '../core/three-guards.ts';
+import {
+  mountAttachments,
+  releaseAttachmentMounts,
+  releaseClonedMounts,
+  type AttachmentAssets,
+  type AttachmentConfig,
+} from './attachments.ts';
 import { createWeaponAnimation } from './authored-animation.ts';
 import type { WeaponEntry } from './runtime-types.ts';
 
 /** Independent transforms, skeletons and mixers; geometry/maps remain weapon-owned. */
-export function createWeaponInspection(entry: WeaponEntry): {
+export function createWeaponInspection(
+  entry: WeaponEntry,
+  config: AttachmentConfig,
+  assets: AttachmentAssets
+): {
   scene: THREE.Group;
   dispose(): void;
 } {
@@ -22,6 +33,9 @@ export function createWeaponInspection(entry: WeaponEntry): {
     materials: new Set<THREE.Material>(),
     textures: new Set<THREE.Texture>(),
   };
+  // The gameplay scene may contain mounted instances; replace the cloned mounts.
+  releaseClonedMounts(root);
+  const mounted = mountAttachments(model, config, assets);
   const animation = createWeaponAnimation(model, entry.def);
   animation.update(0, null, 0, false, true, entry.def.magSize);
   scene.updateMatrixWorld(true);
@@ -29,6 +43,7 @@ export function createWeaponInspection(entry: WeaponEntry): {
     scene,
     dispose(): void {
       scene.removeFromParent();
+      releaseAttachmentMounts(mounted);
       // The authored animation owns its cloned skeletons (as it does in gameplay).
       animation.dispose();
       scene.traverse((node): void => {

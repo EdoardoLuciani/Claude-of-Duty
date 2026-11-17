@@ -740,40 +740,6 @@ export function polyPrism(
   return geo;
 }
 
-/** Flat irregular patch on the XZ plane — sand drifts, oil stains, render patches. */
-export function patchGeometry(
-  rng: Rng,
-  radius: number,
-  opts: { lobes?: number; wobble?: number; sag?: number } = {}
-): THREE.BufferGeometry {
-  const { lobes = 9, wobble = 0.45, sag = 0.0 } = opts;
-  const pos: number[] = [];
-  const nrm: number[] = [];
-  const uv: number[] = [];
-  const idx: number[] = [];
-  pos.push(0, 0, 0);
-  nrm.push(0, 1, 0);
-  uv.push(0, 0);
-  const rs = [];
-  for (let i = 0; i < lobes; i++) rs.push(radius * (1 - wobble + rng.float() * wobble * 2));
-  for (let i = 0; i < lobes; i++) {
-    const t = (i / lobes) * Math.PI * 2;
-    const r = rs[i];
-    pos.push(Math.cos(t) * r, -sag, Math.sin(t) * r);
-    nrm.push(0, 1, 0);
-    uv.push(Math.cos(t), Math.sin(t));
-  }
-  for (let i = 0; i < lobes; i++) idx.push(0, 1 + i, 1 + ((i + 1) % lobes));
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
-  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-  g.setIndex(idx);
-  g.computeBoundingBox();
-  g.computeBoundingSphere();
-  return g;
-}
-
 /**
  * A drift berm: a ridge of blown sand or swept rubble piled against a wall.
  *

@@ -14,13 +14,15 @@ export type SampleKind =
   | 'pistol-distant'
   | 'lmg-distant'
   | 'sniper-distant'
-  | 'shotgun-distant';
+  | 'shotgun-distant'
+  | 'mcx-distant'
+  | 'mpx-distant'
+  | `${'rifle' | 'mcx' | 'mpx' | 'lmg' | 'sniper' | 'pistol' | 'shotgun'}-suppressed${'' | '-distant'}`;
 
 export interface WeaponProfile {
   sample: SampleKind;
-  /** Authored distant perspective; MCX/MPX retain their suppressed close recordings. */
+  /** Authored distant perspective of the same recorded donor as the close bank. */
   distantSample?: SampleKind;
-  suppressed?: boolean;
 }
 
 export interface SampleOptions {

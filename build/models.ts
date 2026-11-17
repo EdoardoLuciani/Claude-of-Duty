@@ -3,11 +3,13 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { copyFileSync, mkdirSync, mkdtempSync, rmSync, statSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { availableParallelism, tmpdir } from 'node:os';
 import { basename, dirname, extname, join, resolve } from 'node:path';
 
 const ROOT = resolve(import.meta.dirname, '..');
 export const GLTFPACK_VERSION = 'gltfpack 1.3';
+// Up to four asset workers cook concurrently; leave each a share of the CPUs.
+const ENCODING_THREADS = Math.max(1, Math.floor(availableParallelism() / 4));
 // Preserve named mechanics and authored timing. Float positions/UVs avoid
 // dequantization wrapper nodes and texture-transform clones in the runtime.
 export const GLTFPACK_FLAGS = [
@@ -33,14 +35,30 @@ export const GLTFPACK_FLAGS = [
   '-cc',
   '-tu',
   '-tq',
-  '10',
-  '-tj',
-  '1',
+  '8',
 ];
 // Opt assets in here after validating their adapters and visual/animation fidelity.
 // Simplification is model-specific, never a blanket default for all models.
-// `output` is repo-relative: weapons are served from public/, standalone attachments are not wired yet.
+// `output` is repo-relative; runtime-mounted weapons/attachments are served from public/.
+const attachment = (
+  directory: string,
+  source: string,
+  runtime: string,
+  flags: string[] = []
+): { directory: string; source: string; output: string; flags: string[] } => ({
+  directory: `assets/attachments/${directory}`,
+  source,
+  output: `public/models/attachments/${runtime}.runtime.glb`,
+  flags,
+});
 export const MODEL_COOKS = {
+  suppressor12g: attachment('12g-suppressor', 'suppressor12g.glb', 'suppressor12g'),
+  suppressor9mm: attachment('compact-9mm', 'suppressor9mm.glb', 'suppressor9mm'),
+  suppressor338: attachment('suppressor-338', 'suppressor338.glb', 'suppressor338'),
+  srd762ti: attachment('sig-srd762ti', 'suppressor.glb', 'srd762ti'),
+  acog: attachment('trijicon-acog', 'acog.glb', 'acog'),
+  scope: attachment('schmidt-bender-pm-ii', 'scope.glb', 'scope'),
+  rmr: attachment('trijicon-rmr', 'rmr.glb', 'rmr'),
   m590: {
     directory: 'assets/weapons/m590',
     source: 'm590.glb',
@@ -77,20 +95,16 @@ export const MODEL_COOKS = {
     output: 'public/models/weapons/mpx.runtime.glb',
     flags: ['-km', '-vc', '16', '-si', '0.7', '-se', '0.0002', '-sp'],
   },
-  tor_mini: {
-    directory: 'assets/attachments/steiner-tor-mini',
-    source: 'tor-mini.glb',
-    output: 'assets/attachments/steiner-tor-mini/tor-mini.runtime.glb',
-    // Preserve the small aperture, screw slots and pressure-pad silhouettes.
-    flags: [],
-  },
-  exps3: {
-    directory: 'assets/attachments/eotech-exps3-0',
-    source: 'exps3-0.glb',
-    output: 'assets/attachments/eotech-exps3-0/exps3-0.runtime.glb',
-    // The P320 error limit clips the rounded optical opening on this smaller asset.
-    flags: ['-si', '0.50', '-se', '0.0002', '-sp'],
-  },
+  // Preserve the small aperture, screw slots and pressure-pad silhouettes.
+  tor_mini: attachment('steiner-tor-mini', 'tor-mini.glb', 'laser'),
+  // The P320 error limit clips the rounded optical opening on this smaller asset.
+  exps3: attachment('eotech-exps3-0', 'exps3-0.glb', 'exps3', [
+    '-si',
+    '0.50',
+    '-se',
+    '0.0002',
+    '-sp',
+  ]),
   p320: {
     directory: 'assets/weapons/p320-compact',
     source: 'p320-compact.glb',
@@ -118,9 +132,12 @@ function cookModel(input: string, output: string, flags: string[]): void {
   const scratch = mkdtempSync(join(tmpdir(), 'model-cook-'));
   try {
     const cooked = join(scratch, basename(output));
-    execFileSync(encoder, ['-i', input, '-o', cooked, ...GLTFPACK_FLAGS, ...flags], {
-      stdio: 'inherit',
-    });
+    // Scheduling is machine-local, not part of the output-affecting cache flags.
+    execFileSync(
+      encoder,
+      ['-i', input, '-o', cooked, ...GLTFPACK_FLAGS, '-tj', String(ENCODING_THREADS), ...flags],
+      { stdio: 'inherit' }
+    );
     mkdirSync(dirname(output), { recursive: true });
     copyFileSync(cooked, output);
     console.log(`Cooked ${input} -> ${output} (${statSync(output).size} bytes)`);

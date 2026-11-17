@@ -56,7 +56,7 @@ export const SURFACE = {
   rubber: 0,
   plaster: 0,
 } satisfies Record<SurfaceName, number>;
-for (let i = 0; i < SURFACE_NAMES.length; i++) SURFACE[SURFACE_NAMES[i]] = i;
+for (const [i, name] of SURFACE_NAMES.entries()) SURFACE[name] = i;
 
 /**
  * Per-surface physical response.
@@ -239,7 +239,7 @@ const GUESS: [RegExp, number][] = [
 /** Best-effort surface inference from a mesh/material name. */
 export function guessSurface(name: string | null | undefined, fallback = SURFACE.concrete): number {
   if (!name) return fallback;
-  for (let i = 0; i < GUESS.length; i++) if (GUESS[i][0].test(name)) return GUESS[i][1];
+  for (const [pattern, surface] of GUESS) if (pattern.test(name)) return surface;
   return fallback;
 }
 

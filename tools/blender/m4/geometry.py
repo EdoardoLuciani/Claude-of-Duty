@@ -3,6 +3,7 @@ import math
 import bpy
 import numpy as np
 from mathutils import Vector, Matrix
+import picatinny
 
 def build_geometry(materials):
     scene=bpy.context.scene
@@ -28,6 +29,7 @@ def build_geometry(materials):
         o=bpy.data.objects.new(name,None);asset.objects.link(o);o.parent=parent;o.location=xyz(loc);o.empty_display_size=.008;return o
     rig=empty('M4_RIG');body=empty('receiver',parent=rig)
     guard_root=empty('handguard',parent=body);stock_root=empty('stock',parent=body)
+    irons_root=empty('IRON_sights',parent=body);low_block=empty('IRON_sights_removed',parent=body)
     mag=empty('magazine',parent=rig);spare=empty('magazine_spare',parent=rig)
     bolt=empty('bolt',parent=rig);head=empty('bolt_head',(0,.075,-.1015),bolt);handle=empty('charging_handle',parent=rig)
     trigger=empty('trigger',(0,.0455,-.0055),rig)
@@ -231,45 +233,35 @@ def build_geometry(materials):
     # Six-bolt mounting flange and barrel nut sit within the nominal rail envelope.
     flange=tube('RIS II bolt-up flange',(0,BORE,HG_REAR-.004),.026,.014605,.008,fde)
     cut(flange,box('CUT',(0,.091,HG_REAR-.004),(.0045,.0042,.016),None,None,0))
+    # The flange is also the rail's support at this joint. Relieve its shoulders
+    # below the standard neck so a clamp lip does not cut into the circular rim.
+    for side in (-1,1):
+        cut(flange,box('CUT rail shoulder relief',(side*.017,BORE+.0286-picatinny.NECK_DEPTH-.0002+.005,HG_REAR-.004),
+                      (.019,.010,.010),None,None,0))
     for i in range(6):
         a=math.tau*i/6+.20;x=math.cos(a)*.0218;y=BORE+math.sin(a)*.0218
         screw=cyl('RIS II mounting screw',(x,y,HG_REAR-.0025),.0032,.005,steel,axis='Z',sides=24)
         cut(screw,cyl('CUT',(x,y,HG_REAR+.0005),.00145,.002,None,None,'Z',6,0))
-    # Rails use physical Picatinny spacing; the FSP cutout removes top teeth only.
+    # Identical rail profile on top/bottom/sides; rotate, never scale its head.
     def rail(name,z0,z1,side='top',mat=fde):
-        center=(z0+z1)/2
-        if side=='top':
-            y,height=(.1004,.0048) if name=='Upper receiver rail' else (.0972,.0055)
-            base=box(name+' web',(0,y,center),(.016,height,z1-z0),mat)
-        elif side=='bottom':base=box(name+' web',(0,.052,center),(.020,.007,z1-z0),mat)
-        else:base=box(name+' web',(side*.023,BORE,center),(.008,.020,z1-z0),mat)
-        count=int((z1-z0)/.0100076)
-        for i in range(count):
-            z=z0+.0025+i*.0100076
-            if name.startswith('RIS II') and side=='top' and -.330<z<-.265:continue
-            section=[(-.0079,.0210),(.0079,.0210),(.0079,.0240),(.0106045,.0266),(.0086,.0286),(-.0086,.0286),(-.0106045,.0266),(-.0079,.0240)]
-            angle=0 if side=='top' else math.pi if side=='bottom' else -side*math.pi/2
-            radial=1 if side=='top' else .02855/.0286 if side=='bottom' else .028321/.0286
-            # Model the small cross-section radii directly, instead of a bevel
-            # modifier multiplying every tiny tooth edge into hundreds of faces.
-            rounded=[]
-            for j,point in enumerate(section):
-                q=Vector(point);a=q+(Vector(section[j-1])-q).normalized()*.0002;b=q+(Vector(section[(j+1)%len(section)])-q).normalized()*.0002
-                for step in range(3):
-                    t=step/2;rounded.append(a*(1-t)**2+q*2*t*(1-t)+b*t*t)
-            rings=[]
-            for dz in (-.0023876,.0023876):
-                ring=[]
-                for x,y in rounded:
-                    ring.append((x*math.cos(angle)-y*radial*math.sin(angle),BORE+x*math.sin(angle)+y*radial*math.cos(angle),z+dz))
-                rings.append(ring)
-            loft(name+' tooth',rings,mat,bevel=0,rounded=True)
+        angle=0 if side=='top' else math.pi if side=='bottom' else -side*math.pi/2
+        radius=.0286 if side=='top' else .02855 if side=='bottom' else .028321
+        origin=-.067 if name=='Upper receiver rail' else -.250
+        def rings(outline,a,b):
+            return [[(x*math.cos(angle)-y*math.sin(angle),
+                      BORE+x*math.sin(angle)+y*math.cos(angle),z)
+                     for x,y in outline] for z in (a,b)]
+        base=loft(name+' web',rings(picatinny.section(radius,radius-.0056,slot=True),z0,z1),mat,bevel=0,rounded=False)
+        for a,b in picatinny.lands(z0,z1,origin):
+            if name.startswith('RIS II') and side=='top' and -.330<(a+b)/2<-.265:continue
+            loft(name+' tooth',rings(picatinny.section(radius,radius-.0056),a,b),mat,bevel=0,rounded=False)
         if name.startswith('RIS II') and side=='top':cut(base,box('CUT',(0,.102,-.297),(.031,.055,.065),None,None,0))
     rail('Upper receiver rail',-.136,.055,'top',anodized)
     for side in ('top','bottom',-1,1):rail('RIS II '+str(side),HG_FRONT,HG_REAR,side)
     cut(core,box('CUT',(0,.102,-.297),(.031,.055,.065),None,None,.001))
     # F-marked A2 base, forged yoke, round gas boss and protected front post.
     GAS=-.297
+    before_front=set(asset.objects)
     tube('A2 gas boss',(0,BORE,GAS),.0132,.00835,.047,steel)
     # Cast A-frame with a real triangular through-window.
     tower=profile('A2 tower casting',[(GAS+.022,.065),(GAS+.022,.086),(GAS+.006,.112),(GAS-.007,.135),(GAS-.018,.137),(GAS-.022,.134),(GAS-.022,.065)],.0218,steel,bevel=.0008,rounded=True)
@@ -290,6 +282,17 @@ def build_geometry(materials):
     tube('Gas tube',(0,.0899,-.307+GAS_TUBE_LEN/2),.00165,.0007,GAS_TUBE_LEN,burnished,sides=24)
     gas_socket=box('A2 gas-tube socket',(0,.0895,GAS-.005),(.0065,.005,.020),steel,bevel=.00012)
     cut(gas_socket,cyl('CUT',(0,.0899,GAS-.005),.00180,.026,None,None,'Z',24,0))
+    for obj in set(asset.objects)-before_front:
+        if obj.name!='Gas tube':obj.parent=irons_root;obj.matrix_parent_inverse=irons_root.matrix_world.inverted()
+    # Replacement collar and bored tube seat retain the gas system without the tower.
+    tube('Low-profile gas collar',(0,BORE,GAS),.0125,.00835,.032,steel,low_block)
+    seat=box('Low-profile gas tube seat',(0,.086,GAS-.005),(.013,.014,.020),steel,low_block,.0005)
+    cut(seat,cyl('CUT',(0,BORE,GAS),.00835,.040,None,None,'Z',48,0))
+    cut(seat,cyl('CUT',(0,.0899,GAS-.005),.00180,.026,None,None,'Z',24,0))
+    for obj in low_block.children:obj.hide_render=True
+    # Removable flash hider; the barrel thread stays on the receiver.
+    muzzle_device=empty('MUZZLE_device',parent=rig)
+    before_muzzle=set(asset.objects)
     # SureFire nominal 66.04 mm; metric catalog conflict is disclosed in README.md.
     FH_LEN=.06604;FH_REAR=CROWN+.013;FH_TIP=FH_REAR-FH_LEN
     for name,z0,z1,r in [('FH556RC mounting shank',FH_REAR-.018,FH_REAR,.0114),('FH556RC suppressor bearing',FH_REAR-.034,FH_REAR-.018,.0119)]:
@@ -301,6 +304,12 @@ def build_geometry(materials):
         for z,r in [(FH_REAR-.030,.0119),(FH_REAR-.043,.0109),(FH_TIP+.001,.0101),(FH_TIP,.0098)]:
             rings.append([(math.cos(a+d)*radius,BORE+math.sin(a+d)*radius,z) for radius,d in [(r,-.33),(r,.33),(r-.003,.33),(r-.003,-.33)]])
         loft('FH556RC tine',rings,steel,bevel=.0003,rounded=True)
+    for obj in set(asset.objects)-before_muzzle:
+        obj.parent=muzzle_device;obj.matrix_parent_inverse=muzzle_device.matrix_world.inverted()
+    # Thread adapter: 1/2-28 barrel to the shared can's 5/8-24 rear seat.
+    empty('MOUNT_muzzle',(0,BORE,CROWN+.013),rig)
+    muzzle_adapter=empty('MUZZLE_device_removed',parent=rig)
+    tube('M4 thread adapter',(0,BORE,CROWN+.0065),.0079375,.0064,.013,steel,muzzle_adapter)
     # A2 grip has varying rounded sections, a backstrap and its characteristic ledge.
     rings=[]
     for y,z,rx,rz in [(.034,.035,.0155,.023),(.015,.040,.016,.023),(-.012,.052,.0167,.024),(-.040,.064,.0168,.025),(-.064,.073,.016,.024),(-.075,.077,.0155,.023)]:
@@ -334,6 +343,7 @@ def build_geometry(materials):
     for y in np.arange(-.030,.087,.0045):box('Buttpad traction',(0,float(y),.284),(.020 if y<.027 else .050,.0014,.001),rubber,bevel=.00015)
 
     # MaTech: seated steel base, range wedge, windage drum, open peep and stalk.
+    before_rear=set(asset.objects)
     box('MaTech rail base',(0,.109,.023),(.033,.011,.050),steel,bevel=.0008)
     for x in (-.015,.015):box('MaTech clamp',(x,.1065,.023),(.006,.007,.044),steel,bevel=.0006)
     profile('MaTech ranging wedge',[(-.002,.111),(.035,.111),(.033,.126),(.025,.128),(.016,.120),(-.002,.118)],.020,steel,bevel=.0007)
@@ -346,6 +356,8 @@ def build_geometry(materials):
     cup=mesh('MaTech open aperture',verts,faces,steel,bevel=0,rounded=True)
     cyl('MaTech windage drum',(.018,.121,.028),.0044,.0055,steel,axis='X',sides=32)
     for y in (.112,.114,.116):box('MaTech thumb traction',(-.012,y,.002),(.008,.0005,.011),steel,bevel=.0001)
+    for obj in set(asset.objects)-before_rear:
+        obj.parent=irons_root;obj.matrix_parent_inverse=irons_root.matrix_world.inverted()
 
     # Standard USGI metal magazine; complete shape is photo-informed, not PMAG-sized.
     mag_stations=[(.054,-.078,.031),(.022,-.078,.031),(-.010,-.079,.031),(-.035,-.081,.031),(-.060,-.085,.031),(-.079,-.090,.0305),(-.095,-.094,.030)]
@@ -400,9 +412,9 @@ def build_geometry(materials):
     for word,loc in [('SAFE',(-.0176,.050,.053)),('SEMI',(-.0176,.058,.035)),('AUTO',(-.0176,.049,.004))]:text(word,loc,.0022)
     text('DANIEL DEFENSE',( -.0198,.084,-.400),.0024,mat=marking)
     text('M4A1 RIS II FSP',(-.0198,.080,-.400),.0020,mat=marking)
-    for n,y in [('200',.113),('300',.115),('400',.117),('450',.119),('500',.121),('550',.123),('600',.125)]:text(n,(-.0103,y,.019),.0016)
+    for n,y in [('200',.113),('300',.115),('400',.117),('450',.119),('500',.121),('550',.123),('600',.125)]:text(n,(-.0103,y,.019),.0016,parent=irons_root)
     text('OKAY',(-.01255,-.052,-.094),.0023,mat=magmat,parent=mag)
-    for name,pos in [('SOCKET_muzzle',(0,BORE,FH_TIP)),('SOCKET_ejection',(.023,.081,-.052)),('SOCKET_sight',(0,SIGHT_Y,.034)),('SOCKET_front_post',(0,SIGHT_Y,GAS-.007)),('SOCKET_bolt_face',(0,BORE,BOLT_FACE)),('SOCKET_barrel_crown',(0,BORE,CROWN))]:empty(name,pos,rig)
+    for name,pos in [('MOUNT_optic',(0,BORE+.0286,-.067)),('SOCKET_muzzle',(0,BORE,FH_TIP)),('SOCKET_ejection',(.023,.081,-.052)),('SOCKET_sight',(0,SIGHT_Y,.034)),('SOCKET_front_post',(0,SIGHT_Y,GAS-.007)),('SOCKET_bolt_face',(0,BORE,BOLT_FACE)),('SOCKET_barrel_crown',(0,BORE,CROWN))]:empty(name,pos,rig)
     # Conform markings to the actual shaped surface, not a floating label plane.
     from mathutils.bvhtree import BVHTree
     for o in list(asset.objects):
@@ -442,6 +454,9 @@ def build_geometry(materials):
     for o in list(asset.objects):
         if o.type=='MESH' and o.parent in (mag,round_live):
             clone=o.copy();clone.data=o.data;asset.objects.link(clone);clone.parent=spare if o.parent==mag else round_spare;clone.name=o.name+' | spare'
+    # Right RIS II seat: TOR Mini sits outboard, ahead of the support hand and FSP.
+    rail_mount=empty('MOUNT_rail',(.028321,BORE,-.250-16*picatinny.PITCH),guard_root)
+    rail_mount.rotation_euler.y=-math.pi/2
     parts=[rig,bolt,head,handle,trigger,cover,release,mag,spare,case,round_live,round_spare]
-    parents=[body,guard_root,stock_root,bolt,head,handle,trigger,cover,release,mag,spare,case,round_live,round_spare]
+    parents=[body,muzzle_device,muzzle_adapter,guard_root,stock_root,irons_root,low_block,bolt,head,handle,trigger,cover,release,mag,spare,case,round_live,round_spare]
     return asset,parts,parents,(front_post,front_tip,stalk,cup)

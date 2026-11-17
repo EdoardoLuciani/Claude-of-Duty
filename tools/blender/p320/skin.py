@@ -38,7 +38,9 @@ def build_skin(asset, parts, clips):
     bpy.ops.object.mode_set(mode='OBJECT')
     for bone in arm.pose.bones:
         bone.rotation_mode = 'QUATERNION'
-    surfaces = [obj for obj in asset.objects if obj.type == 'MESH']
+    # Removable muzzle states stay ordinary meshes under the moving barrel.
+    surfaces = [obj for obj in asset.objects if obj.type == 'MESH'
+                and obj.parent.name not in ('MUZZLE_device', 'MUZZLE_device_removed')]
     for obj in surfaces:
         parent = obj.parent
         # Spare UV/topology is shared until skinning; weights must not alias
@@ -67,7 +69,7 @@ def build_skin(asset, parts, clips):
     mod.object = arm
     # Keep native names and sockets under the corresponding moving bone.
     for obj in list(asset.objects):
-        if not obj.name.startswith('SOCKET_') or obj.parent not in controls:
+        if not obj.name.startswith(('SOCKET_', 'MOUNT_', 'MUZZLE_')) or obj.parent not in controls:
             continue
         world = obj.matrix_world.copy()
         parent = obj.parent

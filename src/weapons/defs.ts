@@ -2,12 +2,12 @@
  * zeroRange is the sight-line crossing; learned sightline recoil is separate from random spread.
  */
 
+import type { CanModel, MuzzleId, OpticId, RailId } from './attachments.ts';
+
 export const WEAPON_IDS = ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper', 'mcx'] as const;
 export type WeaponId = (typeof WEAPON_IDS)[number];
 export const PRIMARY_IDS = ['rifle', 'lmg', 'sniper', 'mcx'] as const satisfies readonly WeaponId[];
 export const SECONDARY_IDS = ['pistol', 'smg', 'shotgun'] as const satisfies readonly WeaponId[];
-export type PrimaryWeaponId = (typeof PRIMARY_IDS)[number];
-export type SecondaryWeaponId = (typeof SECONDARY_IDS)[number];
 export type WeaponMode = 'auto' | 'burst' | 'semi';
 export type WeaponClass = 'carbine' | 'smg' | 'pistol' | 'lmg' | 'shotgun' | 'sniper';
 type TuningVector = [number, number, number];
@@ -19,7 +19,6 @@ export interface WeaponDef {
   class: WeaponClass;
   caliber: string;
   audio?: string;
-  suppressed?: boolean;
   rpm: number;
   modes: [WeaponMode, ...WeaponMode[]];
   burstCount?: number;
@@ -63,8 +62,6 @@ export interface WeaponDef {
   };
   fireVibe: { amp: number; duration: number; adsScale: number };
   adsTime: number;
-  adsFovScale?: number;
-  adsSensScale?: number;
   viewFov: number;
   drawTime: number;
   holsterTime: number;
@@ -72,13 +69,25 @@ export interface WeaponDef {
   hipRot: TuningVector;
   adsCant: TuningVector;
   eyeRelief: number;
+  /** Verified fits per attachment slot: a key enables that attachment on this weapon
+   * and holds its fit data. Unverified fits stay absent; no handling modifiers. */
+  fits?: {
+    optic?: Partial<Record<OpticId, { eyeRelief: number; railSlots?: number }>>;
+    rail?: Partial<Record<RailId, Record<string, never>>>;
+    muzzle?: Partial<Record<MuzzleId, { model: CanModel }>>;
+  };
+  /** Authored `IRON_sights` are hidden whenever an optic is mounted (an optional
+   * `IRON_sights_removed` part replaces them); unset keeps fixed irons under an optic. */
+  removableIrons?: true;
+  /** Authored `MUZZLE_device` is hidden whenever a can is mounted (an optional
+   * `MUZZLE_device_removed` part replaces it); unset keeps permanent muzzle hardware. */
+  removableMuzzleDevice?: true;
   sprintPos: TuningVector;
   sprintRot: TuningVector;
   lowReadyPos: TuningVector;
   lowReadyRot: TuningVector;
   swayScale: number;
   bobScale: number;
-  magLen?: number;
   firingShoulderZ?: number;
   adsFiringShoulderZ?: number;
   supportShoulderZ?: number;
@@ -89,6 +98,14 @@ export function isWeaponId(value: unknown): value is WeaponId {
   return typeof value === 'string' && Object.hasOwn(WEAPON_DEFS, value);
 }
 
+/** Optic eye reliefs shared by every weapon whose rail seats them at the base slot. */
+const OPTIC_FITS = {
+  rmr: { eyeRelief: 0.125 },
+  acog: { eyeRelief: 0.11 },
+  scope: { eyeRelief: 0.09 },
+  exps3: { eyeRelief: 0.2 },
+} satisfies NonNullable<WeaponDef['fits']>['optic'];
+
 export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
   mcx: {
     id: 'mcx',
@@ -96,13 +113,12 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     class: 'carbine',
     caliber: '.300 BLK',
     audio: 'mcx',
-    suppressed: true,
     rpm: 800,
     modes: ['auto', 'semi'],
     magSize: 30,
     reserve: 180,
     fireAnimationSpeed: 2.5, // finish carrier return before the next 75 ms shot
-    // Suppressed subsonic game load: more drop than the M4, not a reskinned 5.56.
+    // Subsonic game load: more drop than the M4, not a reskinned 5.56.
     muzzleVelocity: 305,
     damage: 39,
     penetration: 0.82,
@@ -133,22 +149,26 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     },
     fireVibe: { amp: 0.82, duration: 0.055, adsScale: 0.38 },
     adsTime: 0.26,
-    adsFovScale: 0.28,
-    adsSensScale: 0.28,
     viewFov: 0.86,
     drawTime: 0.62,
     holsterTime: 0.4,
     hipPos: [0.118, -0.192, -0.3],
     hipRot: [-0.05, 0.081, -0.135],
     adsCant: [0, 0, 0],
-    eyeRelief: 0.11,
+    eyeRelief: 0.06,
+    fits: {
+      optic: OPTIC_FITS,
+      muzzle: { suppressor: { model: 'srd762ti' } },
+      rail: { laser: {} },
+    },
+    removableIrons: true,
+    removableMuzzleDevice: true,
     sprintPos: [0.09, -0.275, -0.275],
     sprintRot: [-0.4, 0.6, 0.2],
     lowReadyPos: [0.112, -0.29, -0.289],
     lowReadyRot: [-0.46, 0.125, -0.09],
     swayScale: 0.85,
     bobScale: 0.95,
-    magLen: 0.18,
   },
   rifle: {
     id: 'rifle',
@@ -213,6 +233,18 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     adsCant: [0, 0, 0.004],
     // Bring the eye closer to open the rear aperture; its bore and aim datum stay authored.
     eyeRelief: 0.03,
+    fits: {
+      muzzle: { suppressor: { model: 'srd762ti' } },
+      optic: {
+        ...OPTIC_FITS,
+        // Forward rail slots clear the ocular from the charging hand; eye relief
+        // includes that forward offset.
+        scope: { eyeRelief: 0.16, railSlots: 7 },
+      },
+      rail: { laser: {} },
+    },
+    removableIrons: true,
+    removableMuzzleDevice: true,
     /* Sprint: gun dropped and angled across the body, muzzle down-left.
      * Carried over by the same delta as the hip pose so the blend does not
      * translate the weapon 90 mm sideways on the way into a sprint. */
@@ -229,7 +261,6 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     label: 'SIG MPX',
     class: 'smg',
     audio: 'mpx',
-    suppressed: true,
     caliber: '9x19',
     rpm: 950,
     modes: ['auto', 'semi'],
@@ -270,26 +301,30 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     },
     fireVibe: { amp: 0.72, duration: 0.048, adsScale: 0.4 },
     adsTime: 0.185,
-    viewFov: 0.145, // Large housing without a near-eye tunnel; weapon-only 8.7°.
+    viewFov: 0.7, // Open irons, matching the rifle iron-sight weapon FOV.
     drawTime: 0.52,
     holsterTime: 0.34,
-    // Keep the existing reactive hip pose; the suppressor socket is at its exit.
+    // Reactive hip pose; the base muzzle ends at its thread protector.
     firingShoulderZ: 0.12, // MPX inspection must not stretch a behind-eye arm.
-    adsFiringShoulderZ: 0.28, // Farther ADS eye needs a body anchor behind the wrist.
+    adsFiringShoulderZ: 0.28, // ADS shoulder anchor stays behind the wrist.
     hipPos: [0.111, -0.163, -0.288],
     hipRot: [-0.05, 0.072, -0.131],
     adsCant: [0, 0, 0.005],
-    // Eye distance controls perspective, weapon FOV independently controls size.
-    // 85.5 mm is the CLOSED overall envelope, not the optical tube length.
-    // ADS translation remains solved from the real optical-axis socket.
-    eyeRelief: 0.28,
+    // Aim through the deployed rear peep.
+    eyeRelief: 0.06,
+    fits: {
+      optic: OPTIC_FITS,
+      muzzle: { suppressor: { model: 'srd762ti' } },
+      rail: { laser: {} },
+    },
+    removableIrons: true,
+    removableMuzzleDevice: true,
     sprintPos: [0.088, -0.24, -0.262],
     sprintRot: [-0.38, 0.58, 0.19],
     lowReadyPos: [0.108, -0.252, -0.276],
     lowReadyRot: [-0.44, 0.125, -0.085],
     swayScale: 0.92,
     bobScale: 0.95,
-    magLen: 0.192,
   },
 
   lmg: {
@@ -337,7 +372,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     },
     fireVibe: { amp: 0.88, duration: 0.058, adsScale: 0.4 },
     adsTime: 0.32,
-    viewFov: 0.48, // Readable RMR window while retaining its existing eye/arm placement.
+    viewFov: 0.7, // Open rear aperture and readable front post, without optic zoom.
     drawTime: 0.75,
     holsterTime: 0.5,
     // Forward support grip clears the pouch; a less-bladed shoulder keeps
@@ -347,14 +382,27 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     hipPos: [0.118, -0.185, -0.3],
     hipRot: [-0.074, 0.081, -0.135],
     adsCant: [0, 0, 0.004],
-    eyeRelief: 0.125,
+    eyeRelief: 0.03,
+    fits: {
+      optic: {
+        ...OPTIC_FITS,
+        // MOUNT_optic is the rearmost (RMR) seat; larger bodies sit whole
+        // grooves forward, clear of the charging-hand sweep.
+        exps3: { eyeRelief: 0.16, railSlots: 3 },
+        acog: { ...OPTIC_FITS.acog, railSlots: 6 },
+        scope: { ...OPTIC_FITS.scope, railSlots: 6 },
+      },
+      muzzle: { suppressor: { model: 'srd762ti' } },
+      rail: { laser: {} },
+    },
+    removableIrons: true,
+    removableMuzzleDevice: true,
     sprintPos: [0.09, -0.29, -0.285],
     sprintRot: [-0.42, 0.62, 0.22],
     lowReadyPos: [0.108, -0.305, -0.295],
     lowReadyRot: [-0.48, 0.12, -0.09],
     swayScale: 0.9,
     bobScale: 0.95,
-    magLen: 0.135,
   },
 
   pistol: {
@@ -413,13 +461,18 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     hipRot: [-0.05, 0.066, -0.115],
     adsCant: [0, 0, 0.003],
     eyeRelief: 0.34,
+    // Fixed iron sights; only the under-barrel laser and compact can are supported.
+    fits: {
+      rail: { laser: {} },
+      muzzle: { suppressor: { model: 'suppressor9mm' } },
+    },
+    removableMuzzleDevice: true,
     sprintPos: [0.09, -0.25, -0.28],
     sprintRot: [-0.42, 0.5, 0.14],
     lowReadyPos: [0.1, -0.26, -0.32],
     lowReadyRot: [-0.44, 0.105, -0.07],
     swayScale: 1.15,
     bobScale: 1.1,
-    magLen: 0.108,
   },
 
   shotgun: {
@@ -476,13 +529,24 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     hipRot: [-0.05, 0.078, -0.125],
     adsCant: [0, 0, 0.003],
     eyeRelief: 0.28,
+    // Extended integrated-sight rail seats RMR/ACOG and both PM II pedestals.
+    // The optional TOR Mini stays on the fixed forward magazine-tube clamps.
+    fits: {
+      optic: {
+        rmr: { eyeRelief: 0.12 },
+        acog: { eyeRelief: 0.1 },
+        scope: { eyeRelief: 0.09 },
+        exps3: { eyeRelief: 0.2 },
+      },
+      rail: { laser: {} },
+      muzzle: { suppressor: { model: 'suppressor12g' } },
+    },
     sprintPos: [0.09, -0.27, -0.28],
     sprintRot: [-0.42, 0.58, 0.2],
     lowReadyPos: [0.11, -0.29, -0.29],
     lowReadyRot: [-0.48, 0.12, -0.09],
     swayScale: 1.05,
     bobScale: 1.05,
-    magLen: 0.07,
   },
 
   sniper: {
@@ -526,22 +590,26 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     },
     fireVibe: { amp: 0.82, duration: 0.07, adsScale: 0.2 },
     adsTime: 0.42,
-    adsFovScale: 0.25,
     viewFov: 0.72,
-    adsSensScale: 0.25,
     drawTime: 0.88,
     holsterTime: 0.56,
     hipPos: [0.124, -0.2, -0.34],
     hipRot: [-0.055, 0.078, -0.13],
     adsCant: [0, 0, 0],
-    eyeRelief: 0.09,
+    eyeRelief: 0.07,
+    fits: {
+      optic: OPTIC_FITS,
+      rail: { laser: {} },
+      muzzle: { suppressor: { model: 'suppressor338' } },
+    },
+    removableIrons: true,
+    removableMuzzleDevice: true,
     sprintPos: [0.088, -0.31, -0.3],
     sprintRot: [-0.46, 0.66, 0.22],
     lowReadyPos: [0.11, -0.32, -0.31],
     lowReadyRot: [-0.52, 0.12, -0.09],
     swayScale: 1.22,
     bobScale: 1.1,
-    magLen: 0.118,
   },
 };
 
@@ -552,7 +620,7 @@ interface RecoilDefinition {
   recoil: {
     patternLength: number;
     patternSeed: number;
-    climbShape: number[];
+    climbShape: WeaponDef['recoil']['climbShape'];
     pitch: number;
     yaw: number;
     drift: number;

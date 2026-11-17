@@ -2,8 +2,9 @@
 
 SKU50774 (2016): 18.5-inch barrel, 6+1, ghost rings, fixed synthetic stock and
 tri-rail forend. Strict fidelity and final visual/gameplay acceptance are unapproved.
-Nominal barrel/OAL/LOP are .4699 / 1.0033 / .352425 m. Photo-derived LOP disagrees;
-published dimensions take precedence. The 89 mm pump stroke is provisional.
+Nominal factory barrel/OAL/LOP are .4699 / 1.0033 / .352425 m. Photo-derived LOP
+disagrees; published dimensions take precedence. The permanent 12g adapter adds
+12 mm forward of the original crown. The 89 mm pump stroke is provisional.
 
 [Shared workflow](../../../tools/blender/README.md)
 
@@ -28,12 +29,44 @@ Use `--output /tmp/m590-review` for scratch builds. Preserve one mixer,
 event-only gameplay bridge, pump-owned casing ejection, authored shell visibility,
 cancellation/reset and 6+1 accounting. Keep full right-arm skin checks.
 
-The approved shared-glove tessellation exception lives in `clearance.py`:
-exact file/topology hashes and two glove faces against the stock, with an absolute
-30 µm signed-distance ceiling. It is not a general tolerance or triangle skip.
-Other intersections still fail. Shoulder offsets and firing-hand calibration are
-presentation compromises, not anatomical approval. Preserve AgX color management.
+All firing-arm skins require zero crossings against the stock, receiver/tang and
+trigger guard. Shoulder offsets remain presentation compromises, not anatomical
+approval. Preserve AgX color management.
 
-For play review, buy/equip the secondary and inspect fire/ADS/reload/transitions.
-Historical optimization measurements and external review locations are in Git;
-storage reductions do not imply an FPS gain or final visual acceptance.
+## Integrated rear sight and attachment seats
+
+The default has the integrated ghost-ring irons and no optic/glass, suppressor or
+laser; `removableIrons` stays unset, so mounted optics must clear the fixed irons.
+The receiver carries an AIMPRO-style low rail with an integrated rear ghost ring
+([reference photos and published description](https://jerkingthetrigger.com/2013/10/29/aimpro-tactical-ghost-ring-rail/)),
+an aftermarket game-art configuration rather than the original sight assembly.
+Its scout extension runs forward over the barrel on a receiver-seated base so the
+PM II's complete pedestal envelopes sit on real teeth. The original iron sightline,
+front blade/shroud, barrel/OAL/LOP anchors and safety are retained.
+
+| Datum | Ownership |
+| --- | --- |
+| `MOUNT_optic` | receiver; extended top rail |
+| `MOUNT_muzzle` | receiver; permanent 12g adapter forward face |
+| `MOUNT_rail` | receiver; fixed forward magazine-tube clamp rail |
+
+Rails and clamp channels use the [shared Picatinny profile](../../../tools/blender/README.md#common-picatinny-interface).
+Only mating rail teeth may contact optic feet; all other weapon surfaces stay strict.
+See `check.py` for the seating and clearance thresholds.
+
+The TOR Mini rail is supported by two clamps on the fixed magazine tube, ahead of
+the moving forend and clear of the cap fluting/barrel lug; all support hardware
+stays fixed through the pump stroke. `check.py` sweeps deformed hands, mechanisms,
+the visible insertion hull, mounted optics, laser hardware and emitter corridor
+through the full native clips. See the
+[shared laser contract](../../attachments/steiner-tor-mini/README.md#weapon-mounting).
+
+The open-bore 12g muzzle adapter is permanent seating hardware, **not** a
+suppressor: `SOCKET_muzzle` stays at its exit, while `DATUM_barrel_crown` retains
+the factory measurement. The `suppressor` fit mounts the dedicated
+[12g expansion can](../../attachments/12g-suppressor/README.md) on that seat; its
+wide body intentionally occludes the low ghost-ring sightline. `muzzle.py`,
+appended to `check.py`, checks the can against the actual optic meshes, sight
+rays, TOR Mini and the full-clip hand/mechanism sweep.
+
+For play review, equip the secondary and inspect fire, ADS, reloads and transitions.

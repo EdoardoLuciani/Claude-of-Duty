@@ -7,12 +7,7 @@ import manifest from '../../assets/weapons/m4a1-block-ii/manifest.json' with { t
 import { loadWeaponGLTF } from './asset-loader.ts';
 import { convertWeaponScene } from './asset-material.ts';
 import { sampleAuthoredFire, MAGAZINE_ALIASES } from './authored-actions.ts';
-import {
-  authoredModel,
-  requiredNode,
-  type AuthoredModelData,
-  type AuthoredNodes,
-} from './authored-model.ts';
+import { authoredModel, requiredNode, type AuthoredModelData } from './authored-model.ts';
 import { createAuthoredRig, sampleAuthoredPose } from './authored-rig.ts';
 import { buildManifestClips, type Clip } from './clips.ts';
 import { configureM4Finishes } from './m4-finishes.ts';
@@ -23,25 +18,24 @@ const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(MAGAZINE_ALIASES
 
 export function makeM4Model(gltf: GLTF): M4Model {
   const scene = gltf.scene;
-  const { root, animations, point } = authoredModel(gltf, 'M4_RIG', REQUIRED, manifest.clips);
+  const { root, opticMountRest, animations, point } = authoredModel(
+    gltf,
+    'M4_RIG',
+    REQUIRED,
+    manifest.clips
+  );
   const model = {
     id: 'rifle' as const,
     label: 'M4A1',
     scene,
     root,
+    opticMountRest,
     animations,
     reactiveFire: true,
     handPoses: { left: handReference.sides.left.grip, right: handReference.sides.right.grip },
     nodes: {
-      muzzle: point('SOCKET_muzzle'),
-      eject: point('SOCKET_ejection'),
       sight: point('SOCKET_sight'),
       ejectDir: [0.86, 0.44, 0.26],
-      gripR: handReference.grips.right,
-      gripL: handReference.grips.left,
-      magSeat: { pos: [0, 0.054, -0.078], rot: [0, 0, 0] },
-      triggerPivot: { pos: point('trigger'), rot: [0, 0, 0] },
-      handguard: { axis: [0, 0.075, 0], dir: [0, 0, 1], r: 0.0286, z0: -0.133, z1: -0.44415 },
     },
     shell: { caseLen: 0.0447, rimR: 0.00478 },
     magSize: { len: 0.16 },
@@ -61,13 +55,7 @@ export async function loadM4(renderer: Pick<Renderer, 'hasFeature'>): Promise<M4
 
 /** Blender owns mechanisms and wrist/finger choreography; the existing recoil,
  * shared arm skin, upper/forearm IK and ammunition/event system remain in charge. */
-type M4Model = AuthoredModelData<
-  'rifle',
-  AuthoredNodes & {
-    triggerPivot: { pos: [number, number, number]; rot: number[] };
-    handguard: { axis: number[]; dir: number[]; r: number; z0: number; z1: number };
-  }
-> & {
+type M4Model = AuthoredModelData<'rifle'> & {
   label: string;
   reactiveFire: boolean;
   handPoses: {

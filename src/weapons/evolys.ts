@@ -8,12 +8,7 @@ import { hasOwn } from '../core/guards.ts';
 import { loadWeaponGLTF } from './asset-loader.ts';
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
 import { sampleAuthoredFire, MAGAZINE_ALIASES, disposeAuthoredMixer } from './authored-actions.ts';
-import {
-  authoredModel,
-  requiredNode,
-  type AuthoredModelData,
-  type AuthoredNodes,
-} from './authored-model.ts';
+import { authoredModel, requiredNode, type AuthoredModelData } from './authored-model.ts';
 import { createAuthoredRig, sampleAuthoredPose } from './authored-rig.ts';
 import { buildManifestClips, type Clip } from './clips.ts';
 import type { WeaponAnimation } from './runtime-types.ts';
@@ -23,47 +18,29 @@ const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(MAGAZINE_ALIASES
 
 export function makeEvolysModel(gltf: GLTF): EvolysModel {
   const scene = gltf.scene;
-  const { root, animations, point } = authoredModel(gltf, 'EVOLYS_RIG', REQUIRED, manifest.clips);
-  const sight = point('SOCKET_sight');
+  const { root, opticMountRest, animations, point } = authoredModel(
+    gltf,
+    'EVOLYS_RIG',
+    REQUIRED,
+    manifest.clips
+  );
   const model = {
     id: 'lmg' as const,
     label: 'EVOLYS-7.62',
     scene,
     root,
+    opticMountRest,
     animations,
     reactiveFire: true,
     handPoses: { left: handReference.sides.left.grip, right: handReference.sides.right.grip },
     nodes: {
-      muzzle: point('SOCKET_muzzle'),
-      eject: point('SOCKET_ejection'),
-      sight,
+      sight: point('SOCKET_sight'),
       ejectDir: [0.86, 0.44, 0.26],
-      gripR: handReference.grips.right,
-      gripL: handReference.grips.left,
-      magSeat: { pos: point('SOCKET_pouch'), rot: [0, 0, 0] },
-      triggerPivot: { pos: point('trigger'), rot: [0, 0, 0] },
-      handguard: { axis: [0, 0.075, 0], dir: [0, 0, 1], r: 0.027, z0: -0.23, z1: -0.4 },
-      opticGlass: {
-        center: sight,
-        apertureR: 0.0055,
-        windowW: 0.0098,
-        windowH: 0.0058,
-        // Size the RMR aiming dot against the world, not the enlarged weapon window.
-        dotMoa: 3.25,
-        minDotPixels: 5,
-        dotOpacity: 0.9,
-      },
     },
     shell: { caseLen: 0.051, rimR: 0.005975 },
     magSize: { len: 0.125 },
   };
-  const converted = convertWeaponScene(scene, (source, material): void => {
-    if (source.name.startsWith('10 |')) {
-      material.transparent = true;
-      material.opacity = 0.13;
-      material.depthWrite = false;
-      material.side = THREE.DoubleSide;
-    }
+  const converted = convertWeaponScene(scene, (_source, material): void => {
     for (const value of Object.values(material as object)) {
       if (value instanceof THREE.Texture) value.anisotropy = 8;
     }
@@ -78,23 +55,7 @@ export async function loadEvolys(renderer: Pick<Renderer, 'hasFeature'>): Promis
 /** Native Blender mechanism/belt/hand tracks, under shared ADS/sway/recoil.
  * Only ammunition-tail visibility is runtime-driven. No per-shot belt objects,
  * new textures, duplicate cases, frame allocations or second animation rig. */
-type EvolysModel = AuthoredModelData<
-  'lmg',
-  AuthoredNodes & {
-    magSeat: { pos: [number, number, number]; rot: number[] };
-    triggerPivot: { pos: [number, number, number]; rot: number[] };
-    handguard: { axis: number[]; dir: number[]; r: number; z0: number; z1: number };
-    opticGlass: {
-      center: [number, number, number];
-      apertureR: number;
-      windowW: number;
-      windowH: number;
-      dotMoa: number;
-      minDotPixels: number;
-      dotOpacity: number;
-    };
-  }
-> & {
+type EvolysModel = AuthoredModelData<'lmg'> & {
   label: string;
   reactiveFire: boolean;
   handPoses: {
