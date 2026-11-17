@@ -113,6 +113,8 @@ def build_geometry(materials):
         (.035,.020,.0575,.017),(.008,.014,.0575,.0173),(-.026,.015,.0575,.0175),
         (-.037,.002,.0575,.0192),(-.049,.005,.0575,.0198),(-.084,.010,.0575,.020),
         (-.098,.014,.0575,.0195),(-.100,.035,.0575,.018),(-.112,.045,.0575,.018)])
+    # Two segments render the 1 mm edge radius identically at a fraction of the cost.
+    lower.modifiers['Selective edge radius'].segments=2
     well=box('CUT',(0,.022,-.068),(.0262,.090,.061),None,None,.0012)
     cut(lower,well,bake_cutter=True)
     # The Colt window has rounded shoulders above the GI guard's straight bar.
