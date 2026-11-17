@@ -33,17 +33,17 @@ acceptance remain in Git history; they are not general visual or FPS approval.
 
 ## Side-profile reference
 
-The GI guard uses a straight lower bar with upturned ends and a deep opening;
-the curved trigger reaches toward that bar. The guard ears, receiver, magazine
-well and A2 grip locate the opening, rather than an enlarged ornamental loop.
+The GI guard has a straight lower bar with upturned ends. Rounded receiver
+shoulders narrow the opening toward the ends, and the curved trigger reaches
+toward the bar. The guard ears and A2 grip locate the ends of the opening.
 The [Colt Block II FSP owner's parts photograph](https://www.reddit.com/r/GunPorn/comments/eqzf90/m4a1_block_ii_fsp/)
 shows this lower nearly side-on and identifies the SOCOM barrel, RIS II FSP and
 GI guard. Register its takedown pins with one uniform scale and a small in-plane
 rotation; its assembled companion photograph is oblique and is not a dimension gauge.
 
 [Daniel Defense's SOCOM M4A1 FSP side photographs](https://danieldefense.com/socom-m4a1-fsp.html)
-provide a whole-rifle cross-check of the barrel/rail/receiver silhouette. Their
-enhanced curved guard, furniture, magazine, muzzle device and rear sight differ
-from this Colt/GI configuration. Those parts are not templates for the model.
-Photo comparisons establish visual proportions, not manufacturing dimensions;
-the SOPMOD extension, iron datums and hand-contact geometry retain their authored fits.
+provide a whole-rifle cross-check of the barrel/rail/receiver silhouette. The
+front-sight pocket sits forward on the rail and follows the sight tower profile.
+The photo shows Daniel Defense furniture and an enhanced curved guard. The Colt
+photo guides the GI opening and trigger shape. The game uses a SOPMOD stock with
+a fixed extension and separately calibrated hand contacts.

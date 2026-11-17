@@ -111,12 +111,15 @@ def build_geometry(materials):
     lower=forging('Colt lower forging',[(.062,.030,.0555,.0148),(.037,.020,.0555,.017),(.008,.016,.0555,.0173),(-.026,.016,.0555,.0175),(-.042,.011,.0555,.0192),(-.073,.008,.0555,.020),(-.109,.009,.0555,.0195),(-.121,.014,.0555,.018)])
     well=box('CUT',(0,.023,-.078),(.0262,.090,.0625),None,None,.0012)
     cut(lower,well,bake_cutter=True)
-    # Cut through both receiver side walls so the trigger stays visible.
-    # Registered Colt GI side reference: a taller window with a substantial
-    # front web, and a straight winter guard below the magazine-well heel.
-    opening=profile('CUT',[(-.035,-.018),(-.035,.017),(-.030,.022),(.012,.022),(.018,.018),(.018,-.018)],.080,None,None,.0012,rounded=True)
+    # The Colt window has rounded shoulders above the GI guard's straight bar.
+    opening=profile('CUT',[(-.035,-.018),(-.035,.012),(-.034,.017),(-.031,.021),
+        (-.026,.024),(.001,.024),(.008,.022),(.013,.018),(.016,.012),(.015,.004),
+        (.012,-.018)],.080,None,None,.0012,rounded=True)
     cut(lower,opening,bake_cutter=True)
-    profile('GI trigger guard',[(-.040,.013),(-.040,-.002),(-.034,-.008),(.013,-.008),(.020,-.001),(.020,.011),(.017,.011),(.017,.000),(.012,-.005),(-.033,-.005),(-.037,-.001),(-.037,.013)],.0138,steel,bevel=.00045,rounded=True)
+    profile('GI trigger guard',[(-.040,.013),(-.039,.002),(-.037,-.003),(-.032,-.008),
+        (.010,-.008),(.016,-.004),(.019,.002),(.020,.011),(.016,.011),(.015,.004),
+        (.012,-.001),(.008,-.005),(-.030,-.005),(-.032,-.003),(-.034,.001),
+        (-.035,.006),(-.037,.013)],.0138,steel,bevel=.00045,rounded=True)
     for z in (-.041,.018):
         box('GI guard mounting ear',(0,.014,z),(.030,.009,.006),anodized,bevel=.0008)
         cyl('GI guard retaining pin',(0,.0115,z),.0012,.031,steel,axis='X',sides=20)
@@ -183,11 +186,17 @@ def build_geometry(materials):
     profile('Charging T bow',[(.063,.0945),(.075,.0945),(.078,.0975),(.075,.1025),(.064,.1025)],.063,anodized,handle,.001,rounded=True)
     profile('Charging latch',[(.055,.0945),(.074,.0945),(.078,.0975),(.076,.1015),(.066,.1015),(.058,.0985)],.007,steel,handle,.0006,x=-.027,rounded=True)
     cyl('Charging latch pin',(-.027,.1005,.068),.0014,.004,steel,handle,'Y',20)
-    profile('Curved trigger',[(-.007,.048),(.002,.048),(.007,.030),(.010,.022),(.008,.009),(.003,.000),(.000,-.001),(.002,.006),(.005,.016),(.005,.024),(.000,.033),(-.002,.040)],.0064,steel,trigger,.00055,rounded=True)
+    profile('Curved trigger',[(-.007,.048),(.002,.048),(.007,.030),(.006,.022),
+        (.004,.010),(-.002,.000),(-.005,-.003),(-.003,.004),(.000,.014),(.001,.024),
+        (.000,.033),(-.002,.040)],.0064,steel,trigger,.00055,rounded=True)
 
     # RIS II FSP two-piece body: full envelope targets, supported quad rails,
     # slotted walls and genuine front-sight cutout. No polymer free-float panels.
     HG_REAR=-.133;HG_FRONT=HG_REAR-.31115
+    GAS=-.329
+    FSP_FRONT, FSP_REAR = GAS-.027, GAS+.027
+    fsp_center=(0,.102,GAS)
+    fsp_size=(.031,.055,FSP_REAR-FSP_FRONT)
     # Native corner windows avoid the bevel/Boolean explosion of invisible side
     # slots. The four diagonal rows are actually visible above/below the side rails.
     outline=[(-.0235,-.009),(-.009,-.0235),(.009,-.0235),(.0235,-.009),(.0235,.009),(.009,.0235),(-.009,.0235),(-.0235,.009)]
@@ -203,7 +212,7 @@ def build_geometry(materials):
         angles=sorted(set([i*math.tau/16 for i in range(16)]+[math.atan2(y,x)%math.tau for x in (-width/2,width/2) for y in (-pitch/2,pitch/2)]))
         for cell in range(count):
             z=HG_FRONT+(cell+.5)*pitch
-            if mid.y>0 and -.330<z<-.265:continue
+            if mid.y>0 and FSP_FRONT<z<FSP_REAR:continue
             rings=[[],[],[],[]]
             for angle in angles:
                 cs,sn=math.cos(angle),math.sin(angle);t=min(width/2/max(abs(cs),1e-10),pitch/2/max(abs(sn),1e-10))
@@ -214,8 +223,8 @@ def build_geometry(materials):
                 vi,vj=Vector(verts[of[i]]),Vector(verts[of[j]])
                 # Long side boundaries and only actual row ends, not internal caps.
                 edge=(abs((Vector((vi.x,vi.y-BORE))-mid).dot(u))>width/2-1e-7 and abs((Vector((vj.x,vj.y-BORE))-mid).dot(u))>width/2-1e-7)
-                start=cell==0 or (mid.y>0 and -.330<z-pitch<-.265)
-                stop=cell==count-1 or (mid.y>0 and -.330<z+pitch<-.265)
+                start=cell==0 or (mid.y>0 and FSP_FRONT<z-pitch<FSP_REAR)
+                stop=cell==count-1 or (mid.y>0 and FSP_FRONT<z+pitch<FSP_REAR)
                 end=(start and abs(vi.z-(z-pitch/2))<1e-7 and abs(vj.z-(z-pitch/2))<1e-7) or (stop and abs(vi.z-(z+pitch/2))<1e-7 and abs(vj.z-(z+pitch/2))<1e-7)
                 if edge or end:faces.append((of[j],of[i],ib[i],ib[j]));smooth.append(False)
         o=mesh(name,verts,faces,fde,bevel=0)
@@ -255,14 +264,13 @@ def build_geometry(materials):
                      for x,y in outline] for z in (a,b)]
         base=loft(name+' web',rings(picatinny.section(radius,radius-.0056,slot=True),z0,z1),mat,bevel=0,rounded=False)
         for a,b in picatinny.lands(z0,z1,origin):
-            if name.startswith('RIS II') and side=='top' and -.330<(a+b)/2<-.265:continue
+            if name.startswith('RIS II') and side=='top' and FSP_FRONT<(a+b)/2<FSP_REAR:continue
             loft(name+' tooth',rings(picatinny.section(radius,radius-.0056),a,b),mat,bevel=0,rounded=False)
-        if name.startswith('RIS II') and side=='top':cut(base,box('CUT',(0,.102,-.297),(.031,.055,.065),None,None,0))
+        if name.startswith('RIS II') and side=='top':cut(base,box('CUT',fsp_center,fsp_size,None,None,0))
     rail('Upper receiver rail',-.136,.055,'top',anodized)
     for side in ('top','bottom',-1,1):rail('RIS II '+str(side),HG_FRONT,HG_REAR,side)
-    cut(core,box('CUT',(0,.102,-.297),(.031,.055,.065),None,None,.001))
+    cut(core,box('CUT',fsp_center,fsp_size,None,None,.001))
     # F-marked A2 base, forged yoke, round gas boss and protected front post.
-    GAS=-.297
     before_front=set(asset.objects)
     tube('A2 gas boss',(0,BORE,GAS),.0132,.00835,.047,steel)
     # Cast A-frame with a real triangular through-window.
@@ -277,11 +285,11 @@ def build_geometry(materials):
     # side faces by 10 µm and cap by 1 µm, avoiding coincident paint/metal surfaces.
     front_tip=cyl('Front sight tip',(0,SIGHT_Y-.0007+.0000005,GAS-.007),.00131,.001401,paint,axis='Y',sides=16,bevel=0)
     for x in (-.009,.009):
-        profile('A2 protective ear',[(GAS+.003,.128),(GAS-.003,.144),(GAS-.009,.150),(GAS-.015,.151),(GAS-.020,.147),(GAS-.020,.128)],.0043,steel,bevel=.0007,x=x,rounded=True)
+        profile('A2 protective ear',[(GAS+.003,.128),(GAS-.003,.140),(GAS-.009,.145),(GAS-.015,.146),(GAS-.020,.142),(GAS-.020,.128)],.0043,steel,bevel=.0007,x=x,rounded=True)
     for z in (GAS-.012,GAS+.013):cyl('A2 taper pin',(0,.068,z),.0018,.031,steel,axis='X',sides=24)
-    # DD publishes 9.783 inches; installation endpoints/bend remain fit-inferred.
-    GAS_TUBE_LEN=.2484882
-    tube('Gas tube',(0,.0899,-.307+GAS_TUBE_LEN/2),.00165,.0007,GAS_TUBE_LEN,burnished,sides=24)
+    # Seat the decorative tube between the receiver and the sight assembly.
+    tube_front, tube_rear = GAS-.010, -.0585
+    tube('Gas tube',(0,.0899,(tube_front+tube_rear)/2),.00165,.0007,tube_rear-tube_front,burnished,sides=24)
     gas_socket=box('A2 gas-tube socket',(0,.0895,GAS-.005),(.0065,.005,.020),steel,bevel=.00012)
     cut(gas_socket,cyl('CUT',(0,.0899,GAS-.005),.00180,.026,None,None,'Z',24,0))
     for obj in set(asset.objects)-before_front:

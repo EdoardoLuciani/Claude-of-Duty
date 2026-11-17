@@ -120,7 +120,8 @@ assert attached(pick('Forward assist housing'),upper),'forward-assist housing is
 assert attached(pick('Forward assist housing'),pick('Forward assist paddle')),'forward-assist button is detached'
 # Through-window and hidden/outboard stock storage regressions use the actual
 # rendered triangles, not merely component origins or a reference screenshot.
-assert tree(pick('A2 tower casting')).ray_cast(Vector((-.05,.106,-.298)),Vector((1,0,0)),.1)[0] is None,'A2 triangular casting window is blocked'
+post_z=(CI@bpy.data.objects['SOCKET_front_post'].matrix_world.translation).z
+assert tree(pick('A2 tower casting')).ray_cast(Vector((-.05,.106,post_z+.006)),Vector((1,0,0)),.1)[0] is None,'A2 triangular casting window is blocked'
 for o in pick('LMT storage tube'):
     lo,hi=bounds([o])
     assert hi[1]<.063 and lo[1]>.042,'storage chambers must sit below the buffer axis inside the cheek shell'
@@ -140,6 +141,8 @@ for y in (-.025,.005,.030,.055,.080):
 assert max(pad_hits)-min(pad_hits)<.0001,'stock pad is raked rather than square to buffer axis'
 assert tree(lower).ray_cast(Vector((-.05,.018,-.022)),Vector((1,0,0)),.1)[0] is None,'receiver side walls hide the trigger window'
 window=tree(lower+pick('GI trigger guard'))
+assert window.ray_cast(Vector((-.05,.023,-.015)),Vector((1,0,0)),.1)[0] is None,'GI opening has a rounded raised crown'
+assert window.ray_cast(Vector((-.05,.023,-.033)),Vector((1,0,0)),.1)[0] is not None,'GI crown retains its rounded front shoulder'
 assert window.ray_cast(Vector((-.05,.004,-.022)),Vector((1,0,0)),.1)[0] is None,'GI opening is too shallow below the trigger'
 assert window.ray_cast(Vector((-.05,-.007,-.022)),Vector((1,0,0)),.1)[0] is not None,'GI lower bar is missing'
 assert window.ray_cast(Vector((-.05,.018,-.038)),Vector((1,0,0)),.1)[0] is not None,'magwell rear web is too thin'
