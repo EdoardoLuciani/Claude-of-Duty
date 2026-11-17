@@ -105,9 +105,14 @@ for obj in asset.objects:
         assert bvh(obj.name).ray_cast(Vector((.270,0,.009)),Vector((1,0,0)),.06)[0] is None, ('blocked bore',obj.name)
 assert (objects['SOCKET_muzzle'].matrix_world.translation-Vector((.317,0,.009))).length < 1e-6
 
+def bounds(vertices):
+    return (Vector(tuple(min(v[i] for v in vertices) for i in range(3))),
+            Vector(tuple(max(v[i] for v in vertices) for i in range(3))))
+
+
 def extent(names):
-    vertices = [v for name in names for v in mesh_world(name)[0]]
-    return Vector(tuple(max(v[i] for v in vertices)-min(v[i] for v in vertices) for i in range(3)))
+    low, high = bounds([v for name in names for v in mesh_world(name)[0]])
+    return high - low
 
 guard_size = extent(['Hollow octagonal VIRTUS handguard'])
 assert abs(guard_size.x-.2032) <= .001, '8-inch PDW nominal exterior length'
@@ -124,13 +129,9 @@ for o in asset.objects:
 
 def magazine_bounds(parent):
     inverse = objects['MCX_RIG'].matrix_world.inverted()
-    vertices = [inverse @ v for o in objects[parent].children
-                if o.type == 'MESH' and not o.name.startswith('Top round')
-                for v in mesh_world(o.name)[0]]
-    return (
-        Vector(tuple(min(v[i] for v in vertices) for i in range(3))),
-        Vector(tuple(max(v[i] for v in vertices) for i in range(3))),
-    )
+    return bounds([inverse @ v for o in objects[parent].children
+                   if o.type == 'MESH' and not o.name.startswith('Top round')
+                   for v in mesh_world(o.name)[0]])
 
 
 # Judge the seated silhouette relative to the grip heel, including the floorplate.
@@ -146,7 +147,7 @@ lip = bvh('Magazine well lip')
 assert lip.ray_cast(Vector((0,0,-.085)), Vector((0,0,1)), .035)[0] is None, 'open magazine well lip'
 assert lip.ray_cast(Vector((0,.020,-.085)), Vector((0,0,1)), .035)[0] is not None, 'lip retains its sidewall'
 seating_parts = ('Flared magazine well','Magazine well lip','Sculpted trigger guard')
-well_and_guard = surface([objects[name] for name in seating_parts], objects['MCX_RIG'].matrix_world.inverted())
+well_and_guard = surface([objects[name] for name in seating_parts], rig_inverse)
 for parent, frames in [('magazine',(20,25,29)), ('magazine_spare',(104,107,111,117))]:
     parts = [o for o in objects[parent].children if o.type == 'MESH']
     for frame in frames:
