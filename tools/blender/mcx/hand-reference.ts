@@ -33,7 +33,7 @@ for (const side of ['right', 'left'] as const) {
   // Thumb centres sit one glove radius off the surface; the trigger contact is the palmar pad.
   const options: GripOptions =
     side === 'right'
-      ? { thumb: [-0.024, 0.04, 0.022], index: [0, 0.019, -0.06], spread: [0, 0.6, 0.62, 0.64] }
+      ? { thumb: [-0.024, 0.04, 0.022], index: [0, 0.019, -0.066], spread: [0, 0.6, 0.62, 0.64] }
       : { thumb: [-0.022, 0.104, -0.302], thumbPole: [0, 0, -1] };
   arm.fitGrip('mcx', options);
   sides[side] = {
