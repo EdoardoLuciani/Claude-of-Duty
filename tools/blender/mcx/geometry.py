@@ -54,6 +54,8 @@ def build_geometry(materials):
     irons = empty('IRON_sights', parent=body)
     folded = empty('IRON_sights_removed', parent=body)
     muzzle = empty('MUZZLE_device', parent=body)
+    # Barrel, muzzle device and muzzle datums share this bore axis.
+    bore = .009
 
     active, finish, box, profile, loft, forging, cylinder, ellipsoid, cut, opening, tube, cord, screw, text = create_primitives(asset, body, materials)
 
@@ -193,7 +195,7 @@ def build_geometry(materials):
             cut(tube_obj,cylinder('CUT',(.067,side*.027,.008),.0044,.008,None,'Y',None,24,0))
         # Barrel/gas exterior silhouettes only. The accessory is not a functional model.
         # Full 228.6 mm exterior includes the 4.6 mm threaded end below.
-        cylinder('Barrel under vented guard',(.162,0,.009),.0087,.224,steel)
+        cylinder('Barrel under vented guard',(.162,0,bore),.0087,.224,steel)
         cylinder('Gas system silhouette',(.146,0,.028),.0036,.168,steel)
         box('Gas block silhouette',(.233,0,.015),(.014,.023,.029),steel)
         # Same across/up interface as every weapon; this rifle remains +X forward.
@@ -347,12 +349,12 @@ def build_geometry(materials):
     build_handguard()
     # The 9-inch barrel ends at its 5/8-24 direct-thread shoulder. An open
     # three-prong game-fit flash hider replaces the former integrated can.
-    tube('Muzzle thread',(.2763,0,.009),.00794,.0041,.0046,steel)
-    tube('Base muzzle collar',(.281,0,.009),.0105,.0080,.014,steel,muzzle)
-    tube('Base muzzle throat',(.289,0,.009),.0105,.0041,.004,steel,muzzle)
+    tube('Muzzle thread',(.2763,0,bore),.00794,.0041,.0046,steel)
+    tube('Base muzzle collar',(.281,0,bore),.0105,.0080,.014,steel,muzzle)
+    tube('Base muzzle throat',(.289,0,bore),.0105,.0041,.004,steel,muzzle)
     for i in range(3):
         angle = i*math.tau/3
-        prong = box('Base muzzle prong',(.303,math.cos(angle)*.008,.009+math.sin(angle)*.008),
+        prong = box('Base muzzle prong',(.303,math.cos(angle)*.008,bore+math.sin(angle)*.008),
                     (.028,.004,.005),steel,muzzle,.0005)
         prong.rotation_euler.x = angle
     build_charging_handle()
@@ -361,12 +363,12 @@ def build_geometry(materials):
     build_casing()
 
     # Named attachment / integration sockets; adapter hand contacts follow the fit.
-    for name,loc,parent in [('SOCKET_muzzle',(.317,0,.009),rig),('SOCKET_ejection',(-.018,-.030,.004),rig),('SOCKET_grip_R',(-.139,0,-.099),rig),('SOCKET_grip_L',(.171,0,-.020),rig),('SOCKET_magazine',(.004,0,-.042),mag),('SOCKET_sight',(-.146,0,.077),rig),('SOCKET_front_post',(.236,0,.077),rig)]:
+    for name,loc,parent in [('SOCKET_muzzle',(.317,0,bore),rig),('SOCKET_ejection',(-.018,-.030,.004),rig),('SOCKET_grip_R',(-.139,0,-.099),rig),('SOCKET_grip_L',(.171,0,-.020),rig),('SOCKET_magazine',(.004,0,-.042),mag),('SOCKET_sight',(-.146,0,.077),rig),('SOCKET_front_post',(.236,0,.077),rig)]:
         empty(name,loc,parent)
 
     # Rail contact frames: attachment Blender +Y maps to rifle +X; +Z stays up.
     # The optic mount sits forward of the deployed rear leaf so mounted optics clear it.
-    for name, loc in [('MOUNT_optic',(-.036,0,.046)),('MOUNT_muzzle',(.274,0,.009))]:
+    for name, loc in [('MOUNT_optic',(-.036,0,.046)),('MOUNT_muzzle',(.274,0,bore))]:
         mount = empty(name,loc,body)
         mount.rotation_euler.z = -math.pi/2
 

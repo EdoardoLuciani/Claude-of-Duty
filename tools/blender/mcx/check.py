@@ -61,8 +61,9 @@ assert not bvh('Curved trigger blade').overlap(guard), 'trigger must clear guard
 assert guard.ray_cast(Vector((-.037,-.05,-.068)), Vector((0,1,0)), .1)[0] is not None, 'front guard band reaches the well'
 assert bvh('Length adjustment latch').overlap(bvh('Stock upper spine')), 'stock latch must attach to spine'
 assert objects['Length adjustment latch'].parent == objects['stock_hinge']
-stock_frame = surface([objects['Stock butt frame']], objects['MCX_RIG'].matrix_world.inverted())
-assert bvh('Rubber recoil pad').overlap(bvh('Stock butt frame')), 'recoil pad must attach to the stock'
+rig_inverse = objects['MCX_RIG'].matrix_world.inverted()
+stock_frame = surface([objects['Stock butt frame']], rig_inverse)
+assert stock_frame.overlap(surface([objects['Rubber recoil pad']], rig_inverse)), 'recoil pad must attach to the stock'
 assert stock_frame.ray_cast(Vector((-.395,-.05,-.043)), Vector((0,1,0)), .1)[0] is None, 'stock relief slot remains open'
 
 for frame in range(13):
@@ -108,8 +109,9 @@ def extent(names):
     vertices = [v for name in names for v in mesh_world(name)[0]]
     return Vector(tuple(max(v[i] for v in vertices)-min(v[i] for v in vertices) for i in range(3)))
 
-assert abs(extent(['Hollow octagonal VIRTUS handguard']).x-.2032) <= .001, '8-inch PDW nominal exterior length'
-assert extent(['Hollow octagonal VIRTUS handguard']).z < .054, 'short guard must not regain the deep lower skirt'
+guard_size = extent(['Hollow octagonal VIRTUS handguard'])
+assert abs(guard_size.x-.2032) <= .001, '8-inch PDW nominal exterior length'
+assert guard_size.z < .054, 'short guard must not regain the deep lower skirt'
 guard_shell = bvh('Hollow octagonal VIRTUS handguard')
 assert guard_shell.ray_cast(Vector((.093,-.06,-.012)), Vector((0,1,0)))[0] is None, 'diagonal vent must be open'
 assert guard_shell.ray_cast(Vector((.096,-.06,-.018)), Vector((0,1,0)))[0] is not None, 'diagonal vent retains its lower rim'
@@ -132,26 +134,24 @@ def magazine_bounds(parent):
 
 
 # Judge the seated silhouette relative to the grip heel, including the floorplate.
-grip_vertices = mesh_world('Ergonomic pistol grip')[0]
+grip_heel = min(v.z for v in mesh_world('Ergonomic pistol grip')[0])
 mag_bounds = magazine_bounds('magazine')
 shell = bvh('Curved .300 magazine shell')
 assert shell.ray_cast(Vector((0,-.05,-.120)), Vector((0,1,0)), .1)[0] is not None, 'exposed magazine shell is present'
 neck_edges = [shell.ray_cast(Vector((-.06,0,z)), Vector((1,0,0)), .05)[0] for z in (-.075,-.088)]
 assert all(edge is not None for edge in neck_edges) and abs(neck_edges[0].x-neck_edges[1].x) < .002, 'magazine neck blends into body'
-drop = min(v.z for v in grip_vertices) - mag_bounds[0].z
+drop = grip_heel - mag_bounds[0].z
 assert .035 < drop < .046, ('magazine floorplate below grip heel', drop)
 lip = bvh('Magazine well lip')
 assert lip.ray_cast(Vector((0,0,-.085)), Vector((0,0,1)), .035)[0] is None, 'open magazine well lip'
 assert lip.ray_cast(Vector((0,.020,-.085)), Vector((0,0,1)), .035)[0] is not None, 'lip retains its sidewall'
-inverse = objects['MCX_RIG'].matrix_world.inverted()
 seating_parts = ('Flared magazine well','Magazine well lip','Sculpted trigger guard')
-well_and_guard = surface([objects[name] for name in seating_parts], inverse)
+well_and_guard = surface([objects[name] for name in seating_parts], objects['MCX_RIG'].matrix_world.inverted())
 for parent, frames in [('magazine',(20,25,29)), ('magazine_spare',(104,107,111,117))]:
     parts = [o for o in objects[parent].children if o.type == 'MESH']
     for frame in frames:
         pose('Reload_Empty', frame)
-        inverse = objects['MCX_RIG'].matrix_world.inverted()
-        assert not well_and_guard.overlap(surface(parts, inverse)), (parent, frame, 'magazine clips the well or guard')
+        assert not well_and_guard.overlap(surface(parts, objects['MCX_RIG'].matrix_world.inverted())), (parent, frame, 'magazine clips the well or guard')
 
 for clip in ('Reload_Tactical','Reload_Empty'):
     pose(clip, 117)
@@ -165,7 +165,7 @@ for name in ['VIRTUS upper forging','Ambidextrous lower receiver','Ergonomic pis
 assert not any(o.name.startswith(('Upper machined shoulder','Receiver lower shoulder',
                                 'Magazine well forging relief')) for o in asset.objects), 'no slab overlays'
 # Local silhouette/contact regressions, NOT certified SIG dimensions.
-assert -.151 < min(v.z for v in grip_vertices) < -.145, 'grip heel follows registered reference'
+assert -.151 < grip_heel < -.145, 'grip heel follows registered reference'
 assert -.077 < min(v.z for v in mesh_world('Magazine well lip')[0]) < -.072, 'magwell not oversized below rail'
 assert extent(['Ergonomic pistol grip']).y < .035, 'retain grip thickness budget'
 assert abs(objects['SOCKET_magazine'].matrix_world.translation.z+.042) < 1e-6, 'revised seated-mag socket'
