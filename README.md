@@ -106,7 +106,9 @@ Home/End and PageUp/Down keys adjust sliders or scroll the focused reference.
 After death, New Game is available after 2.85 seconds. It resets the run and
 returns to the Start dialog; gameplay stays frozen until you select Start and
 mouse capture succeeds. Terminal errors require Reload. Quality changes restart
-the run; Defaults resets settings, not bindings. Gamepad sticks move/look; no
+the run; Defaults resets settings, not bindings. Pause-menu audio sliders set
+master and per-category volume immediately; they are saved in this browser and
+Reset Audio restores the designed mix. Gamepad sticks move/look; no
 buttons are bound. F7/F8 are telemetry-only.
 
 Survive escalating squads, earn credits and shop between waves. Hover or focus a

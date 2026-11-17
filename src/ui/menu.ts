@@ -1,3 +1,4 @@
+import type { VolumeKey } from '../audio/settings.ts';
 import { bindingLabel } from '../core/bindings.ts';
 import type { EngineContext } from '../core/context.ts';
 import { clamp, damp } from '../core/math.ts';
@@ -11,6 +12,21 @@ interface SliderApi {
   set(value: number): void;
 }
 type InvertButton = [HTMLButtonElement, boolean];
+
+/** Every audio category, in menu order, with the sounds it actually controls. */
+const VOLUME_ROWS: Record<VolumeKey, [label: string, detail: string]> = {
+  master: ['Master Volume', 'All sound, after the safety limiter'],
+  weapons: ['Gunfire', 'Shots, dry fire, distant firefights'],
+  explosions: ['Explosions', 'Grenades, air strikes, ear ringing'],
+  foley: ['Footsteps & Impacts', 'Movement, reloads, casings, impacts, near misses'],
+  voice: ['Voices', 'Enemy callouts and reactions'],
+  ambience: ['Ambience', 'Environment and strike aircraft'],
+  ui: ['Interface & Alerts', 'Hits, damage, heartbeat, radio, intel'],
+  music: ['Music', 'Supply tent radio'],
+};
+const VOLUME_KEYS = Object.keys(VOLUME_ROWS).filter((key): key is VolumeKey =>
+  Object.hasOwn(VOLUME_ROWS, key)
+);
 
 /** Settings write shared config directly; quality reloads with ?q= because passes
  * are chosen at init. FOV also updates the live camera. Emits ui:pause {paused}.
@@ -27,6 +43,7 @@ export class PauseMenu {
   // ---- quality preset --------------------------------------------------
   qBtns: HTMLButtonElement[] = [];
   invBtns: InvertButton[] = [];
+  volumes = new Map<VolumeKey, SliderApi>();
   open: boolean = false;
   shown: number = 0;
 
@@ -95,6 +112,34 @@ export class PauseMenu {
       this.invBtns.push([b, val]);
     }
 
+    // ---- audio -----------------------------------------------------------
+    const audioHead = el('div', 'ow-menu-section', this.rows);
+    el('h2', null, audioHead, 'AUDIO');
+    const resetAudio = el('button', 'ow-btn small', audioHead, 'Reset Audio');
+    resetAudio.type = 'button';
+    resetAudio.addEventListener('click', (): void => this.resetAudio());
+    el(
+      'div',
+      'hint',
+      this.rows,
+      '100% is the designed mix. 50% sounds about half as loud. 0% is muted.'
+    );
+    for (const key of VOLUME_KEYS) {
+      const [label, detail] = VOLUME_ROWS[key];
+      const slider = this._slider(
+        label,
+        0,
+        100,
+        1,
+        (v): string => {
+          this.ctx.peek('audio')?.setVolume(key, v);
+          return v <= 0 ? 'MUTED' : `${v}%`;
+        },
+        detail
+      );
+      this.volumes.set(key, slider);
+    }
+
     // ---- buttons ---------------------------------------------------------
     const btns = el('div', 'ow-btns', inner);
     this.resumeBtn = el('button', 'ow-btn primary', btns, 'Resume');
@@ -108,6 +153,7 @@ export class PauseMenu {
       this.fov.set(80);
       this.shake.set(1);
       this.ctx.config.invertY = false;
+      this.resetAudio();
       this.setQuality('high');
     });
     el('div', 'hint', inner, `${bindingLabel('pause').toUpperCase()} RESUME`);
@@ -134,9 +180,10 @@ export class PauseMenu {
     this.syncFromConfig();
   }
 
-  _row(name: string): HTMLElement {
-    const r = el('div', 'ow-row', this.rows);
-    el('div', 'name', r, name.toUpperCase());
+  _row(name: string, detail?: string): HTMLElement {
+    const r = el('div', detail ? 'ow-row compact' : 'ow-row', this.rows);
+    const label = el('div', 'name', r, name.toUpperCase());
+    if (detail) el('div', 'detail', label, detail);
     return r;
   }
 
@@ -145,16 +192,17 @@ export class PauseMenu {
     min: number,
     max: number,
     step: number,
-    apply: (value: number) => string
+    apply: (value: number) => string,
+    detail?: string
   ): SliderApi {
-    const row = this._row(name);
+    const row = this._row(name, detail);
     const wrap = el('div', 'ow-slider', row);
     el('div', 'track', wrap);
     const fill = el('div', 'fill', wrap);
     const knob = el('div', 'knob', wrap);
     const input = el('input', null, wrap);
     input.type = 'range';
-    input.setAttribute('aria-label', name);
+    input.setAttribute('aria-label', detail ? `${name}: ${detail}` : name);
     input.min = String(min);
     input.max = String(max);
     input.step = String(step);
@@ -164,7 +212,9 @@ export class PauseMenu {
       const t = (v - min) / (max - min);
       setStyle(fill, 'width', (t * 100).toFixed(2) + '%');
       setStyle(knob, 'left', (t * 100).toFixed(2) + '%');
-      setText(val, apply(v));
+      const text = apply(v);
+      setText(val, text);
+      input.setAttribute('aria-valuetext', text);
     };
     input.addEventListener('input', (): void => paint(parseFloat(input.value)));
     const api = {
@@ -195,6 +245,13 @@ export class PauseMenu {
     this.sens.set(cfg.sensitivity / 0.0022);
     this.fov.set(cfg.fov);
     this.shake.set(cfg.firingShake);
+    const audio = this.ctx.peek('audio');
+    if (audio) for (const [key, slider] of this.volumes) slider.set(audio.volumes[key]);
+  }
+
+  resetAudio(): void {
+    this.ctx.peek('audio')?.resetVolumes();
+    this.syncFromConfig();
   }
 
   toggle(): void {

@@ -363,6 +363,21 @@ Donor/calibre decisions live in `src/audio/samples/weapon-reports-provenance.jso
 Callout provenance is `src/audio/samples/callouts/provenance.json`; there
 is no runtime TTS or credential access.
 
+Gain staging has one owner per stage: each recording/profile owns its authored
+level (weapon reports use only their fixed bank reference), each mixer bus owns its
+category trim and compressor, the shared reverb return and energy limiter own
+summation headroom and peak safety, and the player's master gain follows the
+limiter. A bus applies trim, player volume, the supply-tent dip and ducking once,
+post-compressor, to both its dry output and its reverb send. Buses are the
+player-facing categories: `weapons` (all firearm reports, dry fire, distant
+volleys), `explosions` (grenades, bombs, distant booms, tinnitus), `foley`
+(movement, reloads, casings, impacts, near misses), `voice`, `ambience`
+(environment events, aircraft), `ui` (feedback, heartbeat, radio/intel cues) and
+`music`. New sounds join an existing bus rather than bypassing one. Gunfire and
+explosion ducking scale with their own category's volume. `src/audio/settings.ts`
+owns the validated, locally persisted percentages and their loudness curve; audio
+keeps them across graph start, pause, shop and restart.
+
 ## Prewarm
 
 `src/core/prewarm.ts` awaits subsystem `prewarmMaterials(ctx)` before gameplay.

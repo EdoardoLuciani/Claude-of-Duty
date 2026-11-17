@@ -1,6 +1,7 @@
 /** Voices feed category buses, world dry/reverb sums, hearing gain, then master limiting/volume.
- * UI and tinnitus bypass hearing muffling. Reverb sends are per voice with five blended spaces.
- * Gunfire sidechains post-compressor category gain, preserving compressor drive and user volume.
+ * UI, music and tinnitus bypass hearing muffling. Reverb sends are per voice with five blended
+ * spaces. Each bus level is authored trim x user volume x shop dip x duck, applied post-compressor
+ * to dry and wet alike, so compressor drive never depends on player settings.
  */
 
 import { hasOwn } from '../core/guards.ts';
@@ -15,7 +16,9 @@ interface MixerBus {
   send: GainNode;
   comp: DynamicsCompressorNode | null;
   baseTrim: number;
+  shopTrim: number;
   volume: number;
+  shop: number;
   duckAmount: number;
   duckHold?: number;
 }
@@ -50,14 +53,22 @@ function holdHearingParam(param: AudioParam, time: number): void {
 }
 const CONCUSSION_CUTOFF_RATIO = 0.075; // full concussion bottoms out at 1.5 kHz
 
+/** One authored level per category. `shop` dips the field while the supply tent is open. */
 const BUS_DEFS = {
   // The only authored weapon-level control. Sources have no separate profile
   // trim; shared summation headroom and output safety remain downstream.
   weapons: { trim: 1, comp: null },
-  foley: { trim: 0.6, comp: { threshold: -14, knee: 10, ratio: 2.0, attack: 0.004, release: 0.2 } },
+  // Same authored level as gunfire; separate only so players can balance them.
+  explosions: { trim: 1, comp: null },
+  foley: {
+    trim: 0.6,
+    shop: 0.5,
+    comp: { threshold: -14, knee: 10, ratio: 2.0, attack: 0.004, release: 0.2 },
+  },
   // Sparse environmental events support the action, below foley and weapons.
   ambience: {
     trim: 0.06,
+    shop: 0.28,
     comp: { threshold: -24, knee: 12, ratio: 2.0, attack: 0.05, release: 0.5 },
   },
   voice: {
@@ -68,7 +79,9 @@ const BUS_DEFS = {
   ui: { trim: 0.45, comp: null },
   music: { trim: 0.6, comp: null },
 };
-const BUS_NAMES = Object.keys(BUS_DEFS).filter((name): name is BusName => hasOwn(BUS_DEFS, name));
+export const BUS_NAMES = Object.keys(BUS_DEFS).filter((name): name is BusName =>
+  hasOwn(BUS_DEFS, name)
+);
 const preparedContexts = new WeakMap<BaseAudioContext, Promise<void>>();
 
 export class Mixer {
@@ -78,6 +91,7 @@ export class Mixer {
   masterSum!: GainNode;
   energyMix!: AudioWorkletNode;
   masterGain!: GainNode;
+  tinnitusOut!: GainNode;
   worldSum!: GainNode;
   muffleLP!: BiquadFilterNode;
   muffleHS!: BiquadFilterNode;
@@ -119,12 +133,17 @@ export class Mixer {
   _concussionAttackUntil: number = 0;
   deafness: number = 0; // 0..1, public: UI/render may read this
 
-  constructor(actx: BaseAudioContext, rng: Rng, opts: { masterVolume?: number } = {}) {
+  /** Volumes are linear user gains, applied from the first sample. */
+  constructor(
+    actx: BaseAudioContext,
+    rng: Rng,
+    opts: { masterVolume?: number; busVolumes?: Partial<Record<BusName, number>> } = {}
+  ) {
     this.actx = actx;
     this.rng = rng;
     // User volume is last. Category balance and summation headroom belong
     // upstream of the single shared peak-safety processor.
-    this.masterVolume = opts.masterVolume ?? 1;
+    this.masterVolume = clamp(opts.masterVolume ?? 1, 0, 1);
 
     /* ---- master chain (built first, everything hangs off it) ------ */
     this.masterSum = gain(actx, 1);
@@ -165,7 +184,8 @@ export class Mixer {
     /* ---- buses ---------------------------------------------------- */
     const createBus = (name: BusName): MixerBus => {
       const def = BUS_DEFS[name];
-      const level = gain(actx, def.trim);
+      const volume = clamp(opts.busVolumes?.[name] ?? 1, 0, 1);
+      const level = gain(actx, def.trim * volume);
       let comp: DynamicsCompressorNode | null = null;
       if (def.comp) {
         comp = actx.createDynamicsCompressor();
@@ -183,15 +203,18 @@ export class Mixer {
       return {
         input: comp ?? level,
         level,
-        send: gain(actx, def.trim),
+        send: gain(actx, def.trim * volume),
         comp,
         baseTrim: def.trim,
-        volume: 1,
+        shopTrim: 'shop' in def ? def.shop : 1,
+        volume,
+        shop: 1,
         duckAmount: 0,
       };
     };
     this.buses = {
       weapons: createBus('weapons'),
+      explosions: createBus('explosions'),
       foley: createBus('foley'),
       ambience: createBus('ambience'),
       voice: createBus('voice'),
@@ -223,6 +246,10 @@ export class Mixer {
     // it must never lay a second, warehouse-sized tail over every report.
     this.reverbReturn = gain(actx, 0.26);
     this.reverbReturn.connect(this.worldSum);
+
+    // Blast ringing is part of the Explosions category, but stays post-muffle.
+    this.tinnitusOut = gain(actx, this.buses.explosions.volume);
+    this.tinnitusOut.connect(this.masterSum);
   }
 
   /**
@@ -296,9 +323,11 @@ export class Mixer {
 
   /**
    * Sidechain duck. `amount` 0..1 of gain reduction, `hold` seconds before it
-   * starts floating back. Called on every gunshot and explosion.
+   * starts floating back. Called on every gunshot and explosion; scaled by the
+   * source category's user volume so a muted category never pumps the others.
    */
-  duck(amount: number, hold = 0.12): void {
+  duck(amount: number, hold: number, source: BusName): void {
+    amount *= this.buses[source].volume;
     const t = this.actx.currentTime;
     const apply = (name: BusName, scale: number): void => {
       const b = this.buses[name];
@@ -386,7 +415,7 @@ export class Mixer {
     const lfoG = gain(actx, 26);
     lfo.connect(lfoG);
     lfoG.connect(o2.frequency);
-    g.connect(this.masterSum); // post-muffle on purpose
+    g.connect(this.tinnitusOut); // post-muffle on purpose
     o1.start(t);
     o2.start(t);
     o3.start(t);
@@ -492,16 +521,29 @@ export class Mixer {
     this.masterGain.gain.setTargetAtTime(this.masterVolume, this.actx.currentTime, 0.03);
   }
 
+  /** Linear user gain for one category, including voices already playing. */
   setBusVolume(name: BusName, v: number): void {
     if (!hasOwn(this.buses, name)) return;
     const b = this.buses[name];
-    b.volume = clamp(v, 0, 2);
+    b.volume = clamp(v, 0, 1);
     this._setBusLevel(b, 0.05);
+    if (name === 'explosions') {
+      this.tinnitusOut.gain.setTargetAtTime(b.volume, this.actx.currentTime, 0.05);
+    }
+  }
+
+  /** Supply-tent dip; independent of user volume, so closing restores the player's mix. */
+  setShopMix(open: boolean): void {
+    for (const name of BUS_NAMES) {
+      const b = this.buses[name];
+      b.shop = open ? b.shopTrim : 1;
+      this._setBusLevel(b, 0.05);
+    }
   }
 
   /** One logical category level drives dry and wet; a mute always wins. */
   _setBusLevel(b: MixerBus, smooth: number): void {
-    const value = b.baseTrim * b.volume * (1 - b.duckAmount);
+    const value = b.baseTrim * b.volume * b.shop * (1 - b.duckAmount);
     const t = this.actx.currentTime;
     b.level.gain.setTargetAtTime(value, t, smooth);
     b.send.gain.setTargetAtTime(value, t, smooth);
@@ -542,6 +584,7 @@ export class Mixer {
     this.muffleGain.disconnect();
     this.muffleDry.disconnect();
     this.muffleWet.disconnect();
+    this.tinnitusOut.disconnect();
     this.masterSum.disconnect();
     this.energyMix.onprocessorerror = null;
     this.energyMix.port.postMessage('stop');

@@ -173,6 +173,22 @@ const CSS = `
 .ow-menu .ow-seg button { font-size:max(11px, calc(10px * var(--k))); }
 .ow-menu .hint { font-size:max(11px, calc(9.5px * var(--k))); color:#bdcbd3; letter-spacing:.08em; }
 .ow-menu :focus-visible { outline:2px solid var(--amber); outline-offset:4px; }
+.ow-menu .ow-slider:has(input:focus-visible) { outline:2px solid var(--amber); outline-offset:4px; }
+.ow-menu-section {
+  display:flex; align-items:center; justify-content:space-between;
+  margin-top: calc(var(--u) * 6); padding-bottom: calc(var(--u) * 1.5);
+  border-bottom: 1px solid var(--hair);
+}
+.ow-menu-section h2 { font-family:var(--fd); font-size:max(16px, calc(18px * var(--k))); letter-spacing:.24em; }
+.ow-menu .ow-btn.small { padding: calc(var(--u) * 1.2) calc(var(--u) * 2.6); }
+.ow-row > .name .detail {
+  margin-top:3px; font-size:max(11px, calc(10px * var(--k)));
+  letter-spacing:.03em; text-transform:none; color:#bdcbd3;
+}
+.ow-menu .ow-row > .name { flex:1; min-width:0; }
+.ow-menu .ow-slider { flex:none; }
+.ow-menu .ow-row.compact { padding: calc(var(--u) * 2) 0; }
+.ow-menu .ow-row.compact .ow-slider { width: calc(150px * var(--k)); }
 .ow-controls {
   min-width:0; max-height:calc(100vh - 48px); overflow:auto;
   padding:max(18px, calc(24px * var(--k)));
