@@ -1043,22 +1043,23 @@ function palmFrond(rng: Rng, len = 2.6): THREE.BufferGeometry {
   const list = [];
   const rise = 0.28;
   const sag = 0.62;
-  const at = (t: number, out: THREE.Vector3): THREE.Vector3 =>
-    out.set(t * len, len * (rise * t - sag * t * t), 0);
   const pos = new THREE.Vector3();
   const tan = new THREE.Vector3();
   const up = new THREE.Vector3();
+  // Midrib point, tangent and in-plane up at parameter t.
+  const frame = (t: number): void => {
+    pos.set(t * len, len * (rise * t - sag * t * t), 0);
+    tan.set(1, rise - 2 * sag * t, 0).normalize();
+    up.set(-tan.y, tan.x, 0);
+  };
   const dir = new THREE.Vector3();
   const width = new THREE.Vector3();
   const normal = new THREE.Vector3();
   const basis = new THREE.Matrix4();
   const n = 30;
   for (let i = 0; i < n; i++) {
-    const t = 0.16 + (i / (n - 1)) * 0.82;
-    const u = (t - 0.16) / 0.82;
-    at(t, pos);
-    tan.set(1, rise - 2 * sag * t, 0).normalize();
-    up.set(-tan.y, tan.x, 0);
+    const u = i / (n - 1);
+    frame(0.16 + u * 0.82);
     const lw = (0.2 + Math.sin(Math.PI * Math.pow(u, 0.75)) * 0.6) * rng.range(0.9, 1.1);
     for (const side of [-1, 1]) {
       // Sweep toward the tip, lift into a V that flattens toward the tip.
@@ -1071,10 +1072,11 @@ function palmFrond(rng: Rng, len = 2.6): THREE.BufferGeometry {
         .addScaledVector(up, Math.sin(lift))
         .normalize();
       // The blade contains the midrib tangent, then folds slightly along its own rib.
-      width.copy(tan).addScaledVector(dir, -tan.dot(dir)).normalize();
-      normal.crossVectors(dir, width);
-      const fold = side * 0.35;
-      width.multiplyScalar(Math.cos(fold)).addScaledVector(normal, Math.sin(fold));
+      width
+        .copy(tan)
+        .projectOnPlane(dir)
+        .normalize()
+        .applyAxisAngle(dir, side * 0.35);
       normal.crossVectors(dir, width);
       const q = new THREE.PlaneGeometry(lw, 0.19, 2, 1);
       const pa = q.getAttribute('position');
@@ -1091,19 +1093,18 @@ function palmFrond(rng: Rng, len = 2.6): THREE.BufferGeometry {
   }
   // Midrib: a tapering ribbon from slightly inside the crown to the tip, mapped
   // onto the opaque centre vein of the leaf tile so the cutout keeps it whole.
-  const segs = 12;
-  const spine = new THREE.PlaneGeometry(1, 1, segs, 1);
+  const spine = new THREE.PlaneGeometry(1, 1, 12, 1);
   const sa = spine.getAttribute('position');
   const su = spine.getAttribute('uv');
   for (let v = 0; v < sa.count; v++) {
-    const t = -0.04 + (sa.getX(v) + 0.5) * 1.04;
-    at(t, pos);
-    tan.set(1, rise - 2 * sag * t, 0).normalize();
-    up.set(-tan.y, tan.x, 0);
-    const half = (0.035 - Math.max(t, 0) * 0.028) * Math.sign(sa.getY(v));
+    const s = sa.getX(v) + 0.5;
+    const edge = Math.sign(sa.getY(v));
+    const t = -0.04 + s * 1.04;
+    frame(t);
     // Pitch the ribbon 45 degrees about the midrib so it reads from any side.
-    sa.setXYZ(v, pos.x + up.x * half * 0.7, pos.y + up.y * half * 0.7, half * 0.7);
-    su.setXY(v, 0.3 + (sa.getX(v) + 0.5) * 0.4, 0.5 + Math.sign(sa.getY(v)) * 0.03);
+    const h = (0.035 - Math.max(t, 0) * 0.028) * edge * 0.7;
+    sa.setXYZ(v, pos.x + up.x * h, pos.y + up.y * h, h);
+    su.setXY(v, 0.3 + s * 0.4, 0.5 + edge * 0.03);
   }
   spine.computeVertexNormals();
   fillMasks(spine, 0.2, 0.3, 0);
@@ -1348,12 +1349,9 @@ export function registerProps(A: Assembler): Assembler {
   P('can', 'steel', can(), { maxDist: 45, castShadow: false });
 
   // vegetation
-  const palm = palmTree(R('palm_trunk'), 5.2);
+  const palm = palmTree(R('palm_trunk'));
   P('palm_trunk', 'wood_dark', palm, { skirt: 0.57, chunk: false });
-  P('palm_frond', 'foliage', palmFrond(R('palm_frond'), 2.7), {
-    chunk: false,
-    receiveShadow: true,
-  });
+  P('palm_frond', 'foliage', palmFrond(R('palm_frond'), 2.7), { chunk: false });
   P('shrub', 'foliage', shrub(R('shrub'), 0.85));
   P('weeds', 'foliage', weedTuft(R('weeds')), { maxDist: 40 });
   P('planter', 'concrete_prop', planter(), { skirt: 0.33 });
