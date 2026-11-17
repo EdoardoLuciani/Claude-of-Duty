@@ -28,6 +28,7 @@ import {
   saveVolumes,
   clampVolume,
   volumeGain,
+  VOLUME_KEYS,
   type VolumeKey,
   type VolumeSettings,
 } from './settings.ts';
@@ -916,10 +917,8 @@ export class AudioSystem {
   }
 
   resetVolumes(): void {
-    this.volumes = defaultVolumes();
-    saveVolumes(this.volumes);
-    this.mixer?.setMasterVolume(volumeGain(this.volumes.master));
-    for (const name of BUS_NAMES) this.mixer?.setBusVolume(name, volumeGain(this.volumes[name]));
+    const defaults = defaultVolumes();
+    for (const key of VOLUME_KEYS) this.setVolume(key, defaults[key]);
   }
 
   _onIntelOperation(e: { active?: boolean }): void {

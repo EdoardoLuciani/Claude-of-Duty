@@ -185,7 +185,7 @@ const CSS = `
   margin-top:3px; font-size:max(11px, calc(10px * var(--k)));
   letter-spacing:.03em; text-transform:none; color:#bdcbd3;
 }
-.ow-menu .ow-row > .name { flex:1; min-width:0; }
+.ow-menu .ow-row > .name { flex:1 1 auto; min-width:0; }
 .ow-menu .ow-slider { flex:none; }
 .ow-menu .ow-row.compact { padding: calc(var(--u) * 2) 0; }
 .ow-menu .ow-row.compact .ow-slider { width: calc(150px * var(--k)); }
