@@ -112,9 +112,11 @@ def build_geometry(materials):
     well=box('CUT',(0,.023,-.078),(.0262,.090,.0625),None,None,.0012)
     cut(lower,well,bake_cutter=True)
     # Cut through both receiver side walls so the trigger stays visible.
-    opening=profile('CUT',[(-.040,-.015),(-.040,.022),(-.034,.026),(.014,.026),(.018,.022),(.018,-.015)],.080,None,None,.0012,rounded=True)
+    # Registered Colt GI side reference: a taller window with a substantial
+    # front web, and a straight winter guard below the magazine-well heel.
+    opening=profile('CUT',[(-.035,-.018),(-.035,.017),(-.030,.022),(.012,.022),(.018,.018),(.018,-.018)],.080,None,None,.0012,rounded=True)
     cut(lower,opening,bake_cutter=True)
-    profile('GI trigger guard',[(-.040,.013),(-.040,.005),(-.035,.003),(.013,.003),(.020,.008),(.018,.011),(.012,.006),(-.034,.006),(-.037,.013)],.0138,steel,bevel=.00045,rounded=True)
+    profile('GI trigger guard',[(-.040,.013),(-.040,-.002),(-.034,-.008),(.013,-.008),(.020,-.001),(.020,.011),(.017,.011),(.017,.000),(.012,-.005),(-.033,-.005),(-.037,-.001),(-.037,.013)],.0138,steel,bevel=.00045,rounded=True)
     for z in (-.041,.018):
         box('GI guard mounting ear',(0,.014,z),(.030,.009,.006),anodized,bevel=.0008)
         cyl('GI guard retaining pin',(0,.0115,z),.0012,.031,steel,axis='X',sides=20)
@@ -181,7 +183,7 @@ def build_geometry(materials):
     profile('Charging T bow',[(.063,.0945),(.075,.0945),(.078,.0975),(.075,.1025),(.064,.1025)],.063,anodized,handle,.001,rounded=True)
     profile('Charging latch',[(.055,.0945),(.074,.0945),(.078,.0975),(.076,.1015),(.066,.1015),(.058,.0985)],.007,steel,handle,.0006,x=-.027,rounded=True)
     cyl('Charging latch pin',(-.027,.1005,.068),.0014,.004,steel,handle,'Y',20)
-    profile('Curved trigger',[(-.007,.048),(.002,.048),(.007,.030),(.010,.022),(.008,.015),(.003,.008),(.000,.007),(.002,.013),(.005,.019),(.005,.024),(.000,.033),(-.002,.040)],.0064,steel,trigger,.00055,rounded=True)
+    profile('Curved trigger',[(-.007,.048),(.002,.048),(.007,.030),(.010,.022),(.008,.009),(.003,.000),(.000,-.001),(.002,.006),(.005,.016),(.005,.024),(.000,.033),(-.002,.040)],.0064,steel,trigger,.00055,rounded=True)
 
     # RIS II FSP two-piece body: full envelope targets, supported quad rails,
     # slotted walls and genuine front-sight cutout. No polymer free-float panels.

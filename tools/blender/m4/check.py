@@ -139,6 +139,10 @@ for y in (-.025,.005,.030,.055,.080):
     pad_hits.append(hit.z)
 assert max(pad_hits)-min(pad_hits)<.0001,'stock pad is raked rather than square to buffer axis'
 assert tree(lower).ray_cast(Vector((-.05,.018,-.022)),Vector((1,0,0)),.1)[0] is None,'receiver side walls hide the trigger window'
+window=tree(lower+pick('GI trigger guard'))
+assert window.ray_cast(Vector((-.05,.004,-.022)),Vector((1,0,0)),.1)[0] is None,'GI opening is too shallow below the trigger'
+assert window.ray_cast(Vector((-.05,-.007,-.022)),Vector((1,0,0)),.1)[0] is not None,'GI lower bar is missing'
+assert window.ray_cast(Vector((-.05,.018,-.038)),Vector((1,0,0)),.1)[0] is not None,'magwell rear web is too thin'
 assert attached(pick('GI trigger guard'),pick('GI guard mounting ear')),'GI guard is detached from mounting ears'
 for ear in pick('GI guard mounting ear'):
     assert attached([ear],lower),'GI guard mounting ear is detached from receiver'
