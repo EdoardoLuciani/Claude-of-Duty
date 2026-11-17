@@ -1080,9 +1080,10 @@ function palmFrond(rng: Rng, len = 2.6): THREE.BufferGeometry {
       normal.crossVectors(dir, width);
       const q = new THREE.PlaneGeometry(lw, 0.19, 2, 1);
       const pa = q.getAttribute('position');
+      // The basis is mirrored per side, so its normal flips: keep both tips drooping.
       for (let v = 0; v < pa.count; v++) {
         const x = pa.getX(v) + lw / 2;
-        pa.setXYZ(v, x, pa.getY(v), -((x / lw) ** 2) * lw * 0.18);
+        pa.setXYZ(v, x, pa.getY(v), -side * (x / lw) ** 2 * lw * 0.18);
       }
       q.computeVertexNormals();
       basis.makeBasis(dir, width, normal).setPosition(pos);

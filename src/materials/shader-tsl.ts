@@ -670,7 +670,9 @@ export function createSurfaceNodeMaterial(
     // Authored backlight approximation, not physical transmission: this emissive
     // term uses orientation/cavity AO, but does not sample direct-light shadows.
     // Keep opaque sleeves separate; shared sun/moon uniforms follow the sky.
-    const back = max(float(0), dot(normalWorldGeometry, shared.keyDir).negate());
+    // Double-sided cards glow on whichever face is shown, not the authored one.
+    const shownN = frontFacing.select(normalWorldGeometry, normalWorldGeometry.negate());
+    const back = max(float(0), dot(shownN, shared.keyDir).negate());
     const view = normalize(cameraPosition.sub(positionWorld));
     const forward = max(float(0), dot(view, shared.keyDir).negate());
     mat.emissiveNode = channels.color
