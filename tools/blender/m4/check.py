@@ -120,7 +120,8 @@ assert attached(pick('Forward assist housing'),upper),'forward-assist housing is
 assert attached(pick('Forward assist housing'),pick('Forward assist paddle')),'forward-assist button is detached'
 # Through-window and hidden/outboard stock storage regressions use the actual
 # rendered triangles, not merely component origins or a reference screenshot.
-assert tree(pick('A2 tower casting')).ray_cast(Vector((-.05,.106,-.298)),Vector((1,0,0)),.1)[0] is None,'A2 triangular casting window is blocked'
+front=bpy.data.objects['SOCKET_front_post'];f=CI@front.matrix_world.translation
+assert tree(pick('A2 tower casting')).ray_cast(Vector((-.05,.106,f.z+.006)),Vector((1,0,0)),.1)[0] is None,'A2 triangular casting window is blocked'
 for o in pick('LMT storage tube'):
     lo,hi=bounds([o])
     assert hi[1]<.063 and lo[1]>.042,'storage chambers must sit below the buffer axis inside the cheek shell'
@@ -138,7 +139,16 @@ for y in (-.025,.005,.030,.055,.080):
     assert hit is not None,'stock pad side profile has a hole'
     pad_hits.append(hit.z)
 assert max(pad_hits)-min(pad_hits)<.0001,'stock pad is raked rather than square to buffer axis'
-assert tree(lower).ray_cast(Vector((-.05,.018,-.022)),Vector((1,0,0)),.1)[0] is None,'receiver side walls hide the trigger window'
+lower_tree=tree(lower)
+assert lower_tree.ray_cast(Vector((-.05,.018,-.022)),Vector((1,0,0)),.1)[0] is None,'receiver side walls hide the trigger window'
+window=tree(lower+pick('GI trigger guard'))
+for y,z,solid,message in [(.023,-.015,False,'GI opening has a rounded raised crown'),
+        (.023,-.033,True,'GI crown retains its rounded front shoulder'),(.004,-.022,False,'GI opening is too shallow below the trigger'),
+        (-.007,-.022,True,'GI lower bar is missing')]:
+    assert (window.ray_cast(Vector((-.05,y,z)),Vector((1,0,0)),.1)[0] is not None)==solid,message
+# Measure the web between the well and the opening, not the outer side walls.
+web=[lower_tree.ray_cast(Vector((0,.010,z)),Vector((0,0,d)),.02)[0] for z,d in ((-.030,-1),(-.050,1))]
+assert web[0] and web[1] and web[0].z-web[1].z>.002,'magwell rear web is too thin'
 assert attached(pick('GI trigger guard'),pick('GI guard mounting ear')),'GI guard is detached from mounting ears'
 for ear in pick('GI guard mounting ear'):
     assert attached([ear],lower),'GI guard mounting ear is detached from receiver'
@@ -148,6 +158,14 @@ for name in ('Fire','Last_Shot'):
         assert not attached(pick('Curved trigger'),pick('GI trigger guard')),'trigger intersects guard during pull'
 pose('Idle')
 assert attached(pick('USGI floorplate'),pick('USGI formed aluminum body')),'magazine floorplate is detached from stamped walls'
+# Sample the magazines as they leave (after magout) and re-enter (before magin) the well.
+reload=clips['Reload_Tactical'];event={e['event']:e['time'] for e in reload['events']}
+for parent,anchor,offsets in [('magazine','magout',(0,.01,.02,.03)),('magazine_spare','magin',(-.04,-.01,0))]:
+    magazine=[o for o in pick('USGI formed aluminum body') if o.parent.name==parent]
+    for offset in offsets:
+        pose('Reload_Tactical',event[anchor]+offset*reload['duration'])
+        assert not lower_tree.overlap(tree(magazine)),(parent,anchor,offset,'magazine clips the well')
+pose('Idle')
 
 # Include the fasteners in the handguard exterior, not a shell-only envelope.
 guard=pick('RIS II')
@@ -156,8 +174,7 @@ rail=bpy.data.objects['MOUNT_rail']
 assert (CI@rail.matrix_world.translation-Vector((.028321,.075,-.4101216))).length<1e-6,'right-rail contact datum moved'
 assert (CI@(rail.matrix_world.to_3x3()@Vector((0,0,-1)))-Vector((1,0,0))).length<1e-6,'laser body must sit outboard'
 assert (CI@(rail.matrix_world.to_3x3()@Vector((0,1,0)))-Vector((0,0,-1))).length<1e-6,'laser must face forward'
-front=bpy.data.objects['SOCKET_front_post'];sight=bpy.data.objects['SOCKET_sight']
-f=CI@front.matrix_world.translation;s=CI@sight.matrix_world.translation
+sight=bpy.data.objects['SOCKET_sight'];s=CI@sight.matrix_world.translation
 near(f.x,s.x,.00001);near(f.y,s.y,.00001)
 rear_tree=tree(rear)
 assert rear_tree.ray_cast(Vector((s.x,s.y,s.z+.025)),Vector((0,0,-1)),.045)[0] is None,'rear sight bore is blocked'

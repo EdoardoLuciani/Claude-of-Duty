@@ -30,3 +30,14 @@ Use `--output /tmp/m4-review` for scratch builds. Refit hands only intentionally
 Preserve events, STEP visibility, iron rays, lockback, contacts and resource
 ownership. Representation/storage measurements and bounded normal-rounding
 acceptance remain in Git history; they are not general visual or FPS approval.
+
+## Side-profile references
+
+- [Colt Block II FSP parts photograph](https://www.reddit.com/r/GunPorn/comments/eqzf90/m4a1_block_ii_fsp/):
+  register its nearly side-on lower on the takedown pins for the GI opening,
+  straight guard bar and trigger curve. Its assembled companion is oblique.
+- [Daniel Defense SOCOM M4A1 FSP](https://danieldefense.com/socom-m4a1-fsp.html):
+  whole-rifle barrel, rail, front-sight and receiver silhouette. Its furniture
+  and enhanced guard differ.
+- [Colt M4 catalog, page 26](https://www.colt.com/wp-content/uploads/2024/09/24-COLT-2263-COLLATERAL-MLE_Catalog-web-FINAL.pdf#page=26):
+  lower forging taper, A2 grip heel and seated USGI magazine.
