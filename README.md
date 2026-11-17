@@ -78,8 +78,8 @@ dialog appears.
 After loading, select **Start** to capture the mouse and begin. Pending or denied
 mouse capture keeps the run frozen; select **Retry Start** to retry (there is no
 unlocked-play fallback). Once playing, click the game canvas to reacquire the
-cursor (also a fire press). The pause menu contains the full keyboard/mouse
-reference, including contextual behaviors.
+cursor (also a fire press). The pause menu has Gameplay, Audio and Controls tabs;
+Controls is the full keyboard/mouse reference, including contextual behaviors.
 Bindings are fixed defaults in `src/core/bindings.ts`.
 
 | Keys                    | Action                                                 |
@@ -101,14 +101,15 @@ Intel takes priority over ammo and requires a four-second stationary, visible,
 hands-free hold; release after completion before collecting ammo. Equipment and
 movement can interrupt actions; the pause reference lists exact conditions.
 
-Unlocked menus use native mouse, Tab/Shift+Tab and Enter/Space navigation; arrow,
-Home/End and PageUp/Down keys adjust sliders or scroll the focused reference.
+Unlocked menus use native mouse, Tab/Shift+Tab and Enter/Space navigation; arrows
+switch pause tabs, and arrow, Home/End and PageUp/Down keys adjust sliders or scroll
+the focused reference.
 After death, New Game is available after 2.85 seconds. It resets the run and
 returns to the Start dialog; gameplay stays frozen until you select Start and
 mouse capture succeeds. Terminal errors require Reload. Quality changes restart
-the run; Defaults resets settings, not bindings. Pause-menu audio sliders set
-master and per-category volume immediately; they are saved in this browser and
-Reset Audio restores the designed mix. Gamepad sticks move/look; no
+the run; each settings tab has its own reset, which never changes bindings. Audio
+sliders set master and per-category volume immediately and are saved in this
+browser. Gamepad sticks move/look; no
 buttons are bound. F7/F8 are telemetry-only.
 
 Survive escalating squads, earn credits and shop between waves. Hover or focus a

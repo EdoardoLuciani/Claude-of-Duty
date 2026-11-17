@@ -119,6 +119,12 @@ for (const label of ['Mouse Sensitivity', 'Field Of View', 'Firing Camera Shake'
     )
   );
 }
+const visiblePages = (): boolean[] =>
+  [...menu.tabs.values()].map(([, page]): boolean => !page.hidden);
+assert.deepEqual(visiblePages(), [true, false, false], 'opens on Gameplay');
+menu.selectTab('Controls');
+assert.deepEqual(visiblePages(), [false, false, true], 'one page at a time');
+assert.equal(menu.tabs.get('Controls')?.[0].getAttribute('aria-selected'), 'true');
 menu.show();
 assert.equal(ctx.time.scale, 0);
 assert.equal(menu.root.open, true, 'pause menu is a native modal');

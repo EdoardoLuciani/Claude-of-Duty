@@ -85,54 +85,92 @@ const CSS = `
 .ow-menu {
   position:absolute; inset:0; pointer-events:auto;
   display:flex; flex-direction:column; overflow:auto;
-  background: linear-gradient(105deg, rgba(4,6,8,.90) 0%, rgba(4,6,8,.72) 46%, rgba(4,6,8,.42) 100%);
+  background: linear-gradient(105deg, rgba(4,6,8,.92) 0%, rgba(4,6,8,.78) 46%, rgba(4,6,8,.55) 100%);
   backdrop-filter: blur(calc(9px * var(--k))) saturate(.7) brightness(.8);
   opacity:0; will-change: opacity;
 }
+/* Rail (title, tabs, Resume) beside one fixed-height page; short viewports scroll. */
 .ow-menu-layout {
-  display:grid; grid-template-columns: minmax(400px, calc(430px * var(--k))) minmax(0, 1fr);
-  gap: max(28px, calc(40px * var(--k)));
-  width: min(max(1520px, calc(1520px * var(--k))), 100%);
+  display:grid; grid-template-columns: minmax(240px, calc(300px * var(--k))) minmax(0, calc(900px * var(--k)));
+  gap: max(28px, calc(48px * var(--k)));
+  width:100%; max-width: max(1100px, calc(1300px * var(--k)));
   padding:24px; margin:auto; flex-shrink:0;
 }
-.ow-menu-inner {
-  align-self:center; min-width:0;
+.ow-menu-rail {
+  display:flex; flex-direction:column; align-self:center;
   padding-left: calc(var(--u) * 4.5);
   border-left: calc(2px * var(--k)) solid var(--amber);
 }
 .ow-menu h1 {
   font-family: var(--fd);
-  font-size: calc(46px * var(--k)); font-weight:700; letter-spacing:.3em;
+  font-size: max(36px, calc(46px * var(--k))); font-weight:700; letter-spacing:.3em;
   text-shadow: 0 2px 6px rgba(0,0,0,.8);
 }
 .ow-menu .sub {
-  margin-top: calc(var(--u) * 1.2); font-size: calc(10px * var(--k));
-  letter-spacing:.28em; color: var(--ink-3);
+  margin-top: calc(var(--u) * 1.2); font-size: max(10px, calc(10px * var(--k)));
+  letter-spacing:.16em; white-space:nowrap; color: var(--ink-3);
 }
-.ow-menu .rule {
-  margin: calc(var(--u) * 5) 0 calc(var(--u) * 2); height:1px;
-  background: linear-gradient(to right, rgba(255,255,255,.28), rgba(255,255,255,0));
+.ow-tabs { display:flex; flex-direction:column; margin: calc(var(--u) * 8) 0; }
+.ow-tab {
+  appearance:none; border:0; background:transparent; text-align:left; cursor:pointer;
+  font-family:var(--fd); font-weight:700; text-transform:uppercase;
+  font-size:max(18px, calc(22px * var(--k))); letter-spacing:.18em; color: var(--ink-2);
+  padding: calc(var(--u) * 2.2) calc(var(--u) * 3);
+  margin-left: calc(var(--u) * -4.5 - 2px * var(--k));
+  border-left: calc(2px * var(--k)) solid transparent;
+  transition: color .12s, background .12s, border-color .12s;
+}
+.ow-tab:hover { color: var(--ink); background: rgba(255,255,255,.05); }
+.ow-tab.on {
+  color: var(--ink); border-left-color: var(--ink);
+  background: linear-gradient(to right, rgba(255,176,42,.18), rgba(255,176,42,0));
+}
+.ow-menu-rail .ow-btn.primary { align-self:flex-start; }
+.ow-menu-pages {
+  min-width:0; height: min(calc(840px * var(--k)), calc(100vh - 48px)); min-height:420px;
+  background:rgba(7,11,15,.94); border:1px solid var(--hair);
+}
+.ow-page { height:100%; overflow:auto; padding: max(20px, calc(28px * var(--k))) max(22px, calc(32px * var(--k))); }
+.ow-page[hidden] { display:none; }
+.ow-page-head {
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  padding-bottom: calc(var(--u) * 3); margin-bottom: calc(var(--u) * 1);
+  border-bottom: 1px solid var(--hair);
+}
+.ow-page-head h2 { font-family:var(--fd); font-size:max(24px, calc(28px * var(--k))); letter-spacing:.16em; }
+.ow-page-note {
+  font-size:max(14px, calc(14px * var(--k))); line-height:1.5; color:#bdcbd3;
+  text-transform:none; letter-spacing:.02em; margin: calc(var(--u) * 3) 0 calc(var(--u) * 1);
 }
 .ow-row {
   display:flex; align-items:center; justify-content:space-between;
-  gap: calc(var(--u) * 4); padding: calc(var(--u) * 3.2) 0;
+  gap: calc(var(--u) * 4); padding: calc(var(--u) * 2.6) 0;
   border-bottom: 1px solid var(--hair-2);
 }
-.ow-row > .name { font-size: calc(11.5px * var(--k)); letter-spacing:.2em; color: var(--ink); }
-.ow-row > .val { font-family: var(--fm); font-size: calc(11px * var(--k)); color: var(--amber);
-  letter-spacing:.04em; min-width: calc(46px * var(--k)); text-align:right; }
-.ow-seg { display:flex; gap:0; }
+.ow-row > .name {
+  flex:1 1 auto; min-width:0; letter-spacing:.2em; color: var(--ink);
+  font-size:max(13px, calc(13px * var(--k)));
+}
+.ow-row > .name .detail {
+  margin-top:4px; font-size:max(13px, calc(13px * var(--k)));
+  letter-spacing:.02em; text-transform:none; color:#bdcbd3;
+}
+.ow-row > .val {
+  font-family: var(--fm); font-size:max(13px, calc(12px * var(--k))); color: var(--amber);
+  letter-spacing:.04em; min-width: max(56px, calc(56px * var(--k))); text-align:right;
+}
+.ow-seg { display:flex; gap:0; flex:none; }
 .ow-seg button {
   appearance:none; border:1px solid var(--hair); border-right:0; background:rgba(255,255,255,.03);
   color: var(--ink-2); font-family:var(--ff); font-weight:600; text-transform:uppercase;
-  font-size: calc(10px * var(--k)); letter-spacing:.16em;
-  padding: calc(var(--u) * 1.3) calc(var(--u) * 2.2);
+  font-size:max(11px, calc(11px * var(--k))); letter-spacing:.16em;
+  padding: calc(var(--u) * 1.5) calc(var(--u) * 2.6);
   cursor:pointer; position:relative; transition: color .12s, background .12s;
 }
 .ow-seg button:last-child { border-right:1px solid var(--hair); }
 .ow-seg button:hover { color: var(--ink); background: rgba(255,255,255,.07); }
 .ow-seg button.on { color:#0b0d0f; background: var(--ink); }
-.ow-slider { position:relative; width: calc(190px * var(--k)); height: calc(18px * var(--k)); }
+.ow-slider { position:relative; flex:none; width: max(160px, calc(260px * var(--k))); height: max(16px, calc(18px * var(--k))); }
 .ow-slider .track {
   position:absolute; left:0; right:0; top:50%; height: calc(2px * var(--k));
   transform: translateY(-50%); background: rgba(255,255,255,.16);
@@ -142,7 +180,7 @@ const CSS = `
   transform: translateY(-50%); background: var(--amber);
 }
 .ow-slider .knob {
-  position:absolute; top:50%; width: calc(9px * var(--k)); height: calc(9px * var(--k));
+  position:absolute; top:50%; width: calc(10px * var(--k)); height: calc(10px * var(--k));
   background: var(--amber); transform: translate(-50%,-50%) rotate(45deg);
   box-shadow: 0 0 calc(6px * var(--k)) rgba(255,176,42,.5);
 }
@@ -150,75 +188,51 @@ const CSS = `
   position:absolute; inset:0; width:100%; height:100%; margin:0;
   appearance:none; background:transparent; cursor:pointer; opacity:0;
 }
-.ow-btns { margin-top: calc(var(--u) * 5); display:flex; gap: calc(var(--u) * 2.5); }
 .ow-btn {
   appearance:none; border:1px solid var(--hair); background: rgba(255,255,255,.04);
   color: var(--ink); font-family: var(--ff); font-weight:600; text-transform:uppercase;
-  font-size: calc(11px * var(--k)); letter-spacing:.2em;
-  padding: calc(var(--u) * 2.2) calc(var(--u) * 5);
+  font-size:max(12px, calc(11px * var(--k))); letter-spacing:.2em;
+  padding: calc(var(--u) * 2.2) calc(var(--u) * 6);
   cursor:pointer; transition: background .12s, border-color .12s;
 }
 .ow-btn:hover { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.4); }
 .ow-btn.primary { background: var(--amber); border-color: var(--amber); color:#100b02; }
 .ow-btn.primary:hover { background:#ffc251; }
+.ow-btn.small { padding: calc(var(--u) * 1.3) calc(var(--u) * 2.8); }
 .ow-menu .hint {
-  margin-top: calc(var(--u) * 4); font-size: calc(9.5px * var(--k));
-  letter-spacing:.2em; color: var(--ink-3);
+  margin-top: calc(var(--u) * 3); font-size:max(11px, calc(9.5px * var(--k)));
+  letter-spacing:.08em; color:#bdcbd3;
 }
-
-/* Pause reference stays in normal flow: short/narrow viewports scroll rather
-   than clipping controls or shrinking text below a readable size. */
-.ow-menu .ow-row > .name { font-size:max(12px, calc(11.5px * var(--k))); }
-.ow-menu .ow-row > .val, .ow-menu .ow-btn { font-size:max(12px, calc(11px * var(--k))); }
-.ow-menu .ow-seg button { font-size:max(11px, calc(10px * var(--k))); }
-.ow-menu .hint { font-size:max(11px, calc(9.5px * var(--k))); color:#bdcbd3; letter-spacing:.08em; }
 .ow-menu :focus-visible { outline:2px solid var(--amber); outline-offset:4px; }
-.ow-menu .ow-slider:has(input:focus-visible) { outline:2px solid var(--amber); outline-offset:4px; }
-.ow-menu-section {
-  display:flex; align-items:center; justify-content:space-between;
-  margin-top: calc(var(--u) * 6); padding-bottom: calc(var(--u) * 1.5);
-  border-bottom: 1px solid var(--hair);
-}
-.ow-menu-section h2 { font-family:var(--fd); font-size:max(16px, calc(18px * var(--k))); letter-spacing:.24em; }
-.ow-menu .ow-btn.small { padding: calc(var(--u) * 1.2) calc(var(--u) * 2.6); }
-.ow-row > .name .detail {
-  margin-top:3px; font-size:max(11px, calc(10px * var(--k)));
-  letter-spacing:.03em; text-transform:none; color:#bdcbd3;
-}
-.ow-menu .ow-row > .name { flex:1 1 auto; min-width:0; }
-.ow-menu .ow-slider { flex:none; }
-.ow-menu .ow-row.compact { padding: calc(var(--u) * 2) 0; }
-.ow-menu .ow-row.compact .ow-slider { width: calc(150px * var(--k)); }
-.ow-controls {
-  min-width:0; max-height:calc(100vh - 48px); overflow:auto;
-  padding:max(18px, calc(24px * var(--k)));
-  background:rgba(7,11,15,.94); border:1px solid var(--hair);
-  text-transform:none; letter-spacing:.02em;
-}
-.ow-controls h2 { font-family:var(--fd); font-size:max(24px, calc(28px * var(--k))); letter-spacing:.16em; }
-.ow-controls-note { font-size:max(14px, calc(14px * var(--k))); line-height:1.5; color:#bdcbd3; margin-top:12px; }
+.ow-menu .ow-tab:focus-visible { outline-offset:-2px; }
+.ow-menu .ow-page:focus-visible { outline-offset:-4px; }
+.ow-menu .ow-slider:has(input:focus-visible) { outline:2px solid var(--amber); outline-offset:6px; }
 .ow-controls-groups { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:20px 28px; margin:16px 0; }
-.ow-controls h3 { font-size:max(14px, calc(14px * var(--k))); color:var(--amber); margin-bottom:8px; }
+.ow-controls h3 { font-size:max(14px, calc(14px * var(--k))); color:var(--amber); margin-bottom:8px; text-transform:none; letter-spacing:.02em; }
 .ow-control {
   display:grid; grid-template-columns:minmax(0, .65fr) minmax(0, 1fr); gap:12px;
   padding:6px 0; border-top:1px solid var(--hair-2);
   font-size:max(14px, calc(14px * var(--k))); line-height:1.4;
+  text-transform:none; letter-spacing:.02em;
 }
 .ow-control dt { color:#f0f5f7; font-weight:800; }
 .ow-control dd { color:#bdcbd3; }
 .ow-control dt, .ow-control dd { overflow-wrap:anywhere; }
 
-@media (max-width:1200px) {
+@media (max-width:1100px) {
   .ow-controls-groups { grid-template-columns:minmax(0, 1fr); }
 }
-@media (max-width:1000px) {
-  .ow-menu-layout { grid-template-columns:minmax(0, 1fr); max-width:760px; }
-  .ow-menu-inner { width:100%; }
-  .ow-controls { max-height:none; }
+@media (max-width:800px) {
+  .ow-menu-layout { grid-template-columns:minmax(0, 1fr); }
+  .ow-tabs { flex-direction:row; flex-wrap:wrap; gap:8px; margin: 16px 0; }
+  .ow-tab { margin-left:0; padding:6px 12px; font-size:16px; border-left:0; border-bottom:2px solid transparent; }
+  .ow-tab.on { border-bottom-color: var(--ink); }
+  .ow-menu-pages { height:auto; min-height:0; }
 }
 @media (max-width:560px) {
   .ow-menu-layout { padding:16px; }
-  .ow-menu .ow-row { flex-wrap:wrap; }
+  .ow-row { flex-wrap:wrap; }
+  .ow-slider { width:100%; }
 }
 
 /* ============================================================= game over */
