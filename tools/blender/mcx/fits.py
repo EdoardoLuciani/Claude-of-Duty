@@ -29,7 +29,7 @@ def check_attachment_fits():
     folded = bpy.data.objects['IRON_sights_removed']
     device = bpy.data.objects['MUZZLE_device']
     # Weapon Blender +X forward; attachment Blender +Y forward and +Z up.
-    for name, position in [('MOUNT_optic',(-.036,0,.046)),('MOUNT_muzzle',(.274,0,0))]:
+    for name, position in [('MOUNT_optic',(-.036,0,.046)),('MOUNT_muzzle',(.274,0,.009))]:
         mount = bpy.data.objects[name]
         local = inverse @ mount.matrix_world
         assert mount.parent == bpy.data.objects['receiver']
@@ -69,7 +69,7 @@ def check_attachment_fits():
         elif slot == 'muzzle':
             assert not surface.overlap(attachment_source.surface(list(installed.children),inverse)), 'can clips irons'
             exit = attachment_source.named(objects, 'SOCKET_muzzle')
-            assert (inverse @ exit.matrix_world.translation-Vector((.510,0,0))).length < 1e-6, 'installed exit'
+            assert (inverse @ exit.matrix_world.translation-Vector((.510,0,.009))).length < 1e-6, 'installed exit'
         elif slot == 'rail':
             emitter = attachment_source.named(objects, 'SOCKET_laser')
             emitter_frame = inverse @ emitter.matrix_world

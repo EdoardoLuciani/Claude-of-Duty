@@ -94,17 +94,18 @@ for obj in asset.objects:
 assert all(o.parent == objects['MUZZLE_device'] for o in asset.objects if o.name.startswith('Base muzzle '))
 for obj in asset.objects:
     if obj.type == 'MESH' and obj.name.startswith(('Base muzzle ','Muzzle thread')):
-        assert bvh(obj.name).ray_cast(Vector((.270,0,0)),Vector((1,0,0)),.06)[0] is None, ('blocked bore',obj.name)
-assert (objects['SOCKET_muzzle'].matrix_world.translation-Vector((.317,0,0))).length < 1e-6
+        assert bvh(obj.name).ray_cast(Vector((.270,0,.009)),Vector((1,0,0)),.06)[0] is None, ('blocked bore',obj.name)
+assert (objects['SOCKET_muzzle'].matrix_world.translation-Vector((.317,0,.009))).length < 1e-6
 
 def extent(names):
     vertices = [v for name in names for v in mesh_world(name)[0]]
     return Vector(tuple(max(v[i] for v in vertices)-min(v[i] for v in vertices) for i in range(3)))
 
 assert abs(extent(['Hollow octagonal VIRTUS handguard']).x-.2032) <= .001, '8-inch PDW nominal exterior length'
+assert extent(['Hollow octagonal VIRTUS handguard']).z < .054, 'short guard must not regain the deep lower skirt'
 guard_shell = bvh('Hollow octagonal VIRTUS handguard')
-assert guard_shell.ray_cast(Vector((.093,-.06,-.023)), Vector((0,1,0)))[0] is None, 'diagonal vent must be open'
-assert guard_shell.ray_cast(Vector((.096,-.06,-.032)), Vector((0,1,0)))[0] is not None, 'diagonal vent retains its lower rim'
+assert guard_shell.ray_cast(Vector((.093,-.06,-.012)), Vector((0,1,0)))[0] is None, 'diagonal vent must be open'
+assert guard_shell.ray_cast(Vector((.096,-.06,-.018)), Vector((0,1,0)))[0] is not None, 'diagonal vent retains its lower rim'
 assert 'Stock lower skeleton strut' not in objects, 'factory telescoping stock, not skeleton approximation'
 assert 'Magazine longitudinal rib' not in objects, 'MAG800 smooth upper side, not 5.56 lattice'
 assert 'Mount locking ring' not in objects, 'direct-thread suppressor, not generic QD mount'

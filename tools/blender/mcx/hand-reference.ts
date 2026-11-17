@@ -15,7 +15,7 @@ import {
 
 const grips: Record<Side, GripFrame> = {
   right: { pos: [0.0351, -0.012, 0.086], finger: [0.15, 0.35, -0.92], back: [1, 0.03, 0.04] },
-  left: { pos: [-0.073, 0.04, -0.243], finger: [0.7, -0.1, -0.71], back: [-0.14, -0.985, 0.001] },
+  left: { pos: [-0.073, 0.048, -0.243], finger: [0.7, -0.1, -0.71], back: [-0.14, -0.985, 0.001] },
 };
 const sides: Partial<Record<Side, HandSideReference>> = {};
 for (const side of ['right', 'left'] as const) {
@@ -25,7 +25,7 @@ for (const side of ['right', 'left'] as const) {
   arm.hand.quaternion.copy(basis(grip.finger, grip.back));
   arm.setPose(side === 'right' ? 'gripRifle' : 'clamp');
   if (side === 'left') {
-    arm.fitToCylinder(arm.hand.position, arm.hand.quaternion, [0, 0.07, 0], [0, 0, 1], 0.026, {
+    arm.fitToCylinder(arm.hand.position, arm.hand.quaternion, [0, 0.078, 0], [0, 0, 1], 0.026, {
       clearance: 0.001,
       poseName: 'clamp',
     });
@@ -34,7 +34,7 @@ for (const side of ['right', 'left'] as const) {
   const options: GripOptions =
     side === 'right'
       ? { thumb: [-0.024, 0.04, 0.022], index: [0, 0.019, -0.06], spread: [0, 0.6, 0.62, 0.64] }
-      : { thumb: [-0.022, 0.096, -0.302], thumbPole: [0, 0, -1] };
+      : { thumb: [-0.022, 0.104, -0.302], thumbPole: [0, 0, -1] };
   arm.fitGrip('mcx', options);
   sides[side] = {
     quaternion: arm.hand.quaternion.toArray(),

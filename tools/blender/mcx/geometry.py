@@ -62,7 +62,12 @@ def build_geometry(materials):
         # Unpublished contours remain photo-inferred, not manufacturing dimensions.
         upper = forging('VIRTUS upper forging', [(-.178,-.008,.020,.019),
             (-.166,-.009,.034,.026),(-.146,-.010,.037,.0245),
-            (.037,-.008,.037,.0245),(.052,-.008,.024,.0245)])
+            (.037,-.008,.037,.0245),(.078,-.008,.034,.0245)])
+        # The nose meets the guard's diagonal rear shoulder at every height;
+        # a square extension would leave a raised ledge across that seam.
+        for vertex in upper.data.vertices:
+            if vertex.co.x > .077:
+                vertex.co.x = .045 + .033*max(0,min(1,(vertex.co.z-.010)/.024))
         opening(upper, (-.006,-.022,.013), (.085,.024,.020), .0035)
         box('Port interior shadow', (-.006,.001,.013), (.089,.008,.021), rubber)
         for side in (-1,1):
@@ -158,8 +163,12 @@ def build_geometry(materials):
         # Build the shell along X from octagonal Y/Z rings.
         # 8-inch PDW exterior, including its rear receiver overlap. Width/section are
         # inferred from photographs; 203.2 mm is the catalog's nominal length.
-        ring = [(-.015,.034),(.015,.034),(.026,.019),(.026,-.019),(.017,-.033),(-.017,-.033),(-.026,-.019),(-.026,.019)]
-        verts = [(x,y,z) for x in (.045,.2482) for y,z in ring]
+        # Side-photo registration uses rail pitch, not an independent height
+        # stretch. The lower edge sits just below the bore; the rear upper
+        # shoulder runs diagonally into the receiver instead of a square cuff.
+        ring = [(-.015,.034),(.015,.034),(.026,.019),(.026,-.007),(.017,-.019),(-.017,-.019),(-.026,-.007),(-.026,.019)]
+        rear = [.077,.077,.052,.045,.045,.045,.045,.052]
+        verts = [(x,y,z) for x,(y,z) in zip(rear,ring)] + [(.2482,y,z) for y,z in ring]
         faces = [(i,(i+1)%8,(i+1)%8+8,i+8) for i in range(8)]
         mesh = bpy.data.meshes.new('Handguard shell'); mesh.from_pydata(verts,[],faces);mesh.update()
         obj = bpy.data.objects.new('Hollow octagonal VIRTUS handguard',mesh);asset.objects.link(obj)
@@ -169,22 +178,22 @@ def build_geometry(materials):
         handguard = finish(obj,obj.name,coating,bevel=.0008)
         # Four side M-LOK lands: a short rear land followed by three full slots.
         for x,length in [(.095,.012),(.126,.032),(.169,.032),(.212,.032)]:
-            opening(handguard,(x,0,-.006),(length,.072,.009),.003)
+            opening(handguard,(x,0,.008),(length,.072,.009),.003)
         # Nonuniform upper vents and the distinctive diagonal lower openings.
         for points in [[(.086,.017),(.092,.024),(.108,.024),(.102,.017)],[(.111,.017),(.117,.024),(.133,.024),(.127,.017)],[(.157,.025),(.168,.033),(.191,.033),(.187,.023),(.163,.023)],[(.207,.020),(.210,.030),(.239,.030),(.239,.020)]]:
             cut(handguard,profile('CUT',points,.072,None,None,.001))
         for x in (.096,.125,.154,.183,.212,.238):
-            cut(handguard,profile('CUT',[(x-.014,-.017),(x-.005,-.017),(x+.009,-.030),(x-.005,-.030)],.072,None,None,.0015))
+            cut(handguard,profile('CUT',[(x-.014,-.006),(x-.005,-.006),(x+.009,-.017),(x-.005,-.017)],.072,None,None,.0015))
         for x in (.100,.140,.180,.220):
-            opening(handguard,(x,0,-.032),(.028,.014,.018),.002)
+            opening(handguard,(x,0,-.018),(.028,.014,.018),.002)
         for side in (-1,1):
-            tube_obj = cylinder('QD sling socket',(.067,side*.027,-.004),.0065,.003,steel,'Y')
-            cut(tube_obj,cylinder('CUT',(.067,side*.027,-.004),.0044,.008,None,'Y',None,24,0))
+            tube_obj = cylinder('QD sling socket',(.067,side*.027,.008),.0065,.003,steel,'Y')
+            cut(tube_obj,cylinder('CUT',(.067,side*.027,.008),.0044,.008,None,'Y',None,24,0))
         # Barrel/gas exterior silhouettes only. The accessory is not a functional model.
         # Full 228.6 mm exterior includes the 4.6 mm threaded end below.
-        cylinder('Barrel under vented guard',(.162,0,0),.0087,.224,steel)
-        cylinder('Gas system silhouette',(.146,0,.022),.0036,.168,steel)
-        box('Gas block silhouette',(.233,0,.006),(.014,.023,.029),steel)
+        cylinder('Barrel under vented guard',(.162,0,.009),.0087,.224,steel)
+        cylinder('Gas system silhouette',(.146,0,.028),.0036,.168,steel)
+        box('Gas block silhouette',(.233,0,.015),(.014,.023,.029),steel)
         # Same across/up interface as every weapon; this rifle remains +X forward.
         for name, outline, spans in [
             ('Continuous top rail foot', picatinny.section(.046,.035,slot=True), [(-.170,.247)]),
@@ -243,16 +252,17 @@ def build_geometry(materials):
         profile('Stock upper spine',[(-.184,.019),(-.365,.019),(-.369,-.008),(-.184,-.008)],.022,anodized,stock,.0012)
         for side in (-1,1):
             box('Stock spine inset',(-.252,side*.0115,.0045),(.104,.001,.014),polymer,stock,.001)
-        stock_body=profile('Stock butt frame',[(-.304,.028),(-.424,.028),(-.434,.019),(-.434,-.104),(-.419,-.116),(-.404,-.103),(-.379,-.054),(-.327,-.048),(-.304,-.015)],.037,polymer,stock,.0025)
-        cut(stock_body,profile('CUT',[(-.415,-.088),(-.394,-.042),(-.380,-.041),(-.405,-.092)],.052,None,None,.002))
+        # Preserve extension/fold hardware while fitting the shallower factory butt.
+        stock_body=profile('Stock butt frame',[(-.304,.028),(-.424,.028),(-.434,.019),(-.434,-.080),(-.419,-.091),(-.404,-.079),(-.379,-.039),(-.327,-.034),(-.304,-.007)],.037,polymer,stock,.0025)
+        cut(stock_body,profile('CUT',[(-.415,-.067),(-.394,-.029),(-.380,-.028),(-.405,-.070)],.052,None,None,.002))
         for side in (-1,1):
-            profile('Stock molded side panel',[(-.320,.012),(-.419,.012),(-.422,-.025),(-.395,-.028),(-.383,-.047),(-.329,-.039)],.0011,polymer,stock,.0012,y=side*.019)
+            profile('Stock molded side panel',[(-.320,.012),(-.419,.012),(-.422,-.016),(-.395,-.018),(-.383,-.034),(-.329,-.027)],.0011,polymer,stock,.0012,y=side*.019)
             for x in (-.341,-.395):
                 opening(stock_body,(x,side*.020,.012),(.022,.006,.004),.0015)
-            profile('Stock stipple panel',[(-.418,-.036),(-.397,-.036),(-.417,-.087),(-.424,-.094)],.001,rubber,stock,.001,y=side*.019)
-        profile('Rubber recoil pad',[(-.432,.024),(-.442,.024),(-.444,-.107),(-.431,-.117),(-.425,-.106)],.040,rubber,stock,.002)
+            profile('Stock stipple panel',[(-.418,-.024),(-.397,-.024),(-.417,-.066),(-.424,-.072)],.001,rubber,stock,.001,y=side*.019)
+        profile('Rubber recoil pad',[(-.432,.024),(-.442,.024),(-.444,-.083),(-.431,-.091),(-.425,-.082)],.040,rubber,stock,.002)
         for i in range(17):
-            box('Butt pad traction rib',(-.443,0,.015-i*.007),(.0017,.036,.0013),rubber,stock,.0004)
+            box('Butt pad traction rib',(-.443,0,.015-i*.0057),(.0017,.036,.0013),rubber,stock,.0004)
         # Latch locks into the spine and remains supported in the folded showcase.
         profile('Length adjustment latch',[(-.347,-.004),(-.316,-.004),(-.316,-.017),(-.340,-.026),(-.349,-.020)],.022,polymer,stock,.0012)
         for i in range(8):
@@ -332,12 +342,12 @@ def build_geometry(materials):
     build_handguard()
     # The 9-inch barrel ends at its 5/8-24 direct-thread shoulder. An open
     # three-prong game-fit flash hider replaces the former integrated can.
-    tube('Muzzle thread',(.2763,0,0),.00794,.0041,.0046,steel)
-    tube('Base muzzle collar',(.281,0,0),.0105,.0080,.014,steel,muzzle)
-    tube('Base muzzle throat',(.289,0,0),.0105,.0041,.004,steel,muzzle)
+    tube('Muzzle thread',(.2763,0,.009),.00794,.0041,.0046,steel)
+    tube('Base muzzle collar',(.281,0,.009),.0105,.0080,.014,steel,muzzle)
+    tube('Base muzzle throat',(.289,0,.009),.0105,.0041,.004,steel,muzzle)
     for i in range(3):
         angle = i*math.tau/3
-        prong = box('Base muzzle prong',(.303,math.cos(angle)*.008,math.sin(angle)*.008),
+        prong = box('Base muzzle prong',(.303,math.cos(angle)*.008,.009+math.sin(angle)*.008),
                     (.028,.004,.005),steel,muzzle,.0005)
         prong.rotation_euler.x = angle
     build_charging_handle()
@@ -346,12 +356,12 @@ def build_geometry(materials):
     build_casing()
 
     # Named attachment / integration sockets; adapter hand contacts follow the fit.
-    for name,loc,parent in [('SOCKET_muzzle',(.317,0,0),rig),('SOCKET_ejection',(-.018,-.030,.004),rig),('SOCKET_grip_R',(-.139,0,-.099),rig),('SOCKET_grip_L',(.171,0,-.028),rig),('SOCKET_magazine',(.004,0,-.042),mag),('SOCKET_sight',(-.146,0,.077),rig),('SOCKET_front_post',(.236,0,.077),rig)]:
+    for name,loc,parent in [('SOCKET_muzzle',(.317,0,.009),rig),('SOCKET_ejection',(-.018,-.030,.004),rig),('SOCKET_grip_R',(-.139,0,-.099),rig),('SOCKET_grip_L',(.171,0,-.020),rig),('SOCKET_magazine',(.004,0,-.042),mag),('SOCKET_sight',(-.146,0,.077),rig),('SOCKET_front_post',(.236,0,.077),rig)]:
         empty(name,loc,parent)
 
     # Rail contact frames: attachment Blender +Y maps to rifle +X; +Z stays up.
     # The optic mount sits forward of the deployed rear leaf so mounted optics clear it.
-    for name, loc in [('MOUNT_optic',(-.036,0,.046)),('MOUNT_muzzle',(.274,0,0))]:
+    for name, loc in [('MOUNT_optic',(-.036,0,.046)),('MOUNT_muzzle',(.274,0,.009))]:
         mount = empty(name,loc,body)
         mount.rotation_euler.z = -math.pi/2
 
