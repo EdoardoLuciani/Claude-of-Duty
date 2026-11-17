@@ -72,11 +72,12 @@ The guard has a shallow lower edge, bore-height side slots and a diagonal rear
 shoulder supported by the receiver nose. The barrel, bare flash hider and muzzle
 attachment datum share that bore axis. The support-hand calibration follows the
 guard; optic/laser seating and the stock hinge retain their independent fits.
-The butt follows the shallow factory outline. Stock extension is adjustable, and
-the reference's translucent magazine is not the authored MAG800. The registered
-receiver, magazine well and pistol grip support retaining their overall scale;
-the nominal barrel/guard lengths and MAG800 envelope remain separate constraints.
-Contours are photo-inferred game art, not scanned or certified SIG dimensions.
+The butt follows the shallow factory outline. The rifle photograph shows a
+translucent Lancer magazine. Use the grip heel and well lip to judge how far
+the seated magazine projects below the receiver. The game model has a straight
+neck, a gently swept body with recessed polymer panels, and a sloped floorplate.
+The well lip frames an open mouth during reloads. Both magazines share the same
+exterior and glove contact.
 
 ## Attachment fits
 

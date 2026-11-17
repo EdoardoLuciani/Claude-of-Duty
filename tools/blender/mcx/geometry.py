@@ -93,8 +93,9 @@ def build_geometry(materials):
             (-.035,-.042,-.008,.021),(.037,-.044,-.007,.022)])
         magwell = profile('Flared magazine well', [(-.035,-.017),(.037,-.011),
             (.037,-.058),(.039,-.061),(-.031,-.075),(-.035,-.072)], .050, coating, bevel=.003, rounded=True)
-        opening(magwell, (.003,0,-.065), (.061,.029,.040), .002)
-        profile('Magazine well lip', [(-.032,-.071),(.037,-.057),(.041,-.062),(-.033,-.078)], .053, coating, bevel=.001)
+        lip = profile('Magazine well lip', [(-.032,-.071),(.037,-.057),(.041,-.062),(-.033,-.078)], .053, coating, bevel=.001)
+        for part in (magwell, lip):
+            opening(part, (.003,0,-.055), (.062,.029,.070), .002)
         guard = profile('Sculpted trigger guard', [(-.095,-.041),(-.031,-.040),
             (-.034,-.065),(-.045,-.075),(-.051,-.078),(-.069,-.079),
             (-.087,-.073),(-.098,-.065)], .015, coating, bevel=.002, rounded=True)
@@ -274,43 +275,38 @@ def build_geometry(materials):
             text('SIG SAUER',(-.421 if side==-1 else -.397,side*.020,-.027),.0035,side,stock,mat=polymer)
 
     def build_magazines():
-        # MAG800 .300 BLK GEN M3: smooth upper side, large lower panels, front/back
-        # traction ribs and a paint-pen matrix. Do not reuse the 5.56 magazine lattice.
-        mag_points=[(-.014,-.070),(.046,-.070),(.047,-.127),(.051,-.163),(.058,-.200),(.069,-.239),(.009,-.258),(-.002,-.218),(-.010,-.169)]
-        mag_shell=profile('Curved .300 magazine shell',mag_points,.025,polymer,mag,.0015)
-        profile('Magazine base plate',[(.008,-.253),(.070,-.235),(.074,-.245),(.009,-.264),(.004,-.260)],.029,polymer,mag,.001)
+        # Author the profile seated in the receiver. The inserted neck stays
+        # straight while the exposed body sweeps forward towards the floorplate.
+        sections = [(-.030,-.025,.032),(-.082,-.025,.032),(-.100,-.024,.033),
+                    (-.115,-.023,.034),(-.130,-.021,.036),(-.145,-.018,.039),
+                    (-.160,-.014,.043)]
+        outline = [(rear,z) for z,rear,_ in sections]
+        outline += [(-.008,-.181),(.049,-.163)]
+        outline += [(front,z) for z,_,front in reversed(sections)]
+        mag_shell = profile('Curved .300 magazine shell', outline, .025, polymer, mag, .0016, rounded=True)
+        profile('Magazine base plate', [(-.013,-.176),(.050,-.156),(.054,-.165),(-.010,-.186)],
+                .028, polymer, mag, .0012, rounded=True)
         for side in (-1,1):
-            # Shallow molded relief, not a raised black slab over the whole side.
-            for points in [[(-.006,-.139),(.012,-.139),(.018,-.197),(.007,-.201)],[(.020,-.139),(.041,-.139),(.051,-.194),(.026,-.201)]]:
-                cut(mag_shell,profile('CUT',points,.0024,None,None,.001,y=side*.0127))
-            profile('Magazine shoulder rib',[(-.012,-.131),(.046,-.130),(.047,-.135),(-.011,-.137)],.0012,polymer,mag,.0005,y=side*.0128)
-            text('300 BLK',(.015 if side==-1 else .055,side*.0127,-.217),.0038,side,mag,mat=polymer)
-            # Small dots are individually visible on inspect; four-face marks suffice.
-            for row in range(4):
-                for col in range(6):
-                    box('Magazine paint-pen dot',(.020+col*.004+row*.0008,side*.0128,-.228-row*.004),(.0018,.0005,.0018),rubber,mag,0)
-        for i in range(9):
-            z=-.142-i*.010; shift=max(0,-z-.150)*.17
-            for x in (-.009+shift,.048+shift):
-                box('Magazine edge traction rib',(x,0,z),(.0022,.024,.003),polymer,mag,.0006)
-        # Molded seam and over-insertion shoulders in the smooth upper region.
-        for x in (-.010,.042):
-            box('Magazine upper shoulder',(x,0,-.116),(.005,.027,.004),polymer,mag,.0005)
-        # Brass cartridge detail at the feed lips (aesthetic only).
+            # Recess shallow molded panels close to the receiver instead of
+            # leaving a smooth collar between the well and the magazine's body.
+            for points in [
+                [(-.018,-.097),(-.001,-.093),(.000,-.113),(.006,-.149),(-.009,-.154),(-.016,-.122)],
+                [(.005,-.092),(.025,-.087),(.028,-.112),(.035,-.141),(.012,-.147),(.007,-.116)],
+            ]:
+                cut(mag_shell, profile('CUT', points, .0024, None, None, .001, y=side*.0127))
+            text('300 BLK', (.000 if side==-1 else .026, side*.0126, -.160), .0035, side, mag, mat=polymer)
+            for row in range(3):
+                for col in range(5):
+                    x = .004+col*.0035+row*.0007
+                    z = -.166+col*.0011-row*.0034
+                    box('Magazine paint-pen dot', (x,side*.0125,z), (.0015,.0005,.0015), rubber, mag, 0)
+        for z,rear,front in sections[2:]:
+            for x in (rear,front):
+                box('Magazine edge traction rib', (x,0,z), (.0022,.023,.003), polymer, mag, .0006)
+        # Visual feed-end detail, visible only when the magazine leaves the well.
         for y in (-.006,.006):
-            cylinder('Top round brass',(.019,y,-.073),.0047,.032,brass,parent=mag,vertices=24)
-            ellipsoid('Top round copper', (.04, y, -.073), (.012, .0039, .0039), copper, mag)
-        # Complete magazine length convention: longer side of the minimum-area X/Z
-        # envelope, including the floorplate, excluding cartridges. The unscaled
-        # evaluated exterior is 195.083136 mm. Magpul gives 7.5 in but no datum drawing;
-        # this conservative 190.5 mm envelope is explicit, not certified metrology.
-        mag_scale = 190.5 / 195.083136
-        mag_shell['length_datum'] = 'Minimum-area side envelope, floorplate included, cartridges excluded'
-        mag_shell['length_target_mm'] = 190.5
-        for obj in list(asset.objects):
-            if obj.parent == mag and obj.type in {'MESH','FONT'}:
-                obj.location *= mag_scale; obj.scale *= mag_scale
-                obj.location.x -= .012; obj.location.z += .040
+            cylinder('Top round brass', (.007,y,-.033), .0045, .031, brass, parent=mag, vertices=24)
+            ellipsoid('Top round copper', (.023,y,-.033), (.009,.0038,.0038), copper, mag)
         # Duplicate magazine geometry for replacement/retention animation.
         bpy.context.view_layer.update()
         for obj in list(asset.objects):

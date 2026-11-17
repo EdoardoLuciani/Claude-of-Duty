@@ -7,8 +7,10 @@ import sys
 from pathlib import Path
 import bpy
 from mathutils import Vector
-from mathutils.geometry import convex_hull_2d
 from mathutils.bvhtree import BVHTree
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from attachment_source import surface
 
 scene = bpy.context.scene
 objects = bpy.data.objects
@@ -107,35 +109,44 @@ guard_shell = bvh('Hollow octagonal VIRTUS handguard')
 assert guard_shell.ray_cast(Vector((.093,-.06,-.012)), Vector((0,1,0)))[0] is None, 'diagonal vent must be open'
 assert guard_shell.ray_cast(Vector((.096,-.06,-.018)), Vector((0,1,0)))[0] is not None, 'diagonal vent retains its lower rim'
 assert 'Stock lower skeleton strut' not in objects, 'factory telescoping stock, not skeleton approximation'
-assert 'Magazine longitudinal rib' not in objects, 'MAG800 smooth upper side, not 5.56 lattice'
 assert 'Mount locking ring' not in objects, 'direct-thread suppressor, not generic QD mount'
 for o in asset.objects:
     if o.type == 'FONT':
         assert not any(label in o.data.body for label in ['VISUAL ASSET', 'PRISM OPTIC', 'SUPPRESSED']), o.name
-# Explicit, independently measured magazine convention; this does not infer
-# Magpul's unpublished datum. Both seated magazines must have the same exterior.
-def magazine_envelope(parent):
-    vertices = [v for o in asset.objects if o.parent == objects[parent]
-                and o.type == 'MESH' and 'Top round' not in o.name
-                for v in mesh_world(o.name)[0]]
-    # Remove the whole-rifle inspect/reload pose before comparing dimensions.
-    inverse = objects['MCX_RIG'].matrix_world.inverted()
-    local = [inverse @ v for v in vertices]
-    points = [Vector((v.x,v.z)) for v in local]
-    hull = [points[i] for i in convex_hull_2d(points)]
-    best = None
-    for i, a in enumerate(hull):
-        u = (hull[(i+1)%len(hull)]-a).normalized(); v = Vector((-u.y,u.x))
-        width = max(p.dot(u) for p in hull)-min(p.dot(u) for p in hull)
-        height = max(p.dot(v) for p in hull)-min(p.dot(v) for p in hull)
-        if best is None or width*height < best[0]: best = (width*height,max(width,height))
-    return best[1], max(p.y for p in points)-min(p.y for p in points)
 
-length, height = magazine_envelope('magazine')
-assert abs(length-.1905) < .0001 and height <= .1905, f'MAG800 complete envelope: {length}, {height}'
-pose('Reload_Tactical', 117)
-spare_length, spare_height = magazine_envelope('magazine_spare')
-assert abs(spare_length-length) < 1e-6 and abs(spare_height-height) < 1e-6, 'identical magazine exteriors'
+
+def magazine_bounds(parent):
+    inverse = objects['MCX_RIG'].matrix_world.inverted()
+    vertices = [inverse @ v for o in objects[parent].children
+                if o.type == 'MESH' and not o.name.startswith('Top round')
+                for v in mesh_world(o.name)[0]]
+    return (
+        Vector(tuple(min(v[i] for v in vertices) for i in range(3))),
+        Vector(tuple(max(v[i] for v in vertices) for i in range(3))),
+    )
+
+
+# Judge the seated silhouette relative to the grip heel, including the floorplate.
+grip_vertices = mesh_world('Ergonomic pistol grip')[0]
+mag_bounds = magazine_bounds('magazine')
+drop = min(v.z for v in grip_vertices) - mag_bounds[0].z
+assert .035 < drop < .046, ('magazine floorplate below grip heel', drop)
+lip = bvh('Magazine well lip')
+assert lip.ray_cast(Vector((0,0,-.085)), Vector((0,0,1)), .035)[0] is None, 'open magazine well lip'
+assert lip.ray_cast(Vector((0,.020,-.085)), Vector((0,0,1)), .035)[0] is not None, 'lip retains its sidewall'
+inverse = objects['MCX_RIG'].matrix_world.inverted()
+well = surface([objects[name] for name in ('Flared magazine well','Magazine well lip')], inverse)
+for parent, frames in [('magazine',(20,25,29)), ('magazine_spare',(104,107,111,117))]:
+    parts = [o for o in objects[parent].children if o.type == 'MESH']
+    for frame in frames:
+        pose('Reload_Empty', frame)
+        inverse = objects['MCX_RIG'].matrix_world.inverted()
+        assert not well.overlap(surface(parts, inverse)), (parent, frame, 'magazine clips the well')
+
+for clip in ('Reload_Tactical','Reload_Empty'):
+    pose(clip, 117)
+    for regular, spare in zip(mag_bounds, magazine_bounds('magazine_spare')):
+        assert (regular-spare).length < 1e-6, (clip, 'replacement seats with the same silhouette')
 pose('Idle', 0)
 for name in ['VIRTUS upper forging','Ambidextrous lower receiver','Ergonomic pistol grip']:
     obj = objects[name]
@@ -144,7 +155,6 @@ for name in ['VIRTUS upper forging','Ambidextrous lower receiver','Ergonomic pis
 assert not any(o.name.startswith(('Upper machined shoulder','Receiver lower shoulder',
                                 'Magazine well forging relief')) for o in asset.objects), 'no slab overlays'
 # Local silhouette/contact regressions, NOT certified SIG dimensions.
-grip_vertices = mesh_world('Ergonomic pistol grip')[0]
 assert -.148 < min(v.z for v in grip_vertices) < -.144, 'grip heel follows registered reference'
 assert -.080 < min(v.z for v in mesh_world('Magazine well lip')[0]) < -.075, 'magwell not oversized below rail'
 assert extent(['Ergonomic pistol grip']).y < .035, 'retain grip thickness budget'
@@ -219,7 +229,7 @@ for step in range(129*2,157*2+1):
     stock_handle_clearance(f'folded rack {step/2}')
 pose('Idle', 0)
 print(f'MCX_STOCK_HANDLE_CLEARANCE_OK: moving stock/hinge >= {minimum_separation["moving_stock"]*1000:.3f} mm; fixed rear plate >= {minimum_separation["rear_plate"]*1000:.3f} mm; full clips/midframes/folded rack')
-print(f'MCX_GEOMETRY_OK: moving parts clear/attached, rounded receiver/grip, MAG800 envelope {length*1000:.3f} mm, open aligned irons and base muzzle')
+print('MCX_GEOMETRY_OK: moving parts clear/attached, rounded receiver/grip, seated magazine and open well, open aligned irons and base muzzle')
 
 # The rotated adapter must actually seat on the upper handguard, not float
 # above it to avoid the glove. Six rays span both screw stations on real faces.
@@ -236,7 +246,6 @@ for obj in asset.objects:
     if obj.type == 'MESH' and obj.name.startswith('Laser rail '):
         assert bvh(obj.name).ray_cast(sight,Vector((1,0,0)),1)[0] is None, ('laser hardware blocks ACOG',obj.name)
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 # Validate native hand controls, review skins and the hidden-magazine transition.
 from mcx.review_hands import check_review_hands
 check_review_hands()
