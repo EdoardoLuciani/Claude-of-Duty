@@ -155,6 +155,13 @@ for name in ('Fire','Last_Shot'):
         assert not attached(pick('Curved trigger'),pick('GI trigger guard')),'trigger intersects guard during pull'
 pose('Idle')
 assert attached(pick('USGI floorplate'),pick('USGI formed aluminum body')),'magazine floorplate is detached from stamped walls'
+well=tree(lower)
+for parent, beats in [('magazine',(.15,.17,.20)),('magazine_spare',(.77,.80,.81))]:
+    magazine=[o for o in pick('USGI formed aluminum body') if o.parent.name==parent]
+    for beat in beats:
+        pose('Reload_Tactical',beat*clips['Reload_Tactical']['duration'])
+        assert not well.overlap(tree(magazine)), (parent,beat,'magazine clips the well')
+pose('Idle')
 
 # Include the fasteners in the handguard exterior, not a shell-only envelope.
 guard=pick('RIS II')

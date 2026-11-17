@@ -47,3 +47,9 @@ front-sight pocket sits forward on the rail and follows the sight tower profile.
 The photo shows Daniel Defense furniture and an enhanced curved guard. The Colt
 photo guides the GI opening and trigger shape. The game uses a SOPMOD stock with
 a fixed extension and separately calibrated hand contacts.
+
+The [Colt M4 catalog side profile](https://www.colt.com/wp-content/uploads/2024/09/24-COLT-2263-COLLATERAL-MLE_Catalog-web-FINAL.pdf#page=26)
+shows the A2 grip and seated metal magazine. The lower forging narrows below the
+front pin, the well lip slopes toward the trigger, and the grip ends in an angled
+heel. The two magazine meshes share an outline and the reload hand follows the
+seated position.

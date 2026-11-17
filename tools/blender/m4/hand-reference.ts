@@ -13,7 +13,7 @@ import {
 } from '../hand-reference.ts';
 
 const grips: Record<Side, GripFrame> = {
-  right: { pos: [0.0351, -0.012, 0.1228], finger: [0.15, 0.35, -0.92], back: [1, 0.03, 0.04] },
+  right: { pos: [0.0351, -0.012, 0.1188], finger: [0.15, 0.35, -0.92], back: [1, 0.03, 0.04] },
   left: {
     pos: [-0.067358, 0.048661, -0.193517],
     finger: [0.7, -0.1, -0.71],
@@ -52,7 +52,7 @@ for (const side of ['right', 'left'] as const) {
 }
 const arm = new Arm(-1, { scale: 0.97 });
 const magGrip: GripFrame = {
-  pos: [-0.038, -0.121, -0.016],
+  pos: [-0.038, -0.118, -0.007],
   finger: [0.1, 0.98, -0.15],
   back: [-1, 0, 0],
 };
@@ -62,12 +62,12 @@ arm.setPose('wrap');
 arm.fitToCylinder(
   arm.hand.position,
   arm.hand.quaternion,
-  [0, -0.035, -0.069],
+  [0, -0.035, -0.059],
   [0, 1, -0.11],
   0.02,
   { clearance: 0.0015, poseName: 'magazine' }
 );
-arm.fitGrip('magazine', { thumb: [0.017, -0.04, -0.061], thumbPole: [0, 0, 1] });
+arm.fitGrip('magazine', { thumb: [0.017, -0.04, -0.051], thumbPole: [0, 0, 1] });
 const magazine = {
   pos: magGrip.pos,
   quaternion: arm.hand.quaternion.toArray(),

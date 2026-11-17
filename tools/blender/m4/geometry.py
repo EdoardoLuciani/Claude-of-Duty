@@ -108,8 +108,12 @@ def build_geometry(materials):
     cut(upper,box('CUT',(0,.09065,-.035),(.0142,.0103,.212),None,None,0))
     port=box('CUT',(.018,.078,-.052),(.021,.020,.073),None,None,.001)
     cut(upper,port,bake_cutter=True)
-    lower=forging('Colt lower forging',[(.062,.030,.0555,.0148),(.037,.020,.0555,.017),(.008,.016,.0555,.0173),(-.026,.016,.0555,.0175),(-.042,.011,.0555,.0192),(-.073,.008,.0555,.020),(-.109,.009,.0555,.0195),(-.121,.014,.0555,.018)])
-    well=box('CUT',(0,.023,-.078),(.0262,.090,.0625),None,None,.0012)
+    # The lower forging rounds in below the front pin, with an angled well lip.
+    lower=forging('Colt lower forging',[(.073,.049,.0575,.014),(.063,.033,.0575,.0148),(.046,.027,.0575,.016),
+        (.035,.020,.0575,.017),(.008,.014,.0575,.0173),(-.026,.015,.0575,.0175),
+        (-.037,.002,.0575,.0192),(-.049,.005,.0575,.0198),(-.084,.010,.0575,.020),
+        (-.098,.014,.0575,.0195),(-.100,.035,.0575,.018),(-.112,.045,.0575,.018)])
+    well=box('CUT',(0,.022,-.068),(.0262,.090,.061),None,None,.0012)
     cut(lower,well,bake_cutter=True)
     # The Colt window has rounded shoulders above the GI guard's straight bar.
     opening=profile('CUT',[(-.035,-.018),(-.035,.012),(-.034,.017),(-.031,.021),
@@ -322,12 +326,20 @@ def build_geometry(materials):
     tube('M4 thread adapter',(0,BORE,CROWN+.0065),.0079375,.0064,.013,steel,muzzle_adapter)
     # A2 grip has varying rounded sections, a backstrap and its characteristic ledge.
     rings=[]
-    for y,z,rx,rz in [(.034,.035,.0155,.023),(.015,.040,.016,.023),(-.012,.052,.0167,.024),(-.040,.064,.0168,.025),(-.064,.073,.016,.024),(-.075,.077,.0155,.023)]:
-        rings.append([(math.copysign(abs(math.cos(a))**.65,math.cos(a))*rx,y,z+math.copysign(abs(math.sin(a))**.65,math.sin(a))*rz) for a in [i*math.tau/32 for i in range(32)]])
+    grip_sections=[(.034,.031,.0155,.022),(.019,.035,.016,.021),(.005,.039,.016,.021),
+        (-.012,.046,.0167,.022),(-.027,.054,.0168,.023),(-.043,.065,.0168,.024),
+        (-.055,.071,.016,.024),(-.0625,.071,.0155,.0235)]
+    for i,(y,z,rx,rz) in enumerate(grip_sections):
+        ring=[]
+        for a in [j*math.tau/32 for j in range(32)]:
+            offset=math.copysign(abs(math.sin(a))**.65,math.sin(a))*rz
+            heel=(.16 if i==len(grip_sections)-2 else .23 if i==len(grip_sections)-1 else 0)*offset
+            ring.append((math.copysign(abs(math.cos(a))**.65,math.cos(a))*rx,y+heel,z+offset))
+        rings.append(ring)
     grip=loft('A2 sculpted grip',rings,polymer,bevel=0)
-    profile('A2 finger ledge',[(.033,-.027),(.037,-.035),(.051,-.038),(.054,-.030)],.032,polymer,bevel=.0015,rounded=True)
+    profile('A2 finger ledge',[(.030,-.019),(.025,-.028),(.043,-.031),(.047,-.023)],.032,polymer,bevel=.0015,rounded=True)
     # Diamond checkering is mapped below; no tessellated/fictitious stripe ribs.
-    cyl('A2 grip screw',(0,-.073,.077),.0048,.002,steel,axis='Y',sides=24)
+    cyl('A2 grip screw',(0,-.059,.071),.0048,.002,steel,axis='Y',sides=24)
     # SOPMOD storage chambers sit inside the cheek shell, below/outboard of the buffer bore.
     cheek=[(-.003,.091),(.003,.091),(.013,.087),(.024,.076),(.0325,.060),(.033,.049),(.029,.040),(.018,.0385),(.009,.048),(-.009,.048),(-.018,.0385),(-.029,.040),(-.033,.049),(-.0325,.060),(-.024,.076),(-.013,.087)]
     stock_body=loft('LMT SOPMOD body',[[(x,y,z) for x,y in cheek] for z in (.095,.112,.261,.274)],polymer,bevel=.001,rounded=True)
@@ -370,7 +382,8 @@ def build_geometry(materials):
         obj.parent=irons_root;obj.matrix_parent_inverse=irons_root.matrix_world.inverted()
 
     # Standard USGI metal magazine; complete shape is photo-informed, not PMAG-sized.
-    mag_stations=[(.054,-.078,.031),(.022,-.078,.031),(-.010,-.079,.031),(-.035,-.081,.031),(-.060,-.085,.031),(-.079,-.090,.0305),(-.095,-.094,.030)]
+    mag_stations=[(.054,-.068,.029),(.022,-.067,.029),(-.010,-.067,.029),
+        (-.035,-.0695,.029),(-.060,-.076,.0295),(-.078,-.082,.0295),(-.092,-.0865,.029)]
     def magazine_rings(width,inside=False):
         rings=[]
         offsets=sorted([-.030,.030]+[center+d for center in (-.020,-.006,.009,.022) for d in (-.002,-.0012,-.0007,0,.0007,.0012,.002)])
@@ -381,7 +394,7 @@ def build_geometry(materials):
                     dent=max(.0005*max(0,1-abs(d-center)/.0015) for center in (-.020,-.006,.009,.022))
                     # The stamped floor end follows the lower curve: it is not a
                     # horizontal chop through both walls of a curved magazine.
-                    slope=max(0,min(1,(-y-.060)/.035))*.18
+                    slope=max(0,min(1,(-y-.060)/.032))*.25
                     ring.append((side*(width-dent),y-d*slope,z+d*(depth-(.0007 if inside else 0))/.030))
             rings.append(ring)
         return rings
@@ -397,9 +410,9 @@ def build_geometry(materials):
     mag_shell=mesh('USGI formed aluminum body',verts,faces,magmat,mag,.0001,True)
     mag_shell.modifiers['Selective edge radius'].segments=2
     for side in (-1,1):
-        profile('USGI feed lip',[(-.104,.052),(-.100,.056),(-.060,.056),(-.049,.052),(-.052,.048),(-.100,.048)],.0015,magmat,mag,.0004,x=side*.0108)
-    profile('USGI floorplate',[(-.126,-.089),(-.126,-.0905),(-.062,-.102),(-.062,-.1005)],.0265,magmat,mag,.0006,rounded=True)
-    box('USGI follower',(0,.046,-.078),(.021,.004,.051),follower,mag,.0007)
+        profile('USGI feed lip',[(-.094,.052),(-.090,.056),(-.050,.056),(-.039,.052),(-.042,.048),(-.090,.048)],.0015,magmat,mag,.0004,x=side*.0108)
+    profile('USGI floorplate',[(-.116,-.083),(-.116,-.085),(-.0565,-.101),(-.0565,-.099)],.0265,magmat,mag,.0006,rounded=True)
+    box('USGI follower',(0,.046,-.068),(.021,.004,.051),follower,mag,.0007)
     # Visible top cartridges use the same parent for loaded/empty state.
     case_profile=[(0,.00478),(-.00115,.00478),(-.00115,.0043),(-.0025,.0043),(-.0025,.0047),(-.030,.0044),(-.037,.0042),(-.040,.00285),(-.0447,.00285)]
     def cartridge_part(name,loc,section,mat,parent):
@@ -408,8 +421,8 @@ def build_geometry(materials):
     for x,y in [(-.0045,.054),(.0045,.049)]:
         # Stagger vertically; do not shove an oversized bullet through the front
         # wall. 44.7 mm case + 12.7 mm exposed ogive fits the 62 mm feed envelope.
-        cartridge_part('Magazine cartridge',(x,y,-.0498),case_profile,brass,round_live)
-        cartridge_part('Magazine projectile',(x,y,-.0945),[(0,.00285),(-.003,.0028),(-.0075,.0019),(-.0115,.0008),(-.0127,.0001)],copper,round_live)
+        cartridge_part('Magazine cartridge',(x,y,-.0398),case_profile,brass,round_live)
+        cartridge_part('Magazine projectile',(x,y,-.0845),[(0,.00285),(-.003,.0028),(-.0075,.0019),(-.0115,.0008),(-.0127,.0001)],copper,round_live)
     cartridge_part('Review fired case',(0,0,.02235),case_profile,brass,case)
 
     # Primary-backed words only; typography/stock contours remain approximations.
@@ -423,7 +436,7 @@ def build_geometry(materials):
     text('DANIEL DEFENSE',( -.0198,.084,-.400),.0024,mat=marking)
     text('M4A1 RIS II FSP',(-.0198,.080,-.400),.0020,mat=marking)
     for n,y in [('200',.113),('300',.115),('400',.117),('450',.119),('500',.121),('550',.123),('600',.125)]:text(n,(-.0103,y,.019),.0016,parent=irons_root)
-    text('OKAY',(-.01255,-.052,-.094),.0023,mat=magmat,parent=mag)
+    text('OKAY',(-.01255,-.052,-.085),.0023,mat=magmat,parent=mag)
     for name,pos in [('MOUNT_optic',(0,BORE+.0286,-.067)),('SOCKET_muzzle',(0,BORE,FH_TIP)),('SOCKET_ejection',(.023,.081,-.052)),('SOCKET_sight',(0,SIGHT_Y,.034)),('SOCKET_front_post',(0,SIGHT_Y,GAS-.007)),('SOCKET_bolt_face',(0,BORE,BOLT_FACE)),('SOCKET_barrel_crown',(0,BORE,CROWN))]:empty(name,pos,rig)
     # Conform markings to the actual shaped surface, not a floating label plane.
     from mathutils.bvhtree import BVHTree
