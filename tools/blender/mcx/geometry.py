@@ -253,21 +253,30 @@ def build_geometry(materials):
         profile('Stock upper spine',[(-.184,.019),(-.365,.019),(-.369,-.008),(-.184,-.008)],.022,anodized,stock,.0012)
         for side in (-1,1):
             box('Stock spine inset',(-.252,side*.0115,.0045),(.104,.001,.014),polymer,stock,.001)
-        # Preserve extension/fold hardware while fitting the shallower factory butt.
-        stock_body=profile('Stock butt frame',[(-.304,.028),(-.424,.028),(-.434,.019),(-.434,-.080),(-.419,-.091),(-.404,-.079),(-.379,-.039),(-.327,-.034),(-.304,-.007)],.037,polymer,stock,.0025)
-        cut(stock_body,profile('CUT',[(-.415,-.067),(-.394,-.029),(-.380,-.028),(-.405,-.070)],.052,None,None,.002))
+        # The butt follows the pad into a rounded toe and a relieved lower shoulder.
+        stock_body=profile('Stock butt frame',[(-.304,.028),(-.429,.028),(-.436,.024),
+            (-.432,-.027),(-.427,-.075),(-.424,-.090),(-.398,-.090),(-.390,-.086),
+            (-.388,-.080),(-.392,-.072),(-.399,-.063),(-.395,-.057),(-.365,-.025),
+            (-.340,-.021),(-.323,.000),(-.304,.000)],.037,polymer,stock,.0025,rounded=True)
+        cut(stock_body,profile('CUT',[(-.409,-.054),(-.384,-.028),(-.381,-.026),
+            (-.379,-.028),(-.406,-.059),(-.410,-.060)],.052,None,None,.002))
         for side in (-1,1):
-            profile('Stock molded side panel',[(-.320,.012),(-.419,.012),(-.422,-.016),(-.395,-.018),(-.383,-.034),(-.329,-.027)],.0011,polymer,stock,.0012,y=side*.019)
+            profile('Stock molded side panel',[(-.320,.012),(-.419,.012),(-.421,-.016),
+                (-.397,-.018),(-.370,-.015),(-.336,-.011)],.0011,polymer,stock,.0012,y=side*.019)
             for x in (-.341,-.395):
                 opening(stock_body,(x,side*.020,.012),(.022,.006,.004),.0015)
-            profile('Stock stipple panel',[(-.418,-.024),(-.397,-.024),(-.417,-.066),(-.424,-.072)],.001,rubber,stock,.001,y=side*.019)
-        profile('Rubber recoil pad',[(-.432,.024),(-.442,.024),(-.444,-.083),(-.431,-.091),(-.425,-.082)],.040,rubber,stock,.002)
-        for i in range(17):
-            box('Butt pad traction rib',(-.443,0,.015-i*.0057),(.0017,.036,.0013),rubber,stock,.0004)
-        # Latch locks into the spine and remains supported in the folded showcase.
-        profile('Length adjustment latch',[(-.347,-.004),(-.316,-.004),(-.316,-.017),(-.340,-.026),(-.349,-.020)],.022,polymer,stock,.0012)
-        for i in range(8):
-            box('Stock latch serration',(-.344+i*.003,0,-.020),(.001,.023,.0014),rubber,stock,.0002)
+            profile('Stock stipple panel',[(-.418,-.024),(-.397,-.024),(-.417,-.060),
+                (-.422,-.068)],.001,rubber,stock,.001,y=side*.019)
+        profile('Rubber recoil pad',[(-.428,.029),(-.441,.027),(-.446,.016),(-.437,-.075),
+            (-.433,-.089),(-.427,-.092),(-.418,-.089),(-.423,-.073),(-.431,.018)],
+            .040,rubber,stock,.002,rounded=True)
+        for i in range(18):
+            box('Butt pad traction rib',(-.4462+i*.00052,0,.012-i*.0051),(.0017,.036,.0013),rubber,stock,.0004)
+        # The latch rides the underside of the spine within the tapered shoulder.
+        profile('Length adjustment latch',[(-.353,-.004),(-.320,-.004),(-.327,-.008),
+            (-.344,-.019),(-.353,-.017)],.022,polymer,stock,.0012)
+        for i in range(7):
+            box('Stock latch serration',(-.350+i*.0025,0,-.018+i*.00085),(.001,.023,.0014),rubber,stock,.0002)
         for side in (-1,1):
             socket = cylinder('Stock sling socket',(-.419,side*.021,-.008),.0065,.003,steel,'Y',stock)
             cut(socket,cylinder('CUT',(-.419,side*.021,-.008),.0042,.008,None,'Y',None,24,0))

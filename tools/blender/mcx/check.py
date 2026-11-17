@@ -59,6 +59,9 @@ assert bvh('Curved trigger blade').overlap(bvh('Ambidextrous lower receiver')), 
 assert not bvh('Curved trigger blade').overlap(bvh('Sculpted trigger guard')), 'trigger must clear guard'
 assert bvh('Length adjustment latch').overlap(bvh('Stock upper spine')), 'stock latch must attach to spine'
 assert objects['Length adjustment latch'].parent == objects['stock_hinge']
+stock_frame = surface([objects['Stock butt frame']], objects['MCX_RIG'].matrix_world.inverted())
+assert bvh('Rubber recoil pad').overlap(bvh('Stock butt frame')), 'recoil pad must attach to the stock'
+assert stock_frame.ray_cast(Vector((-.395,-.05,-.043)), Vector((0,1,0)), .1)[0] is None, 'stock relief slot remains open'
 
 for frame in range(13):
     pose('Fire', frame)
