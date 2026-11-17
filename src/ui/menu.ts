@@ -1,6 +1,7 @@
-import { VOLUME_KEYS, type VolumeKey } from '../audio/settings.ts';
+import type { VolumeKey } from '../audio/settings.ts';
 import { bindingLabel } from '../core/bindings.ts';
 import type { EngineContext } from '../core/context.ts';
+import { hasOwn } from '../core/guards.ts';
 import { clamp, damp } from '../core/math.ts';
 import { CONTROL_SECTIONS } from './controls.ts';
 import { el, setText, setStyle, ease } from './util.ts';
@@ -13,7 +14,7 @@ interface SliderApi {
 }
 type InvertButton = [HTMLButtonElement, boolean];
 
-/** Every audio category with the sounds it actually controls; order follows VOLUME_KEYS. */
+/** Every audio category with the sounds it actually controls, in menu order. */
 const VOLUME_ROWS: Record<VolumeKey, [label: string, detail: string]> = {
   master: ['Master Volume', 'All sound, after the safety limiter'],
   weapons: ['Gunfire', 'Shots, dry fire, distant firefights'],
@@ -160,7 +161,8 @@ export class PauseMenu {
       audio,
       '100% is the designed mix. 50% sounds about half as loud. 0% is muted.'
     );
-    for (const key of VOLUME_KEYS) {
+    for (const key of Object.keys(VOLUME_ROWS)) {
+      if (!hasOwn(VOLUME_ROWS, key)) continue;
       const [label, detail] = VOLUME_ROWS[key];
       const slider = this._slider(
         audio,

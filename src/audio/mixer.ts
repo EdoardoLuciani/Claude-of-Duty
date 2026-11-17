@@ -54,7 +54,7 @@ function holdHearingParam(param: AudioParam, time: number): void {
 }
 const CONCUSSION_CUTOFF_RATIO = 0.075; // full concussion bottoms out at 1.5 kHz
 
-/** One authored level per category, in menu order. `shop` dips the field while the supply
+/** One authored level per category. `shop` dips the field while the supply
  * tent is open; `direct` adds a post-muffle output following the same level. */
 const BUS_DEFS = {
   // The only authored weapon-level control. Sources have no separate profile
