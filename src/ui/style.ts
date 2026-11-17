@@ -98,8 +98,9 @@ const CSS = `
 }
 .ow-menu-rail {
   display:flex; flex-direction:column; align-self:center;
-  padding-left: calc(var(--u) * 4.5);
-  border-left: calc(2px * var(--k)) solid var(--amber);
+  --rail-pad: calc(var(--u) * 4.5); --rail-line: calc(2px * var(--k));
+  padding-left: var(--rail-pad);
+  border-left: var(--rail-line) solid var(--amber);
 }
 .ow-menu h1 {
   font-family: var(--fd);
@@ -116,8 +117,9 @@ const CSS = `
   font-family:var(--fd); font-weight:700; text-transform:uppercase;
   font-size:max(18px, calc(22px * var(--k))); letter-spacing:.18em; color: var(--ink-2);
   padding: calc(var(--u) * 2.2) calc(var(--u) * 3);
-  margin-left: calc(var(--u) * -4.5 - 2px * var(--k));
-  border-left: calc(2px * var(--k)) solid transparent;
+  /* The selected tab's marker sits on the rail line. */
+  margin-left: calc(-1 * (var(--rail-pad) + var(--rail-line)));
+  border-left: var(--rail-line) solid transparent;
   transition: color .12s, background .12s, border-color .12s;
 }
 .ow-tab:hover { color: var(--ink); background: rgba(255,255,255,.05); }
@@ -131,7 +133,6 @@ const CSS = `
   background:rgba(7,11,15,.94); border:1px solid var(--hair);
 }
 .ow-page { height:100%; overflow:auto; padding: max(20px, calc(28px * var(--k))) max(22px, calc(32px * var(--k))); }
-.ow-page[hidden] { display:none; }
 .ow-page-head {
   display:flex; align-items:center; justify-content:space-between; gap:16px;
   padding-bottom: calc(var(--u) * 3); margin-bottom: calc(var(--u) * 1);
@@ -207,13 +208,15 @@ const CSS = `
 .ow-menu .ow-tab:focus-visible { outline-offset:-2px; }
 .ow-menu .ow-page:focus-visible { outline-offset:-4px; }
 .ow-menu .ow-slider:has(input:focus-visible) { outline:2px solid var(--amber); outline-offset:6px; }
-.ow-controls-groups { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:20px 28px; margin:16px 0; }
-.ow-controls h3 { font-size:max(14px, calc(14px * var(--k))); color:var(--amber); margin-bottom:8px; text-transform:none; letter-spacing:.02em; }
+.ow-controls-groups {
+  display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:20px 28px; margin:16px 0;
+  text-transform:none; letter-spacing:.02em;
+}
+.ow-controls-groups h3 { font-size:max(14px, calc(14px * var(--k))); color:var(--amber); margin-bottom:8px; }
 .ow-control {
   display:grid; grid-template-columns:minmax(0, .65fr) minmax(0, 1fr); gap:12px;
   padding:6px 0; border-top:1px solid var(--hair-2);
   font-size:max(14px, calc(14px * var(--k))); line-height:1.4;
-  text-transform:none; letter-spacing:.02em;
 }
 .ow-control dt { color:#f0f5f7; font-weight:800; }
 .ow-control dd { color:#bdcbd3; }
@@ -224,9 +227,7 @@ const CSS = `
 }
 @media (max-width:800px) {
   .ow-menu-layout { grid-template-columns:minmax(0, 1fr); }
-  .ow-tabs { flex-direction:row; flex-wrap:wrap; gap:8px; margin: 16px 0; }
-  .ow-tab { margin-left:0; padding:6px 12px; font-size:16px; border-left:0; border-bottom:2px solid transparent; }
-  .ow-tab.on { border-bottom-color: var(--ink); }
+  .ow-tabs { margin: 16px 0; }
   .ow-menu-pages { height:auto; min-height:0; }
 }
 @media (max-width:560px) {

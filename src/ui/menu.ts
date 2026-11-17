@@ -27,6 +27,12 @@ const VOLUME_ROWS: Record<VolumeKey, [label: string, detail: string]> = {
 
 const TABS = ['Gameplay', 'Audio', 'Controls'] as const;
 type MenuTab = (typeof TABS)[number];
+const TAB_STEP: Partial<Record<string, number>> = {
+  ArrowDown: 1,
+  ArrowRight: 1,
+  ArrowUp: -1,
+  ArrowLeft: -1,
+};
 
 /** Tabbed pause menu: a rail (title, tabs, Resume) and one page at a time.
  * Settings write shared config directly; quality reloads with ?q= because passes
@@ -44,7 +50,9 @@ export class PauseMenu {
   qBtns: HTMLButtonElement[] = [];
   invBtns: InvertButton[] = [];
   volumes = new Map<VolumeKey, SliderApi>();
-  tabs = new Map<MenuTab, [tab: HTMLButtonElement, page: HTMLElement]>();
+  /** Tab buttons and their pages, in TABS order. */
+  tabs: HTMLButtonElement[] = [];
+  pages: HTMLElement[] = [];
   open: boolean = false;
   shown: number = 0;
 
@@ -77,22 +85,17 @@ export class PauseMenu {
       const page = el('section', 'ow-page', pages);
       page.setAttribute('role', 'tabpanel');
       page.setAttribute('aria-labelledby', tab.id);
-      this.tabs.set(name, [tab, page]);
+      this.tabs.push(tab);
+      this.pages.push(page);
     }
     tablist.addEventListener('keydown', (event): void => {
-      const key = event.key;
-      const step =
-        key === 'ArrowDown' || key === 'ArrowRight'
-          ? 1
-          : key === 'ArrowUp' || key === 'ArrowLeft'
-            ? -1
-            : 0;
+      const step = TAB_STEP[event.key];
       if (!step) return;
       event.preventDefault();
-      const index = TABS.findIndex((name): boolean => this.tabs.get(name)?.[0] === event.target);
+      const index = this.tabs.findIndex((tab): boolean => tab === event.target);
       const next = TABS[(index + step + TABS.length) % TABS.length];
       this.selectTab(next);
-      this.tabs.get(next)?.[0].focus();
+      this.tabs[TABS.indexOf(next)].focus();
     });
 
     this.resumeBtn = el('button', 'ow-btn primary', rail, 'Resume');
@@ -102,7 +105,7 @@ export class PauseMenu {
     el('div', 'hint', rail, `${bindingLabel('pause').toUpperCase()} RESUME`);
 
     // ---- gameplay ----------------------------------------------------------
-    const game = this._page('Gameplay', 'Reset Gameplay', (): void => {
+    const game = this._page('Gameplay', (): void => {
       this.sens.set(1);
       this.fov.set(80);
       this.shake.set(1);
@@ -147,7 +150,7 @@ export class PauseMenu {
     }
 
     // ---- audio -------------------------------------------------------------
-    const audio = this._page('Audio', 'Reset Audio', (): void => {
+    const audio = this._page('Audio', (): void => {
       this.ctx.peek('audio')?.resetVolumes();
       this.syncFromConfig();
     });
@@ -176,8 +179,6 @@ export class PauseMenu {
 
     // ---- controls reference -------------------------------------------------
     const reference = this._page('Controls');
-    reference.className = 'ow-page ow-controls';
-    reference.setAttribute('aria-label', 'Gameplay controls');
     reference.tabIndex = 0; // Keyboard users can scroll the reference without leaving the game.
     el('p', 'ow-page-note', reference, 'Keyboard & mouse · Quick reference.');
     const groups = el('div', 'ow-controls-groups', reference);
@@ -199,14 +200,12 @@ export class PauseMenu {
   }
 
   /** Page header with an optional page-scoped reset. */
-  _page(name: MenuTab, resetLabel?: string, reset?: () => void): HTMLElement {
-    const entry = this.tabs.get(name);
-    if (!entry) throw new Error(`[ui] missing menu tab ${name}`);
-    const page = entry[1];
+  _page(name: MenuTab, reset?: () => void): HTMLElement {
+    const page = this.pages[TABS.indexOf(name)];
     const head = el('div', 'ow-page-head', page);
     el('h2', null, head, name.toUpperCase());
-    if (resetLabel && reset) {
-      const b = el('button', 'ow-btn small', head, resetLabel);
+    if (reset) {
+      const b = el('button', 'ow-btn small', head, `Reset ${name}`);
       b.type = 'button';
       b.addEventListener('click', reset);
     }
@@ -214,13 +213,14 @@ export class PauseMenu {
   }
 
   selectTab(name: MenuTab): void {
-    for (const [tabName, [tab, page]] of this.tabs) {
+    TABS.forEach((tabName, i): void => {
       const on = tabName === name;
+      const tab = this.tabs[i];
       tab.classList.toggle('on', on);
       tab.setAttribute('aria-selected', String(on));
       tab.tabIndex = on ? 0 : -1;
-      page.hidden = !on;
-    }
+      this.pages[i].hidden = !on;
+    });
   }
 
   _row(parent: HTMLElement, name: string, detail?: string): HTMLElement {

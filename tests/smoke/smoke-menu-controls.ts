@@ -61,12 +61,7 @@ ctx.events.on('ui:pause', (payload): void => {
 const menu = new PauseMenu(makeEl(), ctx);
 const flatten = (node: Element): Element[] => [node, ...Array.from(node.children).flatMap(flatten)];
 const nodes = flatten(menu.root);
-const reference = nodes.find(
-  (node): boolean => node.getAttribute('aria-label') === 'Gameplay controls'
-);
-assert(reference);
-assert('tabIndex' in reference);
-assert.equal(reference.tabIndex, 0, 'reference is keyboard scrollable');
+assert.equal(menu.pages[2].tabIndex, 0, 'reference is keyboard scrollable');
 assert.equal(nodes.filter((node): boolean => node.tagName === 'DD').length, controls.length);
 assert.equal(controls.length, 24, 'only the concise grouped reference is rendered');
 assert.ok(
@@ -119,12 +114,11 @@ for (const label of ['Mouse Sensitivity', 'Field Of View', 'Firing Camera Shake'
     )
   );
 }
-const visiblePages = (): boolean[] =>
-  [...menu.tabs.values()].map(([, page]): boolean => !page.hidden);
+const visiblePages = (): boolean[] => menu.pages.map((page): boolean => !page.hidden);
 assert.deepEqual(visiblePages(), [true, false, false], 'opens on Gameplay');
 menu.selectTab('Controls');
 assert.deepEqual(visiblePages(), [false, false, true], 'one page at a time');
-assert.equal(menu.tabs.get('Controls')?.[0].getAttribute('aria-selected'), 'true');
+assert.equal(menu.tabs[2].getAttribute('aria-selected'), 'true');
 menu.show();
 assert.equal(ctx.time.scale, 0);
 assert.equal(menu.root.open, true, 'pause menu is a native modal');
