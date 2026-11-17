@@ -257,10 +257,11 @@ def build_geometry(materials):
         for side in (-1,1):
             box('Stock spine inset',(-.252,side*.0115,.0045),(.104,.001,.014),polymer,stock,.001)
         # The butt follows the pad into a rounded toe and a relieved lower shoulder.
+        # Small stock/magazine radii use two segments: cut rims repeat every segment.
         stock_body=profile('Stock butt frame',[(-.304,.028),(-.429,.028),(-.436,.024),
             (-.432,-.027),(-.427,-.075),(-.424,-.090),(-.398,-.090),(-.390,-.086),
             (-.388,-.080),(-.392,-.072),(-.399,-.063),(-.395,-.057),(-.365,-.025),
-            (-.340,-.021),(-.323,.000),(-.304,.000)],.037,polymer,stock,.0025,rounded=True)
+            (-.340,-.021),(-.323,.000),(-.304,.000)],.037,polymer,stock,.0025,rounded=True,segments=2)
         cut(stock_body,profile('CUT',[(-.409,-.054),(-.384,-.028),(-.381,-.026),
             (-.379,-.028),(-.406,-.059),(-.410,-.060)],.052,None,None,.002))
         for side in (-1,1):
@@ -272,7 +273,7 @@ def build_geometry(materials):
                 (-.422,-.068)],.001,rubber,stock,.001,y=side*.019)
         profile('Rubber recoil pad',[(-.428,.029),(-.441,.027),(-.446,.016),(-.437,-.075),
             (-.433,-.089),(-.427,-.092),(-.418,-.089),(-.423,-.073),(-.431,.018)],
-            .040,rubber,stock,.002,rounded=True)
+            .040,rubber,stock,.002,rounded=True,segments=2)
         for i in range(18):
             box('Butt pad traction rib',(-.4462+i*.00052,0,.012-i*.0051),(.0017,.036,.0013),rubber,stock,.0004)
         # The latch rides the underside of the spine within the tapered shoulder.
@@ -294,9 +295,9 @@ def build_geometry(materials):
         outline = [(rear,z) for z,rear,_ in sections]
         outline += [(-.016,-.185),(.047,-.168)]
         outline += [(front,z) for z,_,front in reversed(sections)]
-        mag_shell = profile('Curved .300 magazine shell', outline, .025, polymer, mag, .0016, rounded=True)
+        mag_shell = profile('Curved .300 magazine shell', outline, .025, polymer, mag, .0016, rounded=True, segments=2)
         profile('Magazine base plate', [(-.020,-.181),(.048,-.162),(.051,-.171),(-.017,-.191)],
-                .028, polymer, mag, .0012, rounded=True)
+                .028, polymer, mag, .0012, rounded=True, segments=2)
         for side in (-1,1):
             # Recess shallow molded panels close to the receiver instead of
             # leaving a smooth collar between the well and the magazine's body.
