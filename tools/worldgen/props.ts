@@ -1033,34 +1033,79 @@ function palmTree(rng: Rng, h = 5.2): THREE.BufferGeometry {
   return p.build();
 }
 
-/** One palm frond: leaflets along a curved spine, foliage-textured quads. */
-function palmFrond(len = 2.6): THREE.BufferGeometry {
+/**
+ * One palm frond along +X: a midrib that rises off the crown and then arches
+ * down, with paired leaflets swept toward the tip and lifted into a shallow V.
+ * Leaflet cards lie roughly along the frond surface, so the crown reads as a
+ * canopy from below and above, not as hanging slivers.
+ */
+function palmFrond(rng: Rng, len = 2.6): THREE.BufferGeometry {
   const list = [];
-  const n = 13;
+  const rise = 0.28;
+  const sag = 0.62;
+  const pos = new THREE.Vector3();
+  const tan = new THREE.Vector3();
+  const up = new THREE.Vector3();
+  // Midrib point, tangent and in-plane up at parameter t.
+  const frame = (t: number): void => {
+    pos.set(t * len, len * (rise * t - sag * t * t), 0);
+    tan.set(1, rise - 2 * sag * t, 0).normalize();
+    up.set(-tan.y, tan.x, 0);
+  };
+  const dir = new THREE.Vector3();
+  const width = new THREE.Vector3();
+  const normal = new THREE.Vector3();
+  const basis = new THREE.Matrix4();
+  const n = 30;
   for (let i = 0; i < n; i++) {
-    const t = (i + 1) / (n + 1);
-    const x = t * len;
-    const droop = -t * t * len * 0.42;
-    const lw = (0.42 + Math.sin(t * Math.PI) * 0.55) * (1 - t * 0.35);
+    const u = i / (n - 1);
+    frame(0.16 + u * 0.82);
+    const lw = (0.2 + Math.sin(Math.PI * Math.pow(u, 0.75)) * 0.6) * rng.range(0.9, 1.1);
     for (const side of [-1, 1]) {
-      const q = new THREE.PlaneGeometry(lw, 0.16, 1, 1);
-      q.translate(lw / 2, 0, 0);
-      const m = mat(x, droop, 0, 0, 0, 0);
-      const rot = new THREE.Matrix4().makeRotationZ(-0.5 - t * 0.5);
-      const yaw = new THREE.Matrix4().makeRotationY(side * (1.15 - t * 0.35));
-      q.applyMatrix4(rot);
-      q.applyMatrix4(yaw);
-      q.applyMatrix4(m);
+      // Sweep toward the tip, lift into a V that flattens toward the tip.
+      const sweep = 0.5 + u * 0.35 + rng.range(-0.08, 0.08);
+      const lift = 0.5 - u * 0.4 + rng.range(-0.06, 0.06);
+      dir
+        .set(0, 0, side * Math.cos(sweep))
+        .addScaledVector(tan, Math.sin(sweep))
+        .multiplyScalar(Math.cos(lift))
+        .addScaledVector(up, Math.sin(lift))
+        .normalize();
+      // The blade contains the midrib tangent, then folds slightly along its own rib.
+      width
+        .copy(tan)
+        .projectOnPlane(dir)
+        .normalize()
+        .applyAxisAngle(dir, side * 0.35);
+      normal.crossVectors(dir, width);
+      const q = new THREE.PlaneGeometry(lw, 0.19, 2, 1);
+      const pa = q.getAttribute('position');
+      // The basis is mirrored per side, so its normal flips: keep both tips drooping.
+      for (let v = 0; v < pa.count; v++) {
+        const x = pa.getX(v) + lw / 2;
+        pa.setXYZ(v, x, pa.getY(v), -side * (x / lw) ** 2 * lw * 0.18);
+      }
+      q.computeVertexNormals();
+      basis.makeBasis(dir, width, normal).setPosition(pos);
+      q.applyMatrix4(basis);
       fillMasks(q, 0.2, 0.25, 0);
       list.push(q);
     }
   }
-  // spine
-  const spine = new THREE.PlaneGeometry(len, 0.05, 6, 1);
-  const pa = spine.getAttribute('position');
-  for (let i = 0; i < pa.count; i++) {
-    const x = pa.getX(i) + len / 2;
-    pa.setXYZ(i, x, pa.getY(i) - (x / len) ** 2 * len * 0.42, pa.getZ(i));
+  // Midrib: a tapering ribbon from slightly inside the crown to the tip, mapped
+  // onto the opaque centre vein of the leaf tile so the cutout keeps it whole.
+  const spine = new THREE.PlaneGeometry(1, 1, 12, 1);
+  const sa = spine.getAttribute('position');
+  const su = spine.getAttribute('uv');
+  for (let v = 0; v < sa.count; v++) {
+    const s = sa.getX(v) + 0.5;
+    const edge = Math.sign(sa.getY(v));
+    const t = -0.04 + s * 1.04;
+    frame(t);
+    // Pitch the ribbon 45 degrees about the midrib so it reads from any side.
+    const h = (0.035 - Math.max(t, 0) * 0.028) * edge * 0.7;
+    sa.setXYZ(v, pos.x + up.x * h, pos.y + up.y * h, h);
+    su.setXY(v, 0.3 + s * 0.4, 0.5 + edge * 0.03);
   }
   spine.computeVertexNormals();
   fillMasks(spine, 0.2, 0.3, 0);
@@ -1305,9 +1350,9 @@ export function registerProps(A: Assembler): Assembler {
   P('can', 'steel', can(), { maxDist: 45, castShadow: false });
 
   // vegetation
-  const palm = palmTree(R('palm_trunk'), 5.4);
+  const palm = palmTree(R('palm_trunk'));
   P('palm_trunk', 'wood_dark', palm, { skirt: 0.57, chunk: false });
-  P('palm_frond', 'foliage', palmFrond(2.7), { chunk: false, receiveShadow: true });
+  P('palm_frond', 'foliage', palmFrond(R('palm_frond'), 2.7), { chunk: false });
   P('shrub', 'foliage', shrub(R('shrub'), 0.85));
   P('weeds', 'foliage', weedTuft(R('weeds')), { maxDist: 40 });
   P('planter', 'concrete_prop', planter(), { skirt: 0.33 });

@@ -657,7 +657,11 @@ export function createSurfaceNodeMaterial(
     return { color, opacity: alb.a, normal, rough, metal: clamp(metalness, 0, 1), ao };
   })();
   mat.colorNode = channels.color;
-  if (p.alphaMask) mat.opacityNode = channels.opacity;
+  if (p.alphaMask) {
+    mat.opacityNode = channels.opacity;
+    // Shadow passes replace the material; keep the cutout instead of the whole card.
+    mat.maskShadowNode = channels.opacity.greaterThan(mat.alphaTest);
+  }
   mat.normalNode = channels.normal;
   mat.roughnessNode = channels.rough.mul(materialRoughness);
   mat.metalnessNode = channels.metal.mul(materialMetalness);
@@ -666,7 +670,9 @@ export function createSurfaceNodeMaterial(
     // Authored backlight approximation, not physical transmission: this emissive
     // term uses orientation/cavity AO, but does not sample direct-light shadows.
     // Keep opaque sleeves separate; shared sun/moon uniforms follow the sky.
-    const back = max(float(0), dot(normalWorldGeometry, shared.keyDir).negate());
+    // Double-sided cards glow on whichever face is shown, not the authored one.
+    const shownN = frontFacing.select(normalWorldGeometry, normalWorldGeometry.negate());
+    const back = max(float(0), dot(shownN, shared.keyDir).negate());
     const view = normalize(cameraPosition.sub(positionWorld));
     const forward = max(float(0), dot(view, shared.keyDir).negate());
     mat.emissiveNode = channels.color
