@@ -31,25 +31,13 @@ Preserve events, STEP visibility, iron rays, lockback, contacts and resource
 ownership. Representation/storage measurements and bounded normal-rounding
 acceptance remain in Git history; they are not general visual or FPS approval.
 
-## Side-profile reference
+## Side-profile references
 
-The GI guard has a straight lower bar with upturned ends. Rounded receiver
-shoulders narrow the opening toward the ends, and the curved trigger reaches
-toward the bar. The guard ears and A2 grip locate the ends of the opening.
-The [Colt Block II FSP owner's parts photograph](https://www.reddit.com/r/GunPorn/comments/eqzf90/m4a1_block_ii_fsp/)
-shows this lower nearly side-on and identifies the SOCOM barrel, RIS II FSP and
-GI guard. Register its takedown pins with one uniform scale and a small in-plane
-rotation; its assembled companion photograph is oblique and is not a dimension gauge.
-
-[Daniel Defense's SOCOM M4A1 FSP side photographs](https://danieldefense.com/socom-m4a1-fsp.html)
-provide a whole-rifle cross-check of the barrel/rail/receiver silhouette. The
-front-sight pocket sits forward on the rail and follows the sight tower profile.
-The photo shows Daniel Defense furniture and an enhanced curved guard. The Colt
-photo guides the GI opening and trigger shape. The game uses a SOPMOD stock with
-a fixed extension and separately calibrated hand contacts.
-
-The [Colt M4 catalog side profile](https://www.colt.com/wp-content/uploads/2024/09/24-COLT-2263-COLLATERAL-MLE_Catalog-web-FINAL.pdf#page=26)
-shows the A2 grip and seated metal magazine. The lower forging narrows below the
-front pin, the well lip slopes toward the trigger, and the grip ends in an angled
-heel. The two magazine meshes share an outline and the reload hand follows the
-seated position.
+- [Colt Block II FSP parts photograph](https://www.reddit.com/r/GunPorn/comments/eqzf90/m4a1_block_ii_fsp/):
+  register its nearly side-on lower on the takedown pins for the GI opening,
+  straight guard bar and trigger curve. Its assembled companion is oblique.
+- [Daniel Defense SOCOM M4A1 FSP](https://danieldefense.com/socom-m4a1-fsp.html):
+  whole-rifle barrel, rail, front-sight and receiver silhouette. Its furniture
+  and enhanced guard differ.
+- [Colt M4 catalog, page 26](https://www.colt.com/wp-content/uploads/2024/09/24-COLT-2263-COLLATERAL-MLE_Catalog-web-FINAL.pdf#page=26):
+  lower forging taper, A2 grip heel and seated USGI magazine.

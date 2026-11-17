@@ -197,10 +197,8 @@ def build_geometry(materials):
     # RIS II FSP two-piece body: full envelope targets, supported quad rails,
     # slotted walls and genuine front-sight cutout. No polymer free-float panels.
     HG_REAR=-.133;HG_FRONT=HG_REAR-.31115
-    GAS=-.329
-    FSP_FRONT, FSP_REAR = GAS-.027, GAS+.027
-    fsp_center=(0,.102,GAS)
-    fsp_size=(.031,.055,FSP_REAR-FSP_FRONT)
+    # FSP is the half-length of the rail pocket centred on the front-sight base.
+    GAS=-.329;FSP=.027
     # Native corner windows avoid the bevel/Boolean explosion of invisible side
     # slots. The four diagonal rows are actually visible above/below the side rails.
     outline=[(-.0235,-.009),(-.009,-.0235),(.009,-.0235),(.0235,-.009),(.0235,.009),(.009,.0235),(-.009,.0235),(-.0235,.009)]
@@ -216,7 +214,7 @@ def build_geometry(materials):
         angles=sorted(set([i*math.tau/16 for i in range(16)]+[math.atan2(y,x)%math.tau for x in (-width/2,width/2) for y in (-pitch/2,pitch/2)]))
         for cell in range(count):
             z=HG_FRONT+(cell+.5)*pitch
-            if mid.y>0 and FSP_FRONT<z<FSP_REAR:continue
+            if mid.y>0 and abs(z-GAS)<FSP:continue
             rings=[[],[],[],[]]
             for angle in angles:
                 cs,sn=math.cos(angle),math.sin(angle);t=min(width/2/max(abs(cs),1e-10),pitch/2/max(abs(sn),1e-10))
@@ -227,8 +225,8 @@ def build_geometry(materials):
                 vi,vj=Vector(verts[of[i]]),Vector(verts[of[j]])
                 # Long side boundaries and only actual row ends, not internal caps.
                 edge=(abs((Vector((vi.x,vi.y-BORE))-mid).dot(u))>width/2-1e-7 and abs((Vector((vj.x,vj.y-BORE))-mid).dot(u))>width/2-1e-7)
-                start=cell==0 or (mid.y>0 and FSP_FRONT<z-pitch<FSP_REAR)
-                stop=cell==count-1 or (mid.y>0 and FSP_FRONT<z+pitch<FSP_REAR)
+                start=cell==0 or (mid.y>0 and abs(z-pitch-GAS)<FSP)
+                stop=cell==count-1 or (mid.y>0 and abs(z+pitch-GAS)<FSP)
                 end=(start and abs(vi.z-(z-pitch/2))<1e-7 and abs(vj.z-(z-pitch/2))<1e-7) or (stop and abs(vi.z-(z+pitch/2))<1e-7 and abs(vj.z-(z+pitch/2))<1e-7)
                 if edge or end:faces.append((of[j],of[i],ib[i],ib[j]));smooth.append(False)
         o=mesh(name,verts,faces,fde,bevel=0)
@@ -268,12 +266,12 @@ def build_geometry(materials):
                      for x,y in outline] for z in (a,b)]
         base=loft(name+' web',rings(picatinny.section(radius,radius-.0056,slot=True),z0,z1),mat,bevel=0,rounded=False)
         for a,b in picatinny.lands(z0,z1,origin):
-            if name.startswith('RIS II') and side=='top' and FSP_FRONT<(a+b)/2<FSP_REAR:continue
+            if name.startswith('RIS II') and side=='top' and abs((a+b)/2-GAS)<FSP:continue
             loft(name+' tooth',rings(picatinny.section(radius,radius-.0056),a,b),mat,bevel=0,rounded=False)
-        if name.startswith('RIS II') and side=='top':cut(base,box('CUT',fsp_center,fsp_size,None,None,0))
+        if name.startswith('RIS II') and side=='top':cut(base,box('CUT',(0,.102,GAS),(.031,.055,2*FSP),None,None,0))
     rail('Upper receiver rail',-.136,.055,'top',anodized)
     for side in ('top','bottom',-1,1):rail('RIS II '+str(side),HG_FRONT,HG_REAR,side)
-    cut(core,box('CUT',fsp_center,fsp_size,None,None,.001))
+    cut(core,box('CUT',(0,.102,GAS),(.031,.055,2*FSP),None,None,.001))
     # F-marked A2 base, forged yoke, round gas boss and protected front post.
     before_front=set(asset.objects)
     tube('A2 gas boss',(0,BORE,GAS),.0132,.00835,.047,steel)
@@ -325,16 +323,15 @@ def build_geometry(materials):
     muzzle_adapter=empty('MUZZLE_device_removed',parent=rig)
     tube('M4 thread adapter',(0,BORE,CROWN+.0065),.0079375,.0064,.013,steel,muzzle_adapter)
     # A2 grip has varying rounded sections, a backstrap and its characteristic ledge.
+    # Last field rakes the lower sections into the angled heel.
     rings=[]
-    grip_sections=[(.034,.031,.0155,.022),(.019,.035,.016,.021),(.005,.039,.016,.021),
-        (-.012,.046,.0167,.022),(-.027,.054,.0168,.023),(-.043,.065,.0168,.024),
-        (-.055,.071,.016,.024),(-.0625,.071,.0155,.0235)]
-    for i,(y,z,rx,rz) in enumerate(grip_sections):
+    for y,z,rx,rz,heel in [(.034,.031,.0155,.022,0),(.019,.035,.016,.021,0),(.005,.039,.016,.021,0),
+        (-.012,.046,.0167,.022,0),(-.027,.054,.0168,.023,0),(-.043,.065,.0168,.024,0),
+        (-.055,.071,.016,.024,.16),(-.0625,.071,.0155,.0235,.23)]:
         ring=[]
         for a in [j*math.tau/32 for j in range(32)]:
             offset=math.copysign(abs(math.sin(a))**.65,math.sin(a))*rz
-            heel=(.16 if i==len(grip_sections)-2 else .23 if i==len(grip_sections)-1 else 0)*offset
-            ring.append((math.copysign(abs(math.cos(a))**.65,math.cos(a))*rx,y+heel,z+offset))
+            ring.append((math.copysign(abs(math.cos(a))**.65,math.cos(a))*rx,y+heel*offset,z+offset))
         rings.append(ring)
     grip=loft('A2 sculpted grip',rings,polymer,bevel=0)
     profile('A2 finger ledge',[(.030,-.019),(.025,-.028),(.043,-.031),(.047,-.023)],.032,polymer,bevel=.0015,rounded=True)
