@@ -1,5 +1,7 @@
+import type { VolumeKey } from '../audio/settings.ts';
 import { bindingLabel } from '../core/bindings.ts';
 import type { EngineContext } from '../core/context.ts';
+import { hasOwn } from '../core/guards.ts';
 import { clamp, damp } from '../core/math.ts';
 import { CONTROL_SECTIONS } from './controls.ts';
 import { el, setText, setStyle, ease } from './util.ts';
@@ -12,13 +14,34 @@ interface SliderApi {
 }
 type InvertButton = [HTMLButtonElement, boolean];
 
-/** Settings write shared config directly; quality reloads with ?q= because passes
+/** Every audio category with the sounds it actually controls, in menu order. */
+const VOLUME_ROWS: Record<VolumeKey, [label: string, detail: string]> = {
+  master: ['Master Volume', 'All sound, after the safety limiter'],
+  weapons: ['Gunfire', 'Shots, dry fire, distant firefights'],
+  explosions: ['Explosions', 'Grenades, air strikes, ear ringing'],
+  foley: ['Footsteps & Impacts', 'Movement, reloads, casings, impacts, near misses'],
+  voice: ['Voices', 'Enemy callouts and reactions'],
+  ambience: ['Ambience', 'Environment and strike aircraft'],
+  ui: ['Interface & Alerts', 'Hits, damage, heartbeat, radio, intel'],
+  music: ['Music', 'Supply tent radio'],
+};
+
+const TABS = ['Gameplay', 'Audio', 'Controls'] as const;
+type MenuTab = (typeof TABS)[number];
+const TAB_STEP: Partial<Record<string, number>> = {
+  ArrowDown: 1,
+  ArrowRight: 1,
+  ArrowUp: -1,
+  ArrowLeft: -1,
+};
+
+/** Tabbed pause menu: a rail (title, tabs, Resume) and one page at a time.
+ * Settings write shared config directly; quality reloads with ?q= because passes
  * are chosen at init. FOV also updates the live camera. Emits ui:pause {paused}.
  */
 export class PauseMenu {
   ctx: MenuContext;
   root: HTMLDialogElement;
-  rows: HTMLElement;
   sens: SliderApi;
   fov: SliderApi;
   shake: SliderApi;
@@ -27,6 +50,10 @@ export class PauseMenu {
   // ---- quality preset --------------------------------------------------
   qBtns: HTMLButtonElement[] = [];
   invBtns: InvertButton[] = [];
+  volumes = new Map<VolumeKey, SliderApi>();
+  /** Tab buttons and their pages, in TABS order. */
+  tabs: HTMLButtonElement[] = [];
+  pages: HTMLElement[] = [];
   open: boolean = false;
   shown: number = 0;
 
@@ -38,17 +65,55 @@ export class PauseMenu {
     this.root.setAttribute('closedby', 'none');
     this.root.oncancel = (event): void => event.preventDefault();
     const layout = el('div', 'ow-menu-layout', this.root);
-    const inner = el('div', 'ow-menu-inner', layout);
+    const rail = el('nav', 'ow-menu-rail', layout);
+    rail.setAttribute('aria-label', 'Pause menu');
+    const pages = el('div', 'ow-menu-pages', layout);
 
-    const h = el('h1', null, inner, 'Paused');
+    const h = el('h1', null, rail, 'PAUSED');
     h.id = 'ow-menu-title';
-    h.textContent = 'PAUSED';
-    el('div', 'sub', inner, 'Claude of Duty — TACTICAL OPERATIONS');
-    el('div', 'rule', inner);
+    el('div', 'sub', rail, 'Claude of Duty — TACTICAL OPERATIONS');
 
-    this.rows = el('div', null, inner);
+    // ---- tabs (ARIA tablist: arrows move, one tab stop) --------------------
+    const tablist = el('div', 'ow-tabs', rail);
+    tablist.setAttribute('role', 'tablist');
+    tablist.setAttribute('aria-orientation', 'vertical');
+    for (const name of TABS) {
+      const tab = el('button', 'ow-tab', tablist, name);
+      tab.type = 'button';
+      tab.id = `ow-tab-${name.toLowerCase()}`;
+      tab.setAttribute('role', 'tab');
+      tab.addEventListener('click', (): void => this.selectTab(name));
+      const page = el('section', 'ow-page', pages);
+      page.setAttribute('role', 'tabpanel');
+      page.setAttribute('aria-labelledby', tab.id);
+      this.tabs.push(tab);
+      this.pages.push(page);
+    }
+    tablist.addEventListener('keydown', (event): void => {
+      const step = TAB_STEP[event.key];
+      if (!step) return;
+      event.preventDefault();
+      const index = this.tabs.findIndex((tab): boolean => tab === event.target);
+      const next = TABS[(index + step + TABS.length) % TABS.length];
+      this.selectTab(next);
+      this.tabs[TABS.indexOf(next)].focus();
+    });
 
-    const qRow = this._row('Graphics Preset');
+    this.resumeBtn = el('button', 'ow-btn primary', rail, 'Resume');
+    this.resumeBtn.type = 'button';
+    this.resumeBtn.autofocus = true;
+    this.resumeBtn.addEventListener('click', (): void => this.close());
+    el('div', 'hint', rail, `${bindingLabel('pause').toUpperCase()} RESUME`);
+
+    // ---- gameplay ----------------------------------------------------------
+    const game = this._page('Gameplay', (): void => {
+      this.sens.set(1);
+      this.fov.set(80);
+      this.shake.set(1);
+      this.ctx.config.invertY = false;
+      this.setQuality('high');
+    });
+    const qRow = this._row(game, 'Graphics Preset', 'Changing the preset restarts the run');
     const seg = el('div', 'ow-seg', qRow);
     for (const p of PRESETS) {
       const b = el('button', null, seg, p);
@@ -56,31 +121,21 @@ export class PauseMenu {
       b.addEventListener('click', (): void => this.setQuality(p));
       this.qBtns.push(b);
     }
-    el('div', 'hint', this.rows, 'PRESET CHANGE RESTARTS THE RUN');
-
-    // ---- sensitivity -----------------------------------------------------
-    this.sens = this._slider('Mouse Sensitivity', 0.2, 3.0, 0.01, (v): string => {
+    this.sens = this._slider(game, 'Mouse Sensitivity', 0.2, 3.0, 0.01, (v): string => {
       this.ctx.config.sensitivity = 0.0022 * v;
       return v.toFixed(2);
     });
-
-    // ---- field of view ---------------------------------------------------
-    this.fov = this._slider('Field Of View', 65, 120, 1, (v): string => {
+    this.fov = this._slider(game, 'Field Of View', 65, 120, 1, (v): string => {
       this.ctx.config.fov = v;
       this.ctx.camera.fov = v;
       this.ctx.camera.updateProjectionMatrix();
       return String(v | 0);
     });
-
-    // ---- firing camera shake ---------------------------------------------
-    this.shake = this._slider('Firing Camera Shake', 0, 1, 0.05, (v): string => {
+    this.shake = this._slider(game, 'Firing Camera Shake', 0, 1, 0.05, (v): string => {
       this.ctx.config.firingShake = v;
       return v <= 1e-6 ? 'OFF' : `${Math.round(v * 100)}%`;
     });
-
-    // ---- invert look -----------------------------------------------------
-    const invRow = this._row('Invert Look');
-    const invSeg = el('div', 'ow-seg', invRow);
+    const invSeg = el('div', 'ow-seg', this._row(game, 'Invert Look'));
     const invertOptions: [string, boolean][] = [
       ['off', false],
       ['on', true],
@@ -95,28 +150,39 @@ export class PauseMenu {
       this.invBtns.push([b, val]);
     }
 
-    // ---- buttons ---------------------------------------------------------
-    const btns = el('div', 'ow-btns', inner);
-    this.resumeBtn = el('button', 'ow-btn primary', btns, 'Resume');
-    this.resumeBtn.type = 'button';
-    this.resumeBtn.autofocus = true;
-    this.resumeBtn.addEventListener('click', (): void => this.close());
-    const reset = el('button', 'ow-btn', btns, 'Defaults');
-    reset.type = 'button';
-    reset.addEventListener('click', (): void => {
-      this.sens.set(1);
-      this.fov.set(80);
-      this.shake.set(1);
-      this.ctx.config.invertY = false;
-      this.setQuality('high');
+    // ---- audio -------------------------------------------------------------
+    const audio = this._page('Audio', (): void => {
+      this.ctx.peek('audio')?.resetVolumes();
+      this.syncFromConfig();
     });
-    el('div', 'hint', inner, `${bindingLabel('pause').toUpperCase()} RESUME`);
+    el(
+      'p',
+      'ow-page-note',
+      audio,
+      '100% is the designed mix. 50% sounds about half as loud. 0% is muted.'
+    );
+    for (const key of Object.keys(VOLUME_ROWS)) {
+      if (!hasOwn(VOLUME_ROWS, key)) continue;
+      const [label, detail] = VOLUME_ROWS[key];
+      const slider = this._slider(
+        audio,
+        label,
+        0,
+        100,
+        1,
+        (v): string => {
+          this.ctx.peek('audio')?.setVolume(key, v);
+          return v <= 0 ? 'MUTED' : `${v}%`;
+        },
+        detail
+      );
+      this.volumes.set(key, slider);
+    }
 
-    const reference = el('section', 'ow-controls', layout);
-    reference.setAttribute('aria-label', 'Gameplay controls');
+    // ---- controls reference -------------------------------------------------
+    const reference = this._page('Controls');
     reference.tabIndex = 0; // Keyboard users can scroll the reference without leaving the game.
-    el('h2', null, reference, 'CONTROLS');
-    el('p', 'ow-controls-note', reference, 'Keyboard & mouse · Quick reference.');
+    el('p', 'ow-page-note', reference, 'Keyboard & mouse · Quick reference.');
     const groups = el('div', 'ow-controls-groups', reference);
     for (const section of CONTROL_SECTIONS) {
       const group = el('section', 'ow-controls-group', groups);
@@ -131,30 +197,58 @@ export class PauseMenu {
 
     setStyle(this.root, 'display', 'none');
     setStyle(this.root, 'cursor', 'default');
+    this.selectTab('Gameplay');
     this.syncFromConfig();
   }
 
-  _row(name: string): HTMLElement {
-    const r = el('div', 'ow-row', this.rows);
-    el('div', 'name', r, name.toUpperCase());
+  /** Page header with an optional page-scoped reset. */
+  _page(name: MenuTab, reset?: () => void): HTMLElement {
+    const page = this.pages[TABS.indexOf(name)];
+    const head = el('div', 'ow-page-head', page);
+    el('h2', null, head, name.toUpperCase());
+    if (reset) {
+      const b = el('button', 'ow-btn small', head, `Reset ${name}`);
+      b.type = 'button';
+      b.addEventListener('click', reset);
+    }
+    return page;
+  }
+
+  selectTab(name: MenuTab): void {
+    TABS.forEach((tabName, i): void => {
+      const on = tabName === name;
+      const tab = this.tabs[i];
+      tab.classList.toggle('on', on);
+      tab.setAttribute('aria-selected', String(on));
+      tab.tabIndex = on ? 0 : -1;
+      this.pages[i].hidden = !on;
+    });
+  }
+
+  _row(parent: HTMLElement, name: string, detail?: string): HTMLElement {
+    const r = el('div', 'ow-row', parent);
+    const label = el('div', 'name', r, name.toUpperCase());
+    if (detail) el('div', 'detail', label, detail);
     return r;
   }
 
   _slider(
+    parent: HTMLElement,
     name: string,
     min: number,
     max: number,
     step: number,
-    apply: (value: number) => string
+    apply: (value: number) => string,
+    detail?: string
   ): SliderApi {
-    const row = this._row(name);
+    const row = this._row(parent, name, detail);
     const wrap = el('div', 'ow-slider', row);
     el('div', 'track', wrap);
     const fill = el('div', 'fill', wrap);
     const knob = el('div', 'knob', wrap);
     const input = el('input', null, wrap);
     input.type = 'range';
-    input.setAttribute('aria-label', name);
+    input.setAttribute('aria-label', detail ? `${name}: ${detail}` : name);
     input.min = String(min);
     input.max = String(max);
     input.step = String(step);
@@ -164,7 +258,9 @@ export class PauseMenu {
       const t = (v - min) / (max - min);
       setStyle(fill, 'width', (t * 100).toFixed(2) + '%');
       setStyle(knob, 'left', (t * 100).toFixed(2) + '%');
-      setText(val, apply(v));
+      const text = apply(v);
+      setText(val, text);
+      input.setAttribute('aria-valuetext', text);
     };
     input.addEventListener('input', (): void => paint(parseFloat(input.value)));
     const api = {
@@ -195,6 +291,8 @@ export class PauseMenu {
     this.sens.set(cfg.sensitivity / 0.0022);
     this.fov.set(cfg.fov);
     this.shake.set(cfg.firingShake);
+    const audio = this.ctx.peek('audio');
+    if (audio) for (const [key, slider] of this.volumes) slider.set(audio.volumes[key]);
   }
 
   toggle(): void {

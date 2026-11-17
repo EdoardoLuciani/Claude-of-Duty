@@ -151,7 +151,7 @@ audio.field = fixture<SpatialField>({
   hold(): void {},
 });
 for (const kind of ['grenade', 'bomb'] as const) {
-  assert(audio._playAt('explosion', 0, 0, -70, { explosionKind: kind }, 'weapons'));
+  assert(audio._playAt('explosion', 0, 0, -70, { explosionKind: kind }, 'explosions'));
   assert(acquired);
   assert.equal(acquired.atten, explosionDistanceGain(70, kind));
   assert.equal(acquired.when, 2 + 70 / 343, 'propagation delay remains physical');
@@ -177,7 +177,7 @@ for (const kind of ['grenade', 'bomb'] as const) {
   assert.equal(played[4]?.explosionKind, kind);
   assert.equal(played[4]?.send, undefined, 'recorded voice owns its restrained reverb send');
   assert.equal(played[4]?.gain, EXPLOSION_MIX.gain, 'both ordnance identities receive the boost');
-  assert.equal(played[5], 'weapons');
+  assert.equal(played[5], 'explosions');
 }
 
 bank.dispose();
