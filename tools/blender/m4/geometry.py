@@ -326,10 +326,10 @@ def build_geometry(materials):
     tube('M4 thread adapter',(0,BORE,CROWN+.0065),.0079375,.0064,.013,steel,muzzle_adapter)
     # A2 grip has varying rounded sections, a backstrap and its characteristic ledge.
     # Last field rakes the lower sections into the angled heel.
-    rings=[]
-    for y,z,rx,rz,heel in [(.034,.031,.0155,.022,0),(.019,.035,.016,.021,0),(.005,.039,.016,.021,0),
+    rings=[];grip_stations=[(.034,.031,.0155,.022,0),(.019,.035,.016,.021,0),(.005,.039,.016,.021,0),
         (-.012,.046,.0167,.022,0),(-.027,.054,.0168,.023,0),(-.043,.065,.0168,.024,0),
-        (-.055,.071,.016,.024,.16),(-.0625,.071,.0155,.0235,.23)]:
+        (-.055,.071,.016,.024,.16),(-.0625,.071,.0155,.0235,.23)]
+    for y,z,rx,rz,heel in grip_stations:
         ring=[]
         for a in [j*math.tau/32 for j in range(32)]:
             offset=math.copysign(abs(math.sin(a))**.65,math.sin(a))*rz
@@ -381,7 +381,7 @@ def build_geometry(materials):
         obj.parent=irons_root;obj.matrix_parent_inverse=irons_root.matrix_world.inverted()
 
     # Standard USGI metal magazine; complete shape is photo-informed, not PMAG-sized.
-    mag_stations=[(.054,-.068,.029),(.022,-.067,.029),(-.010,-.067,.029),
+    mag_stations=[(.054,-.0685,.0295),(.022,-.068,.0295),(-.010,-.067,.029),
         (-.035,-.0695,.029),(-.060,-.076,.0295),(-.078,-.082,.0295),(-.092,-.0865,.029)]
     def magazine_rings(width,inside=False):
         rings=[]
@@ -419,7 +419,7 @@ def build_geometry(materials):
         return loft(name,[[(x+math.cos(a)*r,y+math.sin(a)*r,z+dz) for a in [i*math.tau/24 for i in range(24)]] for dz,r in section],mat,parent,0,True)
     for x,y in [(-.0045,.054),(.0045,.049)]:
         # Stagger vertically; do not shove an oversized bullet through the front
-        # wall. 44.7 mm case + 12.7 mm exposed ogive fits the 62 mm feed envelope.
+        # wall. 44.7 mm case + 12.7 mm exposed ogive fits the 59 mm feed envelope.
         cartridge_part('Magazine cartridge',(x,y,-.0398),case_profile,brass,round_live)
         cartridge_part('Magazine projectile',(x,y,-.0845),[(0,.00285),(-.003,.0028),(-.0075,.0019),(-.0115,.0008),(-.0127,.0001)],copper,round_live)
     cartridge_part('Review fired case',(0,0,.02235),case_profile,brass,case)
@@ -429,8 +429,8 @@ def build_geometry(materials):
         d=bpy.data.curves.new(label,'FONT');d.body=label;d.size=size;d.resolution_u=3
         o=bpy.data.objects.new('Mark | '+label,d);asset.objects.link(o);o.location=xyz(loc)
         o.rotation_euler=Matrix(((0,0,side),(side,0,0),(0,1,0))).to_euler();o.parent=parent;o.matrix_parent_inverse=parent.matrix_world.inverted();d.materials.append(mat);return o
-    text('M4A1 CARBINE',(-.0201,.035,-.102),.0032)
-    text('CAL. 5.56 MM',(-.0201,.029,-.102),.0028)
+    text('M4A1 CARBINE',(-.0201,.035,-.098),.0032)
+    text('CAL. 5.56 MM',(-.0201,.029,-.098),.0028)
     for word,loc in [('SAFE',(-.0176,.050,.053)),('SEMI',(-.0176,.058,.035)),('AUTO',(-.0176,.049,.004))]:text(word,loc,.0022)
     text('DANIEL DEFENSE',( -.0198,.084,-.400),.0024,mat=marking)
     text('M4A1 RIS II FSP',(-.0198,.080,-.400),.0020,mat=marking)
@@ -471,7 +471,7 @@ def build_geometry(materials):
                 if abs(face.normal.x)<.6 or face.center.z>=-.012:continue
                 for index in face.loop_indices:
                     game=C.inverted()@o.data.vertices[o.data.loops[index].vertex_index].co
-                    center=.052+max(0,-game.y-.012)*.4
+                    center=np.interp(-game.y,[-s[0] for s in grip_stations],[s[1] for s in grip_stations])
                     uv[index].uv=(.01+max(0,min(1,(game.z-center+.024)/.048))*.48,.01+max(0,min(1,(game.y+.075)/.063))*.98)
     for o in list(asset.objects):
         if o.type=='MESH' and o.parent in (mag,round_live):

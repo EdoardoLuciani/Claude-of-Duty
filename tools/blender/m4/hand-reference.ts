@@ -36,7 +36,7 @@ for (const side of ['right', 'left'] as const) {
   arm.fitGrip(
     'm4',
     side === 'right'
-      ? { thumb: [-0.025, 0.048, 0.046], index: [0, 0.0235, 0.004], spread: [0, 0.6, 0.62, 0.64] }
+      ? { thumb: [-0.025, 0.048, 0.046], index: [0, 0.0235, 0], spread: [0, 0.6, 0.62, 0.64] }
       : { thumb: [-0.0134, 0.1065, -0.252], thumbPole: [0, 0, -1] }
   );
   const entry: SideReference = {
