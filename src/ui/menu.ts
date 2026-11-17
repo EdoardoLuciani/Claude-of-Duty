@@ -1,4 +1,4 @@
-import type { VolumeKey } from '../audio/settings.ts';
+import { VOLUME_KEYS, type VolumeKey } from '../audio/settings.ts';
 import { bindingLabel } from '../core/bindings.ts';
 import type { EngineContext } from '../core/context.ts';
 import { clamp, damp } from '../core/math.ts';
@@ -13,7 +13,7 @@ interface SliderApi {
 }
 type InvertButton = [HTMLButtonElement, boolean];
 
-/** Every audio category, in menu order, with the sounds it actually controls. */
+/** Every audio category with the sounds it actually controls; order follows VOLUME_KEYS. */
 const VOLUME_ROWS: Record<VolumeKey, [label: string, detail: string]> = {
   master: ['Master Volume', 'All sound, after the safety limiter'],
   weapons: ['Gunfire', 'Shots, dry fire, distant firefights'],
@@ -24,9 +24,6 @@ const VOLUME_ROWS: Record<VolumeKey, [label: string, detail: string]> = {
   ui: ['Interface & Alerts', 'Hits, damage, heartbeat, radio, intel'],
   music: ['Music', 'Supply tent radio'],
 };
-const VOLUME_KEYS = Object.keys(VOLUME_ROWS).filter((key): key is VolumeKey =>
-  Object.hasOwn(VOLUME_ROWS, key)
-);
 
 /** Settings write shared config directly; quality reloads with ?q= because passes
  * are chosen at init. FOV also updates the live camera. Emits ui:pause {paused}.

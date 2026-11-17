@@ -3,6 +3,7 @@
  * -10 dB, which listeners hear as roughly half as loud.
  */
 
+import { isRecord } from '../core/guards.ts';
 import { clamp } from '../core/math.ts';
 import { BUS_NAMES, type BusName } from './mixer.ts';
 
@@ -20,20 +21,20 @@ export function defaultVolumes(): VolumeSettings {
     weapons: full,
     explosions: full,
     foley: full,
-    ambience: full,
     voice: full,
+    ambience: full,
     ui: full,
     music: full,
   };
 }
 
 export function clampVolume(percent: number): number {
-  return Number.isFinite(percent) ? Math.round(clamp(percent, 0, 100)) : 100;
+  return Math.round(clamp(percent, 0, 100));
 }
 
-/** Linear gain for a percentage. */
+/** Linear gain for a validated percentage. */
 export function volumeGain(percent: number): number {
-  return Math.pow(clampVolume(percent) / 100, LOUDNESS_EXPONENT);
+  return Math.pow(percent / 100, LOUDNESS_EXPONENT);
 }
 
 /** Saved values are clamped; missing, malformed or unknown entries fall back to defaults. */
@@ -41,9 +42,9 @@ export function loadVolumes(): VolumeSettings {
   const volumes = defaultVolumes();
   try {
     const saved: unknown = JSON.parse(globalThis.localStorage.getItem(STORAGE_KEY) ?? '{}');
-    if (typeof saved !== 'object' || saved === null) return volumes;
+    if (!isRecord(saved)) return volumes;
     for (const key of VOLUME_KEYS) {
-      const value: unknown = Object.hasOwn(saved, key) ? Reflect.get(saved, key) : undefined;
+      const value = saved[key];
       if (typeof value === 'number') volumes[key] = clampVolume(value);
     }
   } catch {

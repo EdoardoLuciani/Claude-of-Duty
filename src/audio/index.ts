@@ -26,7 +26,6 @@ import {
   defaultVolumes,
   loadVolumes,
   saveVolumes,
-  VOLUME_KEYS,
   clampVolume,
   volumeGain,
   type VolumeKey,
@@ -917,8 +916,10 @@ export class AudioSystem {
   }
 
   resetVolumes(): void {
-    const defaults = defaultVolumes();
-    for (const key of VOLUME_KEYS) this.setVolume(key, defaults[key]);
+    this.volumes = defaultVolumes();
+    saveVolumes(this.volumes);
+    this.mixer?.setMasterVolume(volumeGain(this.volumes.master));
+    for (const name of BUS_NAMES) this.mixer?.setBusVolume(name, volumeGain(this.volumes[name]));
   }
 
   _onIntelOperation(e: { active?: boolean }): void {

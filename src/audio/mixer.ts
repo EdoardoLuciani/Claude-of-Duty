@@ -15,8 +15,9 @@ interface MixerBus {
   level: GainNode;
   send: GainNode;
   comp: DynamicsCompressorNode | null;
+  /** Optional post-muffle output at the same logical level (tinnitus). */
+  direct: GainNode | null;
   baseTrim: number;
-  shopTrim: number;
   volume: number;
   shop: number;
   duckAmount: number;
@@ -53,27 +54,28 @@ function holdHearingParam(param: AudioParam, time: number): void {
 }
 const CONCUSSION_CUTOFF_RATIO = 0.075; // full concussion bottoms out at 1.5 kHz
 
-/** One authored level per category. `shop` dips the field while the supply tent is open. */
+/** One authored level per category, in menu order. `shop` dips the field while the supply
+ * tent is open; `direct` adds a post-muffle output following the same level. */
 const BUS_DEFS = {
   // The only authored weapon-level control. Sources have no separate profile
   // trim; shared summation headroom and output safety remain downstream.
   weapons: { trim: 1, comp: null },
   // Same authored level as gunfire; separate only so players can balance them.
-  explosions: { trim: 1, comp: null },
+  explosions: { trim: 1, direct: true, comp: null },
   foley: {
     trim: 0.6,
     shop: 0.5,
     comp: { threshold: -14, knee: 10, ratio: 2.0, attack: 0.004, release: 0.2 },
+  },
+  voice: {
+    trim: 0.6,
+    comp: { threshold: -18, knee: 8, ratio: 3.0, attack: 0.006, release: 0.22 },
   },
   // Sparse environmental events support the action, below foley and weapons.
   ambience: {
     trim: 0.06,
     shop: 0.28,
     comp: { threshold: -24, knee: 12, ratio: 2.0, attack: 0.05, release: 0.5 },
-  },
-  voice: {
-    trim: 0.6,
-    comp: { threshold: -18, knee: 8, ratio: 3.0, attack: 0.006, release: 0.22 },
   },
   // Cues and the shop bed support the action rather than matching gunfire.
   ui: { trim: 0.45, comp: null },
@@ -91,7 +93,6 @@ export class Mixer {
   masterSum!: GainNode;
   energyMix!: AudioWorkletNode;
   masterGain!: GainNode;
-  tinnitusOut!: GainNode;
   worldSum!: GainNode;
   muffleLP!: BiquadFilterNode;
   muffleHS!: BiquadFilterNode;
@@ -143,7 +144,7 @@ export class Mixer {
     this.rng = rng;
     // User volume is last. Category balance and summation headroom belong
     // upstream of the single shared peak-safety processor.
-    this.masterVolume = clamp(opts.masterVolume ?? 1, 0, 1);
+    this.masterVolume = opts.masterVolume ?? 1;
 
     /* ---- master chain (built first, everything hangs off it) ------ */
     this.masterSum = gain(actx, 1);
@@ -184,8 +185,10 @@ export class Mixer {
     /* ---- buses ---------------------------------------------------- */
     const createBus = (name: BusName): MixerBus => {
       const def = BUS_DEFS[name];
-      const volume = clamp(opts.busVolumes?.[name] ?? 1, 0, 1);
+      const volume = opts.busVolumes?.[name] ?? 1;
       const level = gain(actx, def.trim * volume);
+      const direct = 'direct' in def ? gain(actx, def.trim * volume) : null;
+      direct?.connect(this.masterSum);
       let comp: DynamicsCompressorNode | null = null;
       if (def.comp) {
         comp = actx.createDynamicsCompressor();
@@ -205,8 +208,8 @@ export class Mixer {
         level,
         send: gain(actx, def.trim * volume),
         comp,
+        direct,
         baseTrim: def.trim,
-        shopTrim: 'shop' in def ? def.shop : 1,
         volume,
         shop: 1,
         duckAmount: 0,
@@ -216,8 +219,8 @@ export class Mixer {
       weapons: createBus('weapons'),
       explosions: createBus('explosions'),
       foley: createBus('foley'),
-      ambience: createBus('ambience'),
       voice: createBus('voice'),
+      ambience: createBus('ambience'),
       ui: createBus('ui'),
       music: createBus('music'),
     };
@@ -246,10 +249,6 @@ export class Mixer {
     // it must never lay a second, warehouse-sized tail over every report.
     this.reverbReturn = gain(actx, 0.26);
     this.reverbReturn.connect(this.worldSum);
-
-    // Blast ringing is part of the Explosions category, but stays post-muffle.
-    this.tinnitusOut = gain(actx, this.buses.explosions.volume);
-    this.tinnitusOut.connect(this.masterSum);
   }
 
   /**
@@ -415,7 +414,8 @@ export class Mixer {
     const lfoG = gain(actx, 26);
     lfo.connect(lfoG);
     lfoG.connect(o2.frequency);
-    g.connect(this.tinnitusOut); // post-muffle on purpose
+    // Blast ringing belongs to Explosions, post-muffle on purpose.
+    g.connect(this.buses.explosions.direct ?? this.masterSum);
     o1.start(t);
     o2.start(t);
     o3.start(t);
@@ -527,26 +527,26 @@ export class Mixer {
     const b = this.buses[name];
     b.volume = clamp(v, 0, 1);
     this._setBusLevel(b, 0.05);
-    if (name === 'explosions') {
-      this.tinnitusOut.gain.setTargetAtTime(b.volume, this.actx.currentTime, 0.05);
-    }
   }
 
   /** Supply-tent dip; independent of user volume, so closing restores the player's mix. */
   setShopMix(open: boolean): void {
     for (const name of BUS_NAMES) {
+      const def = BUS_DEFS[name];
+      if (!('shop' in def)) continue;
       const b = this.buses[name];
-      b.shop = open ? b.shopTrim : 1;
+      b.shop = open ? def.shop : 1;
       this._setBusLevel(b, 0.05);
     }
   }
 
-  /** One logical category level drives dry and wet; a mute always wins. */
+  /** One logical category level drives dry, wet and direct; a mute always wins. */
   _setBusLevel(b: MixerBus, smooth: number): void {
     const value = b.baseTrim * b.volume * b.shop * (1 - b.duckAmount);
     const t = this.actx.currentTime;
     b.level.gain.setTargetAtTime(value, t, smooth);
     b.send.gain.setTargetAtTime(value, t, smooth);
+    b.direct?.gain.setTargetAtTime(value, t, smooth);
   }
 
   dispose(): void {
@@ -572,6 +572,7 @@ export class Mixer {
     for (const b of Object.values(this.buses)) {
       b.level.disconnect();
       b.send.disconnect();
+      b.direct?.disconnect();
       b.comp?.disconnect();
     }
     this.reverbSend.disconnect();
@@ -584,7 +585,6 @@ export class Mixer {
     this.muffleGain.disconnect();
     this.muffleDry.disconnect();
     this.muffleWet.disconnect();
-    this.tinnitusOut.disconnect();
     this.masterSum.disconnect();
     this.energyMix.onprocessorerror = null;
     this.energyMix.port.postMessage('stop');
