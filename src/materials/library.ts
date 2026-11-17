@@ -330,6 +330,8 @@ export const LIBRARY: Record<MaterialName, MaterialDefinition> = {
       detail: [4, 0.25, 0.15, 8],
       macro: [0.16, 0.3, 0.08, 0.6],
       weather: [0.15, 0.0, 0.0, 0.2],
+      // Thin leaves glow when the sun is behind them, instead of going black.
+      cloth: [0.5, 1, 0, 0],
     },
     three: {
       side: THREE.DoubleSide,

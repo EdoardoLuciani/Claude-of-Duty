@@ -657,7 +657,11 @@ export function createSurfaceNodeMaterial(
     return { color, opacity: alb.a, normal, rough, metal: clamp(metalness, 0, 1), ao };
   })();
   mat.colorNode = channels.color;
-  if (p.alphaMask) mat.opacityNode = channels.opacity;
+  if (p.alphaMask) {
+    mat.opacityNode = channels.opacity;
+    // Shadow passes replace the material; keep the cutout instead of the whole card.
+    mat.maskShadowNode = channels.opacity.greaterThan(mat.alphaTest);
+  }
   mat.normalNode = channels.normal;
   mat.roughnessNode = channels.rough.mul(materialRoughness);
   mat.metalnessNode = channels.metal.mul(materialMetalness);
