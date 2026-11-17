@@ -56,7 +56,9 @@ head = [v.x for v in blade_vertices if v.z > -.040]
 assert sum(belly)/len(belly) < min(rest_tip, sum(head)/len(head)) - .006, 'trigger concavity must face muzzle (+X)'
 assert len(objects['Curved trigger blade'].data.vertices) >= 80, 'smooth sampled blade, not old faceted wedge'
 assert bvh('Curved trigger blade').overlap(bvh('Ambidextrous lower receiver')), 'trigger head must attach to receiver'
-assert not bvh('Curved trigger blade').overlap(bvh('Sculpted trigger guard')), 'trigger must clear guard'
+guard = bvh('Sculpted trigger guard')
+assert not bvh('Curved trigger blade').overlap(guard), 'trigger must clear guard'
+assert guard.ray_cast(Vector((-.037,-.05,-.068)), Vector((0,1,0)), .1)[0] is not None, 'front guard band reaches the well'
 assert bvh('Length adjustment latch').overlap(bvh('Stock upper spine')), 'stock latch must attach to spine'
 assert objects['Length adjustment latch'].parent == objects['stock_hinge']
 stock_frame = surface([objects['Stock butt frame']], objects['MCX_RIG'].matrix_world.inverted())
@@ -134,19 +136,22 @@ grip_vertices = mesh_world('Ergonomic pistol grip')[0]
 mag_bounds = magazine_bounds('magazine')
 shell = bvh('Curved .300 magazine shell')
 assert shell.ray_cast(Vector((0,-.05,-.120)), Vector((0,1,0)), .1)[0] is not None, 'exposed magazine shell is present'
+neck_edges = [shell.ray_cast(Vector((-.06,0,z)), Vector((1,0,0)), .05)[0] for z in (-.075,-.088)]
+assert all(edge is not None for edge in neck_edges) and abs(neck_edges[0].x-neck_edges[1].x) < .002, 'magazine neck blends into body'
 drop = min(v.z for v in grip_vertices) - mag_bounds[0].z
 assert .035 < drop < .046, ('magazine floorplate below grip heel', drop)
 lip = bvh('Magazine well lip')
 assert lip.ray_cast(Vector((0,0,-.085)), Vector((0,0,1)), .035)[0] is None, 'open magazine well lip'
 assert lip.ray_cast(Vector((0,.020,-.085)), Vector((0,0,1)), .035)[0] is not None, 'lip retains its sidewall'
 inverse = objects['MCX_RIG'].matrix_world.inverted()
-well = surface([objects[name] for name in ('Flared magazine well','Magazine well lip')], inverse)
+seating_parts = ('Flared magazine well','Magazine well lip','Sculpted trigger guard')
+well_and_guard = surface([objects[name] for name in seating_parts], inverse)
 for parent, frames in [('magazine',(20,25,29)), ('magazine_spare',(104,107,111,117))]:
     parts = [o for o in objects[parent].children if o.type == 'MESH']
     for frame in frames:
         pose('Reload_Empty', frame)
         inverse = objects['MCX_RIG'].matrix_world.inverted()
-        assert not well.overlap(surface(parts, inverse)), (parent, frame, 'magazine clips the well')
+        assert not well_and_guard.overlap(surface(parts, inverse)), (parent, frame, 'magazine clips the well or guard')
 
 for clip in ('Reload_Tactical','Reload_Empty'):
     pose(clip, 117)

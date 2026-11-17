@@ -96,10 +96,11 @@ def build_geometry(materials):
         lip = profile('Magazine well lip', [(-.035,-.067),(.036,-.055),(.039,-.061),(-.037,-.075)], .053, coating, bevel=.001)
         for part in (magwell, lip):
             opening(part, (.0005,0,-.055), (.067,.029,.070), .002)
+        # Carry the lower band into the front attachment with a rounded shoulder.
         guard = profile('Sculpted trigger guard', [(-.097,-.040),(-.031,-.040),
-            (-.034,-.066),(-.045,-.076),(-.055,-.082),(-.067,-.082),
+            (-.034,-.064),(-.037,-.071),(-.046,-.078),(-.056,-.081),(-.067,-.082),
             (-.082,-.076),(-.091,-.067),(-.098,-.061)], .015, coating, bevel=.0017, rounded=True)
-        opening(guard, (-.061,0,-.0575), (.052,.030,.039), .014)
+        opening(guard, (-.063,0,-.056), (.048,.030,.042), .014)
         # A continuous, rounded blade, with its head embedded in the receiver.
         # Offset a sampled Bezier centreline instead of beveling a six-corner polygon.
         # The finger-facing concavity opens toward the muzzle (+X), not the grip.
@@ -284,9 +285,8 @@ def build_geometry(materials):
             text('SIG SAUER',(-.421 if side==-1 else -.397,side*.020,-.027),.0035,side,stock,mat=polymer)
 
     def build_magazines():
-        # Author the profile seated in the receiver. The inserted neck stays
-        # straight while the exposed body sweeps forward towards the floorplate.
-        sections = [(-.030,-.025,.032),(-.075,-.026,.032),(-.088,-.032,.033),
+        # Blend the seated neck into the body's forward sweep just below the well.
+        sections = [(-.030,-.029,.032),(-.075,-.0305,.032),(-.088,-.0315,.033),
                     (-.111,-.031,.034),(-.131,-.028,.037),(-.146,-.025,.041),
                     (-.161,-.022,.044)]
         outline = [(rear,z) for z,rear,_ in sections]

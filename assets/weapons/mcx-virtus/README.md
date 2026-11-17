@@ -76,9 +76,10 @@ The stock has a tapered lower shoulder, an angled recoil pad and a rounded toe
 with a narrow relief slot above it. The rifle photograph shows a translucent
 Lancer magazine. The lower receiver tapers into the grip saddle. The grip widens
 toward its sloped heel, and the seated polymer magazine sweeps forward below the
-well lip and ends in an angled floorplate.
-The well lip frames an open mouth during reloads. Both magazines share the same
-exterior and glove contact.
+well lip and ends in an angled floorplate. The rear of the magazine blends into
+the neck below the lip, and the trigger guard curves into the well with a
+continuous front band. The well lip frames an open mouth during reloads. Both
+magazines share the same exterior and glove contact.
 
 ## Attachment fits
 
