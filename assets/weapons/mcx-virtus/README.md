@@ -65,8 +65,8 @@ SIG's [2018 commercial catalog, printed page 49](https://luxuscap.com/wp-content
 identifies the gray VIRTUS SBR in .300 BLK with a 9-inch barrel and short M-LOK
 guard. The [matching SIG product photograph](https://images.eurooptic.com/images/products/sig-sauer/0/sig-sauer-mcx-virtus-sbr-9-rifle-rmcx-300b-9b-tap-sbr.jpg)
 is available through [Scopelist](https://www.scopelist.com/sig-sauer-mcx-300blk-9-with-telescoping-folding-stock-rmcx-300b-9b-tap-sbr).
-Use one uniform scale from repeated Picatinny pitch, align the rail, and compare
-the full silhouette; do not independently stretch the photo's height.
+Register the side view at the front rail edge using one scale from the repeated
+rail teeth. Use the same scale for the receiver, magazine and grip.
 
 The guard has a shallow lower edge, bore-height side slots and a diagonal rear
 shoulder supported by the receiver nose. The barrel, bare flash hider and muzzle
@@ -74,9 +74,9 @@ attachment datum share that bore axis. The support-hand calibration follows the
 guard; optic/laser seating and the stock hinge retain their independent fits.
 The stock has a tapered lower shoulder, an angled recoil pad and a rounded toe
 with a narrow relief slot above it. The rifle photograph shows a translucent
-Lancer magazine. Use the grip heel and well lip to judge how far the seated
-magazine projects below the receiver. The game model has a straight neck, a gently
-swept body with recessed polymer panels, and a sloped floorplate.
+Lancer magazine. The lower receiver tapers into the grip saddle. The grip widens
+toward its sloped heel, and the seated polymer magazine sweeps forward below the
+well lip and ends in an angled floorplate.
 The well lip frames an open mouth during reloads. Both magazines share the same
 exterior and glove contact.
 

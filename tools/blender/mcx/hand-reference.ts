@@ -14,7 +14,7 @@ import {
 } from '../hand-reference.ts';
 
 const grips: Record<Side, GripFrame> = {
-  right: { pos: [0.0351, -0.012, 0.086], finger: [0.15, 0.35, -0.92], back: [1, 0.03, 0.04] },
+  right: { pos: [0.0351, -0.012, 0.083], finger: [0.15, 0.35, -0.92], back: [1, 0.03, 0.04] },
   left: { pos: [-0.073, 0.048, -0.243], finger: [0.7, -0.1, -0.71], back: [-0.14, -0.985, 0.001] },
 };
 const sides: Partial<Record<Side, HandSideReference>> = {};

@@ -109,8 +109,8 @@
     }
   },
   "stats": {
-    "triangles": 49146,
-    "vertices": 26113,
+    "triangles": 49024,
+    "vertices": 26050,
     "meshes": 17,
     "material_slots": 17
   },

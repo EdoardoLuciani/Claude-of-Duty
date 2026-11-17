@@ -46,7 +46,7 @@ def build_geometry(materials):
     spare = empty('magazine_spare', parent=rig)
     bolt = empty('bolt', parent=rig)
     handle = empty('charging_handle', parent=rig)
-    trigger = empty('trigger', (-.071, 0, -.034), rig)
+    trigger = empty('trigger', (-.065, 0, -.034), rig)
     cover = empty('dust_cover', (-.02, -.027, -.022), rig)
     stock = empty('stock_hinge', (-.183, .016, .007), rig)
     case = empty('spent_case', parent=rig)
@@ -87,23 +87,23 @@ def build_geometry(materials):
         cylinder('Forward assist button', (-.110,-.030,.013), .0075, .006, steel)
         for z in (.010,.013,.016): box('Forward assist serration',(-.1135,-.030,z),(.0006,.011,.0007),polymer,bevel=.0001)
         # Lower shoulders, rounded rear grip transition and narrower magazine well.
-        forging('Ambidextrous lower receiver', [(-.169,-.020,-.006,.019),
-            (-.150,-.032,-.008,.021),(-.125,-.042,-.009,.021),
-            (-.093,-.042,-.009,.021),(-.075,-.040,-.009,.021),
-            (-.035,-.042,-.008,.021),(.037,-.044,-.007,.022)])
-        magwell = profile('Flared magazine well', [(-.035,-.017),(.037,-.011),
-            (.037,-.058),(.039,-.061),(-.031,-.075),(-.035,-.072)], .050, coating, bevel=.003, rounded=True)
-        lip = profile('Magazine well lip', [(-.032,-.071),(.037,-.057),(.041,-.062),(-.033,-.078)], .053, coating, bevel=.001)
+        forging('Ambidextrous lower receiver', [(-.178,-.012,-.004,.018),
+            (-.165,-.024,-.005,.0195),(-.148,-.033,-.007,.021),(-.125,-.044,-.008,.021),
+            (-.093,-.046,-.009,.021),(-.075,-.046,-.009,.021),
+            (-.035,-.044,-.008,.021),(.037,-.044,-.007,.022)])
+        magwell = profile('Flared magazine well', [(-.041,-.016),(.036,-.011),
+            (.036,-.056),(.038,-.061),(-.035,-.072),(-.040,-.069)], .050, coating, bevel=.003, rounded=True)
+        lip = profile('Magazine well lip', [(-.035,-.067),(.036,-.055),(.039,-.061),(-.037,-.075)], .053, coating, bevel=.001)
         for part in (magwell, lip):
-            opening(part, (.003,0,-.055), (.062,.029,.070), .002)
-        guard = profile('Sculpted trigger guard', [(-.095,-.041),(-.031,-.040),
-            (-.034,-.065),(-.045,-.075),(-.051,-.078),(-.069,-.079),
-            (-.087,-.073),(-.098,-.065)], .015, coating, bevel=.002, rounded=True)
-        opening(guard, (-.065,0,-.056), (.056,.030,.034), .013)
+            opening(part, (.0005,0,-.055), (.067,.029,.070), .002)
+        guard = profile('Sculpted trigger guard', [(-.097,-.040),(-.031,-.040),
+            (-.034,-.066),(-.045,-.076),(-.055,-.082),(-.067,-.082),
+            (-.082,-.076),(-.091,-.067),(-.098,-.061)], .015, coating, bevel=.0017, rounded=True)
+        opening(guard, (-.061,0,-.0575), (.052,.030,.039), .014)
         # A continuous, rounded blade, with its head embedded in the receiver.
         # Offset a sampled Bezier centreline instead of beveling a six-corner polygon.
         # The finger-facing concavity opens toward the muzzle (+X), not the grip.
-        control = [Vector(p) for p in [(-.072,-.035),(-.086,-.050),(-.087,-.060),(-.074,-.068)]]
+        control = [Vector(p) for p in [(-.066,-.035),(-.079,-.050),(-.080,-.060),(-.067,-.068)]]
         front, back_edge = [], []
         for i in range(25):
             t = i/24; u = 1-t
@@ -112,7 +112,7 @@ def build_geometry(materials):
             normal = Vector((-tangent.y, tangent.x)).normalized() * .0021
             front.append(tuple(centre+normal)); back_edge.append(tuple(centre-normal))
         profile('Curved trigger blade', front + back_edge[::-1], .007, steel, trigger, .0007)
-        cylinder('Trigger axle', (-.071,0,-.034), .0035, .012, steel, 'Y', trigger)
+        cylinder('Trigger axle', (-.065,0,-.034), .0035, .012, steel, 'Y', trigger)
         for side in (-1,1):
             screw(-.123,side*.021,-.018,.0031)
             screw(-.074,side*.021,-.032,.0021)
@@ -132,11 +132,11 @@ def build_geometry(materials):
         box('Bolt release paddle', (-.057,.024,-.031), (.011,.005,.016), steel, release, .0015)
         # Molded grip: a narrow web expands into a rounded-rectangle palm section.
         # Side-view station coordinates are photo-inferred, not a scanned grip.
-        grip_sections = [(-.026,-.149,-.126,.012),(-.035,-.142,-.103,.013),
-            (-.043,-.136,-.096,.0135),(-.051,-.134,-.096,.014),
-            (-.060,-.139,-.096,.0145),(-.075,-.147,-.101,.016),
-            (-.085,-.152,-.109,.017),(-.110,-.163,-.116,.017),
-            (-.129,-.170,-.122,.017),(-.139,-.174,-.126,.0165)]
+        grip_sections = [(-.025,-.160,-.125,.012),(-.035,-.151,-.103,.013),
+            (-.047,-.141,-.091,.0135),(-.057,-.139,-.089,.014),
+            (-.070,-.144,-.093,.0145),(-.082,-.153,-.103,.016),
+            (-.096,-.158,-.108,.017),(-.112,-.164,-.112,.017),
+            (-.130,-.168,-.116,.017),(-.139,-.169,-.119,.0165)]
         rings = []
         for j,(z,back,front,w) in enumerate(grip_sections):
             r = .005; ring = []
@@ -145,19 +145,19 @@ def build_geometry(materials):
                 for i in range(5):
                     a = math.radians(start+i*22.5)
                     x = cx+r*math.cos(a); y = cy+r*math.sin(a)
-                    heel = -.32*(x-(back+front)/2) if j == len(grip_sections)-1 else 0
+                    heel = -.36*(x-(back+front)/2) if j == len(grip_sections)-1 else 0
                     ring.append((x,y,z+heel))
             rings.append(ring)
         grip = loft('Ergonomic pistol grip', rings, polymer, bevel=.0007)
         for side in (-1,1):
-            panel = [(-.138,-.075),(-.108,-.081),(-.130,-.136),(-.162,-.126),(-.149,-.090)]
+            panel = [(-.138,-.075),(-.105,-.081),(-.123,-.138),(-.162,-.128),(-.149,-.090)]
             cut(grip,profile('CUT',panel,.0024,None,None,.001,y=side*.0172))
             profile('Grip inset stipple panel',panel,.0004,rubber,bevel=.0005,y=side*.0162)
             text('SIG SAUER',(-.127 if side==-1 else -.105,side*.0145,-.058),.0033,side,mat=polymer)
         for i in range(11):
-            z=-.081-i*.0047; x=-.106-i*.00195
+            z=-.083-i*.0047; x=-.103-i*.00165
             box('Grip front traction rib',(x,0,z),(.0012,.024,.0010),rubber,bevel=.0003)
-        profile('Grip floor plate',[(-.173,-.130),(-.126,-.144),(-.125,-.147),(-.175,-.133)],.034,rubber,bevel=.0008)
+        profile('Grip floor plate',[(-.169,-.130),(-.119,-.145),(-.118,-.148),(-.170,-.133)],.034,rubber,bevel=.0008)
 
     def build_handguard():
         # Handguard is a hollow octagonal extrusion, not black decals on a box.
@@ -240,7 +240,7 @@ def build_geometry(materials):
         # exposed straight adjustment spine (not a minimalist two-strut skeleton).
 
     def build_stock():
-        box('Rear 1913 interface',(-.181,0,-.005),(.014,.030,.063),steel)
+        box('Rear 1913 interface',(-.181,0,.001),(.014,.030,.051),steel)
         # Reference-informed upper shoulder sits below the handle, not through its
         # bow/latch path. Preserve the lower end (-23 mm) and the stock fold pivot.
         # No published hinge drawing: these are exterior fit coordinates, not SIG specs.
@@ -286,14 +286,14 @@ def build_geometry(materials):
     def build_magazines():
         # Author the profile seated in the receiver. The inserted neck stays
         # straight while the exposed body sweeps forward towards the floorplate.
-        sections = [(-.030,-.025,.032),(-.082,-.025,.032),(-.100,-.024,.033),
-                    (-.115,-.023,.034),(-.130,-.021,.036),(-.145,-.018,.039),
-                    (-.160,-.014,.043)]
+        sections = [(-.030,-.025,.032),(-.075,-.026,.032),(-.088,-.032,.033),
+                    (-.111,-.031,.034),(-.131,-.028,.037),(-.146,-.025,.041),
+                    (-.161,-.022,.044)]
         outline = [(rear,z) for z,rear,_ in sections]
-        outline += [(-.008,-.181),(.049,-.163)]
+        outline += [(-.016,-.185),(.047,-.168)]
         outline += [(front,z) for z,_,front in reversed(sections)]
         mag_shell = profile('Curved .300 magazine shell', outline, .025, polymer, mag, .0016, rounded=True)
-        profile('Magazine base plate', [(-.013,-.176),(.050,-.156),(.054,-.165),(-.010,-.186)],
+        profile('Magazine base plate', [(-.020,-.181),(.048,-.162),(.051,-.171),(-.017,-.191)],
                 .028, polymer, mag, .0012, rounded=True)
         for side in (-1,1):
             # Recess shallow molded panels close to the receiver instead of

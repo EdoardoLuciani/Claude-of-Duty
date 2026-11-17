@@ -132,6 +132,8 @@ def magazine_bounds(parent):
 # Judge the seated silhouette relative to the grip heel, including the floorplate.
 grip_vertices = mesh_world('Ergonomic pistol grip')[0]
 mag_bounds = magazine_bounds('magazine')
+shell = bvh('Curved .300 magazine shell')
+assert shell.ray_cast(Vector((0,-.05,-.120)), Vector((0,1,0)), .1)[0] is not None, 'exposed magazine shell is present'
 drop = min(v.z for v in grip_vertices) - mag_bounds[0].z
 assert .035 < drop < .046, ('magazine floorplate below grip heel', drop)
 lip = bvh('Magazine well lip')
@@ -158,8 +160,8 @@ for name in ['VIRTUS upper forging','Ambidextrous lower receiver','Ergonomic pis
 assert not any(o.name.startswith(('Upper machined shoulder','Receiver lower shoulder',
                                 'Magazine well forging relief')) for o in asset.objects), 'no slab overlays'
 # Local silhouette/contact regressions, NOT certified SIG dimensions.
-assert -.148 < min(v.z for v in grip_vertices) < -.144, 'grip heel follows registered reference'
-assert -.080 < min(v.z for v in mesh_world('Magazine well lip')[0]) < -.075, 'magwell not oversized below rail'
+assert -.151 < min(v.z for v in grip_vertices) < -.145, 'grip heel follows registered reference'
+assert -.077 < min(v.z for v in mesh_world('Magazine well lip')[0]) < -.072, 'magwell not oversized below rail'
 assert extent(['Ergonomic pistol grip']).y < .035, 'retain grip thickness budget'
 assert abs(objects['SOCKET_magazine'].matrix_world.translation.z+.042) < 1e-6, 'revised seated-mag socket'
 # Hooked latch outlines and bow replace the rectangular charging crossbar.
