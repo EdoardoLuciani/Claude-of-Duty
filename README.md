@@ -134,9 +134,10 @@ scope; mounting one swaps removable irons for their stowed state (M590 keeps fix
 irons). Every weapon accepts the TOR Mini laser and a suppressor: the M4, MCX, MPX and
 EVOLYS share the SRD762Ti; P320, AX338 and M590 mount dedicated cans. Attachments
 trade handling, never ballistics: larger optics slow ADS, a can softens recoil but slows
-ADS, and the laser tightens hip spread. A can also moves the projectile/flash origin to
-its endcap and selects suppressed reports and a smaller flash; the laser draws a beam
-and surface dot along its emitter axis without predicting spread or drop.
+ADS, and the laser tightens hip spread while it is on. A can also moves the
+projectile/flash origin to its endcap and selects suppressed reports and a smaller flash;
+the laser draws a beam and surface dot along its emitter axis without predicting spread
+or drop.
 **L** toggles the mounted laser per gun, independently of the **F** flashlight.
 
 For debug/capture, `attachmentOptic`, `attachmentRail` and `attachmentMuzzle` (`none`

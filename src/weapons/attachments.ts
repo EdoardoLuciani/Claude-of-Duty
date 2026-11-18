@@ -352,6 +352,9 @@ export function mountAttachments(
   };
 }
 
+/** Hip-spread multiplier the lit laser gives; switching it off with L removes it. */
+export const LASER_HIP_SPREAD = 0.85;
+
 /** Handling trade-offs each attachment multiplies into the authored weapon; an omitted
  * field leaves that value unchanged. Optic magnification and laser/suppressor
  * presentation live with their own data, not here. */
@@ -365,7 +368,7 @@ const HANDLING: Record<
   scope: { adsTime: 1.18 },
   // Can mass at the muzzle slows aiming; its gas trap softens every shot.
   suppressor: { adsTime: 1.08, recoil: 0.88 },
-  laser: { spreadHip: 0.85 },
+  laser: { spreadHip: LASER_HIP_SPREAD },
 };
 /** Kick magnitudes a recoil effect scales; spring, bracing and pattern shape stay authored. */
 const RECOIL_MAGNITUDES = ['pitch', 'yaw', 'kickBack', 'kickUp', 'roll', 'punch'] as const;

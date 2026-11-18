@@ -224,10 +224,15 @@ for (const [primary, first, second] of [
   assert.equal(wp.state.laserEnabled, false, 'L cannot enable a missing module');
   assert(wp.setAttachments('rifle', config));
   assert(wp.state.laserEnabled, 'newly mounted module starts on');
+  const litSpread = wp._restSpread(wp.state.def, player, wp._state);
   tap('KeyF');
   assert(wp.state.laserEnabled, 'F never toggles the laser');
   frame({ down: ['KeyL'] });
   assert(!wp.state.laserEnabled, 'L toggles independently of F');
+  assert(
+    wp._restSpread(wp.state.def, player, wp._state) > litSpread,
+    'an unlit laser gives no hip-spread bonus'
+  );
   frame();
   assert(!wp.state.laserEnabled, 'holding L does not repeat');
   frame({ up: ['KeyL'] });

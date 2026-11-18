@@ -14,6 +14,7 @@ import {
   REPLACED_SLOTS,
   replacedNodes,
   isAttachmentConfig,
+  LASER_HIP_SPREAD,
   hasAttachmentAssets,
   SLOTS,
   loadAttachments,
@@ -1767,7 +1768,11 @@ export class WeaponSystem {
     player: EngineSystems['player'] | null,
     st: WeaponPoseState
   ): number {
-    let base = lerp(def.spreadHip, def.spreadAds, this.adsProgress);
+    let hip = def.spreadHip;
+    // Builds resolve the laser lit; switched off, it gives no hip-spread bonus.
+    if (this.state?.attachments.rail === 'laser' && !this.state.laserEnabled)
+      hip /= LASER_HIP_SPREAD;
+    let base = lerp(hip, def.spreadAds, this.adsProgress);
     if (st.crouch) base *= SPREAD_MODS.crouch;
     if (player?.stance === 'prone') base *= SPREAD_MODS.prone;
     if (st.speed < 0.4) base *= SPREAD_MODS.still;

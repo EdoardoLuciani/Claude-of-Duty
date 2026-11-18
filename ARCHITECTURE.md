@@ -342,6 +342,7 @@ boot warms it even without a module. One pooled bullet-mask query clips the rigi
 FOV mapping and are sampled after firing vibration, without camera-crosshair convergence.
 L toggles per-weapon state across swaps and pause/shop; new mounts start on,
 removal/drop/restart/death switch off. Busy hands hide the beam and block L.
+Builds resolve hip spread with the laser on; while it is off, fire uses the spread without it.
 The laser changes no AI perception; the flashlight keeps separate light ownership.
 
 `tools/blender/soldiers/` builds seeded parametric soldiers; a Bun GLTFExporter cook
