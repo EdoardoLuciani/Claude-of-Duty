@@ -75,6 +75,7 @@ const _UP = new THREE.Vector3(0, 1, 0);
  * cascades, which is the wrong trade at this map size.
  */
 const CHUNK = 64;
+const VISUAL_MERGE_SPAN = 96;
 
 export class Assembler {
   declare materials: AssemblyMaterials;
@@ -382,7 +383,7 @@ export class Assembler {
       }
 
       // The fixed grid can split a compact cloud across cell boundaries. Join
-      // whole buckets only when their occupied X/Z span still fits one cell.
+      // whole visual buckets within a bounded X/Z span to trade culling for fewer draws.
       // Distance-LOD clouds keep their original bounds and visibility decisions.
       const chunks = [...buckets.values()].map((list): number[] => list.slice());
       if (p.chunk && p.maxDist === 0 && chunks.length > 1) {
@@ -396,8 +397,8 @@ export class Assembler {
             const a = bounds[i];
             const b = bounds[j];
             if (
-              Math.max(a.max.x, b.max.x) - Math.min(a.min.x, b.min.x) > CHUNK ||
-              Math.max(a.max.z, b.max.z) - Math.min(a.min.z, b.min.z) > CHUNK
+              Math.max(a.max.x, b.max.x) - Math.min(a.min.x, b.min.x) > VISUAL_MERGE_SPAN ||
+              Math.max(a.max.z, b.max.z) - Math.min(a.min.z, b.min.z) > VISUAL_MERGE_SPAN
             )
               continue;
             chunks[i].push(...chunks[j]);

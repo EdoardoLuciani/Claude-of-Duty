@@ -135,10 +135,10 @@ configuration, intel sites and prop transforms live in `level/`; `level/placemen
 is data-only and `placement.ts` owns validation, placement and clutter clearance.
 See the [world editing map](tools/worldgen/README.md). `bun run world` builds meshes
 and cooks collision with meshoptimizer from canonical instance buckets. Visual-only
-coalescing may join non-distance-LOD clouds within a 64 m X/Z span but never changes
-collision or navigation inputs. A prototype's optional `visualGeo` is visual only;
-support, collision and navigation use canonical `geo`, topology and RNG/instance
-inputs. Manifest v2 and content-hashed GLBs are generated into ignored
+coalescing may join whole non-distance-LOD buckets within a bounded X/Z span
+independent of the canonical grid. It never changes collision or navigation inputs.
+A prototype's optional `visualGeo` is visual only; support, collision and navigation
+use canonical `geo`, topology and RNG/instance inputs. Manifest v2 and content-hashed GLBs are generated into ignored
 `public/models/world/`. Preserve instancing/masks; never author separate collision
 geometry. Validate with `bun run world -- --check`, world/physics tests and screenshots.
 
