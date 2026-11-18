@@ -32,7 +32,7 @@ import {
   shotInterval,
 } from './defs.ts';
 import type { WeaponDef, WeaponId, WeaponMode } from './defs.ts';
-import { grenadeMesh } from './grenade-mesh.ts';
+import { loadGrenade, type GrenadeAsset } from './grenade-mesh.ts';
 import { createWeaponInspection } from './inspection.ts';
 import { WeaponLaser } from './laser.ts';
 import { loadWeapon } from './loaders.ts';
@@ -240,6 +240,7 @@ export class WeaponSystem {
   _shellQueue: Array<{ t: number; weapon: WeaponId | null }> = [];
   _droppedMags: DroppedMagazine[] = [];
   _grenades: LiveGrenade[] = []; // live thrown grenades: { body, mesh, fuse }
+  private _grenadeAsset: GrenadeAsset | null = null;
   grenades: number = GRENADES_PER_LIFE;
   /** Grenade in the hand: G drew it, the weapon is stowed. Equipping is
    *  free — stowing (G again, or a weapon switch) spends nothing. */
@@ -317,9 +318,12 @@ export class WeaponSystem {
     const attachments = loadAttachments(renderer).then((assets): void => {
       this._attachments = assets;
     });
+    const grenade = loadGrenade(renderer).then((asset): void => {
+      this._grenadeAsset = asset;
+      this.viewmodel.grenade.add(asset.instantiate());
+    });
     try {
-      const records = await Promise.all(spawn.map(load));
-      await attachments;
+      const [records] = await Promise.all([Promise.all(spawn.map(load)), attachments, grenade]);
       for (let i = 0; i < spawn.length; i++) {
         tris += this.viewmodel.addWeapon(
           records[i],
@@ -336,8 +340,8 @@ export class WeaponSystem {
         }
       })();
     } catch (error) {
-      // Never rejects; settle it so a following dispose() owns every loaded asset.
-      await attachments;
+      // Settle required and optional props so disposal owns every completed load.
+      await Promise.allSettled([attachments, grenade]);
       await disposeWeaponLoader(renderer);
       throw error;
     }
@@ -523,7 +527,7 @@ export class WeaponSystem {
     const render = this.ctx.peek('render');
     // An early caller may try again after initialization. Once work starts, all
     // callers share its result, including failure: boot warmup never retries in gameplay.
-    if (!render?._graph || !this._viewmodel?.radio)
+    if (!render?._graph || !this._viewmodel?.grenade.children.length)
       return Promise.reject(new Error('[weapons] warmup graph or viewmodel not ready'));
     this._warmTask = this._prewarmMaterials(render);
     return this._warmTask;
@@ -532,6 +536,7 @@ export class WeaponSystem {
   private async _prewarmMaterials(render: EngineSystems['render']): Promise<WeaponWarmupReport> {
     const visible: Array<[THREE.Object3D, boolean]> = [];
     let pickup;
+    let worldGrenade;
     const attachments: THREE.Group[] = [];
     try {
       // Deferred assets must finish before the loading screen is released.
@@ -584,6 +589,10 @@ export class WeaponSystem {
         this.ctx.scene.add(pickup);
         render.patchMaterials(pickup);
       }
+      // A held instance alone misses the world depth and lighting shader variants.
+      worldGrenade = this.createGrenade();
+      this.ctx.scene.add(worldGrenade);
+      render.patchMaterials(worldGrenade);
       // Include the temporary pickup and dropped magazines in the flashlight's
       // real shadow pass, not only in the CSM warmup while the light is off.
       const flashlight = this.ctx.peek('player')?.flashlight;
@@ -594,6 +603,7 @@ export class WeaponSystem {
     } finally {
       for (const [group, value] of visible) group.visible = value;
       pickup?.removeFromParent();
+      worldGrenade?.removeFromParent();
       for (const attachment of attachments) attachment.removeFromParent();
     }
   }
@@ -1429,13 +1439,21 @@ export class WeaponSystem {
     return this._throwPos;
   }
 
+  /** Only the transform belongs to the caller; weapons own the shared asset. */
+  createGrenade(): THREE.Mesh {
+    if (!this._grenadeAsset) throw new Error('[weapons] M67 asset not ready');
+    return this._grenadeAsset.instantiate();
+  }
+
   /** Add a live grenade to the world with the shared rigid-body setup. */
   _spawnGrenade(
     position: { x: number; y: number; z: number },
     velocity: { x: number; y: number; z: number },
     fuse: number
   ): void {
-    const mesh = grenadeMesh();
+    const mesh = this.createGrenade();
+    // Release can occur after this frame's physics-to-render sync.
+    mesh.position.set(position.x, position.y, position.z);
     this.ctx.scene.add(mesh);
     const body = this.physics?.addRigidBody({
       shape: 'sphere',
@@ -1999,6 +2017,8 @@ export class WeaponSystem {
     this._pickups?.dispose();
     this._pickups = null;
     this._viewmodel?.dispose();
+    this._grenadeAsset?.dispose();
+    this._grenadeAsset = null;
     this._laser?.dispose();
     this._laser = null;
     for (const asset of Object.values(this._attachments)) asset.dispose();

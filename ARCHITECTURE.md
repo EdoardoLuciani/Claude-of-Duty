@@ -266,7 +266,11 @@ opaque material per skeleton with packed texture arrays.
 `src/weapons/asset-loader.ts` fetches models concurrently, bounds parsing memory and
 shares one Basis transcoder per renderer during boot, released at boot end, failure
 or teardown. Static map clones are shared only when source, UV, color space and
-sampler match.
+sampler match. The Blender-authored grenade is a required boot asset owned by
+weapons. `weapons.createGrenade()` gives AI and player throws independent transforms
+that borrow the same geometry, material and maps as the held prop. Weapons warm
+both render passes; restart removes live instances, and teardown releases the
+shared asset after AI and the viewmodel have detached their visuals.
 
 `weapons.createInspectionModel(id, config)` returns an independent rest-pose clone
 with `dispose()` for the market's demand-rendered WebGPU studio. Inspection owns
