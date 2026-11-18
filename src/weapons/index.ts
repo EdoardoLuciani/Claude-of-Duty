@@ -318,6 +318,7 @@ export class WeaponSystem {
       this._attachments = assets;
     });
     try {
+      await this.viewmodel.loadRadio(renderer);
       const records = await Promise.all(spawn.map(load));
       await attachments;
       for (let i = 0; i < spawn.length; i++) {

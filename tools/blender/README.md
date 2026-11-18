@@ -26,6 +26,8 @@ build/check commands, declared inputs, references and acceptance limits:
 [M590](../../assets/weapons/m590/README.md).
 Standalone attachments: [EXPS3-0](../../assets/attachments/eotech-exps3-0/README.md),
 [TOR Mini laser](../../assets/attachments/steiner-tor-mini/README.md).
+The [field radio](../../assets/props/field-radio/README.md) is a standalone
+first-person prop with a native export and separate live LCD binding.
 
 ## Build timing and profiling
 

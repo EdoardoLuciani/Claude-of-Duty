@@ -45,6 +45,8 @@ assets/attachments/*/*.blend
 assets/attachments/*/*.glb
 assets/attachments/*/*.png
 assets/attachments/*/manifest.json
+assets/props/field-radio/*.blend
+assets/props/field-radio/*.glb
 assets/player/arms/*.blend
 assets/player/arms/manifest.json
 assets/soldiers/*.blend
