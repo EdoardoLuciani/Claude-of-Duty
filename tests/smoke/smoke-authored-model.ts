@@ -637,7 +637,9 @@ assert.throws(
     surface: 'concrete',
   });
   const positions = laser.geometry.getAttribute('position');
+  const beamEnd = new THREE.Vector3();
   const dot = new THREE.Vector3();
+  const corner = new THREE.Vector3();
   const update = (firingShake = 0): void => {
     context.config.firingShake = firingShake;
     rig.applyTo(camera);
@@ -647,13 +649,25 @@ assert.throws(
     anchor.quaternion.copy(camera.quaternion);
     rig.applyFireVibe(camera, viewCamera, anchor);
     laser.update(camera, viewCamera, emitter, physics, null, 1080, WEAPON_DEFS.rifle.maxRange);
-    dot.set(0, 0, 0);
-    for (let i = 4; i < 8; i++) dot.add(new THREE.Vector3().fromBufferAttribute(positions, i));
-    dot.multiplyScalar(0.25);
+    beamEnd
+      .fromBufferAttribute(positions, 2)
+      .add(corner.fromBufferAttribute(positions, 3))
+      .multiplyScalar(0.5);
+    if (laser.geometry.drawRange.count === 12) {
+      dot.set(0, 0, 0);
+      for (let i = 4; i < 8; i++) dot.add(corner.fromBufferAttribute(positions, i));
+      dot.multiplyScalar(0.25).project(camera);
+      const hit = corner.copy(beamEnd).project(camera);
+      assert(
+        Math.hypot(dot.x - hit.x, dot.y - hit.y) < 1e-5,
+        'the depth-biased spot projects onto the surface hit'
+      );
+    }
   };
   update();
   assert(laser.mesh.visible);
-  assert(Math.abs(dot.z + 4.5) < 0.01, 'spot stops on the AI surface');
+  assert.equal(laser.geometry.drawRange.count, 12, 'a hit draws the beam and spot');
+  assert(Math.abs(beamEnd.z + 4.5) < 0.01, 'beam stops on the AI surface');
   const occluder = physics.addCollider({
     shape: 'sphere',
     radius: 0.01,
@@ -662,16 +676,16 @@ assert.throws(
     surface: 'metal',
   });
   update();
-  assert(Math.abs(dot.z + 0.69) < 0.02, 'emitter obstruction clips a clear muzzle aim');
+  assert(Math.abs(beamEnd.z + 0.69) < 0.02, 'emitter obstruction clips a clear muzzle aim');
   occluder.enabled = false;
   actor.enabled = false;
   update();
-  assert(Math.abs(dot.z + 9) < 0.01, 'spot stops on world collision behind the AI');
-  const unshakenSpot = dot.clone();
+  assert(Math.abs(beamEnd.z + 9) < 0.01, 'beam stops on world collision behind the AI');
+  const unshakenEnd = beamEnd.clone();
   const unshakenEmitter = emitter.getWorldPosition(new THREE.Vector3());
   update(1);
   assert(
-    dot.distanceTo(unshakenSpot) > 1e-5,
+    beamEnd.distanceTo(unshakenEnd) > 1e-5,
     'the rigid beam follows firing shake instead of steering back to the ballistic target'
   );
   assert(
@@ -691,15 +705,11 @@ assert.throws(
         .fromBufferAttribute(positions, 0)
         .add(new THREE.Vector3().fromBufferAttribute(positions, 1))
         .multiplyScalar(0.5);
-      const end = new THREE.Vector3()
-        .fromBufferAttribute(positions, 2)
-        .add(new THREE.Vector3().fromBufferAttribute(positions, 3))
-        .multiplyScalar(0.5);
-      assert(Math.abs(start.distanceTo(end) - WEAPON_DEFS.rifle.maxRange) < 1e-4);
+      assert(Math.abs(start.distanceTo(beamEnd) - WEAPON_DEFS.rifle.maxRange) < 1e-4);
       const lens = emitter.getWorldPosition(new THREE.Vector3()).project(viewCamera);
       const forward = emitter.localToWorld(new THREE.Vector3(0, 0, -1)).project(viewCamera);
       const projectedStart = start.project(camera);
-      const projectedEnd = end.project(camera);
+      const projectedEnd = beamEnd.clone().project(camera);
       assert(
         Math.hypot(projectedStart.x - lens.x, projectedStart.y - lens.y) < 1e-5,
         'beam starts on the projected emitter in hip/ADS FOVs'

@@ -88,8 +88,7 @@ export class WeaponLaser {
     this.normal.copy(hit.normal);
 
     this.up.copy(camera.position).sub(this.origin);
-    // Small pixel floors keep the sub-millimetre beam/spot from disappearing
-    // under temporal AA. They affect presentation only, never the query.
+    // Size the beam and spot in part by their projected coverage under temporal AA.
     const pixelScale = (Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * 2) / height;
     this.side.crossVectors(this.direction, this.up).normalize();
     const startWidth = Math.max(0.0012, this.origin.distanceTo(camera.position) * pixelScale * 0.4);
@@ -101,8 +100,14 @@ export class WeaponLaser {
     this.corner(2, this.end, this.side, -1);
     this.corner(3, this.end, this.side, 1);
     if (hit.hit) {
-      this.end.addScaledVector(this.normal, 0.002);
-      const radius = Math.max(0.004, this.end.distanceTo(camera.position) * pixelScale * 1.5);
+      // Collision can sit slightly behind the rendered surface. Bias only the
+      // spot towards the camera along the sightline so it still projects onto the hit.
+      const distance = this.end.distanceTo(camera.position);
+      this.end.lerp(camera.position, Math.min(0.025 / distance, 0.1));
+      this.up.copy(camera.position).sub(this.end).normalize();
+      // Recover some screen coverage on sloped surfaces without a grazing-angle blowup.
+      const facing = Math.max(0.35, this.up.dot(this.normal));
+      const radius = Math.max(0.004, distance * pixelScale * (3 / Math.sqrt(facing)));
       this.up.set(0, Math.abs(this.normal.y) < 0.9 ? 1 : 0, Math.abs(this.normal.y) < 0.9 ? 0 : 1);
       this.side.crossVectors(this.normal, this.up).normalize().multiplyScalar(radius);
       this.vertical.crossVectors(this.normal, this.side).normalize().multiplyScalar(radius);
