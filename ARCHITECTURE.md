@@ -346,8 +346,9 @@ The laser changes no AI perception; the flashlight keeps separate light ownershi
 
 `tools/blender/soldiers/` builds seeded parametric soldiers; a Bun GLTFExporter cook
 preserves the runtime joint/attribute format. `tools/export-models.ts` validates and
-stages them and generates the spent hull; missing/stale/corrupt products fail rather
-than triggering Blender or a fallback. `models.getSoldier(name)` returns
+stages them; missing/stale/corrupt products fail rather than triggering Blender or a
+fallback. `tools/blender/spent_hull/` authors and validates one native spent hull GLB
+for the FX casing pool. `models.getSoldier(name)` returns
 `{ name, geometry, slots, boneNames, weapon, stats, variant }` as one skinned geometry
 with slot groups. Bone order must match `RIG.createSkeleton()`; mismatches fail boot.
 AI owns the soldier texture arrays and finish lookup textures.

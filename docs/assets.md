@@ -92,7 +92,7 @@ intel sites and explicit placement records. This is the world source—not
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Arms and bandage            | [`player_arms.py`](../tools/blender/player_arms.py), [`player_bandage.py`](../tools/blender/player_bandage.py); [asset contract](../assets/player/arms/README.md) | Follow the asset's Blender commands; review in engine  | `assets/player/arms/`, `public/models/player/`, generated poses/paths in `src/weapons/`; loaded by weapon arm/bandage adapters                                |
 | Soldiers                    | [`tools/blender/soldiers/`](../tools/blender/soldiers/); [asset contract](../assets/soldiers/README.md). Runtime RIG/registry/surfaces remain in `src/ai/`        | Explicit Blender author/cook; `bun run models` stages  | Generated `assets/soldiers/` products stage to ignored `public/models/soldiers/*.glb` + JSON; loaded by `ModelSystem` and AI                                  |
-| Spent shotgun hull          | [`tools/lib/spent-hull.ts`](../tools/lib/spent-hull.ts)                                                                                                           | `bun run models`; review in engine                     | `public/models/fx/spent12g.glb`, consumed by FX                                                                                                               |
+| Spent shotgun hull          | [`tools/blender/spent_hull/`](../tools/blender/spent_hull/); [asset contract](../assets/fx/spent-hull/README.md)                                                  | Standalone Blender build, source check and native cook | `public/models/fx/spent12g.glb`, consumed by FX                                                                                                               |
 | Procedural textures         | [`tools/export-proc-textures.ts`](../tools/export-proc-textures.ts) and its declared AI/FX inputs                                                                 | `bun tools/export-proc-textures.ts`; `bun run test`    | Generated `public/models/proc/`, consumed by AI materials and FX                                                                                              |
 | Standalone EXPS3 attachment | [`exps3.py`](../tools/blender/exps3.py), [`exps3_bake.py`](../tools/blender/exps3_bake.py); [asset contract](../assets/attachments/eotech-exps3-0/README.md)      | Asset Blender commands; `bun run models:cook -- exps3` | Native products: `assets/attachments/eotech-exps3-0/`; cooked: `public/models/attachments/exps3.runtime.glb`; shared gameplay/inspection (except on the P320) |
 
@@ -110,8 +110,8 @@ helpers in `tools/blender/can.py`. Weapon fit checks load built attachments thro
 
 Normal `bun run dev` / `bun run build` (and `bun run assets`) run
 `tools/build-assets.ts`: arms and bandage, each weapon and its cook, standalone
-attachments and soldiers in Blender, then procedural textures and soldier/hull
-staging. The Bun world generation/validation runs alongside these steps. Each
+attachments, spent hull and soldiers in Blender, then procedural textures and
+soldier staging. The Bun world generation/validation runs alongside these steps. Each
 Blender step reruns only when its declared inputs (scripts,
 authored JSON, upstream steps) change; hashes live in ignored `.cache/assets/`
 and `--force` rebuilds all. These products are ignored, not committed; weapon

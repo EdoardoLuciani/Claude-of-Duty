@@ -50,6 +50,8 @@ assets/player/arms/manifest.json
 assets/soldiers/*.blend
 assets/soldiers/*.glb
 assets/soldiers/*.json
+assets/fx/spent-hull/*.blend
+assets/fx/spent-hull/*.glb
 .cache/
 
 # Standalone ACOG packed source maps.
