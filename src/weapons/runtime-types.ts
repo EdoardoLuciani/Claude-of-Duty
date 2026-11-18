@@ -1,7 +1,7 @@
 import type * as THREE from 'three';
 
 import type { EngineContext, EngineSystems } from '../core/context.ts';
-import type { AttachmentConfig, BuildStats } from './attachments.ts';
+import type { AttachmentConfig, BuiltWeaponDef } from './attachments.ts';
 import type { loadAX338 } from './ax338.ts';
 import type { Clip } from './clips.ts';
 import type { WeaponDef, WeaponId, WeaponMode } from './defs.ts';
@@ -15,7 +15,7 @@ import type { loadP320 } from './p320.ts';
 
 export interface WeaponState {
   /** Private copy of the authored definition plus the stored build's stats. */
-  def: WeaponDef & BuildStats;
+  def: BuiltWeaponDef;
   /** The gun's one stored build; its viewmodel entry only holds the mounted instances. */
   attachments: AttachmentConfig;
   laserEnabled: boolean;

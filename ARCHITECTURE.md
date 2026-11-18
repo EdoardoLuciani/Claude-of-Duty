@@ -313,15 +313,12 @@ changes an owned, loaded weapon synchronously outside the frame loop.
 pose; ADS uses the rest-pose optic datum in the weapon frame, while the reticle
 follows the live mount. The mount commit resolves the sight datum, eye relief,
 `OpticData`, laser emitter and muzzle socket on the viewmodel entry. Separately,
-`WeaponSystem` applies `buildStats(id, config)` to the gun's private runtime
-definition and rebuilds its recoil pattern from it: `suppressed` for firing audio/FX,
-the optic's ADS FOV/sensitivity (undefined defers to player config), and the
-effective `adsTime`, `spreadHip` and `recoil`. The catalog's per-attachment handling
-multipliers combine across slots, always from the authored `WeaponDef`, so builds
-never compound, leak between guns or mutate shared definitions. Firing, spread,
-camera/viewmodel recoil and ADS timing read that definition; the viewmodel entry
-shares the same object. Attachments change no ballistic stats. `buildDef(id, config)`
-is the one effective definition: the market draws base, owned and draft stats from it.
+`buildDef(id, config)` resolves suppression, optic ADS FOV/sensitivity (undefined
+defers to player config), ADS time, hip spread and recoil from the authored `WeaponDef`.
+Attachment multipliers combine across slots without compounding or changing ballistics.
+`WeaponSystem` updates the gun's private definition in place (the viewmodel shares it)
+and rebuilds its recoil pattern. The market compares owned and draft definitions from
+the same resolver against the authored base.
 Frame-time reticle, ADS, laser and fire consumers allocate nothing.
 
 Optics define `MOUNT_base` and `SOCKET_sight`; rigid attachments define
@@ -372,8 +369,8 @@ Gain staging has one owner per stage: each recording/profile owns its authored
 level (weapon reports use only their fixed bank reference), each mixer bus owns its
 category trim and compressor, the shared reverb return and energy limiter own
 summation headroom and peak safety, and the player's master gain follows the
-limiter. A bus applies trim, player volume, the supply-tent dip and ducking once,
-post-compressor, to both its dry output and its reverb send. Buses are the
+limiter. Dry output and reverb send use the same trim, player volume, supply-tent
+dip and ducking. Only the dry path passes through the optional compressor before its gain. Buses are the
 player-facing categories: `weapons` (all firearm reports, dry fire, distant
 volleys), `explosions` (grenades, bombs, distant booms, tinnitus), `foley`
 (movement, reloads, casings, impacts, near misses), `voice`, `ambience`

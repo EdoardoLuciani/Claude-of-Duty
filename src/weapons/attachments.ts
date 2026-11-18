@@ -370,17 +370,15 @@ const HANDLING: Record<
 /** Kick magnitudes a recoil effect scales; spring, bracing and pattern shape stay authored. */
 const RECOIL_MAGNITUDES = ['pitch', 'yaw', 'kickBack', 'kickUp', 'roll', 'punch'] as const;
 
-/** Build-resolved fields of a weapon's private runtime definition; never authored.
- * Undefined ADS scales defer to the player's configured iron-sight values. */
-export interface BuildStats extends Pick<WeaponDef, 'adsTime' | 'spreadHip' | 'recoil'> {
+/** Private runtime definition. Undefined ADS scales defer to the player's iron-sight settings. */
+export interface BuiltWeaponDef extends WeaponDef {
   suppressed: boolean;
   adsFovScale: number | undefined;
   adsSensScale: number | undefined;
 }
 
-/** Stats a build gives the weapon: fire audio/FX suppression, ADS camera and handling.
- * Always resolved from the authored definition, so slots combine without compounding. */
-export function buildStats(id: WeaponId, config: AttachmentConfig): BuildStats {
+/** Resolve gameplay and preview from authored tuning, never from a previously fitted build. */
+export function buildDef(id: WeaponId, config: AttachmentConfig): BuiltWeaponDef {
   const base = WEAPON_DEFS[id];
   const optic = config.optic === null ? undefined : OPTICS[config.optic];
   let adsTime = base.adsTime;
@@ -397,6 +395,7 @@ export function buildStats(id: WeaponId, config: AttachmentConfig): BuildStats {
   const recoil = { ...base.recoil };
   for (const key of RECOIL_MAGNITUDES) recoil[key] *= recoilScale;
   return {
+    ...base,
     suppressed: config.muzzle !== null,
     adsFovScale: optic?.adsFovScale,
     adsSensScale: optic?.adsSensScale,
@@ -404,11 +403,6 @@ export function buildStats(id: WeaponId, config: AttachmentConfig): BuildStats {
     spreadHip,
     recoil,
   };
-}
-
-/** Effective definition of `id` fitted with `config`: what gameplay fires and the market shows. */
-export function buildDef(id: WeaponId, config: AttachmentConfig): WeaponDef & BuildStats {
-  return { ...WEAPON_DEFS[id], ...buildStats(id, config) };
 }
 
 /** Commit a fully staged mount atomically: instances, sockets and the ADS datum. */
