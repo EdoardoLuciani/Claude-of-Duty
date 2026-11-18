@@ -313,11 +313,16 @@ changes an owned, loaded weapon synchronously outside the frame loop.
 pose; ADS uses the rest-pose optic datum in the weapon frame, while the reticle
 follows the live mount. The mount commit resolves the sight datum, eye relief,
 `OpticData`, laser emitter and muzzle socket on the viewmodel entry. Separately,
-`WeaponSystem` applies `buildStats()` to the gun's private runtime definition:
-`suppressed` for firing audio/FX and the optic's ADS FOV/sensitivity (undefined
-defers to player config). These are never authored on `WeaponDef`, and attachments
-change no ballistic/handling stats. Frame-time reticle, ADS, laser and fire
-consumers allocate nothing.
+`WeaponSystem` applies `buildStats(id, config)` to the gun's private runtime
+definition and rebuilds its recoil pattern from it: `suppressed` for firing audio/FX,
+the optic's ADS FOV/sensitivity (undefined defers to player config), and the
+effective `adsTime`, `spreadHip` and `recoil`. The catalog's per-attachment handling
+multipliers combine across slots, always from the authored `WeaponDef`, so builds
+never compound, leak between guns or mutate shared definitions. Firing, spread,
+camera/viewmodel recoil and ADS timing read that definition; the viewmodel entry
+shares the same object. Attachments change no ballistic stats. `buildDef(id, config)`
+is the one effective definition: the market draws base, owned and draft stats from it.
+Frame-time reticle, ADS, laser and fire consumers allocate nothing.
 
 Optics define `MOUNT_base` and `SOCKET_sight`; rigid attachments define
 `SOCKET_mount` plus `SOCKET_laser` or `SOCKET_muzzle`, in metres, -Z forward,

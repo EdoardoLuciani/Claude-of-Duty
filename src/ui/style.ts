@@ -314,6 +314,17 @@ const CSS = `
 .ow-market-build select { min-width:0; width:100%; color:var(--ink); background:#171c21; border:1px solid var(--hair-2); padding:calc(var(--u) * 1.5); font:inherit; color-scheme:dark; }
 .ow-market-build-cost { text-align:right; font-family:var(--fm); }
 .ow-market-build-base { font-size:calc(10px * var(--k)); color:var(--ink-2); }
+.ow-market-stats { width:100%; border-collapse:collapse; margin:calc(var(--u) * 2) 0; font-size:calc(10px * var(--k)); color:var(--ink); }
+.ow-market-stats caption { text-align:left; color:var(--ink-2); padding-bottom:calc(var(--u) * 1); }
+.ow-market-stats th, .ow-market-stats td { padding:calc(var(--u) * .75) calc(var(--u) * 1); text-align:right; font-weight:400; white-space:nowrap; border-bottom:1px solid var(--hair-2); }
+.ow-market-stats thead th { color:var(--ink-2); }
+.ow-market-stats th:first-child { text-align:left; color:var(--ink-2); }
+.ow-market-stats tbody th { cursor:help; }
+.ow-market-stats td { font-family:var(--fm); }
+.ow-market-stats td:last-child { color:var(--amber); }
+.ow-market-stat-delta { margin-left:calc(var(--u) * 1.5); font-size:calc(9px * var(--k)); }
+.ow-market-stat-delta.better { color:var(--ok); }
+.ow-market-stat-delta.worse { color:var(--enemy); }
 .ow-market-build-warning { color:var(--amber); font-size:calc(10px * var(--k)); line-height:1.5; }
 .ow-market-build-total { display:flex; justify-content:space-between; gap:calc(var(--u) * 2); margin-top:calc(var(--u) * 2); padding-top:calc(var(--u) * 2); border-top:1px solid var(--hair-2); font-size:calc(12px * var(--k)); color:var(--amber); }
 .ow-market-build-actions { display:flex; gap:calc(var(--u) * 2); }

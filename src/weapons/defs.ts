@@ -70,7 +70,7 @@ export interface WeaponDef {
   adsCant: TuningVector;
   eyeRelief: number;
   /** Verified fits per attachment slot: a key enables that attachment on this weapon
-   * and holds its fit data. Unverified fits stay absent; no handling modifiers. */
+   * and holds its fit data. Unverified fits stay absent; handling effects are catalog data. */
   fits?: {
     optic?: Partial<Record<OpticId, { eyeRelief: number; railSlots?: number }>>;
     rail?: Partial<Record<RailId, Record<string, never>>>;
@@ -657,6 +657,11 @@ export function buildRecoilPattern(
     out[i * 2 + 1] = r.yaw * (snake * r.drift * 3.2 + bias + rng.signed() * 0.25);
   }
   return out;
+}
+
+/** Seconds between shots: the cyclic rate, or a bolt gun's manual cycle. */
+export function shotInterval(def: Pick<WeaponDef, 'boltAction' | 'boltTime' | 'rpm'>): number {
+  return def.boltAction ? (def.boltTime ?? 1.1) : 60 / def.rpm;
 }
 
 export const SPREAD_MODS = {
