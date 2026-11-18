@@ -120,18 +120,23 @@ disabled. In the focused 3D view, arrows rotate, +/- zoom and Home resets.
 Toolbar buttons also provide zoom and reset. Inspection never spends credits.
 Weapon cards open a customization draft: choose an optic, suppressor and laser from
 verified fits, then **Buy Build / Apply Changes** or **Cancel**. The preview changes
-immediately; gameplay and credits change only on confirmation. Owned weapons charge
-only for new attachments, while a new weapon also costs its base price. Removing or
-replacing an attachment discards it without a refund. Closing the market cancels the
-draft; swapped-out weapons lose their attachments and restart clears the loadout.
+immediately, along with a stats table comparing the base weapon, the owned build and
+the draft (damage, fire rate, magazine, velocity, spread, recoil and ADS time, each
+change labelled better or worse); gameplay and credits change only on confirmation.
+Owned weapons charge only for new attachments, while a new weapon also costs its base
+price. Removing or replacing an attachment discards it without a refund. Closing the
+market cancels the draft; swapped-out weapons lose their attachments and restart clears
+the loadout.
 Supplies keep their immediate **Buy** buttons. All controls support keyboard use.
 
 Every weapon starts on irons. All but the P320 accept the RMR, EXPS3, ACOG and PM II
 scope; mounting one swaps removable irons for their stowed state (M590 keeps fixed
 irons). Every weapon accepts the TOR Mini laser and a suppressor: the M4, MCX, MPX and
-EVOLYS share the SRD762Ti; P320, AX338 and M590 mount dedicated cans. Attachments change no handling or ballistic stats: a can moves the
-projectile/flash origin to its endcap and selects suppressed reports, and the laser
-draws a beam and surface dot along its emitter axis without predicting spread or drop.
+EVOLYS share the SRD762Ti; P320, AX338 and M590 mount dedicated cans. Attachments
+trade handling, never ballistics: larger optics slow ADS, a can softens recoil but slows
+ADS, and the laser tightens hip spread. A can also moves the projectile/flash origin to
+its endcap and selects suppressed reports and a smaller flash; the laser draws a beam
+and surface dot along its emitter axis without predicting spread or drop.
 **L** toggles the mounted laser per gun, independently of the **F** flashlight.
 
 For debug/capture, `attachmentOptic`, `attachmentRail` and `attachmentMuzzle` (`none`

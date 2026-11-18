@@ -70,7 +70,7 @@ export interface WeaponDef {
   adsCant: TuningVector;
   eyeRelief: number;
   /** Verified fits per attachment slot: a key enables that attachment on this weapon
-   * and holds its fit data. Unverified fits stay absent; no handling modifiers. */
+   * and holds its fit data. Unverified fits stay absent; handling effects are catalog data. */
   fits?: {
     optic?: Partial<Record<OpticId, { eyeRelief: number; railSlots?: number }>>;
     rail?: Partial<Record<RailId, Record<string, never>>>;

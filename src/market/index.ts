@@ -41,7 +41,9 @@ interface HudBuildSlot {
 }
 interface HudBuild {
   id: WeaponId;
+  /** The unconfirmed draft; `current` is the gun's stored build (base when unowned). */
   config: AttachmentConfig;
+  current: AttachmentConfig;
   owned: boolean;
   baseCost: number;
   total: number;
@@ -190,6 +192,7 @@ export class MarketSystem {
   _buildHud: HudBuild = {
     id: 'rifle',
     config: BASE_ATTACHMENTS,
+    current: BASE_ATTACHMENTS,
     owned: false,
     baseCost: 0,
     total: 0,
@@ -358,6 +361,7 @@ export class MarketSystem {
     h.config = config;
     h.owned = this.weapons.owns(id);
     const current = this.weapons.getAttachments(id);
+    h.current = current;
     h.baseCost = 0;
     if (!h.owned) for (const item of CATALOG) if (item.id === id) h.baseCost = item.cost;
     h.total = h.baseCost;

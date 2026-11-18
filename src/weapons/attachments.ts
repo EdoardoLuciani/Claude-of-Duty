@@ -11,7 +11,7 @@ import {
   type WeaponSceneMaterials,
 } from './asset-material.ts';
 import { requiredNode } from './authored-model.ts';
-import { WEAPON_DEFS, type WeaponId } from './defs.ts';
+import { WEAPON_DEFS, type WeaponDef, type WeaponId } from './defs.ts';
 import type { OpticData, WeaponEntry, WeaponModelRecord } from './runtime-types.ts';
 
 /** MIL-STD-1913 groove pitch (tools/blender/picatinny.py): one `railSlots` step. */
@@ -352,22 +352,68 @@ export function mountAttachments(
   };
 }
 
+/** Handling trade-offs each attachment multiplies into the authored weapon; an omitted
+ * field leaves that value unchanged. Optic magnification and laser/suppressor
+ * presentation live with their own data, not here. */
+const HANDLING: Record<
+  NonNullable<AttachmentConfig[keyof AttachmentConfig]>,
+  { adsTime?: number; recoil?: number; spreadHip?: number }
+> = {
+  rmr: {},
+  exps3: { adsTime: 1.04 },
+  acog: { adsTime: 1.1 },
+  scope: { adsTime: 1.18 },
+  // Can mass at the muzzle slows aiming; its gas trap softens every shot.
+  suppressor: { adsTime: 1.08, recoil: 0.88 },
+  laser: { spreadHip: 0.85 },
+};
+
 /** Build-resolved fields of a weapon's private runtime definition; never authored.
  * Undefined ADS scales defer to the player's configured iron-sight values. */
-export interface BuildStats {
+export interface BuildStats extends Pick<WeaponDef, 'adsTime' | 'spreadHip' | 'recoil'> {
   suppressed: boolean;
   adsFovScale: number | undefined;
   adsSensScale: number | undefined;
 }
 
-/** Stats a build gives the weapon's fire events (audio/FX suppression) and ADS camera. */
-export function buildStats(config: AttachmentConfig): BuildStats {
+/** Stats a build gives the weapon: fire audio/FX suppression, ADS camera and handling.
+ * Always resolved from the authored definition, so slots combine without compounding. */
+export function buildStats(id: WeaponId, config: AttachmentConfig): BuildStats {
+  const base = WEAPON_DEFS[id];
   const optic = config.optic === null ? undefined : OPTICS[config.optic];
+  let adsTime = base.adsTime;
+  let spreadHip = base.spreadHip;
+  let recoil = 1;
+  for (const slot of SLOTS) {
+    const attachment = config[slot];
+    if (attachment === null) continue;
+    const effect = HANDLING[attachment];
+    adsTime *= effect.adsTime ?? 1;
+    spreadHip *= effect.spreadHip ?? 1;
+    recoil *= effect.recoil ?? 1;
+  }
+  const r = base.recoil;
   return {
     suppressed: config.muzzle !== null,
     adsFovScale: optic?.adsFovScale,
     adsSensScale: optic?.adsSensScale,
+    adsTime,
+    spreadHip,
+    recoil: {
+      ...r,
+      pitch: r.pitch * recoil,
+      yaw: r.yaw * recoil,
+      kickBack: r.kickBack * recoil,
+      kickUp: r.kickUp * recoil,
+      roll: r.roll * recoil,
+      punch: r.punch * recoil,
+    },
   };
+}
+
+/** Effective definition of `id` fitted with `config`: what gameplay fires and the market shows. */
+export function buildDef(id: WeaponId, config: AttachmentConfig): WeaponDef & BuildStats {
+  return { ...WEAPON_DEFS[id], ...buildStats(id, config) };
 }
 
 /** Commit a fully staged mount atomically: instances, sockets and the ADS datum. */

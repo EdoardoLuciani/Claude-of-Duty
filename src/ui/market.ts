@@ -5,6 +5,7 @@ import { isAttachmentConfig, SLOTS } from '../weapons/attachments.ts';
 import { isWeaponId } from '../weapons/defs.ts';
 import { marketIcon } from './market-icons.ts';
 import { MarketInspection } from './market-inspection.ts';
+import { MarketStats } from './market-stats.ts';
 import { el, setText, setStyle, setClass } from './util.ts';
 
 type MarketItem = ReturnType<MarketSystem['getHudState']>['items'][number];
@@ -52,6 +53,7 @@ export class MarketOverlay {
   inspection: MarketInspection;
   buildPanel: HTMLElement;
   buildControls: BuildControl[] = [];
+  stats: MarketStats;
   baseCost: HTMLElement;
   buildTotal: HTMLElement;
   buildStatus: HTMLElement;
@@ -125,8 +127,10 @@ export class MarketOverlay {
       'p',
       'ow-market-inspect-help',
       this.buildPanel,
-      'Optics replace removable iron sights. Laser and suppressor add no handling or damage bonuses.'
+      'Optics replace removable irons and magnify the aimed view. The suppressor quiets ' +
+        'shots and shrinks the muzzle flash; the laser beam does not predict spread or drop.'
     );
+    this.stats = new MarketStats(this.buildPanel);
     this.baseCost = el('div', 'ow-market-build-base', this.buildPanel);
     this.discardWarning = el('p', 'ow-market-build-warning', this.buildPanel);
     const total = el('div', 'ow-market-build-total', this.buildPanel);
@@ -307,6 +311,7 @@ export class MarketOverlay {
     const build = state.build;
     this.buildPanel.hidden = !build;
     if (!build) return;
+    this.stats.update(build.id, build.current, build.config, build.owned);
     let discarded = '';
     for (let i = 0; i < this.buildControls.length; i++) {
       // Controls and quote lines share SLOTS order.

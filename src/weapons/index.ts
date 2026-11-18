@@ -9,6 +9,7 @@ import { AmmoPickups } from './ammo-pickups.ts';
 import { disposeWeaponLoader } from './asset-loader.ts';
 import {
   BASE_ATTACHMENTS,
+  buildDef,
   buildStats,
   configureWeaponAttachments,
   REPLACED_SLOTS,
@@ -386,7 +387,7 @@ export class WeaponSystem {
   }
 
   _makeState(id: WeaponId): WeaponState {
-    const def = { ...WEAPON_DEFS[id], ...buildStats(BASE_ATTACHMENTS) };
+    const def = buildDef(id, BASE_ATTACHMENTS);
     return {
       def,
       attachments: BASE_ATTACHMENTS,
@@ -464,10 +465,12 @@ export class WeaponSystem {
     return true;
   }
 
-  /** The stored build and the stats it gives the gun's private definition change together. */
+  /** The stored build, the stats it gives the gun's private definition and the recoil
+   * pattern scaled from them change together. */
   _storeBuild(state: WeaponState, attachments: AttachmentConfig): void {
     state.attachments = attachments;
-    Object.assign(state.def, buildStats(attachments));
+    Object.assign(state.def, buildStats(state.def.id, attachments));
+    state.pattern = buildRecoilPattern(state.def, Rng);
   }
 
   /** Attachments belong to the gun: dropping it or restarting returns the base build. */
