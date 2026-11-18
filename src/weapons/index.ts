@@ -10,7 +10,6 @@ import { disposeWeaponLoader } from './asset-loader.ts';
 import {
   BASE_ATTACHMENTS,
   buildDef,
-  buildStats,
   configureWeaponAttachments,
   REPLACED_SLOTS,
   replacedNodes,
@@ -470,7 +469,7 @@ export class WeaponSystem {
    * pattern scaled from them change together. */
   _storeBuild(state: WeaponState, attachments: AttachmentConfig): void {
     state.attachments = attachments;
-    Object.assign(state.def, buildStats(state.def.id, attachments));
+    Object.assign(state.def, buildDef(state.def.id, attachments));
     state.pattern = buildRecoilPattern(state.def, Rng);
   }
 

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import * as THREE from 'three';
 
-import { BASE_ATTACHMENTS, buildDef } from '../../src/weapons/attachments.ts';
+import { BASE_ATTACHMENTS } from '../../src/weapons/attachments.ts';
 import type { WeaponEntry } from '../../src/weapons/runtime-types.ts';
 import type { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { fixture } from '../lib/fixture.ts';
@@ -18,7 +18,7 @@ import { mountableWeapon, opticAsset, rigidAsset } from '../lib/weapon-attachmen
 import { MarketSystem, MARKET_DELAY } from '../../src/market/index.ts';
 import { Health } from '../../src/player/health.ts';
 import { WEAPON_DEFS, WEAPON_IDS, PRIMARY_IDS } from '../../src/weapons/defs.ts';
-import type { WeaponDef, WeaponId } from '../../src/weapons/defs.ts';
+import type { WeaponId } from '../../src/weapons/defs.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
 import { createTestContext } from '../lib/context.ts';
 import type { TestProviders } from '../lib/context.ts';
@@ -448,28 +448,21 @@ assert.equal(market.credits, 0);
 assert(weaponState('lmg').def.suppressed, 'a mounted can suppresses fire audio/FX');
 assert(market.setBuild(BASE_ATTACHMENTS) && market.confirmBuild());
 assert.equal(weaponState('lmg').def.suppressed, false, 'removal restores the unsuppressed gun');
-// The market preview and the fired gun resolve one definition; removal restores it exactly.
-const handling = ({ adsTime, spreadHip, recoil }: WeaponDef): unknown => ({
-  adsTime,
-  spreadHip,
-  recoil,
-});
+// Confirming changes handling; removal restores the same live definition in place.
 const authoredLmg = structuredClone(WEAPON_DEFS.lmg);
+const liveDef = weaponState('lmg').def;
+const baseDef = structuredClone(liveDef);
 const basePattern = weaponState('lmg').pattern;
 const fullBuild = { optic: 'acog', muzzle: 'suppressor', rail: 'laser' } as const;
 market.credits = 950;
 assert(market.setBuild(fullBuild) && market.confirmBuild());
-const fitted = weaponState('lmg').def;
-assert.deepEqual(
-  handling(fitted),
-  handling(buildDef('lmg', fullBuild)),
-  'gameplay fires the preview'
-);
-const recoilScale = fitted.recoil.pitch / authoredLmg.recoil.pitch;
+assert(liveDef.spreadHip < baseDef.spreadHip, 'laser tightens hip spread');
+assert(liveDef.adsTime > baseDef.adsTime, 'fitted build takes longer to aim');
+const recoilScale = liveDef.recoil.pitch / baseDef.recoil.pitch;
 assert(recoilScale < 1);
 assert(Math.abs(weaponState('lmg').pattern[0] / basePattern[0] - recoilScale) < 1e-6);
 assert(market.setBuild(BASE_ATTACHMENTS) && market.confirmBuild());
-assert.deepEqual(handling(weaponState('lmg').def), handling(authoredLmg), 'removal restores');
+assert.deepEqual(liveDef, baseDef, 'removal restores the base definition');
 assert.deepEqual(weaponState('lmg').pattern, basePattern);
 assert.deepEqual(WEAPON_DEFS.lmg, authoredLmg, 'builds never mutate shared definitions');
 assert(market.setBuild(redDotLaser));

@@ -1,7 +1,7 @@
 /** Voices feed category buses, world dry/reverb sums, hearing gain, then master limiting/volume.
  * UI, music and tinnitus bypass hearing muffling. Reverb sends are per voice with five blended
- * spaces. Each bus level is authored trim x user volume x shop dip x duck, applied post-compressor
- * to dry and wet alike, so compressor drive never depends on player settings.
+ * spaces. Dry and wet gains share trim x user volume x shop dip x duck. Only the dry path runs
+ * through the optional compressor, before that gain.
  */
 
 import { hasOwn } from '../core/guards.ts';

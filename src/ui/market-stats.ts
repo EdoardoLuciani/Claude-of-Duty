@@ -1,9 +1,9 @@
 import { DEG } from '../core/math.ts';
-import { BASE_ATTACHMENTS, buildDef, type AttachmentConfig } from '../weapons/attachments.ts';
-import { shotInterval, type WeaponId } from '../weapons/defs.ts';
+import { buildDef, type AttachmentConfig } from '../weapons/attachments.ts';
+import { shotInterval, WEAPON_DEFS, type WeaponDef, type WeaponId } from '../weapons/defs.ts';
 import { el, setClass, setText } from './util.ts';
 
-type EffectiveDef = ReturnType<typeof buildDef>;
+const degrees = (v: number): string => `${v.toFixed(2)}°`;
 
 /** Rows read the same effective definition gameplay fires. `better` is the direction
  * that helps the player; 0 marks a trade-off with no universal direction. */
@@ -11,8 +11,8 @@ const ROWS: ReadonlyArray<{
   label: string;
   title: string;
   better: -1 | 0 | 1;
-  value(def: EffectiveDef): number;
-  format(value: number, def: EffectiveDef): string;
+  value(def: WeaponDef): number;
+  format(value: number, def: WeaponDef): string;
 }> = [
   {
     label: 'Damage',
@@ -43,25 +43,25 @@ const ROWS: ReadonlyArray<{
     format: (v): string => `${v} m/s`,
   },
   {
-    label: 'Hip spread',
-    title: 'Random cone radius from the hip at rest, before stance and movement modifiers.',
+    label: 'Base hip spread',
+    title: 'Random hip-fire cone radius before stance, movement and firing modifiers.',
     better: -1,
     value: (def): number => def.spreadHip,
-    format: (v): string => `${v.toFixed(2)}°`,
+    format: degrees,
   },
   {
-    label: 'ADS spread',
-    title: 'Random cone radius aimed at rest, before stance and movement modifiers.',
+    label: 'Base ADS spread',
+    title: 'Random aimed cone radius before stance, movement and firing modifiers.',
     better: -1,
     value: (def): number => def.spreadAds,
-    format: (v): string => `${v.toFixed(2)}°`,
+    format: degrees,
   },
   {
-    label: 'Recoil',
-    title: 'Average sightline climb per shot before ADS/crouch bracing; first shots climb more.',
+    label: 'Base recoil',
+    title: 'Vertical sightline kick before the shot pattern and stance modifiers.',
     better: -1,
     value: (def): number => def.recoil.pitch / DEG,
-    format: (v): string => `${v.toFixed(2)}°`,
+    format: degrees,
   },
   {
     label: 'ADS time',
@@ -128,7 +128,7 @@ export class MarketStats {
     this._current = current;
     this._config = config;
     this._owned = owned;
-    const base = buildDef(id, BASE_ATTACHMENTS);
+    const base = WEAPON_DEFS[id];
     const stored = buildDef(id, current);
     const draft = buildDef(id, config);
     setText(this.caption, owned ? 'Draft change vs owned build' : 'Draft change vs base weapon');
