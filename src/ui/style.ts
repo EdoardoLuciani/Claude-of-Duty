@@ -318,7 +318,8 @@ const CSS = `
 .ow-market-stats caption { text-align:left; color:var(--ink-2); padding-bottom:calc(var(--u) * 1); }
 .ow-market-stats th, .ow-market-stats td { padding:calc(var(--u) * .75) calc(var(--u) * 1); text-align:right; font-weight:400; white-space:nowrap; border-bottom:1px solid var(--hair-2); }
 .ow-market-stats thead th { color:var(--ink-2); }
-.ow-market-stats th:first-child { text-align:left; color:var(--ink-2); cursor:help; }
+.ow-market-stats th:first-child { text-align:left; color:var(--ink-2); }
+.ow-market-stats tbody th { cursor:help; }
 .ow-market-stats td { font-family:var(--fm); }
 .ow-market-stats td:last-child { color:var(--amber); }
 .ow-market-stat-delta { margin-left:calc(var(--u) * 1.5); font-size:calc(9px * var(--k)); }

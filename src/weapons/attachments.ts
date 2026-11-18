@@ -367,6 +367,8 @@ const HANDLING: Record<
   suppressor: { adsTime: 1.08, recoil: 0.88 },
   laser: { spreadHip: 0.85 },
 };
+/** Kick magnitudes a recoil effect scales; spring, bracing and pattern shape stay authored. */
+const RECOIL_MAGNITUDES = ['pitch', 'yaw', 'kickBack', 'kickUp', 'roll', 'punch'] as const;
 
 /** Build-resolved fields of a weapon's private runtime definition; never authored.
  * Undefined ADS scales defer to the player's configured iron-sight values. */
@@ -392,10 +394,8 @@ export function buildStats(id: WeaponId, config: AttachmentConfig): BuildStats {
     spreadHip *= effect.spreadHip ?? 1;
     recoilScale *= effect.recoil ?? 1;
   }
-  // Scale the kick's magnitudes; its spring, bracing and pattern shape stay authored.
   const recoil = { ...base.recoil };
-  for (const key of ['pitch', 'yaw', 'kickBack', 'kickUp', 'roll', 'punch'] as const)
-    recoil[key] *= recoilScale;
+  for (const key of RECOIL_MAGNITUDES) recoil[key] *= recoilScale;
   return {
     suppressed: config.muzzle !== null,
     adsFovScale: optic?.adsFovScale,
