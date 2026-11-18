@@ -55,7 +55,8 @@ function holdHearingParam(param: AudioParam, time: number): void {
 const CONCUSSION_CUTOFF_RATIO = 0.075; // full concussion bottoms out at 1.5 kHz
 
 /** One authored level per category. `shop` dips the field while the supply
- * tent is open; `direct` adds a post-muffle output following the same level. */
+ * tent is open; `direct` adds a post-muffle output following the same level;
+ * `postMuffle` routes the whole bus past hearing muffling. */
 const BUS_DEFS = {
   // The only authored weapon-level control. Sources have no separate profile
   // trim; shared summation headroom and output safety remain downstream.
@@ -78,8 +79,9 @@ const BUS_DEFS = {
     comp: { threshold: -24, knee: 12, ratio: 2.0, attack: 0.05, release: 0.5 },
   },
   // Cues and the shop bed support the action rather than matching gunfire.
-  ui: { trim: 0.45, comp: null },
-  music: { trim: 0.6, comp: null },
+  // Post-muffle so HUD ticks and the shop radio survive a grenade.
+  ui: { trim: 0.45, postMuffle: true, comp: null },
+  music: { trim: 0.6, postMuffle: true, comp: null },
 };
 export const BUS_NAMES = Object.keys(BUS_DEFS).filter((name): name is BusName =>
   hasOwn(BUS_DEFS, name)
@@ -199,10 +201,9 @@ export class Mixer {
         comp.release.value = def.comp.release;
         comp.connect(level);
       }
-      // ui/music bypass the muffle so HUD ticks and the shop radio survive a grenade.
       // Keep category volume/balance out of the compressor detector. Ducking
       // now controls the audible post-compressor level too, not its drive.
-      level.connect(name === 'ui' || name === 'music' ? this.masterSum : this.worldSum);
+      level.connect('postMuffle' in def ? this.masterSum : this.worldSum);
       return {
         input: comp ?? level,
         level,
@@ -415,7 +416,7 @@ export class Mixer {
     lfo.connect(lfoG);
     lfoG.connect(o2.frequency);
     // Blast ringing belongs to Explosions, post-muffle on purpose.
-    g.connect(this.buses.explosions.direct ?? this.masterSum);
+    g.connect(this.buses.explosions.direct!);
     o1.start(t);
     o2.start(t);
     o3.start(t);

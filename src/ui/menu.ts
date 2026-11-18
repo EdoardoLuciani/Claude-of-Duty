@@ -1,7 +1,6 @@
-import type { VolumeKey } from '../audio/settings.ts';
+import { VOLUME_KEYS, type VolumeKey } from '../audio/settings.ts';
 import { bindingLabel } from '../core/bindings.ts';
 import type { EngineContext } from '../core/context.ts';
-import { hasOwn } from '../core/guards.ts';
 import { clamp, damp } from '../core/math.ts';
 import { CONTROL_SECTIONS } from './controls.ts';
 import { el, setText, setStyle, ease } from './util.ts';
@@ -94,9 +93,9 @@ export class PauseMenu {
       if (!step) return;
       event.preventDefault();
       const index = this.tabs.findIndex((tab): boolean => tab === event.target);
-      const next = TABS[(index + step + TABS.length) % TABS.length];
-      this.selectTab(next);
-      this.tabs[TABS.indexOf(next)].focus();
+      const next = (index + step + TABS.length) % TABS.length;
+      this.selectTab(TABS[next]);
+      this.tabs[next].focus();
     });
 
     this.resumeBtn = el('button', 'ow-btn primary', rail, 'Resume');
@@ -161,8 +160,7 @@ export class PauseMenu {
       audio,
       '100% is the designed mix. 50% sounds about half as loud. 0% is muted.'
     );
-    for (const key of Object.keys(VOLUME_ROWS)) {
-      if (!hasOwn(VOLUME_ROWS, key)) continue;
+    for (const key of VOLUME_KEYS) {
       const [label, detail] = VOLUME_ROWS[key];
       const slider = this._slider(
         audio,
