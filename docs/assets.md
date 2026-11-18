@@ -88,6 +88,12 @@ intel sites and explicit placement records. This is the world source—not
 
 ## Other model and texture families
 
+The [Al-Maktaba intel case](../assets/props/intel-case/README.md) is authored in
+[`tools/blender/intel_case/`](../tools/blender/intel_case/) and cooked with
+`bun run models:cook -- intel_case`. The recipe is independent of weapons, arms
+and level compilation; [`src/intel/prop.ts`](../src/intel/prop.ts) consumes the
+named hinge, emissive meshes and effect socket, not the editable scene.
+
 | Family                      | Authoritative editing location                                                                                                                                    | Regenerate / validate                                  | Products and consumers                                                                                                                                        |
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Arms and bandage            | [`player_arms.py`](../tools/blender/player_arms.py), [`player_bandage.py`](../tools/blender/player_bandage.py); [asset contract](../assets/player/arms/README.md) | Follow the asset's Blender commands; review in engine  | `assets/player/arms/`, `public/models/player/`, generated poses/paths in `src/weapons/`; loaded by weapon arm/bandage adapters                                |
@@ -110,7 +116,7 @@ helpers in `tools/blender/can.py`. Weapon fit checks load built attachments thro
 
 Normal `bun run dev` / `bun run build` (and `bun run assets`) run
 `tools/build-assets.ts`: arms and bandage, each weapon and its cook, standalone
-attachments and soldiers in Blender, then procedural textures and soldier/hull
+attachments, the intel case and soldiers in Blender, then procedural textures and soldier/hull
 staging. The Bun world generation/validation runs alongside these steps. Each
 Blender step reruns only when its declared inputs (scripts,
 authored JSON, upstream steps) change; hashes live in ignored `.cache/assets/`

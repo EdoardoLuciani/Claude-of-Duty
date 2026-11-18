@@ -6,7 +6,7 @@
  *
  * Player arms run first, then the bandage, which re-saves player-arms.blend.
  * Every weapon loads that blend, so arm changes rebuild all weapons. Then weapons,
- * independent attachments and soldiers share one bounded pool. The Bun stages
+ * independent attachments, the intel case and soldiers share a bounded pool. The Bun stages
  * (procedural textures, soldier/spent-hull staging, world generation) keep their own caches.
  *
  * Input hashes live in .cache/assets/, outside node_modules so `bun ci` keeps them.
@@ -33,10 +33,10 @@ import { fileURLToPath } from 'node:url';
 import { REVISION } from 'three';
 
 import {
-  GLTFPACK_FLAGS,
   GLTFPACK_VERSION,
   MODEL_COOKS,
   isModelId,
+  modelCookBaseFlags,
   type ModelId,
 } from '../build/models.ts';
 
@@ -116,6 +116,7 @@ const SHARED_TOOLS: Partial<Record<ModelId, string[]>> = {
   mpx: ['tools/blender/review_hands.py', 'tools/blender/hand-reference.ts'],
 };
 const STANDALONE_TOOLS: Partial<Record<ModelId, string[]>> = {
+  intel_case: ['tools/blender/intel_case'],
   srd762ti: ['tools/blender/suppressor', 'tools/blender/can.py'],
   suppressor9mm: ['tools/blender/suppressor9mm', 'tools/blender/can.py'],
   suppressor338: ['tools/blender/suppressor338', 'tools/blender/can.py'],
@@ -139,9 +140,13 @@ function cookStep(id: ModelId, salt: string[]): AssetStep {
   const tools = STANDALONE_TOOLS[id] ?? [`tools/blender/${id}`, ...(SHARED_TOOLS[id] ?? [])];
   return {
     id,
-    inputs: [...tools, 'tools/blender/picatinny.py', ...authoredJson(directory)],
+    inputs: [
+      ...tools,
+      ...(id === 'intel_case' ? [] : ['tools/blender/picatinny.py']),
+      ...authoredJson(directory),
+    ],
     // Only this model's cook settings, so one profile edit rebuilds one model.
-    salt: [...salt, JSON.stringify(MODEL_COOKS[id]), ...GLTFPACK_FLAGS, GLTFPACK_VERSION],
+    salt: [...salt, JSON.stringify(MODEL_COOKS[id]), ...modelCookBaseFlags(id), GLTFPACK_VERSION],
     // The editable .blend is used by authoring and attachment-fit checks.
     outputs: [
       `${directory}/${source}`,

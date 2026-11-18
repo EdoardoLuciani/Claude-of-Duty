@@ -242,7 +242,10 @@ and runtime consumers. Each weapon's authoring lives in `tools/blender/<weapon>/
 
 `build/models.ts` owns gltfpack runtime cooking and per-model profiles
 (`bun run models:cook`); `tools/build-assets.ts` rebuilds stale models during
-dev/build. New profiles need adapter, animation and visual validation.
+dev/build. New profiles need adapter, animation and visual validation. The
+[intel case](assets/props/intel-case/README.md) has a standalone Blender recipe;
+IntelSystem loads and owns one shared GLB kit, moves its named hinge, pulses the
+beacon and emits sparks at the effect socket during the pooled interaction.
 All seven weapons (M4, MCX, P320, EVOLYS, MPX, AX338, M590) use generated GLBs with
 weapon-owned adapters in `src/weapons/`. M4/MCX adapters decode packed finish
 metadata. Rigid assemblies use ordinary meshes (EVOLYS skins only its belt); keep
