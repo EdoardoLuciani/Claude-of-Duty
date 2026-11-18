@@ -46,7 +46,7 @@ def build_geometry(materials):
     spare = empty('magazine_spare', parent=rig)
     bolt = empty('bolt', parent=rig)
     handle = empty('charging_handle', parent=rig)
-    trigger = empty('trigger', (-.071, 0, -.034), rig)
+    trigger = empty('trigger', (-.065, 0, -.034), rig)
     cover = empty('dust_cover', (-.02, -.027, -.022), rig)
     stock = empty('stock_hinge', (-.183, .016, .007), rig)
     case = empty('spent_case', parent=rig)
@@ -54,6 +54,8 @@ def build_geometry(materials):
     irons = empty('IRON_sights', parent=body)
     folded = empty('IRON_sights_removed', parent=body)
     muzzle = empty('MUZZLE_device', parent=body)
+    # Barrel, muzzle device and muzzle datums share this bore axis.
+    bore = .009
 
     active, finish, box, profile, loft, forging, cylinder, ellipsoid, cut, opening, tube, cord, screw, text = create_primitives(asset, body, materials)
 
@@ -62,7 +64,12 @@ def build_geometry(materials):
         # Unpublished contours remain photo-inferred, not manufacturing dimensions.
         upper = forging('VIRTUS upper forging', [(-.178,-.008,.020,.019),
             (-.166,-.009,.034,.026),(-.146,-.010,.037,.0245),
-            (.037,-.008,.037,.0245),(.052,-.008,.024,.0245)])
+            (.037,-.008,.037,.0245),(.078,-.008,.034,.0245)])
+        # The nose meets the guard's diagonal rear shoulder at every height;
+        # a square extension would leave a raised ledge across that seam.
+        for vertex in upper.data.vertices:
+            if vertex.co.x > .077:
+                vertex.co.x = .045 + .033*max(0,min(1,(vertex.co.z-.010)/.024))
         opening(upper, (-.006,-.022,.013), (.085,.024,.020), .0035)
         box('Port interior shadow', (-.006,.001,.013), (.089,.008,.021), rubber)
         for side in (-1,1):
@@ -82,22 +89,24 @@ def build_geometry(materials):
         cylinder('Forward assist button', (-.110,-.030,.013), .0075, .006, steel)
         for z in (.010,.013,.016): box('Forward assist serration',(-.1135,-.030,z),(.0006,.011,.0007),polymer,bevel=.0001)
         # Lower shoulders, rounded rear grip transition and narrower magazine well.
-        forging('Ambidextrous lower receiver', [(-.169,-.020,-.006,.019),
-            (-.150,-.032,-.008,.021),(-.125,-.042,-.009,.021),
-            (-.093,-.042,-.009,.021),(-.075,-.040,-.009,.021),
-            (-.035,-.042,-.008,.021),(.037,-.044,-.007,.022)])
-        magwell = profile('Flared magazine well', [(-.035,-.017),(.037,-.011),
-            (.037,-.058),(.039,-.061),(-.031,-.075),(-.035,-.072)], .050, coating, bevel=.003, rounded=True)
-        opening(magwell, (.003,0,-.065), (.061,.029,.040), .002)
-        profile('Magazine well lip', [(-.032,-.071),(.037,-.057),(.041,-.062),(-.033,-.078)], .053, coating, bevel=.001)
-        guard = profile('Sculpted trigger guard', [(-.095,-.041),(-.031,-.040),
-            (-.034,-.065),(-.045,-.075),(-.051,-.078),(-.069,-.079),
-            (-.087,-.073),(-.098,-.065)], .015, coating, bevel=.002, rounded=True)
-        opening(guard, (-.065,0,-.056), (.056,.030,.034), .013)
+        forging('Ambidextrous lower receiver', [(-.178,-.012,-.004,.018),
+            (-.165,-.024,-.005,.0195),(-.148,-.033,-.007,.021),(-.125,-.044,-.008,.021),
+            (-.093,-.046,-.009,.021),(-.075,-.046,-.009,.021),
+            (-.035,-.044,-.008,.021),(.037,-.044,-.007,.022)])
+        magwell = profile('Flared magazine well', [(-.041,-.016),(.036,-.011),
+            (.036,-.056),(.038,-.061),(-.035,-.072),(-.040,-.069)], .050, coating, bevel=.003, rounded=True)
+        lip = profile('Magazine well lip', [(-.035,-.067),(.036,-.055),(.039,-.061),(-.037,-.075)], .053, coating, bevel=.001)
+        for part in (magwell, lip):
+            opening(part, (.0005,0,-.055), (.067,.029,.070), .002)
+        # Carry the lower band into the front attachment with a rounded shoulder.
+        guard = profile('Sculpted trigger guard', [(-.097,-.040),(-.031,-.040),
+            (-.034,-.064),(-.037,-.071),(-.046,-.078),(-.056,-.081),(-.067,-.082),
+            (-.082,-.076),(-.091,-.067),(-.098,-.061)], .015, coating, bevel=.0017, rounded=True)
+        opening(guard, (-.063,0,-.056), (.048,.030,.042), .014)
         # A continuous, rounded blade, with its head embedded in the receiver.
         # Offset a sampled Bezier centreline instead of beveling a six-corner polygon.
         # The finger-facing concavity opens toward the muzzle (+X), not the grip.
-        control = [Vector(p) for p in [(-.072,-.035),(-.086,-.050),(-.087,-.060),(-.074,-.068)]]
+        control = [Vector(p) for p in [(-.066,-.035),(-.079,-.050),(-.080,-.060),(-.067,-.068)]]
         front, back_edge = [], []
         for i in range(25):
             t = i/24; u = 1-t
@@ -106,7 +115,7 @@ def build_geometry(materials):
             normal = Vector((-tangent.y, tangent.x)).normalized() * .0021
             front.append(tuple(centre+normal)); back_edge.append(tuple(centre-normal))
         profile('Curved trigger blade', front + back_edge[::-1], .007, steel, trigger, .0007)
-        cylinder('Trigger axle', (-.071,0,-.034), .0035, .012, steel, 'Y', trigger)
+        cylinder('Trigger axle', (-.065,0,-.034), .0035, .012, steel, 'Y', trigger)
         for side in (-1,1):
             screw(-.123,side*.021,-.018,.0031)
             screw(-.074,side*.021,-.032,.0021)
@@ -126,11 +135,11 @@ def build_geometry(materials):
         box('Bolt release paddle', (-.057,.024,-.031), (.011,.005,.016), steel, release, .0015)
         # Molded grip: a narrow web expands into a rounded-rectangle palm section.
         # Side-view station coordinates are photo-inferred, not a scanned grip.
-        grip_sections = [(-.026,-.149,-.126,.012),(-.035,-.142,-.103,.013),
-            (-.043,-.136,-.096,.0135),(-.051,-.134,-.096,.014),
-            (-.060,-.139,-.096,.0145),(-.075,-.147,-.101,.016),
-            (-.085,-.152,-.109,.017),(-.110,-.163,-.116,.017),
-            (-.129,-.170,-.122,.017),(-.139,-.174,-.126,.0165)]
+        grip_sections = [(-.025,-.160,-.125,.012),(-.035,-.151,-.103,.013),
+            (-.047,-.141,-.091,.0135),(-.057,-.139,-.089,.014),
+            (-.070,-.144,-.093,.0145),(-.082,-.153,-.103,.016),
+            (-.096,-.158,-.108,.017),(-.112,-.164,-.112,.017),
+            (-.130,-.168,-.116,.017),(-.139,-.169,-.119,.0165)]
         rings = []
         for j,(z,back,front,w) in enumerate(grip_sections):
             r = .005; ring = []
@@ -139,27 +148,31 @@ def build_geometry(materials):
                 for i in range(5):
                     a = math.radians(start+i*22.5)
                     x = cx+r*math.cos(a); y = cy+r*math.sin(a)
-                    heel = -.32*(x-(back+front)/2) if j == len(grip_sections)-1 else 0
+                    heel = -.36*(x-(back+front)/2) if j == len(grip_sections)-1 else 0
                     ring.append((x,y,z+heel))
             rings.append(ring)
         grip = loft('Ergonomic pistol grip', rings, polymer, bevel=.0007)
         for side in (-1,1):
-            panel = [(-.138,-.075),(-.108,-.081),(-.130,-.136),(-.162,-.126),(-.149,-.090)]
+            panel = [(-.138,-.075),(-.105,-.081),(-.123,-.138),(-.162,-.128),(-.149,-.090)]
             cut(grip,profile('CUT',panel,.0024,None,None,.001,y=side*.0172))
             profile('Grip inset stipple panel',panel,.0004,rubber,bevel=.0005,y=side*.0162)
             text('SIG SAUER',(-.127 if side==-1 else -.105,side*.0145,-.058),.0033,side,mat=polymer)
         for i in range(11):
-            z=-.081-i*.0047; x=-.106-i*.00195
+            z=-.083-i*.0047; x=-.103-i*.00165
             box('Grip front traction rib',(x,0,z),(.0012,.024,.0010),rubber,bevel=.0003)
-        profile('Grip floor plate',[(-.173,-.130),(-.126,-.144),(-.125,-.147),(-.175,-.133)],.034,rubber,bevel=.0008)
+        profile('Grip floor plate',[(-.169,-.130),(-.119,-.145),(-.118,-.148),(-.170,-.133)],.034,rubber,bevel=.0008)
 
     def build_handguard():
         # Handguard is a hollow octagonal extrusion, not black decals on a box.
         # Build the shell along X from octagonal Y/Z rings.
         # 8-inch PDW exterior, including its rear receiver overlap. Width/section are
         # inferred from photographs; 203.2 mm is the catalog's nominal length.
-        ring = [(-.015,.034),(.015,.034),(.026,.019),(.026,-.019),(.017,-.033),(-.017,-.033),(-.026,-.019),(-.026,.019)]
-        verts = [(x,y,z) for x in (.045,.2482) for y,z in ring]
+        # Side-photo registration uses rail pitch, not an independent height
+        # stretch. The lower edge sits just below the bore; the rear upper
+        # shoulder runs diagonally into the receiver instead of a square cuff.
+        ring = [(-.015,.034),(.015,.034),(.026,.019),(.026,-.007),(.017,-.019),(-.017,-.019),(-.026,-.007),(-.026,.019)]
+        rear = [.077,.077,.052,.045,.045,.045,.045,.052]
+        verts = [(x,y,z) for x,(y,z) in zip(rear,ring)] + [(.2482,y,z) for y,z in ring]
         faces = [(i,(i+1)%8,(i+1)%8+8,i+8) for i in range(8)]
         mesh = bpy.data.meshes.new('Handguard shell'); mesh.from_pydata(verts,[],faces);mesh.update()
         obj = bpy.data.objects.new('Hollow octagonal VIRTUS handguard',mesh);asset.objects.link(obj)
@@ -169,22 +182,22 @@ def build_geometry(materials):
         handguard = finish(obj,obj.name,coating,bevel=.0008)
         # Four side M-LOK lands: a short rear land followed by three full slots.
         for x,length in [(.095,.012),(.126,.032),(.169,.032),(.212,.032)]:
-            opening(handguard,(x,0,-.006),(length,.072,.009),.003)
+            opening(handguard,(x,0,.008),(length,.072,.009),.003)
         # Nonuniform upper vents and the distinctive diagonal lower openings.
         for points in [[(.086,.017),(.092,.024),(.108,.024),(.102,.017)],[(.111,.017),(.117,.024),(.133,.024),(.127,.017)],[(.157,.025),(.168,.033),(.191,.033),(.187,.023),(.163,.023)],[(.207,.020),(.210,.030),(.239,.030),(.239,.020)]]:
             cut(handguard,profile('CUT',points,.072,None,None,.001))
         for x in (.096,.125,.154,.183,.212,.238):
-            cut(handguard,profile('CUT',[(x-.014,-.017),(x-.005,-.017),(x+.009,-.030),(x-.005,-.030)],.072,None,None,.0015))
+            cut(handguard,profile('CUT',[(x-.014,-.006),(x-.005,-.006),(x+.009,-.017),(x-.005,-.017)],.072,None,None,.0015))
         for x in (.100,.140,.180,.220):
-            opening(handguard,(x,0,-.032),(.028,.014,.018),.002)
+            opening(handguard,(x,0,-.018),(.028,.014,.018),.002)
         for side in (-1,1):
-            tube_obj = cylinder('QD sling socket',(.067,side*.027,-.004),.0065,.003,steel,'Y')
-            cut(tube_obj,cylinder('CUT',(.067,side*.027,-.004),.0044,.008,None,'Y',None,24,0))
+            tube_obj = cylinder('QD sling socket',(.067,side*.027,.008),.0065,.003,steel,'Y')
+            cut(tube_obj,cylinder('CUT',(.067,side*.027,.008),.0044,.008,None,'Y',None,24,0))
         # Barrel/gas exterior silhouettes only. The accessory is not a functional model.
         # Full 228.6 mm exterior includes the 4.6 mm threaded end below.
-        cylinder('Barrel under vented guard',(.162,0,0),.0087,.224,steel)
-        cylinder('Gas system silhouette',(.146,0,.022),.0036,.168,steel)
-        box('Gas block silhouette',(.233,0,.006),(.014,.023,.029),steel)
+        cylinder('Barrel under vented guard',(.162,0,bore),.0087,.224,steel)
+        cylinder('Gas system silhouette',(.146,0,.028),.0036,.168,steel)
+        box('Gas block silhouette',(.233,0,.015),(.014,.023,.029),steel)
         # Same across/up interface as every weapon; this rifle remains +X forward.
         for name, outline, spans in [
             ('Continuous top rail foot', picatinny.section(.046,.035,slot=True), [(-.170,.247)]),
@@ -230,7 +243,7 @@ def build_geometry(materials):
         # exposed straight adjustment spine (not a minimalist two-strut skeleton).
 
     def build_stock():
-        box('Rear 1913 interface',(-.181,0,-.005),(.014,.030,.063),steel)
+        box('Rear 1913 interface',(-.181,0,.001),(.014,.030,.051),steel)
         # Reference-informed upper shoulder sits below the handle, not through its
         # bow/latch path. Preserve the lower end (-23 mm) and the stock fold pivot.
         # No published hinge drawing: these are exterior fit coordinates, not SIG specs.
@@ -243,20 +256,31 @@ def build_geometry(materials):
         profile('Stock upper spine',[(-.184,.019),(-.365,.019),(-.369,-.008),(-.184,-.008)],.022,anodized,stock,.0012)
         for side in (-1,1):
             box('Stock spine inset',(-.252,side*.0115,.0045),(.104,.001,.014),polymer,stock,.001)
-        stock_body=profile('Stock butt frame',[(-.304,.028),(-.424,.028),(-.434,.019),(-.434,-.104),(-.419,-.116),(-.404,-.103),(-.379,-.054),(-.327,-.048),(-.304,-.015)],.037,polymer,stock,.0025)
-        cut(stock_body,profile('CUT',[(-.415,-.088),(-.394,-.042),(-.380,-.041),(-.405,-.092)],.052,None,None,.002))
+        # The butt follows the pad into a rounded toe and a relieved lower shoulder.
+        # Small stock/magazine radii use two segments: cut rims repeat every segment.
+        stock_body=profile('Stock butt frame',[(-.304,.028),(-.429,.028),(-.436,.024),
+            (-.432,-.027),(-.427,-.075),(-.424,-.090),(-.398,-.090),(-.390,-.086),
+            (-.388,-.080),(-.392,-.072),(-.399,-.063),(-.395,-.057),(-.365,-.025),
+            (-.340,-.021),(-.323,.000),(-.304,.000)],.037,polymer,stock,.0025,rounded=True,segments=2)
+        cut(stock_body,profile('CUT',[(-.409,-.054),(-.384,-.028),(-.381,-.026),
+            (-.379,-.028),(-.406,-.059),(-.410,-.060)],.052,None,None,.002))
         for side in (-1,1):
-            profile('Stock molded side panel',[(-.320,.012),(-.419,.012),(-.422,-.025),(-.395,-.028),(-.383,-.047),(-.329,-.039)],.0011,polymer,stock,.0012,y=side*.019)
+            profile('Stock molded side panel',[(-.320,.012),(-.419,.012),(-.421,-.016),
+                (-.397,-.018),(-.370,-.015),(-.336,-.011)],.0011,polymer,stock,.0012,y=side*.019)
             for x in (-.341,-.395):
                 opening(stock_body,(x,side*.020,.012),(.022,.006,.004),.0015)
-            profile('Stock stipple panel',[(-.418,-.036),(-.397,-.036),(-.417,-.087),(-.424,-.094)],.001,rubber,stock,.001,y=side*.019)
-        profile('Rubber recoil pad',[(-.432,.024),(-.442,.024),(-.444,-.107),(-.431,-.117),(-.425,-.106)],.040,rubber,stock,.002)
-        for i in range(17):
-            box('Butt pad traction rib',(-.443,0,.015-i*.007),(.0017,.036,.0013),rubber,stock,.0004)
-        # Latch locks into the spine and remains supported in the folded showcase.
-        profile('Length adjustment latch',[(-.347,-.004),(-.316,-.004),(-.316,-.017),(-.340,-.026),(-.349,-.020)],.022,polymer,stock,.0012)
-        for i in range(8):
-            box('Stock latch serration',(-.344+i*.003,0,-.020),(.001,.023,.0014),rubber,stock,.0002)
+            profile('Stock stipple panel',[(-.418,-.024),(-.397,-.024),(-.417,-.060),
+                (-.422,-.068)],.001,rubber,stock,.001,y=side*.019)
+        profile('Rubber recoil pad',[(-.428,.029),(-.441,.027),(-.446,.016),(-.437,-.075),
+            (-.433,-.089),(-.427,-.092),(-.418,-.089),(-.423,-.073),(-.431,.018)],
+            .040,rubber,stock,.002,rounded=True,segments=2)
+        for i in range(18):
+            box('Butt pad traction rib',(-.4462+i*.00052,0,.012-i*.0051),(.0017,.036,.0013),rubber,stock,.0004)
+        # The latch rides the underside of the spine within the tapered shoulder.
+        profile('Length adjustment latch',[(-.353,-.004),(-.320,-.004),(-.327,-.008),
+            (-.344,-.019),(-.353,-.017)],.022,polymer,stock,.0012)
+        for i in range(7):
+            box('Stock latch serration',(-.350+i*.0025,0,-.018+i*.00085),(.001,.023,.0014),rubber,stock,.0002)
         for side in (-1,1):
             socket = cylinder('Stock sling socket',(-.419,side*.021,-.008),.0065,.003,steel,'Y',stock)
             cut(socket,cylinder('CUT',(-.419,side*.021,-.008),.0042,.008,None,'Y',None,24,0))
@@ -264,43 +288,37 @@ def build_geometry(materials):
             text('SIG SAUER',(-.421 if side==-1 else -.397,side*.020,-.027),.0035,side,stock,mat=polymer)
 
     def build_magazines():
-        # MAG800 .300 BLK GEN M3: smooth upper side, large lower panels, front/back
-        # traction ribs and a paint-pen matrix. Do not reuse the 5.56 magazine lattice.
-        mag_points=[(-.014,-.070),(.046,-.070),(.047,-.127),(.051,-.163),(.058,-.200),(.069,-.239),(.009,-.258),(-.002,-.218),(-.010,-.169)]
-        mag_shell=profile('Curved .300 magazine shell',mag_points,.025,polymer,mag,.0015)
-        profile('Magazine base plate',[(.008,-.253),(.070,-.235),(.074,-.245),(.009,-.264),(.004,-.260)],.029,polymer,mag,.001)
+        # Blend the seated neck into the body's forward sweep just below the well.
+        sections = [(-.030,-.029,.032),(-.075,-.0305,.032),(-.088,-.0315,.033),
+                    (-.111,-.031,.034),(-.131,-.028,.037),(-.146,-.025,.041),
+                    (-.161,-.022,.044)]
+        outline = [(rear,z) for z,rear,_ in sections]
+        outline += [(-.016,-.185),(.047,-.168)]
+        outline += [(front,z) for z,_,front in reversed(sections)]
+        mag_shell = profile('Curved .300 magazine shell', outline, .025, polymer, mag, .0016, rounded=True, segments=2)
+        profile('Magazine base plate', [(-.020,-.181),(.048,-.162),(.051,-.171),(-.017,-.191)],
+                .028, polymer, mag, .0012, rounded=True, segments=2)
         for side in (-1,1):
-            # Shallow molded relief, not a raised black slab over the whole side.
-            for points in [[(-.006,-.139),(.012,-.139),(.018,-.197),(.007,-.201)],[(.020,-.139),(.041,-.139),(.051,-.194),(.026,-.201)]]:
-                cut(mag_shell,profile('CUT',points,.0024,None,None,.001,y=side*.0127))
-            profile('Magazine shoulder rib',[(-.012,-.131),(.046,-.130),(.047,-.135),(-.011,-.137)],.0012,polymer,mag,.0005,y=side*.0128)
-            text('300 BLK',(.015 if side==-1 else .055,side*.0127,-.217),.0038,side,mag,mat=polymer)
-            # Small dots are individually visible on inspect; four-face marks suffice.
-            for row in range(4):
-                for col in range(6):
-                    box('Magazine paint-pen dot',(.020+col*.004+row*.0008,side*.0128,-.228-row*.004),(.0018,.0005,.0018),rubber,mag,0)
-        for i in range(9):
-            z=-.142-i*.010; shift=max(0,-z-.150)*.17
-            for x in (-.009+shift,.048+shift):
-                box('Magazine edge traction rib',(x,0,z),(.0022,.024,.003),polymer,mag,.0006)
-        # Molded seam and over-insertion shoulders in the smooth upper region.
-        for x in (-.010,.042):
-            box('Magazine upper shoulder',(x,0,-.116),(.005,.027,.004),polymer,mag,.0005)
-        # Brass cartridge detail at the feed lips (aesthetic only).
+            # Recess shallow molded panels close to the receiver instead of
+            # leaving a smooth collar between the well and the magazine's body.
+            for points in [
+                [(-.018,-.097),(-.001,-.093),(.000,-.113),(.006,-.149),(-.009,-.154),(-.016,-.122)],
+                [(.005,-.092),(.025,-.087),(.028,-.112),(.035,-.141),(.012,-.147),(.007,-.116)],
+            ]:
+                cut(mag_shell, profile('CUT', points, .0024, None, None, .001, y=side*.0127))
+            text('300 BLK', (.000 if side==-1 else .026, side*.0126, -.160), .0035, side, mag, mat=polymer)
+            for row in range(3):
+                for col in range(5):
+                    x = .004+col*.0035+row*.0007
+                    z = -.166+col*.0011-row*.0034
+                    box('Magazine paint-pen dot', (x,side*.0125,z), (.0015,.0005,.0015), rubber, mag, 0)
+        for z,rear,front in sections[2:]:
+            for x in (rear,front):
+                box('Magazine edge traction rib', (x,0,z), (.0022,.023,.003), polymer, mag, .0006)
+        # Visual feed-end detail, visible only when the magazine leaves the well.
         for y in (-.006,.006):
-            cylinder('Top round brass',(.019,y,-.073),.0047,.032,brass,parent=mag,vertices=24)
-            ellipsoid('Top round copper', (.04, y, -.073), (.012, .0039, .0039), copper, mag)
-        # Complete magazine length convention: longer side of the minimum-area X/Z
-        # envelope, including the floorplate, excluding cartridges. The unscaled
-        # evaluated exterior is 195.083136 mm. Magpul gives 7.5 in but no datum drawing;
-        # this conservative 190.5 mm envelope is explicit, not certified metrology.
-        mag_scale = 190.5 / 195.083136
-        mag_shell['length_datum'] = 'Minimum-area side envelope, floorplate included, cartridges excluded'
-        mag_shell['length_target_mm'] = 190.5
-        for obj in list(asset.objects):
-            if obj.parent == mag and obj.type in {'MESH','FONT'}:
-                obj.location *= mag_scale; obj.scale *= mag_scale
-                obj.location.x -= .012; obj.location.z += .040
+            cylinder('Top round brass', (.007,y,-.033), .0045, .031, brass, parent=mag, vertices=24)
+            ellipsoid('Top round copper', (.023,y,-.033), (.009,.0038,.0038), copper, mag)
         # Duplicate magazine geometry for replacement/retention animation.
         bpy.context.view_layer.update()
         for obj in list(asset.objects):
@@ -332,12 +350,12 @@ def build_geometry(materials):
     build_handguard()
     # The 9-inch barrel ends at its 5/8-24 direct-thread shoulder. An open
     # three-prong game-fit flash hider replaces the former integrated can.
-    tube('Muzzle thread',(.2763,0,0),.00794,.0041,.0046,steel)
-    tube('Base muzzle collar',(.281,0,0),.0105,.0080,.014,steel,muzzle)
-    tube('Base muzzle throat',(.289,0,0),.0105,.0041,.004,steel,muzzle)
+    tube('Muzzle thread',(.2763,0,bore),.00794,.0041,.0046,steel)
+    tube('Base muzzle collar',(.281,0,bore),.0105,.0080,.014,steel,muzzle)
+    tube('Base muzzle throat',(.289,0,bore),.0105,.0041,.004,steel,muzzle)
     for i in range(3):
         angle = i*math.tau/3
-        prong = box('Base muzzle prong',(.303,math.cos(angle)*.008,math.sin(angle)*.008),
+        prong = box('Base muzzle prong',(.303,math.cos(angle)*.008,bore+math.sin(angle)*.008),
                     (.028,.004,.005),steel,muzzle,.0005)
         prong.rotation_euler.x = angle
     build_charging_handle()
@@ -346,12 +364,12 @@ def build_geometry(materials):
     build_casing()
 
     # Named attachment / integration sockets; adapter hand contacts follow the fit.
-    for name,loc,parent in [('SOCKET_muzzle',(.317,0,0),rig),('SOCKET_ejection',(-.018,-.030,.004),rig),('SOCKET_grip_R',(-.139,0,-.099),rig),('SOCKET_grip_L',(.171,0,-.028),rig),('SOCKET_magazine',(.004,0,-.042),mag),('SOCKET_sight',(-.146,0,.077),rig),('SOCKET_front_post',(.236,0,.077),rig)]:
+    for name,loc,parent in [('SOCKET_muzzle',(.317,0,bore),rig),('SOCKET_ejection',(-.018,-.030,.004),rig),('SOCKET_grip_R',(-.139,0,-.099),rig),('SOCKET_grip_L',(.171,0,-.020),rig),('SOCKET_magazine',(.004,0,-.042),mag),('SOCKET_sight',(-.146,0,.077),rig),('SOCKET_front_post',(.236,0,.077),rig)]:
         empty(name,loc,parent)
 
     # Rail contact frames: attachment Blender +Y maps to rifle +X; +Z stays up.
     # The optic mount sits forward of the deployed rear leaf so mounted optics clear it.
-    for name, loc in [('MOUNT_optic',(-.036,0,.046)),('MOUNT_muzzle',(.274,0,0))]:
+    for name, loc in [('MOUNT_optic',(-.036,0,.046)),('MOUNT_muzzle',(.274,0,bore))]:
         mount = empty(name,loc,body)
         mount.rotation_euler.z = -math.pi/2
 

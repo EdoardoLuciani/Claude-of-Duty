@@ -17,12 +17,21 @@ import { isEnvironmentKind } from './environment.ts';
 import { EXPLOSION_MIX, explosionDistanceGain, type ExplosionKind } from './explosions.ts';
 import { uiSound, heartbeat, intelSiren } from './foley.ts';
 import { classifySpace, SPACE_KEYS } from './ir.ts';
-import { Mixer } from './mixer.ts';
-import type { BusName } from './mixer.ts';
+import { BUS_NAMES, Mixer, type BusName } from './mixer.ts';
 import { TentRadio } from './music.ts';
 import { radioCue } from './radio.ts';
 import { reactionKind } from './reactions.ts';
 import { WeaponSampleBank } from './samples.ts';
+import {
+  defaultVolumes,
+  loadVolumes,
+  saveVolumes,
+  clampVolume,
+  volumeGain,
+  VOLUME_KEYS,
+  type VolumeKey,
+  type VolumeSettings,
+} from './settings.ts';
 import { SpatialField } from './spatial.ts';
 import type { WeaponProfile } from './types.ts';
 import { WEAPON_PROFILES, reportDistanceGain, resolveProfile } from './weapons.ts';
@@ -37,6 +46,10 @@ const GESTURES = ['pointerdown', 'mousedown', 'keydown', 'touchstart', 'wheel', 
 const AI_STEP_RANGE = 32;
 const AI_STEP_FADE = 12;
 const CALLOUT_BLOCK = { pause: 1, shop: 2, death: 4, error: 8 } as const;
+/** The mix is balanced at this rate; the browser resamples to the device. Chromium's HRTF
+ * panner gain rises with context rate, so a device-rate graph would lift every spatial
+ * source against head-locked anchors. */
+const CONTEXT_RATE = 48000;
 
 type Vec3Like = { x: number; y: number; z: number };
 interface AudioOptions {
@@ -136,7 +149,7 @@ const UI_ALIAS: Record<string, string> = {
 /** Default bus per voice kind, so callers do not have to know the mix layout. */
 const BUS_FOR: Partial<Record<string, BusName>> = {
   shot: 'weapons',
-  explosion: 'weapons',
+  explosion: 'explosions',
   dryfire: 'weapons',
   hitmarker: 'ui',
   headshot: 'ui',
@@ -259,6 +272,8 @@ export class AudioSystem {
   _gestureHandler: (() => void) | null = null;
   _ambienceApi: AmbienceApi | null = null;
   _aircraft: Set<AircraftVoice> = new Set();
+  /** Player percentages; they outlive graph start/teardown, pause and restart. */
+  volumes: VolumeSettings = defaultVolumes();
 
   constructor() {
     for (let i = 0; i < PROBE_RAYS - 1; i++) {
@@ -273,6 +288,7 @@ export class AudioSystem {
   async init(ctx: AudioRuntimeContext): Promise<void> {
     this.ctx = ctx;
     this.rng = ctx.rng.fork();
+    this.volumes = loadVolumes();
     this._wireEvents(ctx);
 
     // Web Audio needs a user gesture. Arm every plausible one; the first to
@@ -319,7 +335,7 @@ export class AudioSystem {
     try {
       const AC = (globalThis as Partial<typeof globalThis>).AudioContext;
       if (!AC) throw new Error('no AudioContext');
-      const actx = new AC({ latencyHint: 'interactive' });
+      const actx = new AC({ latencyHint: 'interactive', sampleRate: CONTEXT_RATE });
       this.actx = actx;
 
       await Mixer.prepare(actx);
@@ -328,7 +344,12 @@ export class AudioSystem {
       this.bank = new NoiseBank(actx, this.rng.fork(), 9.6);
       const samples = (this.samples = new WeaponSampleBank(actx));
       await samples.load();
-      const mixer = (this.mixer = new Mixer(actx, this.rng.fork(), {}));
+      const busVolumes: Partial<Record<BusName, number>> = {};
+      for (const name of BUS_NAMES) busVolumes[name] = volumeGain(this.volumes[name]);
+      const mixer = (this.mixer = new Mixer(actx, this.rng.fork(), {
+        masterVolume: volumeGain(this.volumes.master),
+        busVolumes,
+      }));
       mixer.energyMix.onprocessorerror = (): void => {
         console.error('[audio] energy processor failed; disabling audio');
         this.stats.errors++;
@@ -885,11 +906,19 @@ export class AudioSystem {
     } else this._calloutBlocks &= ~reason;
   }
 
-  setMasterVolume(v: number): void {
-    this.mixer?.setMasterVolume(v);
+  /** Store, persist and apply one player percentage; live voices follow immediately. */
+  setVolume(key: VolumeKey, percent: number): void {
+    const value = clampVolume(percent);
+    if (this.volumes[key] === value) return;
+    this.volumes[key] = value;
+    saveVolumes(this.volumes);
+    if (key === 'master') this.mixer?.setMasterVolume(volumeGain(value));
+    else this.mixer?.setBusVolume(key, volumeGain(value));
   }
-  setBusVolume(bus: BusName, v: number): void {
-    this.mixer?.setBusVolume(bus, v);
+
+  resetVolumes(): void {
+    const defaults = defaultVolumes();
+    for (const key of VOLUME_KEYS) this.setVolume(key, defaults[key]);
   }
 
   _onIntelOperation(e: { active?: boolean }): void {
@@ -971,14 +1000,12 @@ export class AudioSystem {
       this._pauseAircraft();
       if (!this.running) return;
       this.tentRadio?.start().catch((): void => {});
-      this.mixer?.setBusVolume('ambience', 0.28);
-      this.mixer?.setBusVolume('foley', 0.5);
+      this.mixer?.setShopMix(true);
     });
     on('market:close', (): void => {
       this._blockCallouts(CALLOUT_BLOCK.shop, false);
       this.tentRadio?.stop();
-      this.mixer?.setBusVolume('ambience', 1);
-      this.mixer?.setBusVolume('foley', 1);
+      this.mixer?.setShopMix(false);
     });
   }
 
@@ -1011,10 +1038,10 @@ export class AudioSystem {
     if (firstPerson) {
       // The complete recording owns its action and decay; no additional body or reverb.
       this._playDry('shot', { profile, firstPerson: true, gain: 1 }, 'weapons', 0);
-      mixer.duck(0.55, 0.1);
+      mixer.duck(0.55, 0.1, 'weapons');
     } else {
       this._playAt('shot', x, y, z, { profile, firstPerson: false, gain: 1 }, 'weapons', 0.95);
-      mixer.duck(clamp(0.5 - dist * 0.004, 0.12, 0.5), 0.08);
+      mixer.duck(clamp(0.5 - dist * 0.004, 0.12, 0.5), 0.08, 'weapons');
     }
   }
 
@@ -1134,10 +1161,10 @@ export class AudioSystem {
         level: 1,
         gain: EXPLOSION_MIX.gain,
       },
-      'weapons',
+      'explosions',
       1
     );
-    mixer.duck(0.85, 0.35);
+    mixer.duck(0.85, 0.35, 'explosions');
     // Let the pressure crack arrive before hearing damage muffles the world.
     // Starting both together buried the explosion while the tinnitus bypassed it.
     const near = clamp(1 - dist / 22, 0, 1);
@@ -1340,7 +1367,7 @@ export class AudioSystem {
         // Distant environmental punctuation, not a second foreground blast.
         gain: 0.1,
       },
-      'weapons',
+      'explosions',
       0.25
     );
   }

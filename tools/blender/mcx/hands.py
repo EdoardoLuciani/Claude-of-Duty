@@ -72,7 +72,7 @@ def author_hands(root,asset,parts,clips):
         key(cs['thumb_base'],'rotation_quaternion',native(eq(p['thumbBase'])),f)
         for j in range(2): key(cs[f'thumb_{j}'],'rotation_quaternion',native(eq((-p['thumb'][j],0,0))),f)
     # Rigid contact on a moving part. Hidden-magazine STEP scales never collapse it.
-    magazine = (Vector((-.007,-.16,-.039)),basis((.1,.72,-.68),(-.86,.34,-.38)))
+    magazine = (Vector((-.007,-.139,-.049)),basis((.1,.72,-.68),(-.86,.34,-.38)))
     latch = (Vector((-.184,.02,-.05)),basis((.55,.2,.81),(-.2,.94,-.27)))
     def contact(part,grasp,frame):
         scene.frame_set(math.floor(frame),subframe=frame%1)

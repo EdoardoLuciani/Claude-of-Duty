@@ -51,8 +51,8 @@ export const foliageSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<typeo
       0,
       1
     );
-    const young = authoredColor(0.18, 0.33, 0.09);
-    const old = authoredColor(0.095, 0.185, 0.06);
+    const young = authoredColor(0.17, 0.28, 0.08);
+    const old = authoredColor(0.1, 0.165, 0.055);
     const dry = authoredColor(0.39, 0.32, 0.11);
     const fine = fbm01(fbm3(p.mul(12), period.mul(12), 0.5));
     const spots = fbm01(fbm3(p.mul(22), period.mul(22), 0.5));
@@ -63,7 +63,7 @@ export const foliageSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<typeo
 
     const albedo = clamp(lc.mul(fine.mul(0.085).add(0.955)), 0.02, 0.7);
     const rough = clamp(
-      float(0.62).add(vein.oneMinus().mul(0.14)).add(fine.sub(0.5).mul(0.1)),
+      float(0.7).add(vein.oneMinus().mul(0.14)).add(fine.sub(0.5).mul(0.1)),
       0.35,
       0.95
     );

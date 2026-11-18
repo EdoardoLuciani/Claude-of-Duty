@@ -135,10 +135,10 @@ configuration, intel sites and prop transforms live in `level/`; `level/placemen
 is data-only and `placement.ts` owns validation, placement and clutter clearance.
 See the [world editing map](tools/worldgen/README.md). `bun run world` builds meshes
 and cooks collision with meshoptimizer from canonical instance buckets. Visual-only
-coalescing may join non-distance-LOD clouds within a 64 m X/Z span but never changes
-collision or navigation inputs. A prototype's optional `visualGeo` is visual only;
-support, collision and navigation use canonical `geo`, topology and RNG/instance
-inputs. Manifest v2 and content-hashed GLBs are generated into ignored
+coalescing may join whole non-distance-LOD buckets within a bounded X/Z span
+independent of the canonical grid. It never changes collision or navigation inputs.
+A prototype's optional `visualGeo` is visual only; support, collision and navigation
+use canonical `geo`, topology and RNG/instance inputs. Manifest v2 and content-hashed GLBs are generated into ignored
 `public/models/world/`. Preserve instancing/masks; never author separate collision
 geometry. Validate with `bun run world -- --check`, world/physics tests and screenshots.
 
@@ -313,11 +313,14 @@ changes an owned, loaded weapon synchronously outside the frame loop.
 pose; ADS uses the rest-pose optic datum in the weapon frame, while the reticle
 follows the live mount. The mount commit resolves the sight datum, eye relief,
 `OpticData`, laser emitter and muzzle socket on the viewmodel entry. Separately,
-`WeaponSystem` applies `buildStats()` to the gun's private runtime definition:
-`suppressed` for firing audio/FX and the optic's ADS FOV/sensitivity (undefined
-defers to player config). These are never authored on `WeaponDef`, and attachments
-change no ballistic/handling stats. Frame-time reticle, ADS, laser and fire
-consumers allocate nothing.
+`buildDef(id, config)` resolves suppression, optic ADS FOV/sensitivity (undefined
+defers to player config), ADS time, hip spread and recoil from the authored `WeaponDef`.
+Attachment multipliers multiply across slots from the authored definition, never onto a
+previous build, and never change ballistics.
+`WeaponSystem` updates the gun's private definition in place (the viewmodel shares it)
+and rebuilds its recoil pattern. The market compares owned and draft definitions from
+the same resolver against the authored base.
+Frame-time reticle, ADS, laser and fire consumers allocate nothing.
 
 Optics define `MOUNT_base` and `SOCKET_sight`; rigid attachments define
 `SOCKET_mount` plus `SOCKET_laser` or `SOCKET_muzzle`, in metres, -Z forward,
@@ -362,6 +365,21 @@ the effective firing definition, never a fixed profile or another weapon's bank.
 Donor/calibre decisions live in `src/audio/samples/weapon-reports-provenance.json`.
 Callout provenance is `src/audio/samples/callouts/provenance.json`; there
 is no runtime TTS or credential access.
+
+Gain staging has one owner per stage: each recording/profile owns its authored
+level (weapon reports use only their fixed bank reference), each mixer bus owns its
+category trim and compressor, the shared reverb return and energy limiter own
+summation headroom and peak safety, and the player's master gain follows the
+limiter. Dry output and reverb send use the same trim, player volume, supply-tent
+dip and ducking. Only the dry path passes through the optional compressor before its gain. Buses are the
+player-facing categories: `weapons` (all firearm reports, dry fire, distant
+volleys), `explosions` (grenades, bombs, distant booms, tinnitus), `foley`
+(movement, reloads, casings, impacts, near misses), `voice`, `ambience`
+(environment events, aircraft), `ui` (feedback, heartbeat, radio/intel cues) and
+`music`. New sounds join an existing bus rather than bypassing one. Gunfire and
+explosion ducking scale with their own category's volume. `src/audio/settings.ts`
+owns the validated, locally persisted percentages and their loudness curve; audio
+keeps them across graph start, pause, shop and restart.
 
 ## Prewarm
 

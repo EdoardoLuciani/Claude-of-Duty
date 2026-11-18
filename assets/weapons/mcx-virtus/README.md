@@ -59,6 +59,28 @@ select_review_clip('Reload_Empty')
 continuity across hidden magazine states, then sweeps mechanisms and deformed
 hands against catalog attachment surfaces.
 
+## Side-profile reference
+
+SIG's [2018 commercial catalog, printed page 49](https://luxuscap.com/wp-content/uploads/2025/12/2018-SIG-SAUER-COMMERCIAL-CATALOG.pdf#page=51)
+identifies the gray VIRTUS SBR in .300 BLK with a 9-inch barrel and short M-LOK
+guard. The [matching SIG product photograph](https://images.eurooptic.com/images/products/sig-sauer/0/sig-sauer-mcx-virtus-sbr-9-rifle-rmcx-300b-9b-tap-sbr.jpg)
+is available through [Scopelist](https://www.scopelist.com/sig-sauer-mcx-300blk-9-with-telescoping-folding-stock-rmcx-300b-9b-tap-sbr).
+Register the side view at the front rail edge using one scale from the repeated
+rail teeth. Use the same scale for the receiver, magazine and grip.
+
+The guard has a shallow lower edge, bore-height side slots and a diagonal rear
+shoulder supported by the receiver nose. The barrel, bare flash hider and muzzle
+attachment datum share that bore axis. The support-hand calibration follows the
+guard; optic/laser seating and the stock hinge retain their independent fits.
+The stock has a tapered lower shoulder, an angled recoil pad and a rounded toe
+with a narrow relief slot above it. The rifle photograph shows a translucent
+Lancer magazine. The lower receiver tapers into the grip saddle. The grip widens
+toward its sloped heel, and the seated polymer magazine sweeps forward below the
+well lip and ends in an angled floorplate. The rear of the magazine blends into
+the neck below the lip, and the trigger guard curves into the well with a
+continuous front band. The well lip frames an open mouth during reloads. Both
+magazines share the same exterior and glove contact.
+
 ## Attachment fits
 
 The base has no optic, glass or suppressor; standalone optics, the SRD762Ti and

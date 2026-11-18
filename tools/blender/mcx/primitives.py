@@ -60,13 +60,13 @@ def create_primitives(asset, body, materials):
         return finish(obj, name, mat, parent, bevel)
 
 
-    def profile(name, points, width, mat=anodized, parent=body, bevel=.0008, y=0, rounded=False):
+    def profile(name, points, width, mat=anodized, parent=body, bevel=.0008, y=0, rounded=False, segments=4):
         # Outline extrusions are two-ring lofts; ordinary plates remain flat-shaded.
         rings = [[(x, y+s*width/2, z) for x, z in points] for s in (-1, 1)]
-        return loft(name, rings, mat, parent, bevel, rounded)
+        return loft(name, rings, mat, parent, bevel, rounded, segments)
 
 
-    def loft(name, rings, mat, parent=body, bevel=.001, rounded=True):
+    def loft(name, rings, mat, parent=body, bevel=.001, rounded=True, segments=4):
         # Explicit cross-sections: continuous shoulders, not raised plate overlays.
         n = len(rings[0])
         verts = [point for ring in rings for point in ring]
@@ -81,7 +81,7 @@ def create_primitives(asset, body, materials):
         finish(obj, name, mat, parent, bevel)
         if bevel and rounded:
             mod = obj.modifiers.get('Machined edge radius')
-            mod.segments = 4; mod.harden_normals = True
+            mod.segments = segments; mod.harden_normals = True
         return obj
 
 

@@ -222,14 +222,18 @@ export function fixtureBuffer(buffer: AudioBuffer | null): FixtureAudioBuffer {
   if (!(buffer instanceof FixtureAudioBuffer)) throw Error('expected fixture buffer');
   return buffer;
 }
-export function fixtureMixer(actx: BaseAudioContext, rng = new Rng(1)): Mixer {
+export function fixtureMixer(
+  actx: BaseAudioContext,
+  rng = new Rng(1),
+  opts?: ConstructorParameters<typeof Mixer>[2]
+): Mixer {
   const previous = Object.getOwnPropertyDescriptor(globalThis, 'AudioWorkletNode');
   Object.defineProperty(globalThis, 'AudioWorkletNode', {
     configurable: true,
     value: FixtureAudioWorkletNode,
   });
   try {
-    return new Mixer(actx, rng);
+    return new Mixer(actx, rng, opts);
   } finally {
     if (previous) Object.defineProperty(globalThis, 'AudioWorkletNode', previous);
     else Reflect.deleteProperty(globalThis, 'AudioWorkletNode');
