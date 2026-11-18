@@ -383,31 +383,26 @@ export function buildStats(id: WeaponId, config: AttachmentConfig): BuildStats {
   const optic = config.optic === null ? undefined : OPTICS[config.optic];
   let adsTime = base.adsTime;
   let spreadHip = base.spreadHip;
-  let recoil = 1;
+  let recoilScale = 1;
   for (const slot of SLOTS) {
     const attachment = config[slot];
     if (attachment === null) continue;
     const effect = HANDLING[attachment];
     adsTime *= effect.adsTime ?? 1;
     spreadHip *= effect.spreadHip ?? 1;
-    recoil *= effect.recoil ?? 1;
+    recoilScale *= effect.recoil ?? 1;
   }
-  const r = base.recoil;
+  // Scale the kick's magnitudes; its spring, bracing and pattern shape stay authored.
+  const recoil = { ...base.recoil };
+  for (const key of ['pitch', 'yaw', 'kickBack', 'kickUp', 'roll', 'punch'] as const)
+    recoil[key] *= recoilScale;
   return {
     suppressed: config.muzzle !== null,
     adsFovScale: optic?.adsFovScale,
     adsSensScale: optic?.adsSensScale,
     adsTime,
     spreadHip,
-    recoil: {
-      ...r,
-      pitch: r.pitch * recoil,
-      yaw: r.yaw * recoil,
-      kickBack: r.kickBack * recoil,
-      kickUp: r.kickUp * recoil,
-      roll: r.roll * recoil,
-      punch: r.punch * recoil,
-    },
+    recoil,
   };
 }
 

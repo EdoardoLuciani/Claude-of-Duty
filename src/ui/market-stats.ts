@@ -1,9 +1,9 @@
+import { DEG } from '../core/math.ts';
 import { BASE_ATTACHMENTS, buildDef, type AttachmentConfig } from '../weapons/attachments.ts';
-import type { WeaponId } from '../weapons/defs.ts';
+import { shotInterval, type WeaponId } from '../weapons/defs.ts';
 import { el, setClass, setText } from './util.ts';
 
 type EffectiveDef = ReturnType<typeof buildDef>;
-const DEG = 180 / Math.PI;
 
 /** Rows read the same effective definition gameplay fires. `better` is the direction
  * that helps the player; 0 marks a trade-off with no universal direction. */
@@ -25,7 +25,7 @@ const ROWS: ReadonlyArray<{
     label: 'Fire rate',
     title: 'Rounds per minute; bolt guns use their cycle time.',
     better: 0,
-    value: (def): number => (def.boltAction && def.boltTime ? 60 / def.boltTime : def.rpm),
+    value: (def): number => 60 / shotInterval(def),
     format: (v): string => `${Math.round(v)} rpm`,
   },
   {
@@ -60,7 +60,7 @@ const ROWS: ReadonlyArray<{
     label: 'Recoil',
     title: 'Average sightline climb per shot before ADS/crouch bracing; first shots climb more.',
     better: -1,
-    value: (def): number => def.recoil.pitch * DEG,
+    value: (def): number => def.recoil.pitch / DEG,
     format: (v): string => `${v.toFixed(2)}°`,
   },
   {
@@ -131,7 +131,6 @@ export class MarketStats {
     const base = buildDef(id, BASE_ATTACHMENTS);
     const stored = buildDef(id, current);
     const draft = buildDef(id, config);
-    const reference = owned ? stored : base;
     setText(this.caption, owned ? 'Draft change vs owned build' : 'Draft change vs base weapon');
     this.ownedHead.hidden = !owned;
     for (let i = 0; i < ROWS.length; i++) {
@@ -142,7 +141,8 @@ export class MarketStats {
       setText(cells.owned, row.format(row.value(stored), stored));
       const value = row.value(draft);
       setText(cells.draft, row.format(value, draft));
-      const change = value / row.value(reference) - 1;
+      // An unowned gun stores the base build, so the stored build is always the reference.
+      const change = value / row.value(stored) - 1;
       const pct = Math.round(change * 100);
       const quality = pct === 0 ? 0 : Math.sign(change) * row.better;
       const word = quality > 0 ? ' better' : quality < 0 ? ' worse' : '';

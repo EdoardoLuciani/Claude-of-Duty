@@ -30,6 +30,7 @@ import {
   buildRecoilPattern,
   SPREAD_MODS,
   isWeaponId,
+  shotInterval,
 } from './defs.ts';
 import type { WeaponDef, WeaponId, WeaponMode } from './defs.ts';
 import { grenadeMesh } from './grenade-mesh.ts';
@@ -1035,15 +1036,13 @@ export class WeaponSystem {
     this.stats.fired++;
     this._shotSeeds[this._pendingShots++] = seed;
 
+    this._fireTimer = shotInterval(def);
     if (boltAction) {
-      this._fireTimer = def.boltTime ?? 1.1;
       if (s.mag > 0) this.viewmodel.play('cycle');
       else this._queueShell(0.05);
     } else if (def.action === 'pump') {
-      this._fireTimer = 60 / def.rpm;
       this.viewmodel.play('pump');
     } else {
-      this._fireTimer = 60 / def.rpm;
       this._queueShell(
         def.id === 'mcx'
           ? MCX_EJECT_DELAY / requiredTuning(def.fireAnimationSpeed, 'fireAnimationSpeed')

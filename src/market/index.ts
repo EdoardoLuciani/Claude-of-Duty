@@ -360,8 +360,7 @@ export class MarketSystem {
     h.id = id;
     h.config = config;
     h.owned = this.weapons.owns(id);
-    const current = this.weapons.getAttachments(id);
-    h.current = current;
+    const current = (h.current = this.weapons.getAttachments(id));
     h.baseCost = 0;
     if (!h.owned) for (const item of CATALOG) if (item.id === id) h.baseCost = item.cost;
     h.total = h.baseCost;

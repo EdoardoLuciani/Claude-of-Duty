@@ -659,6 +659,11 @@ export function buildRecoilPattern(
   return out;
 }
 
+/** Seconds between shots: the cyclic rate, or a bolt gun's manual cycle. */
+export function shotInterval(def: Pick<WeaponDef, 'boltAction' | 'boltTime' | 'rpm'>): number {
+  return def.boltAction ? (def.boltTime ?? 1.1) : 60 / def.rpm;
+}
+
 export const SPREAD_MODS = {
   crouch: 0.78,
   prone: 0.6,
