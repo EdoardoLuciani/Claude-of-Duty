@@ -1,13 +1,15 @@
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { Fn, attribute, mix, positionLocal, positionPrevious } from 'three/tsl';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
-import type { AttributeNode } from 'three/webgpu';
+import type { AttributeNode, Renderer } from 'three/webgpu';
 
 import { bindingLabel } from '../core/bindings.ts';
 import type { EngineContext } from '../core/context.ts';
 import type { EngineEventMap } from '../core/events.ts';
 import type { Rng } from '../core/rng.ts';
+import { isMesh, isSingleMaterialMesh, isTexture } from '../core/three-guards.ts';
+import { loadWeaponGLTF } from './asset-loader.ts';
+import { disposeWeaponMaterials } from './asset-material.ts';
 import type { WeaponSystem } from './index.ts';
 
 const PICKUP_RADIUS = 2.05;
@@ -59,15 +61,13 @@ export class AmmoPickups {
   owner!: AmmoOwner;
   ctx!: AmmoContext;
   rng!: Rng;
-  geometries!: Record<'case' | 'edge' | 'latch' | 'ring', THREE.BufferGeometry>;
+  readonly geometries: Record<'case' | 'ring', THREE.BufferGeometry>;
+  readonly materials: { case: MeshStandardNodeMaterial; glow: THREE.MeshBasicMaterial };
   _visual: THREE.Group | null = null;
   _batches: THREE.InstancedMesh[] = [];
   _slots: (AmmoPickup | null)[] = Array<AmmoPickup | null>(MAX_PICKUPS).fill(null);
-  _renderedIds: Float64Array[] = [];
+  _renderedIds = new Float64Array(MAX_PICKUPS);
   _hiddenMatrix = new THREE.Matrix4().makeScale(0, 0, 0);
-  materials!: Record<'case' | 'edge' | 'latch', MeshStandardNodeMaterial> & {
-    glow: THREE.MeshBasicMaterial;
-  };
   lifetime: number = 180;
   items: AmmoPickup[] = [];
   _nextId: number = 1;
@@ -75,36 +75,58 @@ export class AmmoPickups {
   _hold: number = 0;
   _prompting: boolean = false;
 
-  constructor(owner: AmmoOwner) {
+  static async load(
+    owner: AmmoOwner,
+    renderer: Pick<Renderer, 'hasFeature'>
+  ): Promise<AmmoPickups> {
+    const { scene } = await loadWeaponGLTF(renderer, '/models/props/ammo-pickup.runtime.glb');
+    const mesh = scene.children.at(0);
+    mesh?.updateMatrix();
+    if (
+      scene.children.length === 1 &&
+      isSingleMaterialMesh(mesh) &&
+      mesh.name === 'Ammo_Case' &&
+      mesh.children.length === 0 &&
+      mesh.matrix.equals(new THREE.Matrix4()) &&
+      mesh.material instanceof THREE.MeshStandardMaterial &&
+      mesh.material.map &&
+      mesh.material.roughnessMap &&
+      mesh.material.roughnessMap === mesh.material.metalnessMap
+    ) {
+      const source = mesh.material;
+      const material = new MeshStandardNodeMaterial().copy(source);
+      source.dispose();
+      return new AmmoPickups(owner, mesh.geometry, material);
+    }
+    const materials = new Set<THREE.Material>();
+    const textures = new Set<THREE.Texture>();
+    scene.traverse((node): void => {
+      if (!isMesh(node)) return;
+      node.geometry.dispose();
+      for (const material of Array.isArray(node.material) ? node.material : [node.material]) {
+        materials.add(material);
+        for (const value of Object.values(material)) if (isTexture(value)) textures.add(value);
+      }
+    });
+    disposeWeaponMaterials({ materials, textures });
+    throw new Error('[weapons] ammo-pickup.runtime.glb: expected one untransformed PBR Ammo_Case');
+  }
+
+  /** Take ownership of the case geometry, material and its atlases. */
+  constructor(
+    owner: AmmoOwner,
+    geometry: THREE.BufferGeometry,
+    material: MeshStandardNodeMaterial
+  ) {
     this.owner = owner;
     this.ctx = owner.ctx;
     this.rng = owner.rng;
-    this._makeAssets();
-  }
-
-  _makeAssets(): void {
-    const lid = new THREE.BoxGeometry(0.4, 0.045, 0.29).translate(0, 0.235, 0);
-    const band = new THREE.BoxGeometry(0.045, 0.205, 0.282).translate(0.1, 0.13, 0);
     this.geometries = {
-      case: new THREE.BoxGeometry(0.38, 0.19, 0.27).translate(0, 0.12, 0),
-      edge: mergeGeometries([lid, band]),
-      latch: new THREE.BoxGeometry(0.075, 0.065, 0.035).translate(0, 0.18, 0.155),
+      case: geometry,
       ring: new THREE.TorusGeometry(0.29, 0.011, 6, 28).rotateX(Math.PI / 2).translate(0, 0.035, 0),
     };
-    lid.dispose();
-    band.dispose();
-    for (const name of ['case', 'edge', 'latch'] as const) {
-      this.geometries[name].setAttribute(
-        'ammoHistoryValid',
-        new THREE.InstancedBufferAttribute(new Float32Array(MAX_PICKUPS), 1).setUsage(
-          THREE.DynamicDrawUsage
-        )
-      );
-    }
     this.materials = {
-      case: new MeshStandardNodeMaterial({ color: 0x3f4933, roughness: 0.72, metalness: 0.5 }),
-      edge: new MeshStandardNodeMaterial({ color: 0x222921, roughness: 0.58, metalness: 0.72 }),
-      latch: new MeshStandardNodeMaterial({ color: 0xb78a3b, roughness: 0.42, metalness: 0.8 }),
+      case: material,
       glow: new THREE.MeshBasicMaterial({
         color: 0xffb02a,
         transparent: true,
@@ -113,17 +135,20 @@ export class AmmoPickups {
         blending: THREE.AdditiveBlending,
       }),
     };
-    for (const name of ['case', 'edge', 'latch'] as const) {
-      const material = this.materials[name];
-      material.positionNode = Fn((): AttributeNode<'vec3'> => {
-        // Native history remains slot-indexed. Only a newly assigned identity
-        // lacks a previous pose; preserve real motion for every surviving slot.
-        positionPrevious.assign(
-          mix(positionLocal, positionPrevious, attribute('ammoHistoryValid', 'float'))
-        );
-        return positionLocal;
-      })();
-    }
+    geometry.setAttribute(
+      'ammoHistoryValid',
+      new THREE.InstancedBufferAttribute(new Float32Array(MAX_PICKUPS), 1).setUsage(
+        THREE.DynamicDrawUsage
+      )
+    );
+    material.positionNode = Fn((): AttributeNode<'vec3'> => {
+      // Native history remains slot-indexed. Only a newly assigned identity
+      // lacks a previous pose; preserve real motion for every surviving slot.
+      positionPrevious.assign(
+        mix(positionLocal, positionPrevious, attribute('ammoHistoryValid', 'float'))
+      );
+      return positionLocal;
+    })();
   }
 
   // The boot hook borrows these same batches, warming the actual instanced
@@ -132,7 +157,7 @@ export class AmmoPickups {
     if (this._visual) return this._visual;
     const root = new THREE.Group();
     root.name = 'ammo-pickups';
-    for (const name of ['case', 'edge', 'latch', 'ring'] as const) {
+    for (const name of ['case', 'ring'] as const) {
       const ring = name === 'ring';
       const mesh = new THREE.InstancedMesh(
         this.geometries[name],
@@ -145,14 +170,12 @@ export class AmmoPickups {
       mesh.castShadow = !ring;
       mesh.receiveShadow = !ring;
       if (ring) mesh.userData.owNoPrepass = true;
-      const renderedIds = new Float64Array(MAX_PICKUPS);
-      this._renderedIds.push(renderedIds);
-      if (!ring)
+      else
         mesh.onAfterRender = (_renderer, _scene, camera): void => {
           // Layer 1 on the world camera is the actual opaque/velocity prepass,
           // not a shadow. An unrendered batch cannot validate fresh slots.
           if (camera !== this.ctx.camera || camera.layers.mask !== 2) return;
-          for (const item of this.items) renderedIds[item.slot] = item.id;
+          for (const item of this.items) this._renderedIds[item.slot] = item.id;
         };
       root.add(mesh);
       this._batches.push(mesh);
@@ -171,8 +194,7 @@ export class AmmoPickups {
     }
     for (const item of this.items) item.group.updateMatrix();
     this._hiddenMatrix.setPosition(this.items[0].group.position);
-    for (let batch = 0; batch < this._batches.length; batch++) {
-      const mesh = this._batches[batch];
+    for (const mesh of this._batches) {
       const geometry = mesh.geometry;
       const valid = geometry.hasAttribute('ammoHistoryValid')
         ? geometry.getAttribute('ammoHistoryValid')
@@ -181,7 +203,7 @@ export class AmmoPickups {
       for (let slot = 0; slot < count; slot++) {
         const item = this._slots[slot];
         mesh.setMatrixAt(slot, item ? item.group.matrix : this._hiddenMatrix);
-        if (valid) valid.setX(slot, item && this._renderedIds[batch][slot] === item.id ? 1 : 0);
+        if (valid) valid.setX(slot, item && this._renderedIds[slot] === item.id ? 1 : 0);
       }
       if (valid) valid.needsUpdate = true;
       mesh.instanceMatrix.needsUpdate = true;
@@ -346,6 +368,10 @@ export class AmmoPickups {
     this.clear();
     for (const mesh of this._batches) mesh.dispose();
     for (const g of Object.values(this.geometries)) g.dispose();
-    for (const m of Object.values(this.materials)) m.dispose();
+    this.materials.glow.dispose();
+    const { case: material } = this.materials;
+    const textures = new Set<THREE.Texture>();
+    for (const value of Object.values(material)) if (isTexture(value)) textures.add(value);
+    disposeWeaponMaterials({ materials: new Set([material]), textures });
   }
 }

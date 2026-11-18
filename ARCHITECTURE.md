@@ -185,8 +185,9 @@ Prepass layer 1 contains opaque meshes/lights, not sky/transparent FX. Schedule 
 exactly once before world rendering at every quality, even without AO.
 `afterDepth` draws haze against current-frame depth; soft particles borrow it.
 Mesh opt-outs: `userData.owNoPrepass = true`, native `castShadow = false`.
-Pickup instances keep stable slots; the world camera's layer-1 prepass callback
-validates their birth/reuse history.
+Ammo pickups share one Blender-authored opaque instanced case and a separate
+runtime-owned glow ring. Instances keep stable slots; the world camera's layer-1
+prepass callback validates their birth/reuse history.
 Refresh CSM frustums when the unjittered projection changes. Bias depends on slope/
 cascade texels. Fog borrows native cascade depth/matrices, adding no shadow draw.
 Hoist noise outside the fog march; its uniform uses application frames. Haze keeps

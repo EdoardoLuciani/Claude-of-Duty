@@ -116,6 +116,7 @@ const SHARED_TOOLS: Partial<Record<ModelId, string[]>> = {
   mpx: ['tools/blender/review_hands.py', 'tools/blender/hand-reference.ts'],
 };
 const STANDALONE_TOOLS: Partial<Record<ModelId, string[]>> = {
+  ammo_pickup: ['tools/blender/ammo_pickup'],
   srd762ti: ['tools/blender/suppressor', 'tools/blender/can.py'],
   suppressor9mm: ['tools/blender/suppressor9mm', 'tools/blender/can.py'],
   suppressor338: ['tools/blender/suppressor338', 'tools/blender/can.py'],
@@ -139,7 +140,11 @@ function cookStep(id: ModelId, salt: string[]): AssetStep {
   const tools = STANDALONE_TOOLS[id] ?? [`tools/blender/${id}`, ...(SHARED_TOOLS[id] ?? [])];
   return {
     id,
-    inputs: [...tools, 'tools/blender/picatinny.py', ...authoredJson(directory)],
+    inputs: [
+      ...tools,
+      ...(id === 'ammo_pickup' ? [] : ['tools/blender/picatinny.py']),
+      ...authoredJson(directory),
+    ],
     // Only this model's cook settings, so one profile edit rebuilds one model.
     salt: [...salt, JSON.stringify(MODEL_COOKS[id]), ...GLTFPACK_FLAGS, GLTFPACK_VERSION],
     // The editable .blend is used by authoring and attachment-fit checks.

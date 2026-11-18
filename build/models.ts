@@ -52,6 +52,12 @@ const attachment = (
   flags,
 });
 export const MODEL_COOKS = {
+  ammo_pickup: {
+    directory: 'assets/props/ammo-pickup',
+    source: 'ammo-pickup.glb',
+    output: 'public/models/props/ammo-pickup.runtime.glb',
+    flags: [],
+  },
   suppressor12g: attachment('12g-suppressor', 'suppressor12g.glb', 'suppressor12g'),
   suppressor9mm: attachment('compact-9mm', 'suppressor9mm.glb', 'suppressor9mm'),
   suppressor338: attachment('suppressor-338', 'suppressor338.glb', 'suppressor338'),
