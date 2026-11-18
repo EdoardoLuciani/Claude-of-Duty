@@ -656,7 +656,14 @@ export function createSurfaceNodeMaterial(
           : normalize(cameraViewMatrix.mul(vec4(nP!, 0)).xyz);
     return { color, opacity: alb.a, normal, rough, metal: clamp(metalness, 0, 1), ao };
   })();
-  mat.colorNode = channels.color;
+  // Three samples colorNode.a for shadow overrides. This RGB graph's implicit
+  // alpha is one; don't pull its surface textures/uniforms into the caster.
+  // Cutout coverage still comes from the independent maskShadowNode below.
+  mat.colorNode = Fn(({ material }): Node<'vec3'> =>
+    'isShadowPassMaterial' in material && material.isShadowPassMaterial === true
+      ? vec3(1)
+      : channels.color
+  )();
   if (p.alphaMask) {
     mat.opacityNode = channels.opacity;
     // Shadow passes replace the material; keep the cutout instead of the whole card.
