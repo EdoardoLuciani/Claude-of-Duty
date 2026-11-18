@@ -315,7 +315,8 @@ follows the live mount. The mount commit resolves the sight datum, eye relief,
 `OpticData`, laser emitter and muzzle socket on the viewmodel entry. Separately,
 `buildDef(id, config)` resolves suppression, optic ADS FOV/sensitivity (undefined
 defers to player config), ADS time, hip spread and recoil from the authored `WeaponDef`.
-Attachment multipliers combine across slots without compounding or changing ballistics.
+Attachment multipliers multiply across slots from the authored definition, never onto a
+previous build, and never change ballistics.
 `WeaponSystem` updates the gun's private definition in place (the viewmodel shares it)
 and rebuilds its recoil pattern. The market compares owned and draft definitions from
 the same resolver against the authored base.
