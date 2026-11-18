@@ -174,7 +174,7 @@ export class WorldSystem {
     let material = this._mats.get(key);
     if (!material) {
       const def = PALETTE[key];
-      material = this.materials.get(def.name, def.opts);
+      material = this.materials.get(def.name, { ...def.opts, fixedSurface: true });
       this._mats.set(key, material);
     }
     return material;

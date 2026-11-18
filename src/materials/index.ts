@@ -51,6 +51,8 @@ interface MaterialContext {
   ): { keyDirection?: Vector3; keyLight?: { color: Color; intensity: number } } | null;
 }
 export interface MaterialOptions extends Partial<SurfaceAuthoringParams> {
+  /** Compile the authored controls into the shader instead of exposing live tuning. */
+  fixedSurface?: boolean;
   bake?: Partial<BakeDefinition>;
   three?: SurfaceMaterialOptions;
 }
@@ -216,7 +218,7 @@ export class MaterialSystemNode {
     if (def.three?.physical && opts.three?.physical === false)
       throw new Error(`[materials] "${key}" requires its authored physical material`);
     const set = this.getTextureSet(key, opts);
-    const { bake, three, ...surface } = opts;
+    const { bake, three, fixedSurface, ...surface } = opts;
     void bake;
     const p: SurfaceParams = { ...DEFAULT_PARAMS };
     applyDefinedPatch(p, def.mat);
@@ -231,28 +233,33 @@ export class MaterialSystemNode {
             ? 32
             : 16;
     p.parallaxLayers = Math.min(p.parallaxLayers ?? 22, layerCap);
-    const tileScale = p.uvMode === 'mesh' ? p.scale : 1 / p.scale;
-    const controls = {
-      tile: uniform(tileScale),
-      tint: uniform(new Color(p.tint)),
-      parallax: uniform(p.parallax),
-      normal: uniform(p.normalStrength),
-      ground: uniform(p.groundY),
-      weather: uniform(new Vector4(...p.weather)),
-    };
-    p.tileNode = controls.tile;
-    p.tintNode = controls.tint.toVec3();
-    p.parallaxNode = controls.parallax;
-    p.normalAmpNode = controls.normal;
-    p.groundNode = controls.ground;
-    p.weatherNode = controls.weather;
+    const controls = fixedSurface
+      ? null
+      : {
+          tile: uniform(p.uvMode === 'mesh' ? p.scale : 1 / p.scale),
+          tint: uniform(new Color(p.tint)),
+          parallax: uniform(p.parallax),
+          normal: uniform(p.normalStrength),
+          ground: uniform(p.groundY),
+          weather: uniform(new Vector4(...p.weather)),
+        };
+    if (controls) {
+      p.tileNode = controls.tile;
+      p.tintNode = controls.tint.toVec3();
+      p.parallaxNode = controls.parallax;
+      p.normalAmpNode = controls.normal;
+      p.groundNode = controls.ground;
+      p.weatherNode = controls.weather;
+    }
     const shared = this._shared;
     if (!shared) throw new Error('[materials] init before requesting materials');
     const mat = createSurfaceNodeMaterial(set, p, shared, { ...def.three, ...three });
     mat.name = matKey;
     mat.userData.owParams = p;
-    mat.userData.owControls = controls;
-    this._controls.set(mat, { params: p, controls });
+    if (controls) {
+      mat.userData.owControls = controls;
+      this._controls.set(mat, { params: p, controls });
+    }
     this._materials.set(matKey, mat);
     return mat;
   }

@@ -219,6 +219,11 @@ let compatible instanced meshes share shader-builder state and pipelines, never
 object buffers; object-specific builds stay uncached. On a Three upgrade, keep the
 TRAA lifetime and pixel-level buffer isolation/reuse regressions passing.
 
+Static world palette materials bake their surface controls (including ground level)
+into the shader at creation. They do not respond to later `materials.tune()` or
+`setGroundLevel()` calls. Other library materials retain live tuning; lighting,
+camera, textures and per-instance data stay live for both.
+
 Bakes use native top-left texture UVs and shared `QuadMesh` geometry: no extra Y
 flip or disposal of borrowed geometry. Gameplay readback uses its explicit
 display-transform path. First-person refraction uses world coordinates.
