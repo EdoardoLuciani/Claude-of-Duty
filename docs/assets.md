@@ -62,6 +62,11 @@ Blender 5.2.2 and the pinned gltfpack encoder are needed by `bun run dev` /
 [cooking recipe](../build/README.md). Committed weapon manifests may name old tool
 paths from their last export; current README commands supersede those notes.
 
+The rigid [M67 grenade prop](../assets/weapons/m67/README.md) is authored in
+[`tools/blender/m67/`](../tools/blender/m67/) and cooked with `bun run models:cook -- m67`.
+It has no arm or animation inputs; the held, player-thrown and AI visuals share
+its one rigid runtime mesh through [`grenade-mesh.ts`](../src/weapons/grenade-mesh.ts).
+
 Gameplay tuning belongs in [`src/weapons/defs.ts`](../src/weapons/defs.ts);
 runtime handling/IK stays in `src/weapons/`, separate from Blender-authored motion.
 
