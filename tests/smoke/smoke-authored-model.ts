@@ -656,7 +656,12 @@ assert.throws(
     if (laser.geometry.drawRange.count === 12) {
       dot.set(0, 0, 0);
       for (let i = 4; i < 8; i++) dot.add(corner.fromBufferAttribute(positions, i));
-      dot.multiplyScalar(0.25).project(camera);
+      dot.multiplyScalar(0.25);
+      assert(
+        dot.distanceTo(camera.position) < beamEnd.distanceTo(camera.position),
+        'the spot is biased in front of the surface hit'
+      );
+      dot.project(camera);
       const hit = corner.copy(beamEnd).project(camera);
       assert(
         Math.hypot(dot.x - hit.x, dot.y - hit.y) < 1e-5,

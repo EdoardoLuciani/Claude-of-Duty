@@ -92,7 +92,8 @@ export class WeaponLaser {
     const pixelScale = (Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * 2) / height;
     this.side.crossVectors(this.direction, this.up).normalize();
     const startWidth = Math.max(0.0012, this.origin.distanceTo(camera.position) * pixelScale * 0.4);
-    const endWidth = Math.max(0.0012, this.end.distanceTo(camera.position) * pixelScale * 0.4);
+    const distance = this.end.distanceTo(camera.position);
+    const endWidth = Math.max(0.0012, distance * pixelScale * 0.4);
     this.side.multiplyScalar(startWidth);
     this.corner(0, this.origin, this.side, 1);
     this.corner(1, this.origin, this.side, -1);
@@ -102,7 +103,6 @@ export class WeaponLaser {
     if (hit.hit) {
       // Collision can sit slightly behind the rendered surface. Bias only the
       // spot towards the camera along the sightline so it still projects onto the hit.
-      const distance = this.end.distanceTo(camera.position);
       this.end.lerp(camera.position, Math.min(0.025 / distance, 0.1));
       this.up.copy(camera.position).sub(this.end).normalize();
       // Recover some screen coverage on sloped surfaces without a grazing-angle blowup.
