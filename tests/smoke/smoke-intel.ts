@@ -339,7 +339,12 @@ async function harness(
       part('INTEL_HINGE', lid, root);
       spark.position.set(0.13, 0.288, 0.06);
       part('INTEL_SPARK', spark, root);
-      const finish = new THREE.MeshStandardMaterial({ map: new THREE.Texture() });
+      const surface = new THREE.Texture();
+      const finish = new THREE.MeshStandardMaterial({
+        map: new THREE.Texture(),
+        roughnessMap: surface,
+        metalnessMap: surface,
+      });
       part('INTEL_BODY', new THREE.Mesh(new THREE.BoxGeometry(), finish), root);
       part('INTEL_LID', new THREE.Mesh(new THREE.BoxGeometry(), finish), lid);
       part('INTEL_BEACON', new THREE.Mesh(new THREE.BoxGeometry()), lid);

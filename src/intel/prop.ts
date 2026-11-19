@@ -1,4 +1,5 @@
 import {
+  MeshStandardMaterial,
   type Group,
   type Object3D,
   type BufferGeometry,
@@ -65,9 +66,19 @@ export function makeKit(scene: Group): IntelKit {
     const root = node(scene, 'INTEL_CASE');
     const lid = node(root, 'INTEL_HINGE');
     node(root, 'INTEL_SPARK');
-    for (const solid of [mesh(root, 'INTEL_BODY'), mesh(lid, 'INTEL_LID')]) {
-      solid.castShadow = solid.receiveShadow = true;
+    const body = mesh(root, 'INTEL_BODY');
+    const lidMesh = mesh(lid, 'INTEL_LID');
+    const finish = body.material;
+    if (
+      !(finish instanceof MeshStandardMaterial) ||
+      lidMesh.material !== finish ||
+      !finish.map ||
+      !finish.roughnessMap ||
+      finish.roughnessMap !== finish.metalnessMap
+    ) {
+      throw new Error('[intel] expected a shared PBR finish with color and packed surface maps');
     }
+    for (const solid of [body, lidMesh]) solid.castShadow = solid.receiveShadow = true;
     const lens = mesh(lid, 'INTEL_BEACON');
     const leds = mesh(root, 'INTEL_LEDS');
     const beacon = new MeshBasicNodeMaterial({ color: 0xff0802 });
