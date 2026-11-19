@@ -70,9 +70,9 @@ passing. Renderer follow-ups: [#370](https://github.com/EdoardoLuciani/Claude-of
 
 ## Play
 
-The gameplay HUD is drawn with PixiJS on WebGPU; menus, startup/error controls and
-the field-radio panel are native DOM. If the HUD fails to initialize, a Reload error
-dialog appears.
+The gameplay HUD is drawn with PixiJS on WebGPU; menus and startup/error controls
+are native DOM. The field radio has no HUD panel: its handheld LCD is the interface.
+If the HUD fails to initialize, a Reload error dialog appears.
 [HUD ownership, boundaries and checks](docs/hud.md).
 
 After loading, select **Start** to capture the mouse and begin. Pending or denied

@@ -13,12 +13,13 @@ import bpy
 OUT = Path(__file__).resolve().parents[3] / 'assets/props/field-radio'
 SIZE = 512
 
-# Ink on the moulding, not on the dynamic LCD. Each glyph is a 5x7 bitmap.
+# Ink on the moulding, not on the dynamic LCD. Each glyph is a 5x7 bitmap,
+# top row first; 0x10 is the leftmost column.
 GLYPHS = dict(zip('ACDEFILNOPRTU0124-/', '''
 0e11111f111111 0f10101010100f 1e11111111111e 1f10101e10101f 1f10101e101010
-0e04040404040e 1010101010101f 11131519111111 0e11111111110e
+0e04040404040e 1010101010101f 11191513111111 0e11111111110e
 1e11111e101010 1e11111e141211 1f040404040404 1111111111110e
-0e11191513110e 0406040404040e 0e11100804021f 080c0a091f0808
+0e11131519110e 040c040404040e 0e11010204081f 02060a121f0202
 0000001f000000 01010204081010'''.split()))
 
 # Atlas tiles for the non-printed surfaces. RGB is display-encoded; roughness

@@ -11,59 +11,44 @@ import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts'
 const SCREEN_W = 256;
 const SCREEN_H = 128;
 
+/** The LCD is the radio interface: charges, request bindings/locks and stow. */
 function drawScreen(g: CanvasRenderingContext2D, count: number): void {
   g.fillStyle = '#04100a';
   g.fillRect(0, 0, SCREEN_W, SCREEN_H);
-  g.fillStyle = 'rgba(90,255,160,0.05)';
-  g.fillRect(0, 0, SCREEN_W, 3);
-
-  g.fillStyle = 'rgba(140,255,180,0.85)';
-  g.font = '700 17px ui-monospace, monospace';
-  g.fillText('FIELD RADIO', 12, 23);
-  g.fillStyle = 'rgba(205,238,215,0.68)';
-  g.font = '10px ui-monospace, monospace';
-  g.fillText(`REQ/${bindingLabel('slot1')}-${bindingLabel('slot3')}`, 188, 21);
-  g.fillStyle = 'rgba(140,255,180,0.14)';
-  g.fillRect(8, 32, SCREEN_W - 16, 1);
 
   const row = (
     y: number,
-    text: string,
-    color: string,
-    count: string | null,
-    countColor = color
+    h: number,
+    band: string,
+    left: string,
+    right: string,
+    ink: string
   ): void => {
-    g.fillStyle = color;
-    g.font = '700 19px ui-monospace, monospace';
-    g.fillText(text, 14, y);
-    if (count !== null) {
-      g.fillStyle = countColor;
-      g.font = '700 16px ui-monospace, monospace';
-      g.textAlign = 'right';
-      g.fillText(count, 244, y + 1);
-      g.textAlign = 'left';
-    }
+    g.fillStyle = band;
+    g.fillRect(6, y, SCREEN_W - 12, h);
+    g.fillStyle = ink;
+    g.textBaseline = 'middle';
+    g.textAlign = 'left';
+    g.fillText(left, 14, y + h / 2 + 1);
+    g.textAlign = 'right';
+    g.fillText(right, SCREEN_W - 14, y + h / 2 + 1);
   };
 
-  if (count > 0) {
-    row(62, `${bindingLabel('slot1')}  CARPET BOMB`, '#46ff7d', `x${count}`, '#a8ffc4');
-    g.fillStyle = 'rgba(70,255,125,0.16)';
-    g.fillRect(8, 44, SCREEN_W - 16, 26);
-  } else {
-    row(62, `${bindingLabel('slot1')}  CARPET BOMB`, '#ef8580', 'NO CHG', '#ff8a8a');
-    g.fillStyle = 'rgba(255,90,90,0.08)';
-    g.fillRect(8, 44, SCREEN_W - 16, 26);
-  }
-  g.fillStyle = 'rgba(255,190,90,0.14)';
-  g.fillRect(8, 72, SCREEN_W - 16, 52);
-  row(90, `${bindingLabel('slot2')}  REQUEST`, '#ffc27b', null);
-  g.fillStyle = '#ff9892';
-  g.font = '700 12px ui-monospace, monospace';
-  g.fillText('TOP-SECRET', 166, 92);
-  row(118, `${bindingLabel('slot3')}  REQUEST`, '#ffc27b', null);
-  g.fillStyle = '#ff9892';
-  g.font = '700 12px ui-monospace, monospace';
-  g.fillText('TOP-SECRET', 166, 120);
+  g.font = '700 17px ui-monospace, monospace';
+  row(4, 26, 'rgba(140,255,180,0.10)', 'FIELD RADIO', `${bindingLabel('radio')} STOW`, '#a8ffc4');
+  g.font = '700 19px ui-monospace, monospace';
+  const ready = count > 0;
+  row(
+    34,
+    30,
+    ready ? 'rgba(70,255,125,0.22)' : 'rgba(255,90,90,0.16)',
+    `${bindingLabel('slot1')} CARPET BOMB`,
+    ready ? `x${count}` : 'EMPTY',
+    ready ? '#5cff8f' : '#ff8a84'
+  );
+  g.font = '700 18px ui-monospace, monospace';
+  row(66, 28, 'rgba(255,190,90,0.12)', `${bindingLabel('slot2')} REQUEST`, 'LOCKED', '#ffc27b');
+  row(96, 28, 'rgba(255,190,90,0.12)', `${bindingLabel('slot3')} REQUEST`, 'LOCKED', '#ffc27b');
 }
 
 export async function loadRadio(renderer: Parameters<typeof loadWeaponGLTF>[0]): Promise<{

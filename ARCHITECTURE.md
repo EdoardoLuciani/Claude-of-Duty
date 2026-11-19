@@ -232,8 +232,8 @@ layers. Only Three destroys the device; Pixi owns its stage, geometry, shaders,
 textures and canvas. Gameplay snapshots/events are the authority; controllers own
 prompts, progress, banners and status priority, and presenters redraw only changed
 visible values. HUD initialization failure goes to the native reload dialog; the
-game never starts without a HUD. Start/error controls, menus, shop, game-over and
-the field-radio panel are native DOM. Details: [docs/hud.md](docs/hud.md).
+game never starts without a HUD. Start/error controls, menus, shop and game-over
+are native DOM. Details: [docs/hud.md](docs/hud.md).
 
 ## Models
 
@@ -279,8 +279,10 @@ shared asset after AI and the viewmodel have detached their visuals.
 The held field radio is a standalone authored GLB. `radio-mesh.ts` loads it during
 weapons boot and binds one retained canvas emissive texture to `SCREEN_radio`.
 The viewmodel mounts it at `GRIP_radio`, owns the asset lifetime, and keeps the
-same model through stow, pause and restart. The radio request state and native
-DOM panel do not depend on the model. [Radio asset contract](assets/props/field-radio/README.md).
+same model through stow, pause and restart. Equipping raises it into a fixed
+camera-space close-up; the LCD is the only radio interface, showing charges or the
+empty state, request bindings and locks, and the stow binding. Request state does
+not depend on the model. [Radio asset contract](assets/props/field-radio/README.md).
 
 `weapons.createInspectionModel(id, config)` returns an independent rest-pose clone
 with `dispose()` for the market's demand-rendered WebGPU studio. Inspection owns
