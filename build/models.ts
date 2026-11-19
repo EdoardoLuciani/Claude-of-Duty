@@ -66,6 +66,12 @@ export const MODEL_COOKS = {
   acog: attachment('trijicon-acog', 'acog.glb', 'acog'),
   scope: attachment('schmidt-bender-pm-ii', 'scope.glb', 'scope'),
   rmr: attachment('trijicon-rmr', 'rmr.glb', 'rmr'),
+  m67: {
+    directory: 'assets/weapons/m67',
+    source: 'm67.glb',
+    output: 'public/models/weapons/m67.runtime.glb',
+    flags: [],
+  },
   m590: {
     directory: 'assets/weapons/m590',
     source: 'm590.glb',

@@ -5,7 +5,6 @@ import type { Node, UniformNode } from 'three/webgpu';
 
 import { Spring, TAU, clamp, clamp01, damp, lerp, smootherstep } from '../core/math.ts';
 import { loadArmAsset } from './arm-asset.ts';
-import { createWeaponMaterial } from './asset-material.ts';
 import {
   configureWeaponAttachments,
   releaseAttachmentMounts,
@@ -26,7 +25,6 @@ import {
 import type { Clip } from './clips.ts';
 import type { WeaponDef } from './defs.ts';
 import { triCount } from './geometry.ts';
-import { grenadeMesh } from './grenade-mesh.ts';
 import { HAND_POSES } from './hand-poses.ts';
 import { Arm } from './hands.ts';
 import type { ReticleMaterials } from './materials-tsl.ts';
@@ -247,7 +245,7 @@ export class Viewmodel {
   // ---- grenade (held in the right hand while cooking / throwing) --------
   // The shared world mesh, slightly enlarged so it reads at arm's length;
   // parented to the hand so it rides the arm through the throw.
-  grenade: THREE.Object3D = grenadeMesh();
+  grenade: THREE.Group = new THREE.Group();
   radio: THREE.Group = new THREE.Group();
   radioAsset: Awaited<ReturnType<typeof loadRadio>> | null = null;
   active: WeaponEntry | null = null;
@@ -268,9 +266,6 @@ export class Viewmodel {
   _grenadeBackR: Float32Array = new Float32Array(3);
   _grenadeFingerL: Float32Array = new Float32Array(3);
   _grenadeBackL: Float32Array = new Float32Array(3);
-  // The templates also serve world projectiles/standalone previews. Own only
-  // native view copies, never patch or dispose their global shared materials.
-  _propMaterials: Map<THREE.Material, THREE.Material> = new Map();
   _radioState: number = 0; // 0 = stowed, 1 = held
   bandageAsset: Awaited<ReturnType<typeof loadBandage>> | null = null;
   _bandageState: number = 0;
@@ -365,14 +360,6 @@ export class Viewmodel {
     };
     this.radio.visible = false;
     this.armR.hand.add(this.radio);
-    this.grenade.traverse((o): void => {
-      if (!isMesh(o) || !(o.material instanceof THREE.MeshStandardMaterial)) return;
-      const source = o.material;
-      if (!this._propMaterials.has(source))
-        this._propMaterials.set(source, createWeaponMaterial(source));
-      const material = this._propMaterials.get(source);
-      if (material) o.material = material;
-    });
 
     this.reticle.name = 'ow-reticle';
     this.anchor.add(this.reticle);
@@ -1433,10 +1420,10 @@ export class Viewmodel {
     this.armL.dispose();
     this.armR.dispose();
     this.armAsset?.dispose();
+    // Detach the held visual before weapons release the shared asset.
+    this.grenade.clear();
     this.radioAsset?.dispose();
     this.radioAsset = null;
-    for (const material of this._propMaterials.values()) material.dispose();
-    this._propMaterials.clear();
     this.bandageAsset?.dispose();
     this.bandageAsset?.roll.removeFromParent();
     this.bandageAsset?.wrap.removeFromParent();

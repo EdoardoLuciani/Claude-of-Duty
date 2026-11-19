@@ -8,7 +8,7 @@ import { GRENADE } from '../../src/ai/tuning.ts';
 /** Issue #356: height-aware lob, cooked 3D arc clearance and live launch parity. */
 import type { EngineEventMap } from '../../src/core/events.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
-import { GRENADE_FUSE } from '../../src/weapons/index.ts';
+import { GRENADE_FUSE, WeaponSystem } from '../../src/weapons/index.ts';
 import { makeAgent } from '../lib/agent-fixture.ts';
 import { brainAnimator } from '../lib/ai-brain-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
@@ -21,7 +21,9 @@ function fixture(): {
   const phys = new PhysicsSystem(),
     ai = new AiSystem();
   ai._phys = phys;
-  ai.ctx = createTestContext();
+  const weapons = new WeaponSystem();
+  weapons.createGrenade = (): THREE.Mesh => new THREE.Mesh();
+  ai.ctx = createTestContext({ providers: { weapons } });
   ai.root = new THREE.Group();
   ai._grenades = [];
   ai._grenadeArc = { dx: 0, dz: 0, dist: 0, vy: 0, vh: 0, tAir: 0, y: 0, valid: false };
@@ -126,6 +128,7 @@ assert.equal(live.ai.predictGrenadeLand(from, target, land), 12);
 const arc = { ...live.ai._grenadeArc };
 live.ai.throwGrenade(makeAgent(), from, target);
 assert.equal(live.ai._grenades.length, 1);
+assert(live.ai._grenades[0].mesh.position.equals(from), 'show the launch origin before sync');
 const body = live.ai._grenades[0].body;
 assert.equal(body.linearDamping, 0, 'no unmodelled drag in the live launch');
 assert(Math.abs(body.linearVelocity.y - arc.vy) < 1e-6);

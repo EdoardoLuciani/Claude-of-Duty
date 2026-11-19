@@ -58,10 +58,10 @@ Change map content in
 shape, placement and build locations. Regenerate with `bun run world`, then run
 `bun run world:validate`. Use `bun run world -- --force` to rebuild unchanged inputs;
 `bun run world -- --check` verifies a fresh rebuild against the generated outputs.
-Runtime models are cooked with the [shared gltfpack build recipe](build/README.md)
-during dev/build; `bun run models:cook -- p320` reruns one cook. All seven authored weapons
-use cooked runtime assets. Native exports remain authoring references; each model
-has its own geometry, material and animation acceptance gates.
+The seven authored weapons use the [shared gltfpack build recipe](build/README.md);
+`bun run models:cook -- p320` reruns one cook. The [spent hull](assets/fx/spent-hull/README.md)
+keeps its validated native export to preserve the casing pool's vertex attributes.
+Each model has its own geometry, material and animation acceptance gates.
 
 **Three.js pin:** `three@0.187.0` with matching `@types/three@0.187.0`, unmodified.
 On upgrade, review `src/render/three-types.d.ts` and keep the renderer smoke guards

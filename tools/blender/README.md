@@ -24,14 +24,16 @@ build/check commands, declared inputs, references and acceptance limits:
 [MPX](../../assets/weapons/sig-mpx/README.md),
 [AX338](../../assets/weapons/ax338/README.md),
 [M590](../../assets/weapons/m590/README.md).
+Standalone rigid prop: [M67 grenade](../../assets/weapons/m67/README.md).
 Standalone attachments: [EXPS3-0](../../assets/attachments/eotech-exps3-0/README.md),
 [TOR Mini laser](../../assets/attachments/steiner-tor-mini/README.md).
 The [field radio](../../assets/props/field-radio/README.md) is a standalone
 first-person prop with a native export and separate live LCD binding.
+Standalone FX: [spent shotgun hull](../../assets/fx/spent-hull/README.md).
 
 ## Build timing and profiling
 
-`tools/build-assets.ts` reports each Blender invocation and gltfpack cook
+`tools/build-assets.ts` reports each Blender invocation and runtime cook
 separately, including failures, in both the console and `.cache/assets/<id>.log`.
 The final `built in` line is the asset's total elapsed time. Concurrent asset
 workers overlap: adding their durations does not give whole-build wall time.

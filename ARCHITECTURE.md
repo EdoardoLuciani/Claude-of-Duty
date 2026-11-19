@@ -266,7 +266,11 @@ opaque material per skeleton with packed texture arrays.
 `src/weapons/asset-loader.ts` fetches models concurrently, bounds parsing memory and
 shares one Basis transcoder per renderer during boot, released at boot end, failure
 or teardown. Static map clones are shared only when source, UV, color space and
-sampler match.
+sampler match. The Blender-authored grenade is a required boot asset owned by
+weapons. `weapons.createGrenade()` gives AI and player throws independent transforms
+that borrow the same geometry, material and maps as the held prop. Weapons warm
+both render passes; restart removes live instances, and teardown releases the
+shared asset after AI and the viewmodel have detached their visuals.
 
 The held field radio is a standalone authored GLB. `radio-mesh.ts` loads it during
 weapons boot and binds one retained canvas emissive texture to `SCREEN_radio`.
@@ -352,8 +356,9 @@ The laser changes no AI perception; the flashlight keeps separate light ownershi
 
 `tools/blender/soldiers/` builds seeded parametric soldiers; a Bun GLTFExporter cook
 preserves the runtime joint/attribute format. `tools/export-models.ts` validates and
-stages them and generates the spent hull; missing/stale/corrupt products fail rather
-than triggering Blender or a fallback. `models.getSoldier(name)` returns
+stages them; missing/stale/corrupt products fail rather than triggering Blender or a
+fallback. `tools/blender/spent_hull/` authors and validates one native spent hull GLB
+for the FX casing pool. `models.getSoldier(name)` returns
 `{ name, geometry, slots, boneNames, weapon, stats, variant }` as one skinned geometry
 with slot groups. Bone order must match `RIG.createSkeleton()`; mismatches fail boot.
 AI owns the soldier texture arrays and finish lookup textures.
