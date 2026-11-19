@@ -90,7 +90,7 @@ Bindings are fixed defaults in `src/core/bindings.ts`.
 | Left Shift, Q / E       | Sprint (double-tap for tactical sprint), lean          |
 | LMB / RMB               | Fire / hold ADS                                        |
 | R / B / I               | Reload / fire mode / inspect                           |
-| 1 / 2, Tab / wheel      | Equipped primary/secondary, cycle pair                 |
+| 1 / 2, Tab / wheel      | Equipped primary/secondary, cycle pair; stow grenade   |
 | Hold T, F, L            | Ammo/intel, flashlight / mounted laser toggle          |
 | Hold H                  | Bandage (3 seconds; +50 HP on completion)              |
 | G, then LMB / RMB       | Equip grenade; cook long/short throw, release to throw |

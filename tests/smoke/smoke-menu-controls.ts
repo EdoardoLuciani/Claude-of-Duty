@@ -96,7 +96,7 @@ for (const distinction of [
   'Flashlight (toggle)',
   'Mounted weapon laser (toggle; weapon out)',
   'Bandage (hold 3s)',
-  'Equip / stow grenade (toggle)',
+  'Equip grenade (weapon keys stow)',
   'Grenade out: cook long / short (hold); release to throw',
   'Equip / stow radio (toggle)',
   'Radio out: carpet-bomb request (immediate)',

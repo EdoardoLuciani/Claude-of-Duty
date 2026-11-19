@@ -241,7 +241,7 @@ export class WeaponSystem {
   private _grenadeAsset: GrenadeAsset | null = null;
   grenades: number = GRENADES_PER_LIFE;
   /** Grenade in the hand: G drew it, the weapon is stowed. Equipping is
-   *  free — stowing (G again, or a weapon switch) spends nothing. */
+   *  free — stowing (any weapon selection) spends nothing. */
   grenadeEquipped: boolean = false;
   radioEquipped: boolean = false;
   healing: boolean = false;
@@ -1323,8 +1323,8 @@ export class WeaponSystem {
    * LMB cooks and throws LONG, RMB cooks and throws SHORT. The fuse burns only
    * while a mouse button is held — releasing commits the throw with whatever
    * fuse is left. Overcooking detonates in your hand. Equipping is free:
-   * pressing G again (or switching weapons) stows the grenade unspent, so the
-   * G key never throws — it only arms and stows.
+   * selecting a weapon stows the grenade unspent. G only arms; it never
+   * throws or stows.
    */
   _updateGrenade(dt: number, input: EngineContext['input'], live: boolean): void {
     if (!live) return; // death drops the grenade via its own listener
@@ -1332,11 +1332,8 @@ export class WeaponSystem {
     // G toggles the grenade in and out of the hand.
     if (input.actionPressed('grenade')) {
       if (this.cooking || this._throwing || this.switching) return; // hands are busy
+      if (this.grenadeEquipped) return;
       this._interruptHeal('grenade');
-      if (this.grenadeEquipped) {
-        this._stowGrenade();
-        return;
-      }
       if (this.grenades > 0) {
         if (this.radioEquipped) this._stowRadio();
         this.grenadeEquipped = true;
@@ -1346,7 +1343,7 @@ export class WeaponSystem {
         this.ui?.setPrompt({
           key: bindingLabel('fire'),
           text: 'LONG THROW',
-          sub: `${bindingLabel('ads')} SHORT THROW · ${bindingLabel('grenade')} STOWS`,
+          sub: `${bindingLabel('ads')} SHORT THROW · ${bindingLabel('slot1')}/${bindingLabel('slot2')} STOWS`,
         });
       }
       return;
@@ -1418,6 +1415,17 @@ export class WeaponSystem {
     this._viewmodel?.endGrenade();
     this._viewmodel?.endRadio();
     this._viewmodel?.endBandage();
+  }
+
+  /** Weapon keys: the already-active weapon is drawn back from a held grenade. */
+  _selectWeapon(id: WeaponId | undefined): void {
+    if (!id) return;
+    if (id !== this.activeId || !this.grenadeEquipped || this.cooking || this._throwing) {
+      this.setWeapon(id);
+      return;
+    }
+    this._stowGrenade();
+    this._viewmodel?.play('draw');
   }
 
   /** Stow the equipped grenade back into the pouch, unspent and unthrown. */
@@ -1700,14 +1708,10 @@ export class WeaponSystem {
       if (input.actionPressed('fireMode')) this.cycleFireMode();
       if (input.actionPressed('inspect')) this.inspect();
       if (!this.radioEquipped) {
-        if (input.actionPressed('slot1')) {
-          const primary = PRIMARY_IDS.find((id): boolean => this.owned.has(id));
-          if (primary) this.setWeapon(primary);
-        }
-        if (input.actionPressed('slot2')) {
-          const secondary = SECONDARY_IDS.find((id): boolean => this.owned.has(id));
-          if (secondary) this.setWeapon(secondary);
-        }
+        if (input.actionPressed('slot1'))
+          this._selectWeapon(PRIMARY_IDS.find((id): boolean => this.owned.has(id)));
+        if (input.actionPressed('slot2'))
+          this._selectWeapon(SECONDARY_IDS.find((id): boolean => this.owned.has(id)));
       }
       if (input.actionPressed('cycleWeapon')) this.nextWeapon();
       if (input.wheel) this.nextWeapon();

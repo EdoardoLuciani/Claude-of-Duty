@@ -60,7 +60,7 @@ export const CONTROL_SECTIONS: ControlSection[] = [
       quick(['flashlight'], 'Flashlight (toggle)'),
       quick(['laser'], 'Mounted weapon laser (toggle; weapon out)'),
       quick(['heal'], 'Bandage (hold 3s)'),
-      quick(['grenade'], 'Equip / stow grenade (toggle)'),
+      quick(['grenade'], 'Equip grenade (weapon keys stow)'),
       quick(['fire', 'ads'], 'Grenade out: cook long / short (hold); release to throw'),
       quick(['radio'], 'Equip / stow radio (toggle)'),
       quick(['slot1'], 'Radio out: carpet-bomb request (immediate)'),
