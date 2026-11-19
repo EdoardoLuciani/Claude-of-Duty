@@ -10,6 +10,8 @@ import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts'
 
 const SCREEN_W = 256;
 const SCREEN_H = 128;
+/** LCD request rows: the carpet bomb, then locked requests. */
+export const RADIO_REQUESTS = 3;
 
 /** The LCD is the radio interface: controls, charges, request locks and a cursor. */
 function drawScreen(g: CanvasRenderingContext2D, count: number, cursor: number): void {
@@ -41,15 +43,12 @@ function drawScreen(g: CanvasRenderingContext2D, count: number, cursor: number):
   row(4, 24, 'rgba(140,255,180,0.10)', select, stow, '#a8ffc4');
 
   const ready = count > 0;
-  const requests = [
-    ['CARPET BOMB', ready ? `x${count}` : 'EMPTY', ready ? '#5cff8f' : '#ff8a84'],
-    ['REQUEST', 'LOCKED', '#ffc27b'],
-    ['REQUEST', 'LOCKED', '#ffc27b'],
-  ];
   g.font = '700 18px ui-monospace, monospace';
   g.lineWidth = 2;
-  for (let i = 0; i < requests.length; i++) {
-    const [name, state, ink] = requests[i];
+  for (let i = 0; i < RADIO_REQUESTS; i++) {
+    const name = i === 0 ? 'CARPET BOMB' : 'REQUEST';
+    const state = i > 0 ? 'LOCKED' : ready ? `x${count}` : 'EMPTY';
+    const ink = i > 0 ? '#ffc27b' : ready ? '#5cff8f' : '#ff8a84';
     const y = 32 + i * 31;
     const on = i === cursor;
     row(
@@ -119,15 +118,14 @@ export async function loadRadio(renderer: Parameters<typeof loadWeaponGLTF>[0]):
     material.emissive.set(0xffffff);
     material.emissiveIntensity = 1.15;
     material.emissiveMap = live;
-    let displayed = -1;
-    let displayedCursor = -1;
+    let displayed = -1; // count * RADIO_REQUESTS + cursor
     const setScreen = (count: number, cursor: number): void => {
       const next = Math.min(99, Math.max(0, count));
-      if (next === displayed && cursor === displayedCursor) return;
+      const key = next * RADIO_REQUESTS + cursor;
+      if (key === displayed) return;
       drawScreen(ctx, next, cursor);
       live.needsUpdate = true;
-      displayed = next;
-      displayedCursor = cursor;
+      displayed = key;
     };
     setScreen(1, 0);
     return { scene, setScreen, dispose };

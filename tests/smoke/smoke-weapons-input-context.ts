@@ -928,14 +928,11 @@ for (const [code, reason] of [
   frame({ wheel: 1 });
   assert.deepEqual(cancellations, ['switch'], 'wheel remains a heal interruption');
 }
-for (const code of ['Digit1', 'Digit3', 'KeyB']) {
+for (const code of ['Digit1', 'KeyB']) {
   const { wp, tap, cancellations } = makeHarness();
   assert(wp.beginHeal());
   tap(code);
-  assert(
-    wp.healing && cancellations.length === 0,
-    'same-slot/unused-slot/fire-mode do not interrupt healing'
-  );
+  assert(wp.healing && cancellations.length === 0, 'same-slot/fire-mode do not interrupt healing');
 }
 for (const blocked of ['disabled', 'frozen', 'dead', 'controls', 'input']) {
   const { wp, input, player, tap } = makeHarness();

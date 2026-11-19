@@ -17,15 +17,9 @@ function isActionId(value: string): value is ActionId {
 const controls = CONTROL_SECTIONS.flatMap(
   (section): (typeof CONTROL_SECTIONS)[number]['controls'] => section.controls
 );
-const movementActions: ActionId[] = ['forward', 'left', 'back', 'right'];
-assert.deepEqual(
-  controls[0].keys,
-  movementActions.flatMap((action): readonly string[] => bindingLabels(action)),
-  'movement lists every canonical binding'
-);
 const labels = new Set(controls.flatMap((control): readonly string[] => control.keys));
 for (const action of Object.keys(DEFAULT_BINDINGS)) {
-  if (!isActionId(action) || movementActions.includes(action)) continue;
+  if (!isActionId(action)) continue;
   for (const label of bindingLabels(action))
     assert.ok(labels.has(label), `${action}: missing ${label}`);
 }

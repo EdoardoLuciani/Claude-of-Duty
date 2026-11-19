@@ -55,10 +55,10 @@ const input = {
   _rmbPressed: false,
   _xPressed: false,
   _digit: 0,
-  _radioAction: '',
+  _action: '',
   ads: false,
   actionPressed(name: string): boolean {
-    if (name === this._radioAction) return true;
+    if (name === this._action) return true;
     if (name === 'grenade') return this._gPressed;
     if (name === 'radio') return this._xPressed;
     if (name === 'fire') return this.firePressed;
@@ -460,10 +460,10 @@ const pressX = (): void => {
   step();
   input._xPressed = false;
 };
-const pressRadio = (action: 'radioUp' | 'radioDown' | 'radioSend'): void => {
-  input._radioAction = action;
+const pressAction = (action: string): void => {
+  input._action = action;
   step();
-  input._radioAction = '';
+  input._action = '';
 };
 let strikeCalls = 0;
 wp.setWeaponImmediate('rifle'); // the market case above left an unowned SMG active
@@ -520,34 +520,34 @@ wp._switchTo = null; // the harness has no holster clip to complete
 
 // ---- the carpet bomb row spends a charge and calls the strike --------------
 pressX();
-pressRadio('radioSend');
+pressAction('radioSend');
 assert.equal(wp.radioEquipped, false, 'calling a strike stows the radio');
 assert.equal(wp.carpetBombs, 0, 'the charge is spent');
 assert.equal(strikeCalls, 1, 'the strike system was invoked exactly once');
 
 // ---- out of charges: the carpet bomb is denied and spends nothing ---------
 pressX();
-pressRadio('radioSend');
+pressAction('radioSend');
 assert.equal(wp.radioEquipped, true, 'a denied request keeps the radio out');
 assert.equal(wp.carpetBombs, 0, 'a denied request spends nothing');
 assert.equal(strikeCalls, 1, 'no strike without a charge');
 
 // ---- requests 2/3 are top-secret: denied ---------------------------------
-pressRadio('radioDown');
-pressRadio('radioSend');
+pressAction('radioDown');
+pressAction('radioSend');
 assert.equal(wp.radioEquipped, true, 'request 2 keeps the radio out');
-pressRadio('radioDown');
-pressRadio('radioSend');
+pressAction('radioDown');
+pressAction('radioSend');
 assert.equal(wp.radioEquipped, true, 'request 3 keeps the radio out');
 assert.equal(strikeCalls, 1, 'top-secret requests never call a strike');
 assert.equal(wp.carpetBombs, 0, 'top-secret requests spend nothing');
-pressRadio('radioUp');
-pressRadio('radioUp');
+pressAction('radioUp');
+pressAction('radioUp');
 
 // ---- market purchases cap at 3 --------------------------------------------
 wp.addCarpetBombs(5);
 assert.equal(wp.carpetBombs, 3, 'market purchases cap at 3 charges');
-pressRadio('radioSend');
+pressAction('radioSend');
 assert.equal(wp.carpetBombs, 2, 'a strike spends a purchased charge');
 assert.equal(strikeCalls, 2);
 // The strike stowed the radio; it is not out right now.
@@ -558,7 +558,7 @@ wp.radioSys = new RadioSystem();
 wp.radioSys.callStrike = (): boolean => false;
 pressX();
 assert.equal(wp.radioEquipped, true, 'radio is out again');
-pressRadio('radioSend');
+pressAction('radioSend');
 assert.equal(wp.carpetBombs, 2, 'a refused strike keeps the charge');
 assert.equal(wp.radioEquipped, true, 'the radio stays out for a retry');
 assert.equal(strikeCalls, 2, 'no strike was attempted twice');
