@@ -98,8 +98,6 @@ interface WeaponHudState {
   lethalCount: number;
   cooking: boolean;
   grenadeEquipped: boolean;
-  radioEquipped: boolean;
-  carpetCount: number;
 }
 interface WeaponStats {
   tris: number;
@@ -285,8 +283,6 @@ export class WeaponSystem {
     lethalCount: GRENADES_PER_LIFE,
     cooking: false,
     grenadeEquipped: false,
-    radioEquipped: false,
-    carpetCount: CARPET_STRIKES_PER_LIFE,
   };
 
   constructor() {
@@ -746,8 +742,6 @@ export class WeaponSystem {
     h.lethalCount = this.grenades;
     h.cooking = this.cooking;
     h.grenadeEquipped = this.grenadeEquipped;
-    h.radioEquipped = this.radioEquipped;
-    h.carpetCount = this.carpetBombs;
     return h;
   }
 
