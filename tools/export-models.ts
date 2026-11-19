@@ -158,7 +158,7 @@ function modelSourceHash(): string {
 
 function assertInputsStable(expected: string): void {
   if (modelSourceHash() !== expected)
-    throw new Error('[models] inputs changed during staging; rerun bun run models');
+    throw new Error('[models] inputs changed during staging; rerun bun tools/export-models.ts');
 }
 
 function outputsPresent(): boolean {

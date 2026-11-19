@@ -1,7 +1,7 @@
 """Built attachment sources for weapon fit checks: one id -> .blend table and loader.
 Optics seat on `MOUNT_base`; rigid attachments on `SOCKET_mount`.
 
-Build the attachment first (`bun run assets`); checks read its editable `.blend`.
+Build the attachment first (`bun tools/build-assets.ts`); checks read its editable `.blend`.
 """
 from pathlib import Path
 

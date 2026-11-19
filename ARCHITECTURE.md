@@ -133,14 +133,14 @@ as `unknown-thickness`, overlapping solids as `overlapping-solids`.
 Checked TypeScript in `tools/worldgen/` is the world source. Map layout,
 configuration, intel sites and prop transforms live in `level/`; `level/placements/`
 is data-only and `placement.ts` owns validation, placement and clutter clearance.
-See the [world editing map](tools/worldgen/README.md). `bun run world` builds meshes
+See the [world editing map](tools/worldgen/README.md). `bun tools/export-world.ts` builds meshes
 and cooks collision with meshoptimizer from canonical instance buckets. Visual-only
 coalescing may join whole non-distance-LOD buckets within a bounded X/Z span
 independent of the canonical grid. It never changes collision or navigation inputs.
 A prototype's optional `visualGeo` is visual only; support, collision and navigation
 use canonical `geo`, topology and RNG/instance inputs. Manifest v2 and content-hashed GLBs are generated into ignored
 `public/models/world/`. Preserve instancing/masks; never author separate collision
-geometry. Validate with `bun run world -- --check`, world/physics tests and screenshots.
+geometry. Validate with `bun tools/export-world.ts --check`, world/physics tests and screenshots.
 
 ## AI physical planning
 
@@ -242,7 +242,7 @@ and runtime consumers. Each weapon's authoring lives in `tools/blender/<weapon>/
 (`build.py`, `check.py`).
 
 `build/models.ts` owns gltfpack runtime cooking and per-model profiles
-(`bun run models:cook`); `tools/build-assets.ts` rebuilds stale models during
+(`bun build/models.ts`); `tools/build-assets.ts` rebuilds stale models during
 dev/build. New profiles need adapter, animation and visual validation. The
 [intel case](assets/props/intel-case/README.md) has a standalone Blender recipe;
 IntelSystem loads and owns one shared GLB kit, moves its named hinge, pulses the

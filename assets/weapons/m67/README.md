@@ -14,14 +14,14 @@ From the repository root with Blender 5.2.2 and gltfpack 1.3:
 review=$(mktemp -d)
 blender -b -t 2 --python-exit-code 1 --python tools/blender/m67/build.py -- --output "$review"
 blender -b "$review/m67.blend" -t 2 --python-exit-code 1 --python tools/blender/m67/check.py
-bun run models:cook -- m67 "$review"
+bun build/models.ts m67 "$review"
 ```
 
 `build.py` owns the shape and UVs; `finish.py` owns the seeded atlas artwork.
 The native exporter writes `m67.blend` and `m67.glb` by default here. The cook
 packs meshopt geometry and two KTX2 maps (base color and metallic/roughness)
 into `public/models/weapons/m67.runtime.glb`. These are ignored products, not
-input files. `bun run assets`/`bun run build` hash the standalone recipe, check
+input files. `bun tools/build-assets.ts`/`bun run build` hash the standalone recipe, check
 and cook profile independently of the arm and firearm recipes.
 
 ## Grip and instance space

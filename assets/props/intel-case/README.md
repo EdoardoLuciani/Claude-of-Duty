@@ -14,7 +14,7 @@ Use Blender 5.2.2 and the repository's gltfpack 1.3. From the repo root:
 ```sh
 OUT="$(mktemp -d)"
 blender -b -t 2 --python-exit-code 1 --python tools/blender/intel_case/build.py -- --output "$OUT"
-bun run models:cook -- intel_case "$OUT"
+bun build/models.ts intel_case "$OUT"
 blender -b "$OUT/intel-case.blend" -t 2 --python-exit-code 1 \
   --python tools/blender/intel_case/check.py -- "$OUT/intel-case.glb" "$OUT/intel-case.runtime.glb"
 ```
@@ -29,7 +29,7 @@ nodes, batch/material budget and self-contained maps in both exports. Sampled
 surface intersections are not a continuous collision proof, nor do they test
 clearance against level props.
 
-`bun run assets` (also `dev` and full `build`) hashes the local Python recipe
+`bun tools/build-assets.ts` (also `dev` and full `build`) hashes the local Python recipe
 and cook settings and rebuilds missing or stale products. There are no shared
 weapon, attachment, external font/image or hand-calibration inputs. Generated
 `.blend` and `.glb` files are ignored. Without a scratch path, the native files

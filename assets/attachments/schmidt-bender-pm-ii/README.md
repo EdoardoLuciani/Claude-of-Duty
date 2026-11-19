@@ -9,7 +9,7 @@ GLB. Edit this recipe, never the generated `.blend`/GLB products.
 
 ```sh
 blender -b -t 4 --python-exit-code 1 --python tools/blender/scope/build.py
-bun run models:cook -- scope
+bun build/models.ts scope
 # The AX338 check loads freshly generated standalone optics to measure their fit:
 blender -b -t 4 assets/weapons/ax338/ax338.blend --python-exit-code 1 \
   --python tools/blender/ax338/check.py

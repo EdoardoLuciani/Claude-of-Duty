@@ -318,7 +318,7 @@ try {
 const expectedSourceHash = worldSourceHash(ROOT);
 if (manifest.sourceHash !== expectedSourceHash) {
   fail(
-    `manifest sourceHash is ${describe(manifest.sourceHash ?? '<missing>')}, expected ${expectedSourceHash}; run bun run world`
+    `manifest sourceHash is ${describe(manifest.sourceHash ?? '<missing>')}, expected ${expectedSourceHash}; run bun tools/export-world.ts`
   );
 }
 

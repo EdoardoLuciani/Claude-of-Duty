@@ -28,8 +28,8 @@ installed exit and intentional iron-line occlusion.
 
 ```sh
 blender -b -t 2 --python-exit-code 1 --python tools/blender/suppressor12g/build.py
-bun run models:cook -- suppressor12g
-# After bun run assets (shared optics/laser and M590):
+bun build/models.ts suppressor12g
+# After bun tools/build-assets.ts (shared optics/laser and M590):
 blender -b -t 2 assets/weapons/m590/m590.blend --python-exit-code 1 \
   --python tools/blender/m590/check.py
 bun tools/capture.ts --weapon=shotgun --rail=laser --muzzle=suppressor --shot=ads \

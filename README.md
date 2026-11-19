@@ -13,6 +13,7 @@ bun run typecheck
 bun run lint
 bun run build
 bun run build:ci     # CI build: generates the world, skips Blender/model assets
+bun run check        # everything CI runs: format:check, build:ci, test
 ```
 
 Bun (version pinned by `packageManager` in `package.json`) is the only toolchain:
@@ -55,11 +56,11 @@ Browser capture, profiling and world-smoke tools show asset-build progress and a
 machines; this is separate from browser/page timeouts. An already-running server is reused.
 Change map content in
 `tools/worldgen/level/`; the [world editing map](tools/worldgen/README.md) identifies
-shape, placement and build locations. Regenerate with `bun run world`, then run
-`bun run world:validate`. Use `bun run world -- --force` to rebuild unchanged inputs;
-`bun run world -- --check` verifies a fresh rebuild against the generated outputs.
+shape, placement and build locations. Regenerate and validate with
+`bun tools/export-world.ts`. Use `bun tools/export-world.ts --force` to rebuild unchanged inputs;
+`bun tools/export-world.ts --check` verifies a fresh rebuild against the generated outputs.
 The seven authored weapons use the [shared gltfpack build recipe](build/README.md);
-`bun run models:cook -- p320` reruns one cook. The [spent hull](assets/fx/spent-hull/README.md)
+`bun build/models.ts p320` reruns one cook. The [spent hull](assets/fx/spent-hull/README.md)
 keeps its validated native export to preserve the casing pool's vertex attributes.
 Each model has its own geometry, material and animation acceptance gates.
 

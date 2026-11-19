@@ -17,7 +17,7 @@ blender -b -t 8 --python-exit-code 1 --python tools/blender/tor_mini/build.py --
 # Separate-process, read-only saved-scene/native-export checks:
 blender -b /tmp/tor-mini-review/tor-mini.blend --python-exit-code 1 \
   --python tools/blender/tor_mini/check.py
-bun run models:cook -- tor_mini /tmp/tor-mini-review
+bun build/models.ts tor_mini /tmp/tor-mini-review
 blender /tmp/tor-mini-review/tor-mini.blend
 ```
 

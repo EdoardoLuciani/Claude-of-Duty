@@ -64,7 +64,7 @@ for source checks.
 Optic/laser sources machine the matching channel before UV/bake/export, retaining
 exact saddle contact and 0.1 mm transverse assembly clearance on the flanks.
 
-After `bun run assets`, run:
+After `bun tools/build-assets.ts`, run:
 
 ```sh
 blender -b -t 2 --python-exit-code 1 --python tools/blender/check_picatinny.py

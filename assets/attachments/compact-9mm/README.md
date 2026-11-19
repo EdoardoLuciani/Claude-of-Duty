@@ -24,7 +24,7 @@ SIGLITE sightline clears the can without raised sights.
 
 ```sh
 blender -b -t 4 --python-exit-code 1 --python tools/blender/suppressor9mm/build.py
-bun run models:cook -- suppressor9mm
+bun build/models.ts suppressor9mm
 blender -b -t 4 assets/weapons/p320-compact/p320-compact.blend \
   --python-exit-code 1 --python tools/blender/p320/check.py
 bun tools/capture.ts --weapon=pistol --muzzle=suppressor --shot=ads \
