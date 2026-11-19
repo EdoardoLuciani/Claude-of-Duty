@@ -461,7 +461,7 @@ export class IntelSystem {
       render.patchMaterials(group);
       // Prime the actual world, unlit MRT and shadow variants without drawing
       // geometry or toggling native light identities. No temporary WebGL target.
-      await render._warmGraph();
+      await render.warmGraph();
     } finally {
       group.visible = visible;
       group.removeFromParent();

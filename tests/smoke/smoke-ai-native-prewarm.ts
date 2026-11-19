@@ -101,11 +101,12 @@ material.addEventListener('dispose', (): number => disposed++);
 const scene = new THREE.Scene(),
   existing = new THREE.Object3D();
 scene.add(existing);
+let graphReady = false;
 const render = fixture<RenderSystem>({
   renderer: fixture<RenderSystem['renderer']>({}),
-  _graph: null,
+  hasGraph: (): boolean => graphReady,
   patchMaterials(): void {},
-  async _warmGraph(): ReturnType<RenderSystem['_warmGraph']> {
+  async warmGraph(): ReturnType<RenderSystem['warmGraph']> {
     calls++;
     assert.equal(scene.children.length, 2);
     const holder = scene.children[1],
@@ -131,7 +132,7 @@ const early = await ai.prewarmMaterials();
 assert.equal(early.ok, false);
 assert.equal(ai._prewarmed, null);
 assert.equal(calls, 0, 'init must not falsely cache prewarm before native graph creation');
-render._graph = fixture<NonNullable<RenderSystem['_graph']>>({});
+graphReady = true;
 const warm = await ai.prewarmMaterials();
 assert.equal(warm.ok, true);
 assert(warm.graphWarm);
@@ -146,7 +147,7 @@ assert.equal(calls, 1);
 assert.deepEqual(scene.children, [existing]);
 assert.equal(disposed, 0);
 ai._prewarmed = null;
-render._warmGraph = async (): Promise<never> => {
+render.warmGraph = async (): Promise<never> => {
   throw new Error('intentional native warm failure');
 };
 const failed = await ai.prewarmMaterials();

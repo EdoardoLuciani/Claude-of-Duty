@@ -1,7 +1,7 @@
 // Query-only collision snapshots: copy used geometry, never live buffers or
 // unused BVH capacity. Scratch remains worker-owned.
 import type { AttachmentSnapshot } from '../ai/attachment-types.ts';
-import type { StaticWorld } from './bvh.ts';
+import { StaticWorld } from './bvh.ts';
 
 type BufferKey =
   | 'pos'
@@ -12,7 +12,7 @@ type BufferKey =
   | 'triIndex'
   | 'nodeBounds'
   | 'nodeMeta'
-  | '_taabb';
+  | 'triBounds';
 type SnapshotBuffer = AttachmentSnapshot[BufferKey];
 
 function sameBuffer<T extends SnapshotBuffer>(value: unknown, source: T): value is T {
@@ -45,7 +45,7 @@ export async function querySnapshot(
     triIndex: world.triIndex,
     nodeBounds: world.nodeBounds,
     nodeMeta: world.nodeMeta,
-    _taabb: world._taabb,
+    triBounds: world.triBounds,
   };
   const lengths = {
     pos: triCount * 9,
@@ -56,7 +56,7 @@ export async function querySnapshot(
     triIndex: triCount,
     nodeBounds: nodeCount * 6,
     nodeMeta: nodeCount * 2,
-    _taabb: triCount * 6,
+    triBounds: triCount * 6,
   };
   const transfer: ArrayBuffer[] = [];
   let bytes = 0;
@@ -74,7 +74,7 @@ export async function querySnapshot(
     'triIndex',
     'nodeBounds',
     'nodeMeta',
-    '_taabb',
+    'triBounds',
   ] as const) {
     const length = lengths[name];
     if (!valid()) return null;
@@ -97,4 +97,12 @@ export async function querySnapshot(
   }
   if (!valid()) return null;
   return { snapshot, transfer, bytes };
+}
+
+/** Rebuild a query-only world from a snapshot; its traversal scratch is the caller's own. */
+export function restoreSnapshot({ stackSize, ...data }: AttachmentSnapshot): StaticWorld {
+  const world = new StaticWorld();
+  Object.assign(world, data);
+  world._stackNode = new Int32Array(stackSize);
+  return world;
 }

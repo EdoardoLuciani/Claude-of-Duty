@@ -266,7 +266,7 @@ export type AttachmentSnapshot = Pick<
   | 'triIndex'
   | 'nodeBounds'
   | 'nodeMeta'
-  | '_taabb'
+  | 'triBounds'
 > & { stackSize: number };
 type ControllerSettings = Pick<
   CharacterController,
@@ -322,7 +322,7 @@ function snapshot(value: unknown): value is AttachmentSnapshot {
     value.triIndex instanceof Uint32Array &&
     value.nodeBounds instanceof Float32Array &&
     value.nodeMeta instanceof Int32Array &&
-    value._taabb instanceof Float32Array
+    value.triBounds instanceof Float32Array
   );
 }
 function settings(value: unknown): value is ControllerSettings & Record<string, unknown> {

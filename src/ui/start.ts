@@ -122,7 +122,7 @@ export class StartGate {
       if (
         this.ended ||
         this.engine.error ||
-        !this.engine._running ||
+        !this.engine.running ||
         !this.waiting ||
         !this.intent ||
         generation !== this.generation ||

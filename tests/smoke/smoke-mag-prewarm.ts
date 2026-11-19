@@ -48,7 +48,7 @@ const scene = new THREE.Scene(),
   viewScene = new THREE.Scene();
 viewScene.add(group, radio, scopeOverlay, reticle, grenade);
 let calls = 0,
-  finish: (report: Awaited<ReturnType<RenderSystem['_warmGraph']>>) => void = (): never => {
+  finish: (report: Awaited<ReturnType<RenderSystem['warmGraph']>>) => void = (): never => {
     throw Error('warmup resolver missing');
   };
 const flashlight = new THREE.SpotLight();
@@ -72,15 +72,15 @@ system.viewmodel = fixture<WeaponSystem['viewmodel']>({
 });
 system.rng = new Rng(1);
 system.rng.signed = (): never => assert.fail('warmup consumed gameplay RNG');
-const graph = fixture<NonNullable<RenderSystem['_graph']>>({});
+let graphReady = true;
 const render = fixture<RenderSystem>({
-  _graph: graph,
+  hasGraph: (): boolean => graphReady,
   patchMaterials(): void {},
-  prewarmLightShadow(light): ReturnType<RenderSystem['_warmGraph']> {
+  prewarmLightShadow(light): ReturnType<RenderSystem['warmGraph']> {
     assert.equal(light, flashlight, 'hidden pickups and magazines need flashlight variants');
-    return render._warmGraph();
+    return render.warmGraph();
   },
-  _warmGraph(): ReturnType<RenderSystem['_warmGraph']> {
+  warmGraph(): ReturnType<RenderSystem['warmGraph']> {
     calls++;
     assert(irons.visible && ironsRemoved.visible, 'warm both independent iron-sight variants');
     assert(muzzleDevice.visible && muzzleAdapter.visible, 'warm both muzzle states');
@@ -95,7 +95,7 @@ const render = fixture<RenderSystem>({
       scopeOverlay.visible && reticle.visible && reticleRing.visible && grenade.visible,
       'hidden optics/grenade ancestors must be warmed'
     );
-    return new Promise<Awaited<ReturnType<RenderSystem['_warmGraph']>>>((resolve): void => {
+    return new Promise<Awaited<ReturnType<RenderSystem['warmGraph']>>>((resolve): void => {
       finish = resolve;
     });
   },
@@ -113,9 +113,9 @@ let loaded = (): void => {
 system._restTask = new Promise<void>((resolve): void => {
   loaded = resolve;
 });
-render._graph = null;
+graphReady = false;
 await assert.rejects(system.prewarmMaterials(), /not ready/, 'early calls must not report success');
-render._graph = graph;
+graphReady = true;
 const pending = system.prewarmMaterials();
 const concurrent = system.prewarmMaterials();
 assert.equal(concurrent, pending, 'concurrent callers share the same work');
@@ -173,7 +173,7 @@ failedSystem.physics = fixture<PhysicsSystem>({
 });
 const failure = new Error('intentional warmup failure');
 let failures = 0;
-render._warmGraph = async (): ReturnType<RenderSystem['_warmGraph']> => {
+render.warmGraph = async (): ReturnType<RenderSystem['warmGraph']> => {
   failures++;
   throw failure;
 };

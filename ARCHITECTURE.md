@@ -10,6 +10,8 @@ Gameplay numbers (timings, distances, rewards) live in code: `src/*/tuning.ts`,
 Subsystems reach each other through `ctx.get(id)`, not imports; the constant coupling
 `ai` → `weapons` is the one exception. `src/core/`, `src/main.ts`, `src/dev/`,
 `tools/` and `build/` are shared infrastructure used by every subsystem.
+A leading `_` marks a member internal to its subsystem: files in the same directory,
+`src/dev/` and `tests/` may use it; other subsystems use public members only.
 
 | id / directory                                     | responsibility                                              |
 | -------------------------------------------------- | ----------------------------------------------------------- |
@@ -162,6 +164,7 @@ Public render surface:
 - `renderer`: initialized strict-WebGPU renderer.
 - `registerPass({ order, asNode(color, exposure), resize, dispose })`.
 - `addLight(light)`, `prewarmLightShadow(light)`.
+- `hasGraph()`, `warmGraph()`: prewarm hooks warm the actual graph through these.
 - `viewLightLevel`; borrowed `sunDir` (never mutate).
 - `screenSize`; `depthTexture` (positive view-space metres),
   `velocityTexture`, `hdrTexture` (world only).

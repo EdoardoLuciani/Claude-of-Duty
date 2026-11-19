@@ -250,7 +250,7 @@ try {
       throw Error('injected draw failure');
     },
   });
-  const warm = owner._warmGraph();
+  const warm = owner.warmGraph();
   fireFrame();
   await assert.rejects(warm, /injected draw failure/);
   assert(failed instanceof Error);

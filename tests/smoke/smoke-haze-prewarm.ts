@@ -62,7 +62,7 @@ for (const graph of [false, true])
     fail = bad;
     const draw = graph
       ? async (): ReturnType<
-          import('../../src/render/index-webgpu.ts').RenderSystem['_warmGraph']
+          import('../../src/render/index-webgpu.ts').RenderSystem['warmGraph']
         > => {
           await Promise.resolve();
           haze.render(renderer, camera);

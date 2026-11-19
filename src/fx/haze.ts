@@ -69,7 +69,7 @@ export class HazeSystem {
   async prewarm(
     renderer: Renderer,
     camera: THREE.Camera | null | undefined = this._camera,
-    drawGraph: RenderSystem['_warmGraph'] | null = null
+    drawGraph: RenderSystem['warmGraph'] | null = null
   ): Promise<
     | { ok: boolean; reason: string; error?: undefined }
     | { ok: boolean; reason?: undefined; error?: undefined }

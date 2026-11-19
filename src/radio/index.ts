@@ -178,7 +178,7 @@ export class RadioSystem {
   /** Warm real MRT/forward variants without starting a strike or drawing geometry. */
   async prewarmMaterials(): Promise<
     | { ok: false; reason: string }
-    | { ok: true; graphWarm: Awaited<ReturnType<EngineSystems['render']['_warmGraph']>> }
+    | { ok: true; graphWarm: Awaited<ReturnType<EngineSystems['render']['warmGraph']>> }
     | { ok: false; error: string }
     | undefined
   > {
@@ -192,7 +192,7 @@ export class RadioSystem {
     this.ctx.scene.add(stage);
     try {
       render.patchMaterials(stage);
-      const graphWarm = await render._warmGraph();
+      const graphWarm = await render.warmGraph();
       this._warmed = true;
       return { ok: true, graphWarm };
     } catch (error) {

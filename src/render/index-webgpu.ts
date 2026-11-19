@@ -404,14 +404,14 @@ export class RenderSystem {
   }
   async prewarmLightShadow(
     light: DirectionalLight | SpotLight
-  ): ReturnType<RenderSystem['_warmGraph']> {
+  ): ReturnType<RenderSystem['warmGraph']> {
     const { autoUpdate, needsUpdate } = light.shadow;
     try {
       // Actual forward/MRT/shadow variants, including the caller's skinned
       // stand-in. Zero draw ranges: no geometry, clock/RNG or light-ID changes.
       light.shadow.autoUpdate = true;
       light.shadow.needsUpdate = true;
-      return await this._warmGraph();
+      return await this.warmGraph();
     } finally {
       light.shadow.autoUpdate = autoUpdate;
       light.shadow.needsUpdate = needsUpdate;
@@ -453,7 +453,11 @@ export class RenderSystem {
       this._releaseGraph();
     };
   }
-  _warmGraph(): Promise<{ ms: number; geometries: number; frameUnchanged: boolean }> {
+  /** True once the production graph exists, i.e. warmGraph() can run. */
+  hasGraph(): boolean {
+    return this._graph !== null;
+  }
+  warmGraph(): Promise<{ ms: number; geometries: number; frameUnchanged: boolean }> {
     this._warmTask = this._warmGraphFrames();
     return this._warmTask;
   }
@@ -617,7 +621,7 @@ export class RenderSystem {
     meter.warm();
     // Direct scene compiles use a different context from the production passes.
     // The zero-range graph warm below covers world/view, CSM, MRT and post.
-    return { ok: true, graphWarm: await this._warmGraph() };
+    return { ok: true, graphWarm: await this.warmGraph() };
   }
   async dispose(): Promise<void> {
     this._disposing = true;

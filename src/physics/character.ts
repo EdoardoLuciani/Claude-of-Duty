@@ -172,17 +172,17 @@ export class CharacterController {
       this.wasGrounded && !jumping && this.stepHeight > 1e-4 && dx * dx + dz * dz > 1e-10;
 
     if (!useStepOffset) {
-      this._slide(dx, dy, dz);
+      this.slide(dx, dy, dz);
     } else {
       // 1. lift — a low ceiling shortens the lift automatically
-      const lift = this._sweepMove(0, this.stepHeight, 0);
+      const lift = this.sweepMove(0, this.stepHeight, 0);
       // 2. horizontal
-      this._slide(dx, 0, dz);
+      this.slide(dx, 0, dz);
       // 3. drop back down, plus this step's gravity, plus the stair-descent snap
       const want = lift + Math.max(0, -dy);
       const snap = this.snapDistance;
       const yBefore = this.position.y;
-      const dropped = this._sweepDown(want + snap);
+      const dropped = this.sweepDown(want + snap);
       if (dropped < 0) {
         // Nothing under us: fall exactly what was asked, no more.
         this.position.y = yBefore - want;
@@ -205,7 +205,7 @@ export class CharacterController {
   }
 
   /** Collide-and-slide core. Returns true if any plane stopped us. */
-  _slide(dx: number, dy: number, dz: number): boolean {
+  slide(dx: number, dy: number, dz: number): boolean {
     const planes = this._planes;
     let planeCount = 0;
     let blocked = false;
@@ -394,7 +394,7 @@ export class CharacterController {
   }
 
   /** Single swept translation with no sliding. Returns distance travelled. */
-  _sweepMove(dx: number, dy: number, dz: number): number {
+  sweepMove(dx: number, dy: number, dz: number): number {
     const dist = Math.hypot(dx, dy, dz);
     if (dist < 1e-7) return 0;
     const inv = 1 / dist;
@@ -431,7 +431,7 @@ export class CharacterController {
    * thinner probe so the bottom hemisphere settles onto a step tread instead of
    * hanging on its nose.
    */
-  _sweepDown(dist: number, radiusScale = 1): number {
+  sweepDown(dist: number, radiusScale = 1): number {
     const hit = this._hit2;
     const r = this.radius * radiusScale;
     const ok = this.world.sweepCapsule(
