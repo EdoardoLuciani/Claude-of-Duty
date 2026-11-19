@@ -14,13 +14,20 @@ export interface GrenadeAsset {
 export async function loadGrenade(renderer: Renderer): Promise<GrenadeAsset> {
   const { scene } = await loadWeaponGLTF(renderer, 'models/weapons/m67.runtime.glb');
   const finishes = convertWeaponScene(scene);
-  const [mesh] = scene.children;
-  if (scene.children.length !== 1 || !isMesh(mesh) || mesh.name !== 'MESH_grenade') {
+  const mesh = scene.children.at(0);
+  mesh?.updateMatrix();
+  if (
+    scene.children.length !== 1 ||
+    !isMesh(mesh) ||
+    mesh.name !== 'MESH_grenade' ||
+    mesh.children.length !== 0 ||
+    !mesh.matrix.equals(new THREE.Matrix4())
+  ) {
     scene.traverse((node): void => {
       if (isMesh(node)) node.geometry.dispose();
     });
     disposeWeaponMaterials(finishes);
-    throw new Error('[weapons] M67: expected a single MESH_grenade at the body centre');
+    throw new Error('[weapons] M67: expected one untransformed MESH_grenade with no children');
   }
   const { geometry, material, name } = mesh;
   return {

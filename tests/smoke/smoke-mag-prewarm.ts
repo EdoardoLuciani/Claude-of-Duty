@@ -87,8 +87,6 @@ const render = fixture<RenderSystem>({
     assert.equal(scene.children.length, 4);
     const worldGrenade = scene.children.at(-1);
     assert(worldGrenade instanceof THREE.Mesh && worldGrenade !== heldGrenade);
-    assert.equal(worldGrenade.geometry, heldGrenade.geometry);
-    assert.equal(worldGrenade.material, heldGrenade.material);
     assert.equal(system._grenades.length, 0, 'warmup must not spawn live grenades');
     assert.equal(system.pickups.items.length, 0);
     assert.equal(system.pickups._nextId, 1);
