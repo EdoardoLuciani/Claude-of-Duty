@@ -7,8 +7,9 @@ import * as THREE from 'three';
  *
  * Issue #83: G no longer throws. G equips the grenade (weapon stowed; a
  * weapon key stows it back); LMB held + release cooks and LONG-throws; RMB
- * held + release cooks and SHORT-throws; each throw type has its own viewmodel animation and
- * its own launch velocity. Overcooking detonates in the hand.
+ * held + release cooks and SHORT-throws; each throw type has its own
+ * viewmodel animation and its own launch velocity. Overcooking detonates in
+ * the hand.
  *
  *   bun test ./tests/smoke/smoke-grenades.ts
  */
