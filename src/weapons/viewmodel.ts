@@ -1260,7 +1260,8 @@ export class Viewmodel {
       return;
     }
 
-    // Radio state: the right hand presents the radio; the left hangs free. Mutually exclusive with the grenade by construction.
+    // Radio state: the right hand presents the radio; the left
+    // hangs free. Mutually exclusive with the grenade by construction.
     if (this._radioState) {
       this._solveRadioHands();
       return;

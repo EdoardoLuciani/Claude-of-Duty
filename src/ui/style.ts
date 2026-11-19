@@ -28,7 +28,6 @@ const CSS = `
   --ok:    #a8e86a;
 
   --sh: 0 1px 2px rgba(0,0,0,.92), 0 0 calc(10px * var(--k)) rgba(0,0,0,.45);
-  --sh-hard: 0 1px 1px rgba(0,0,0,.95);
 
   /* Symmetric synthesized outlines. An offset drop-shadow is a web-overlay
      tell and it fights whatever direction the scene key light comes from; a
