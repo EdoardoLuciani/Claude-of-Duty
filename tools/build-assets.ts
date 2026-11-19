@@ -6,8 +6,8 @@
  *
  * Player arms run first, then the bandage, which re-saves player-arms.blend.
  * Every weapon loads that blend, so arm changes rebuild all weapons. Then weapons,
- * independent attachments and soldiers share one bounded pool. The Bun stages
- * (procedural textures, soldier/spent-hull staging, world generation) keep their own caches.
+ * independent attachments, the spent hull and soldiers share one bounded pool.
+ * The Bun stages (procedural textures, soldier staging, world generation) keep their own caches.
  *
  * Input hashes live in .cache/assets/, outside node_modules so `bun ci` keeps them.
  * Usage: bun tools/build-assets.ts [--force]   Env: BLENDER, GLTFPACK tool paths.
@@ -103,6 +103,18 @@ export const SOLDIER_STEP: AssetStep = {
   salt: [REVISION],
   outputs: soldierProductPaths().map((file): string => relative(ROOT, file)),
   commands: [bun('tools/blender/soldiers/export.ts', '--output', SOLDIERS)],
+};
+
+const SPENT_HULL_STEP: AssetStep = {
+  id: 'spent-hull',
+  inputs: ['tools/blender/spent_hull', 'src/core/three-guards.ts'],
+  salt: [REVISION],
+  outputs: [
+    'assets/fx/spent-hull/spent12g.blend',
+    'assets/fx/spent-hull/spent12g.glb',
+    'public/models/fx/spent12g.glb',
+  ],
+  commands: [blender('tools/blender/spent_hull/build.py'), bun('tools/blender/spent_hull/cook.ts')],
 };
 
 // Shared authoring sources outside a weapon's own tooling directory.
@@ -300,6 +312,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
           .filter(isModelId)
           .map((id): AssetStep => cookStep(id, [])),
         SOLDIER_STEP,
+        SPENT_HULL_STEP,
       ]);
     }
     if (!failed)
