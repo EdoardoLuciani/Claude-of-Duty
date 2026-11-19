@@ -60,6 +60,7 @@ function makeHarness(): WeaponHarness {
     };
   }
   const wp = new ArmedWeaponSystem();
+  wp.createGrenade = (): THREE.Mesh => new THREE.Mesh();
   const clips: string[] = [],
     prompts: Array<Parameters<UiSystem['setPrompt']>[0] & { owner: unknown }> = [],
     cancellations: string[] = [],
