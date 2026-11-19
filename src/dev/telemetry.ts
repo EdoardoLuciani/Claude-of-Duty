@@ -659,7 +659,7 @@ export class TelemetrySystem {
     const api = {
       start: (): { recording: boolean; startedAt: string } => this.start(),
       stop: (): TelemetrySummary => this.stop(),
-      mark: (label?: string): TelemetryMark | null => this.mark(label),
+      mark: (label?: unknown): TelemetryMark | null => this.mark(label),
       download: (): Promise<{
         filename: string;
         bytes: number;
@@ -746,9 +746,12 @@ export class TelemetrySystem {
     return this.summary();
   }
 
-  mark(label: string = 'manual'): TelemetryMark | null {
+  mark(label: unknown = 'manual'): TelemetryMark | null {
     if (!this.recording) return null;
-    const m = this._createMark(label);
+    // Console input: keep strings and numbers, as String() did; ignore anything else.
+    const m = this._createMark(
+      typeof label === 'string' || typeof label === 'number' ? String(label) : 'manual'
+    );
     this.markers.push(m);
     this._grabQueue.push(m);
     this.badge.textContent = `MARK ${this.markers.length} SAVED · F8 EXPORT`;
