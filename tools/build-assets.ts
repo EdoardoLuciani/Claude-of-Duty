@@ -144,6 +144,7 @@ const STANDALONE_TOOLS: Partial<Record<ModelId, string[]>> = {
   rmr: ['tools/blender/rmr'],
   exps3: ['tools/blender/exps3.py', 'tools/blender/exps3_bake.py'],
   tor_mini: ['tools/blender/tor_mini'],
+  field_radio: ['tools/blender/field_radio/build.py'],
 };
 
 /** One Blender build plus its gltfpack cook for a MODEL_COOKS entry. */
@@ -152,11 +153,14 @@ function cookStep(id: ModelId, salt: string[]): AssetStep {
   const tools = STANDALONE_TOOLS[id] ?? [`tools/blender/${id}`, ...(SHARED_TOOLS[id] ?? [])];
   return {
     id,
-    inputs: [
-      ...tools,
-      ...(id === 'm67' ? [] : ['tools/blender/picatinny.py']),
-      ...authoredJson(directory),
-    ],
+    inputs:
+      id === 'field_radio'
+        ? tools
+        : [
+            ...tools,
+            ...(id === 'm67' ? [] : ['tools/blender/picatinny.py']),
+            ...authoredJson(directory),
+          ],
     // Only this model's cook settings, so one profile edit rebuilds one model.
     salt: [...salt, JSON.stringify(MODEL_COOKS[id]), ...GLTFPACK_FLAGS, GLTFPACK_VERSION],
     // The editable .blend is used by authoring and attachment-fit checks.

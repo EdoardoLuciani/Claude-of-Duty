@@ -52,6 +52,13 @@ const attachment = (
   flags,
 });
 export const MODEL_COOKS = {
+  field_radio: {
+    directory: 'assets/props/field-radio',
+    source: 'field-radio.glb',
+    output: 'public/models/player/field-radio.runtime.glb',
+    // Keep the LCD's UVs even though its image is only bound at runtime.
+    flags: ['-kv', '-tc', 'color,attrib'],
+  },
   suppressor12g: attachment('12g-suppressor', 'suppressor12g.glb', 'suppressor12g'),
   suppressor9mm: attachment('compact-9mm', 'suppressor9mm.glb', 'suppressor9mm'),
   suppressor338: attachment('suppressor-338', 'suppressor338.glb', 'suppressor338'),

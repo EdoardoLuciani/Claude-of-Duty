@@ -272,6 +272,12 @@ that borrow the same geometry, material and maps as the held prop. Weapons warm
 both render passes; restart removes live instances, and teardown releases the
 shared asset after AI and the viewmodel have detached their visuals.
 
+The held field radio is a standalone authored GLB. `radio-mesh.ts` loads it during
+weapons boot and binds one retained canvas emissive texture to `SCREEN_radio`.
+The viewmodel mounts it at `GRIP_radio`, owns the asset lifetime, and keeps the
+same model through stow, pause and restart. The radio request state and native
+DOM panel do not depend on the model. [Radio asset contract](assets/props/field-radio/README.md).
+
 `weapons.createInspectionModel(id, config)` returns an independent rest-pose clone
 with `dispose()` for the market's demand-rendered WebGPU studio. Inspection owns
 transforms, skeletons and mixers; geometry, materials and maps are borrowed.

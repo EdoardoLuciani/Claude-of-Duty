@@ -322,8 +322,14 @@ export class WeaponSystem {
       this._grenadeAsset = asset;
       this.viewmodel.grenade.add(asset.instantiate());
     });
+    const radio = this.viewmodel.loadRadio(renderer);
     try {
-      const [records] = await Promise.all([Promise.all(spawn.map(load)), attachments, grenade]);
+      const [records] = await Promise.all([
+        Promise.all(spawn.map(load)),
+        attachments,
+        grenade,
+        radio,
+      ]);
       for (let i = 0; i < spawn.length; i++) {
         tris += this.viewmodel.addWeapon(
           records[i],
@@ -341,7 +347,7 @@ export class WeaponSystem {
       })();
     } catch (error) {
       // Settle required and optional props so disposal owns every completed load.
-      await Promise.allSettled([attachments, grenade]);
+      await Promise.allSettled([attachments, grenade, radio]);
       await disposeWeaponLoader(renderer);
       throw error;
     }

@@ -1,11 +1,10 @@
 import * as THREE from 'three';
 import * as TSL from 'three/tsl';
-import { MeshBasicNodeMaterial, MeshPhysicalNodeMaterial } from 'three/webgpu';
+import { MeshBasicNodeMaterial } from 'three/webgpu';
 import type { Node, UniformNode } from 'three/webgpu';
 
 import { Spring, TAU, clamp, clamp01, damp, lerp, smootherstep } from '../core/math.ts';
 import { loadArmAsset } from './arm-asset.ts';
-import { createWeaponMaterial } from './asset-material.ts';
 import {
   configureWeaponAttachments,
   releaseAttachmentMounts,
@@ -26,10 +25,11 @@ import {
 import type { Clip } from './clips.ts';
 import type { WeaponDef } from './defs.ts';
 import { triCount } from './geometry.ts';
+import { HAND_POSES } from './hand-poses.ts';
 import { Arm } from './hands.ts';
 import type { ReticleMaterials } from './materials-tsl.ts';
 import { Spring3, Noise1, wrapPi } from './mathx.ts';
-import { radioMesh, radioScreenTexture } from './radio-mesh.ts';
+import { loadRadio } from './radio-mesh.ts';
 import type {
   ViewPoseKey,
   ViewState,
@@ -206,7 +206,6 @@ function handBasis(
 
 export class Viewmodel {
   declare ctx: ViewmodelContext;
-  declare radioScreen: THREE.Mesh<THREE.BufferGeometry, MeshPhysicalNodeMaterial> | null;
   declare maskUniforms: {
     uAlpha: UniformNode<'float', number>;
     uAspect: UniformNode<'float', number>;
@@ -247,7 +246,8 @@ export class Viewmodel {
   // The shared world mesh, slightly enlarged so it reads at arm's length;
   // parented to the hand so it rides the arm through the throw.
   grenade: THREE.Group = new THREE.Group();
-  radio: THREE.Object3D = radioMesh();
+  radio: THREE.Group = new THREE.Group();
+  radioAsset: Awaited<ReturnType<typeof loadRadio>> | null = null;
   active: WeaponEntry | null = null;
   // 0 = none, 1 = held / cooking, 2 = throwing. The throw is a short
   // hand-rolled timeline (the clip system animates the weapon, not the arms)
@@ -266,8 +266,6 @@ export class Viewmodel {
   _grenadeBackR: Float32Array = new Float32Array(3);
   _grenadeFingerL: Float32Array = new Float32Array(3);
   _grenadeBackL: Float32Array = new Float32Array(3);
-  // The radio template also serves standalone previews; own only view copies.
-  _radioMaterials: Map<THREE.Material, THREE.Material> = new Map();
   _radioState: number = 0; // 0 = stowed, 1 = held
   bandageAsset: Awaited<ReturnType<typeof loadBandage>> | null = null;
   _bandageState: number = 0;
@@ -352,18 +350,16 @@ export class Viewmodel {
     this.radio.name = 'ow-radio';
     this.radio.position.set(0.0, -0.052, -0.05);
     this.radio.rotation.set(-Math.PI / 2, Math.PI, 0);
+    // Seat the back against the glove while keeping the top controls clear of the fingertips.
+    this.radio.translateZ(-0.025);
+    this.radio.rotateX(0.31);
+    this.armR.poses.radio = {
+      ...HAND_POSES.radio,
+      thumb: [0.16, 0.28],
+      thumbBase: [0.24, 0.25, -0.38],
+    };
     this.radio.visible = false;
     this.armR.hand.add(this.radio);
-    this.radio.traverse((o): void => {
-      if (!isMesh(o) || !(o.material instanceof THREE.MeshStandardMaterial)) return;
-      const source = o.material;
-      if (!this._radioMaterials.has(source))
-        this._radioMaterials.set(source, createWeaponMaterial(source));
-      const material = this._radioMaterials.get(source);
-      if (material) o.material = material;
-    });
-    const screen: unknown = this.radio.userData.screen;
-    this.radioScreen = isRadioScreen(screen) ? screen : null;
 
     this.reticle.name = 'ow-reticle';
     this.anchor.add(this.reticle);
@@ -697,11 +693,7 @@ export class Viewmodel {
   }
 
   setRadioScreen(count: number): void {
-    const screen = this.radioScreen;
-    if (!screen) return;
-    const old = screen.material.map;
-    screen.material.map = radioScreenTexture(count);
-    old?.dispose();
+    this.radioAsset?.setScreen(count);
   }
 
   /**
@@ -995,6 +987,11 @@ export class Viewmodel {
     this.bandageAsset = await loadBandage();
     this.armR.hand.add(this.bandageAsset.roll);
     this.armL.forePivot.add(this.bandageAsset.wrap, this.bandageAsset.tail);
+  }
+
+  async loadRadio(renderer: Parameters<typeof loadRadio>[0]): Promise<void> {
+    this.radioAsset = await loadRadio(renderer);
+    this.radio.add(this.radioAsset.scene);
   }
 
   update(dt: number, s: ViewState): void {
@@ -1425,11 +1422,8 @@ export class Viewmodel {
     this.armAsset?.dispose();
     // Detach the held visual before weapons release the shared asset.
     this.grenade.clear();
-    this.radio?.traverse((o): void => {
-      if (isMesh(o)) o.geometry.dispose();
-    });
-    for (const material of this._radioMaterials.values()) material.dispose();
-    this._radioMaterials.clear();
+    this.radioAsset?.dispose();
+    this.radioAsset = null;
     this.bandageAsset?.dispose();
     this.bandageAsset?.roll.removeFromParent();
     this.bandageAsset?.wrap.removeFromParent();
@@ -1450,14 +1444,4 @@ export type ViewModel = Viewmodel;
 
 function isMesh(object: THREE.Object3D): object is THREE.Mesh {
   return 'isMesh' in object && object.isMesh === true;
-}
-
-function isRadioScreen(
-  screen: unknown
-): screen is THREE.Mesh<THREE.BufferGeometry, MeshPhysicalNodeMaterial> {
-  return (
-    screen instanceof THREE.Mesh &&
-    screen.geometry instanceof THREE.BufferGeometry &&
-    screen.material instanceof MeshPhysicalNodeMaterial
-  );
 }
