@@ -241,7 +241,7 @@ export class WeaponSystem {
   private _grenadeAsset: GrenadeAsset | null = null;
   grenades: number = GRENADES_PER_LIFE;
   /** Grenade in the hand: G drew it, the weapon is stowed. Equipping is
-   *  free — stowing (G again, or a weapon switch) spends nothing. */
+   *  free — stowing (any weapon selection) spends nothing. */
   grenadeEquipped: boolean = false;
   radioEquipped: boolean = false;
   healing: boolean = false;
@@ -809,14 +809,14 @@ export class WeaponSystem {
   }
 
   setWeapon(id: string): boolean {
-    if (
-      !isWeaponId(id) ||
-      this.disabled ||
-      !this.owned.has(id) ||
-      id === this.activeId ||
-      this._switchTo
-    )
-      return false;
+    if (!isWeaponId(id) || this.disabled || !this.owned.has(id) || this._switchTo) return false;
+    if (id === this.activeId) {
+      // Selecting the active weapon draws it back from a held grenade.
+      if (!this.grenadeEquipped || this.cooking || this._throwing) return false;
+      this._stowGrenade();
+      this._viewmodel?.play('draw');
+      return true;
+    }
     if (!this._hasMesh(id)) return false;
     if (this.cycling) return false;
     if (this.cooking || this._throwing) return false; // committed to the throw — no mid-throw swap
@@ -1323,20 +1323,17 @@ export class WeaponSystem {
    * LMB cooks and throws LONG, RMB cooks and throws SHORT. The fuse burns only
    * while a mouse button is held — releasing commits the throw with whatever
    * fuse is left. Overcooking detonates in your hand. Equipping is free:
-   * pressing G again (or switching weapons) stows the grenade unspent, so the
-   * G key never throws — it only arms and stows.
+   * selecting a weapon stows the grenade unspent. G only arms; it never
+   * throws or stows.
    */
   _updateGrenade(dt: number, input: EngineContext['input'], live: boolean): void {
     if (!live) return; // death drops the grenade via its own listener
 
-    // G toggles the grenade in and out of the hand.
+    // G equips the grenade; weapon keys stow it.
     if (input.actionPressed('grenade')) {
       if (this.cooking || this._throwing || this.switching) return; // hands are busy
+      if (this.grenadeEquipped) return;
       this._interruptHeal('grenade');
-      if (this.grenadeEquipped) {
-        this._stowGrenade();
-        return;
-      }
       if (this.grenades > 0) {
         if (this.radioEquipped) this._stowRadio();
         this.grenadeEquipped = true;
@@ -1346,7 +1343,7 @@ export class WeaponSystem {
         this.ui?.setPrompt({
           key: bindingLabel('fire'),
           text: 'LONG THROW',
-          sub: `${bindingLabel('ads')} SHORT THROW · ${bindingLabel('grenade')} STOWS`,
+          sub: `${bindingLabel('ads')} SHORT THROW · ${bindingLabel('slot1')}/${bindingLabel('slot2')} STOWS`,
         });
       }
       return;

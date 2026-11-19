@@ -5,10 +5,11 @@ import * as THREE from 'three';
 /**
  * Bun smoke test for the grenade launch flow — no browser.
  *
- * Issue #83: G no longer throws. G equips the grenade (weapon stowed, free to
- * stow back); LMB held + release cooks and LONG-throws; RMB held + release
- * cooks and SHORT-throws; each throw type has its own viewmodel animation and
- * its own launch velocity. Overcooking detonates in the hand.
+ * Issue #83: G no longer throws. G equips the grenade (weapon stowed; a
+ * weapon key stows it back); LMB held + release cooks and LONG-throws; RMB
+ * held + release cooks and SHORT-throws; each throw type has its own
+ * viewmodel animation and its own launch velocity. Overcooking detonates in
+ * the hand.
  *
  *   bun test ./tests/smoke/smoke-grenades.ts
  */
@@ -158,7 +159,7 @@ pressDigit(2);
 assert.equal(wp._switchTo, 'shotgun', '2 follows the shotgun secondary');
 wp.resetForNewGame();
 
-// ---- G equips, never throws; stowing is free ------------------------------
+// ---- G equips, never throws or stows; the weapon key stows for free --------
 pressG();
 assert.equal(wp.grenadeEquipped, true, 'G equips the grenade');
 assert.equal(wp.grenades, 2, 'equipping spends nothing');
@@ -166,9 +167,12 @@ assert(calls.includes('hold'), 'viewmodel holds the grenade');
 assert(!calls.includes('throw:'), 'G does not throw');
 
 pressG();
-assert.equal(wp.grenadeEquipped, false, 'G again stows the equipped grenade');
+assert.equal(wp.grenadeEquipped, true, 'G again keeps the grenade out');
+pressDigit(1);
+assert.equal(wp.grenadeEquipped, false, 'the active weapon slot stows the grenade');
 assert.equal(wp.grenades, 2, 'stowing spends nothing');
 assert(calls.at(-1) === 'end', 'viewmodel stows the grenade');
+assert.equal(wp.viewmodel.clipName, 'draw', 'the active weapon is drawn back');
 
 // ---- switching weapons while equipped stows the grenade --------------------
 pressG();
@@ -458,6 +462,7 @@ const pressX = (): void => {
   input._xPressed = false;
 };
 let strikeCalls = 0;
+wp.setWeaponImmediate('rifle'); // the market case above left an unowned SMG active
 wp.radioSys = new RadioSystem();
 wp.radioSys.callStrike = (): boolean => {
   strikeCalls++;
@@ -486,8 +491,8 @@ assert.equal(wp.grenadeEquipped, false, 'grenade is not out');
 pressG();
 assert.equal(wp.grenadeEquipped, true, 'G equips the grenade while the radio is out');
 assert.equal(wp.radioEquipped, false, 'equipping the grenade stows the radio');
-pressG(); // stow again for the next case
-assert.equal(wp.grenadeEquipped, false, 'G stows the grenade');
+pressDigit(1); // stow again for the next case
+assert.equal(wp.grenadeEquipped, false, '1 stows the grenade');
 
 // ---- ...and G then X: X is refused while the grenade holds the hand -----
 pressG();
@@ -495,8 +500,8 @@ assert.equal(wp.grenadeEquipped, true, 'grenade is out');
 pressX();
 assert.equal(wp.radioEquipped, false, 'X is refused while the grenade is out');
 assert.equal(wp.grenadeEquipped, true, 'the grenade stays equipped');
-pressG(); // stow
-assert.equal(wp.grenadeEquipped, false, 'G stows the grenade');
+pressDigit(1); // stow
+assert.equal(wp.grenadeEquipped, false, '1 stows the grenade');
 
 // ---- switching weapons while the radio is out stows it --------------------
 pressX();

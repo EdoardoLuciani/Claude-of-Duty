@@ -402,14 +402,18 @@ for (const wheel of [-1, 1]) {
   assert.equal(results.length, 2, 'held Tab and expired wheel do not repeat');
 }
 
-// Slot 3 is inert normally; same-slot selection cannot stow a grenade.
+// Slot 3 is inert normally; same-slot selection stows a grenade and redraws.
 {
   const { wp, tap } = makeHarness();
   tap('Digit3');
   assert.equal(wp._switchTo, null);
   tap('KeyG');
+  tap('KeyG');
+  assert(wp.grenadeEquipped, 'G again is a no-op, not a stow');
   tap('Digit1');
-  assert(wp.grenadeEquipped, 'same-slot selection is a no-op, not a stow');
+  assert(!wp.grenadeEquipped, 'same-slot selection stows the grenade');
+  assert.equal(wp._switchTo, null);
+  tap('KeyG');
   tap('Digit2');
   assert(!wp.grenadeEquipped);
   assert.equal(wp._switchTo, 'pistol');
@@ -835,7 +839,7 @@ for (const [code, other, action, type] of [
   assert.equal(prompts[prompts.length - 1].key, bindingLabel('fire'));
   assert.equal(
     prompts[prompts.length - 1].sub,
-    `${bindingLabel('ads')} SHORT THROW · ${bindingLabel('grenade')} STOWS`
+    `${bindingLabel('ads')} SHORT THROW · ${bindingLabel('slot1')}/${bindingLabel('slot2')} STOWS`
   );
   frame({ down: [code] });
   assert(wp.cooking);
