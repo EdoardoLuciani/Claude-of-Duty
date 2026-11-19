@@ -95,6 +95,7 @@ export class StaticWorld {
   solid: Int32Array = new Int32Array(0);
   triIndex: Uint32Array = new Uint32Array(0);
   nodeBounds: Float32Array = new Float32Array(0);
+  triBounds: Float32Array = new Float32Array(0);
   nodeMeta: Int32Array = new Int32Array(0);
   nodeCount: number = 0;
   maxDepth: number = 0;
@@ -103,7 +104,6 @@ export class StaticWorld {
   version: number = 0;
   // scratch
   _cent: Float32Array = new Float32Array(0);
-  triBounds: Float32Array = new Float32Array(0);
   _stackNode: Int32Array = new Int32Array(128);
   _stackT: Float32Array = new Float32Array(128);
   _buildStack: Int32Array = new Int32Array(3 * 4096);

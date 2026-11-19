@@ -368,10 +368,7 @@ export class FxSystem {
     const haze = await this.hazeSys.prewarm(
       renderer,
       ctx.camera,
-      render?.warmGraph
-        ? (): Promise<{ ms: number; geometries: number; frameUnchanged: boolean }> =>
-            render.warmGraph()
-        : null
+      render ? (): ReturnType<EngineSystems['render']['warmGraph']> => render.warmGraph() : null
     );
     return { ok: haze.ok, haze };
   }

@@ -168,15 +168,6 @@ self.onmessage = ({ data: value }: MessageEvent<unknown>): void => {
           controller.probeGround.bind(controller),
           timedCost('probeGround')
         );
-        controller.slide = instrument(controller.slide.bind(controller), timedCost('slide'));
-        controller.sweepMove = instrument(
-          controller.sweepMove.bind(controller),
-          timedCost('sweepMove')
-        );
-        controller.sweepDown = instrument(
-          controller.sweepDown.bind(controller),
-          timedCost('sweepDown')
-        );
       }
       post({ type: 'ready' });
     } else if (data.type === 'queries') {
