@@ -2,7 +2,7 @@
 
 Authoring authority: `tools/blender/suppressor/build.py` (shared can helpers in
 `tools/blender/can.py`). Cook/asset id: `srd762ti`
-(`/models/attachments/srd762ti.runtime.glb`). Build with `bun run assets`; native
+(`/models/attachments/srd762ti.runtime.glb`). Build with `bun tools/build-assets.ts`; native
 Blender/GLB and cooked runtime products are ignored. Graphite ceramic exterior with
 shallow seams, wrench flats and a recessed open endcap.
 

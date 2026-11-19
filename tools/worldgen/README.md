@@ -30,14 +30,12 @@ meshes or hand-edit products. Navigation shares runtime controller algorithms.
 Run from the repository root after `bun ci`:
 
 ```sh
-bun run world
-bun run world:validate
-bun run world -- --check
-bun run test
-bun run build
+bun tools/export-world.ts
+bun tools/export-world.ts --check
+bun run verify
 ```
 
-Use `bun run world -- --out=/tmp/world-review` for isolated output.
+Use `bun tools/export-world.ts --out=/tmp/world-review` for isolated output.
 Commit source only, not generated assets. `--force` rebuilds unchanged inputs and
 `--check` verifies a fresh rebuild against the local outputs. Paths/source bytes affect provenance;
 compare physical payloads separately from expected hash changes. `source-hash.ts`

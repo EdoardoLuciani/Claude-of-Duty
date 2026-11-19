@@ -24,7 +24,7 @@ bun tools/blender/soldiers/export.ts --output /tmp/soldier-review
 # Optional --seed 0x5eed1234 --blender /absolute/path/to/blender
 # After structural, in-engine material and pose review, regenerate canonical files:
 bun tools/blender/soldiers/export.ts --output "$(pwd)/assets/soldiers"
-bun run models
+bun tools/export-models.ts
 bun run test
 bun run build
 ```

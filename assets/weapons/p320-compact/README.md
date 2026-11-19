@@ -23,7 +23,7 @@ Run from the repository root with Blender 5.2.2 and gltfpack 1.3:
 blender -b -t 8 --python-exit-code 1 --python tools/blender/p320/build.py
 blender -b -t 8 assets/weapons/p320-compact/p320-compact.blend \
   --python-exit-code 1 --python tools/blender/p320/check.py
-bun run models:cook -- p320
+bun build/models.ts p320
 ```
 
 Use `--output /tmp/p320-review --render --quick` for scratch source builds.
@@ -70,4 +70,4 @@ tilt and empty lockback the bore moves, as it should.
 laser and asset-owned `suppressor.py` sweeps at 120 Hz across every clip. They
 verify the barrel-relative mount, intersections against the evaluated mechanical
 skin, both shared arms, TOR Mini and its emitter ray. Build the compact can and
-laser first (`bun run assets`).
+laser first (`bun tools/build-assets.ts`).

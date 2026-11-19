@@ -25,8 +25,8 @@ contact is their shared crown plane. AX338 has no authored bipod.
 
 ```sh
 blender -b -t 2 --python-exit-code 1 --python tools/blender/suppressor338/build.py
-bun run models:cook -- suppressor338
-# After bun run assets (AX338, TOR Mini and standalone optics):
+bun build/models.ts suppressor338
+# After bun tools/build-assets.ts (AX338, TOR Mini and standalone optics):
 blender -b -t 2 assets/weapons/ax338/ax338.blend --python-exit-code 1 \
   --python tools/blender/ax338/muzzle.py
 bun tools/capture.ts --weapon=sniper --optic=scope --rail=laser \

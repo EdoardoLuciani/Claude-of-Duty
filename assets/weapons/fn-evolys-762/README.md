@@ -40,11 +40,11 @@ Run from the repository root with Blender 5.2.2 and gltfpack 1.3:
 blender -b -t 2 --python-exit-code 1 --python tools/blender/evolys/build.py
 blender -b assets/weapons/fn-evolys-762/fn-evolys-762.blend \
   --python-exit-code 1 --python tools/blender/evolys/check.py
-bun run models:cook -- evolys
+bun build/models.ts evolys
 ```
 
 Before running `check.py`, regenerate the shared optic Blender products if missing
-or stale (`bun run assets -- --force`): the asset cache promises GLBs, not
+or stale (`bun tools/build-assets.ts --force`): the asset cache promises GLBs, not
 standalone `.blend` review products. The checker loads the actual optics, SRD762Ti
 and TOR Mini surfaces and checks rail contact, iron clashes, slot coexistence,
 fixed-surface clearance, the mounted exit and a through-bore gauge. It sweeps

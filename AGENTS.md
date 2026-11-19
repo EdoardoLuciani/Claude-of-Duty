@@ -30,15 +30,15 @@ before subsystem changes: it owns directory assignments, APIs and event contract
 ## Commands and invariants
 
 ```sh
-bun ci                 # preferred clean install
-bun run test           # Bun runs tests/smoke/ scripts in isolated parallel processes
-bun run typecheck      # src, tools, build and tests
-bun run lint           # type-aware Oxlint; warnings fail
-bun run build:ci       # CI build (runs typecheck + lint); skips Blender assets
-bun run build          # full build; re-bakes stale Blender models (slow)
-bun run world:validate # required when world/prop assets change
-bun run world          # compile world source and cook collision
-bun run dev            # local server; not needed for CI-only work
+bun ci                    # preferred clean install
+bun run verify            # CI gate: format:check, build:ci, test
+bun run test              # Bun runs tests/smoke/ scripts in isolated parallel processes
+bun run typecheck         # src, tools, build and tests
+bun run lint              # type-aware Oxlint; warnings fail
+bun run build:ci          # CI build (runs typecheck + lint); skips Blender assets
+bun run build             # full build; re-bakes stale Blender models (slow)
+bun tools/export-world.ts # compile and validate the world; required when world/prop assets change
+bun run dev               # local server; not needed for CI-only work
 ```
 
 - Tests and `build:ci` must pass from a clean install: no missing imports/exports or

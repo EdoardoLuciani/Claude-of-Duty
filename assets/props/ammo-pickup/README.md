@@ -18,13 +18,13 @@ With gltfpack 1.3/BasisU on `PATH`, run from the repo root:
 ```sh
 out=$(mktemp -d)
 blender -b -t 2 --python-exit-code 1 --python tools/blender/ammo_pickup/build.py -- --output "$out"
-bun run models:cook -- ammo_pickup "$out"
+bun build/models.ts ammo_pickup "$out"
 blender -b "$out/ammo-pickup.blend" --python-exit-code 1 --python tools/blender/ammo_pickup/check.py
 ```
 
 The `.blend` preserves individually named component meshes and both packed
 atlases. The native export joins only an in-memory copy, then gltfpack cooks
-that GLB with meshopt and UASTC/KTX2. `bun run assets`, `bun run dev` and
+that GLB with meshopt and UASTC/KTX2. `bun tools/build-assets.ts`, `bun run dev` and
 `bun run build` also author/cook it (stale source/product detection, no dependency
 on arms or weapon builds). Normal outputs are `ammo-pickup.blend` and
 `ammo-pickup.glb` here, and `/models/props/ammo-pickup.runtime.glb` under

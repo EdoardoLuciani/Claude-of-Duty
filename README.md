@@ -7,13 +7,11 @@ Blender-authored assets load locally, with no runtime CDN.
 
 ```sh
 bun ci
-bun run dev          # builds stale generated assets, validates world assets, serves :5173
-bun run test
-bun run typecheck
-bun run lint
-bun run build
-bun run build:ci     # CI build: generates the world, skips Blender/model assets
+bun run dev     # builds stale generated assets, validates world assets, serves :5173
+bun run verify  # CI gate: format:check, build:ci, test
 ```
+
+The full command list is in [AGENTS.md](AGENTS.md#commands-and-invariants).
 
 Bun (version pinned by `packageManager` in `package.json`) is the only toolchain:
 it installs, type-checks (`bun check`), formats, lints, bundles, serves, runs the
@@ -50,16 +48,14 @@ the spent hull and the world are generated, not committed. Each step reruns only
 its inputs change or an output is missing; the first build needs **Blender 5.2.2** and
 **gltfpack 1.3** on `PATH` (or `BLENDER`/`GLTFPACK`) and takes several minutes.
 `bun run test` and `bun run build:ci` generate the world with Bun, without Blender.
-Browser capture, profiling and world-smoke tools show asset-build progress and allow
+Browser capture, profiling and world-smoke (`bun tests/e2e/world-smoke.ts`) tools show asset-build progress and allow
 15 minutes for server startup. Set `OW_STARTUP_TIMEOUT_MS` (milliseconds) for slower
 machines; this is separate from browser/page timeouts. An already-running server is reused.
 Change map content in
 `tools/worldgen/level/`; the [world editing map](tools/worldgen/README.md) identifies
-shape, placement and build locations. Regenerate with `bun run world`, then run
-`bun run world:validate`. Use `bun run world -- --force` to rebuild unchanged inputs;
-`bun run world -- --check` verifies a fresh rebuild against the generated outputs.
+shape, placement and build locations, and the `bun tools/export-world.ts` options.
 The seven authored weapons use the [shared gltfpack build recipe](build/README.md);
-`bun run models:cook -- p320` reruns one cook. The [spent hull](assets/fx/spent-hull/README.md)
+`bun build/models.ts p320` reruns one cook. The [spent hull](assets/fx/spent-hull/README.md)
 keeps its validated native export to preserve the casing pool's vertex attributes.
 Each model has its own geometry, material and animation acceptance gates.
 
@@ -176,6 +172,8 @@ Tests are not final human visual acceptance; see each asset's remaining limits.
 - `bun tools/profile.ts`: sustained living-combat frame/CPU percentiles and hitches.
   GPU timestamps are unavailable; node-builder activity is not GPU compilation time.
   Compare matched runs only; there is no cross-hardware frame-time threshold.
+  `--production` profiles the existing `dist/` (`bun run build` first) via
+  `bun build/bun.ts preview`.
 
 Keep capture/profile primitives and focused correctness checks; task-specific
 screenshot matrices, reels and investigation scripts are temporary and not committed. `bun run test` is the correctness gate; it is not visual or combat-
@@ -195,6 +193,6 @@ continues unless it failed; the reload-required error is exposed through
 
 ## Automation
 
-The `Validate` GitHub Actions workflow runs on pull requests and pushes to `main`
-and `develop`. It checks formatting, types, lint, tests and the production build.
+The `Validate` GitHub Actions workflow runs `bun run verify` on pull requests and pushes to `main`
+and `develop`: formatting, types, lint, the production build and tests.
 Changes go through pull requests into `develop`; only the owner promotes to `main`.

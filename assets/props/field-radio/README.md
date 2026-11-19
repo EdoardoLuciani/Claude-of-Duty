@@ -20,7 +20,7 @@ the export joins the housing into one draw and retains the LCD separately.
 # From repository root; repeat in a second empty directory to compare exports.
 out=$(mktemp -d)
 blender -b -t 2 --python-exit-code 1 --python tools/blender/field_radio/build.py -- --output "$out"
-bun run models:cook -- field_radio "$out"
+bun build/models.ts field_radio "$out"
 blender -b "$out/field-radio.blend" -t 2 --python-exit-code 1 \
   --python tools/blender/field_radio/check.py -- "$out/field-radio.glb" "$out/field-radio.runtime.glb"
 ```
@@ -74,7 +74,7 @@ held-minus-hidden CPU delta was 0.1 ms before and 0.0 ms after; the GPU delta
 (0.003/0.020 ms) was small relative to variability. These are not isolated prop
 GPU times or evidence of a whole-frame speedup.
 
-Use `bun run shot -- --shot=radio --out=.cache/radio.png` for held context.
+Use `bun tools/capture.ts --shot=radio --out=.cache/radio.png` for held context.
 Review a matched close-up by cropping the view camera (without moving either
 camera), daylight and streetlight/night, and both available/empty request rows.
 Check glove seating and controls independently of screen text, and compare the
