@@ -809,14 +809,14 @@ export class WeaponSystem {
   }
 
   setWeapon(id: string): boolean {
-    if (
-      !isWeaponId(id) ||
-      this.disabled ||
-      !this.owned.has(id) ||
-      id === this.activeId ||
-      this._switchTo
-    )
-      return false;
+    if (!isWeaponId(id) || this.disabled || !this.owned.has(id) || this._switchTo) return false;
+    if (id === this.activeId) {
+      // Selecting the active weapon draws it back from a held grenade.
+      if (!this.grenadeEquipped || this.cooking || this._throwing) return false;
+      this._stowGrenade();
+      this.viewmodel.play('draw');
+      return true;
+    }
     if (!this._hasMesh(id)) return false;
     if (this.cycling) return false;
     if (this.cooking || this._throwing) return false; // committed to the throw — no mid-throw swap
@@ -1329,7 +1329,7 @@ export class WeaponSystem {
   _updateGrenade(dt: number, input: EngineContext['input'], live: boolean): void {
     if (!live) return; // death drops the grenade via its own listener
 
-    // G toggles the grenade in and out of the hand.
+    // G equips the grenade; weapon keys stow it.
     if (input.actionPressed('grenade')) {
       if (this.cooking || this._throwing || this.switching) return; // hands are busy
       if (this.grenadeEquipped) return;
@@ -1415,17 +1415,6 @@ export class WeaponSystem {
     this._viewmodel?.endGrenade();
     this._viewmodel?.endRadio();
     this._viewmodel?.endBandage();
-  }
-
-  /** Weapon keys: the already-active weapon is drawn back from a held grenade. */
-  _selectWeapon(id: WeaponId | undefined): void {
-    if (!id) return;
-    if (id !== this.activeId || !this.grenadeEquipped || this.cooking || this._throwing) {
-      this.setWeapon(id);
-      return;
-    }
-    this._stowGrenade();
-    this._viewmodel?.play('draw');
   }
 
   /** Stow the equipped grenade back into the pouch, unspent and unthrown. */
@@ -1708,10 +1697,14 @@ export class WeaponSystem {
       if (input.actionPressed('fireMode')) this.cycleFireMode();
       if (input.actionPressed('inspect')) this.inspect();
       if (!this.radioEquipped) {
-        if (input.actionPressed('slot1'))
-          this._selectWeapon(PRIMARY_IDS.find((id): boolean => this.owned.has(id)));
-        if (input.actionPressed('slot2'))
-          this._selectWeapon(SECONDARY_IDS.find((id): boolean => this.owned.has(id)));
+        if (input.actionPressed('slot1')) {
+          const primary = PRIMARY_IDS.find((id): boolean => this.owned.has(id));
+          if (primary) this.setWeapon(primary);
+        }
+        if (input.actionPressed('slot2')) {
+          const secondary = SECONDARY_IDS.find((id): boolean => this.owned.has(id));
+          if (secondary) this.setWeapon(secondary);
+        }
       }
       if (input.actionPressed('cycleWeapon')) this.nextWeapon();
       if (input.wheel) this.nextWeapon();
