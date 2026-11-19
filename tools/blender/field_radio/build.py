@@ -24,14 +24,14 @@ GLYPHS = dict(zip('ACDEFILNOPRTU0124-/', '''
 # Atlas tiles for the non-printed surfaces. RGB is display-encoded; roughness
 # and metalness are linear. Coated metal stays dielectric until paint wears off.
 SWATCHES = {
-    'Polymer': ((75, 77, 66), .68, 0),
+    'Polymer': ((74, 76, 49), .68, 0),
     'Rubber': ((39, 42, 39), .89, 0),
     'Recess': ((21, 26, 25), .86, 0),
     'Anodized': ((103, 108, 108), .35, .78),
     'Fastener': ((133, 136, 131), .47, .86),
-    'Orange': ((181, 78, 38), .71, 0),
+    'Orange': ((180, 69, 31), .71, 0),
     'Pointer': ((189, 184, 150), .63, 0),
-    'Gasket': ((48, 51, 46), .57, 0),
+    'Gasket': ((47, 48, 36), .57, 0),
 }
 
 
@@ -61,7 +61,7 @@ def atlases(out):
         for px in range(SIZE):
             if px < 256:
                 x, y = (px - 128) / 3.72, (py - 12) / 4.1
-                rgb, rough, metal = (82, 84, 71), .71, 0
+                rgb, rough, metal = (88, 88, 59), .71, 0
                 # Outline and narrow scuff bands on the moulded face. Recessed
                 # grille perforations are baked at this scale, not 100 tiny draws.
                 edge = max(abs(x) - 20.2, 1.8 - y, y - 105)
@@ -80,7 +80,7 @@ def atlases(out):
                         elif dist < 1.09 and dy < .25:
                             grain += 15
                 if 103.3 < y < 104.0 and -19 < x < 18:
-                    rgb, grain = (151, 129, 80), 0
+                    rgb, grain = (152, 116, 54), 0
                 rough -= rub / 125
             else:
                 row = max(0, min(1, (py + 10) // 70))

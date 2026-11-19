@@ -55,7 +55,7 @@ The native and cooked GLBs from two clean same-host builds were byte-identical.
 | Triangles / vertices | 246 / 397 | 1,206 / 1,648 |
 | Loaded index + attribute bytes | 14,180 | 46,788 |
 | Resident texture payload (including LCD mips, RDNA 4 BC7) | ~171 KiB | ~597 KiB |
-| Dedicated runtime GLB | None | 75,612 B |
+| Dedicated runtime GLB | None | 76,424 B |
 
 The extra geometry gives the housing curved corners, seating/recesses and a
 shaped antenna/encoder. Extra texture memory buys the static labels, grille,
