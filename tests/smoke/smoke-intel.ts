@@ -1,9 +1,10 @@
+import { spyOn } from 'bun:test';
 /** Authored sites, distance-gated random selection, run limits and interaction. */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import * as THREE from 'three';
-import { MeshStandardNodeMaterial, MeshBasicNodeMaterial } from 'three/webgpu';
+import { MeshBasicNodeMaterial } from 'three/webgpu';
 
 import { INTEL_POINTS } from '#worldgen/level/intel';
 
@@ -12,13 +13,14 @@ import { DEFAULT_BINDINGS, bindingLabel } from '../../src/core/bindings.ts';
 import type { EngineContext } from '../../src/core/context.ts';
 import type { EngineEventMap } from '../../src/core/events.ts';
 import { Rng } from '../../src/core/rng.ts';
+import { isSingleMaterialMesh } from '../../src/core/three-guards.ts';
 import { spawnIntelSparks } from '../../src/fx/impacts.ts';
 import { IntelSystem } from '../../src/intel/index.ts';
+import * as intelProp from '../../src/intel/prop.ts';
 import { randomMarker as selectRandomMarker, rollBudget } from '../../src/intel/spawn.ts';
 import type { IntelMarker } from '../../src/intel/spawn.ts';
 import { INTEL, lureInterval } from '../../src/intel/tuning.ts';
 import { MarketSystem } from '../../src/market/index.ts';
-import { MaterialSystemNode } from '../../src/materials/index.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
 import { RenderSystem } from '../../src/render/index-webgpu.ts';
 import { UiSystem } from '../../src/ui/index.ts';
@@ -269,11 +271,6 @@ async function harness(
   market.open = false;
   const physics = new PhysicsSystem();
   physics.lineOfSight = (): boolean => true;
-  const materials = new MaterialSystemNode();
-  materials.get = (_name, options): MeshStandardNodeMaterial =>
-    new MeshStandardNodeMaterial({ color: options?.tint ?? 0xffffff });
-  materials.bakeMasks = (geometry): THREE.BufferGeometry => geometry;
-  providers.materials = materials;
   const world = new WorldSystem();
   world.intelMarkers = markerList.map(
     (m): { tag: string; id: string; y: number; x: number; z: number } => ({ ...m, tag: 'intel' })
@@ -326,9 +323,42 @@ async function harness(
   ctx.events.on('intel:spark', (e): void => {
     emitted.push({ type: 'intel:spark', ...e, position: e.position.clone() });
   });
+  // The native asset check and WebGPU review use the generated binary. Smoke
+  // tests exercise the adapter and gameplay without requiring Blender products.
+  const loadScene = spyOn(intelProp, 'loadIntelScene').mockImplementation(
+    async (): Promise<THREE.Group> => {
+      const scene = new THREE.Group();
+      const part = (name: string, object: THREE.Object3D, parent: THREE.Object3D): void => {
+        object.name = name;
+        parent.add(object);
+      };
+      const root = new THREE.Group(),
+        lid = new THREE.Group(),
+        spark = new THREE.Object3D();
+      part('INTEL_CASE', root, scene);
+      part('INTEL_HINGE', lid, root);
+      spark.position.set(0.13, 0.288, 0.06);
+      part('INTEL_SPARK', spark, root);
+      const surface = new THREE.Texture();
+      const finish = new THREE.MeshStandardMaterial({
+        map: new THREE.Texture(),
+        roughnessMap: surface,
+        metalnessMap: surface,
+      });
+      part('INTEL_BODY', new THREE.Mesh(new THREE.BoxGeometry(), finish), root);
+      part('INTEL_LID', new THREE.Mesh(new THREE.BoxGeometry(), finish), lid);
+      part('INTEL_BEACON', new THREE.Mesh(new THREE.BoxGeometry()), lid);
+      part('INTEL_LEDS', new THREE.Mesh(new THREE.BoxGeometry()), root);
+      return scene;
+    }
+  );
   const intel = new IntelSystem();
   providers.intel = intel;
-  await intel.init(ctx);
+  try {
+    await intel.init(ctx);
+  } finally {
+    loadScene.mockRestore();
+  }
   const aimAt = (cache: IntelSystem['_alive'][number]): void => {
     player.feetPosition.set(cache.x, cache.y, cache.z + 1.2);
     player.eyePosition.copy(player.feetPosition).add(new THREE.Vector3(0, 1.65, 0));
@@ -462,16 +492,23 @@ const h = await harness();
 const { intel, ctx, player, step, aimAt, sounds, emitted } = h;
 const cache = intel._spawn(markers[0]);
 assert(cache);
-const beacon = cache.group.lid.children.find(
-  (m): m is THREE.Mesh<THREE.BufferGeometry, MeshBasicNodeMaterial> =>
-    m instanceof THREE.Mesh &&
-    m.material instanceof MeshBasicNodeMaterial &&
-    m.material === intel._kit.mats.beacon
-);
-assert(beacon, 'exterior beacon follows the hinged lid');
-beacon.geometry.computeBoundingBox();
-assert(beacon.geometry.boundingBox);
-assert(beacon.geometry.boundingBox.min.y > 0.0475, 'lens clears the closed lid top');
+const [spare] = intel._pool.filter((slot): boolean => slot !== cache);
+const beacon = cache.group.lid.getObjectByName('INTEL_BEACON');
+const spareBeacon = spare.group.lid.getObjectByName('INTEL_BEACON');
+assert(isSingleMaterialMesh(beacon) && isSingleMaterialMesh(spareBeacon));
+assert(beacon.material instanceof MeshBasicNodeMaterial);
+assert.notEqual(cache.group.lid, spare.group.lid, 'pooled hinges move independently');
+assert.equal(spareBeacon.geometry, beacon.geometry, 'pooled cases share geometry');
+assert.equal(spareBeacon.material, beacon.material, 'pooled cases share the pulsed material');
+const body = cache.group.getObjectByName('INTEL_BODY');
+assert(isSingleMaterialMesh(body) && body.material instanceof THREE.MeshStandardMaterial);
+let released = 0;
+for (const resource of [beacon.geometry, beacon.material, body.material, body.material.map]) {
+  assert(resource);
+  resource.addEventListener('dispose', (): void => {
+    released++;
+  });
+}
 const oldTime = ctx.time.elapsed;
 for (const [time, red] of [
   [0, INTEL.beaconDim],
@@ -501,10 +538,10 @@ assert(
 );
 assert.equal(cache.open, 1);
 assert.equal(cache.group.lid.rotation.x, -INTEL.lidAngle);
-assert(
-  emitted.some((e): boolean => e.type === 'intel:spark'),
-  'exposed electronics spark while operated'
-);
+const spark = emitted.find((e): boolean => e.type === 'intel:spark');
+assert(spark?.type === 'intel:spark', 'exposed electronics spark while operated');
+assert.deepEqual(spark.position.toArray(), [cache.x + 0.13, cache.y + 0.288, cache.z + 0.06]);
+assert.equal(Math.abs(spare.group.lid.rotation.x), 0, 'opening one case does not open the other');
 step(0.1);
 assert.equal(
   emitted.filter((e): boolean => e.type === 'intel:noise').length,
@@ -807,7 +844,9 @@ for (let i = 0; i < 7; i++) {
   assert.equal(event.id, `cache-${i}`);
 }
 assert.equal(intel.getHudState().secured, 7);
+assert.equal(released, 0, 'restart and reuse retain shared resources');
 intel.dispose();
+assert.equal(released, 4, 'teardown disposes shared geometry, materials and textures once');
 ctx.events.emit('wave:complete', { wave: 20, nextWave: 0, delay: 20 });
 assert.equal(intel._alive.length, 0, 'dispose unsubscribes');
 // Boot prewarm is simulation-transparent and restores GPU/scene state on failure.

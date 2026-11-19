@@ -103,6 +103,20 @@ intel sites and explicit placement records. This is the world source—not
 | Procedural textures         | [`tools/export-proc-textures.ts`](../tools/export-proc-textures.ts) and its declared AI/FX inputs                                                                 | `bun tools/export-proc-textures.ts`; `bun run test`                                             | Generated `public/models/proc/`, consumed by AI materials and FX                                                                                              |
 | Standalone EXPS3 attachment | [`exps3.py`](../tools/blender/exps3.py), [`exps3_bake.py`](../tools/blender/exps3_bake.py); [asset contract](../assets/attachments/eotech-exps3-0/README.md)      | Asset Blender commands; `bun run models:cook -- exps3`                                          | Native products: `assets/attachments/eotech-exps3-0/`; cooked: `public/models/attachments/exps3.runtime.glb`; shared gameplay/inspection (except on the P320) |
 
+The [Al-Maktaba intel case](../assets/props/intel-case/README.md) is authored in
+[`tools/blender/intel_case/`](../tools/blender/intel_case/) and cooked with
+`bun run models:cook -- intel_case`. The recipe is independent of weapons, arms
+and level compilation; [`src/intel/prop.ts`](../src/intel/prop.ts) consumes the
+named hinge, emissive meshes and effect socket, not the editable scene.
+
+| Family                      | Authoritative editing location                                                                                                                                    | Regenerate / validate                                  | Products and consumers                                                                                                                                        |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Arms and bandage            | [`player_arms.py`](../tools/blender/player_arms.py), [`player_bandage.py`](../tools/blender/player_bandage.py); [asset contract](../assets/player/arms/README.md) | Follow the asset's Blender commands; review in engine  | `assets/player/arms/`, `public/models/player/`, generated poses/paths in `src/weapons/`; loaded by weapon arm/bandage adapters                                |
+| Soldiers                    | [`tools/blender/soldiers/`](../tools/blender/soldiers/); [asset contract](../assets/soldiers/README.md). Runtime RIG/registry/surfaces remain in `src/ai/`        | Explicit Blender author/cook; `bun run models` stages  | Generated `assets/soldiers/` products stage to ignored `public/models/soldiers/*.glb` + JSON; loaded by `ModelSystem` and AI                                  |
+| Spent shotgun hull          | [`tools/lib/spent-hull.ts`](../tools/lib/spent-hull.ts)                                                                                                           | `bun run models`; review in engine                     | `public/models/fx/spent12g.glb`, consumed by FX                                                                                                               |
+| Procedural textures         | [`tools/export-proc-textures.ts`](../tools/export-proc-textures.ts) and its declared AI/FX inputs                                                                 | `bun tools/export-proc-textures.ts`; `bun run test`    | Generated `public/models/proc/`, consumed by AI materials and FX                                                                                              |
+| Standalone EXPS3 attachment | [`exps3.py`](../tools/blender/exps3.py), [`exps3_bake.py`](../tools/blender/exps3_bake.py); [asset contract](../assets/attachments/eotech-exps3-0/README.md)      | Asset Blender commands; `bun run models:cook -- exps3` | Native products: `assets/attachments/eotech-exps3-0/`; cooked: `public/models/attachments/exps3.runtime.glb`; shared gameplay/inspection (except on the P320) |
+
 The standalone [TOR Mini laser](../assets/attachments/steiner-tor-mini/README.md)
 is authored by [`tools/blender/tor_mini/`](../tools/blender/tor_mini/), with native
 Blender validation and `bun run models:cook -- tor_mini`. It is generated alongside
@@ -117,9 +131,9 @@ helpers in `tools/blender/can.py`. Weapon fit checks load built attachments thro
 
 Normal `bun run dev` / `bun run build` (and `bun run assets`) run
 `tools/build-assets.ts`: arms and bandage, each weapon and its cook, standalone
-attachments, the M67 grenade, held field radio, spent hull, ammo pickup case
-and soldiers in Blender, then procedural textures and soldier staging. Bun
-world generation and validation run alongside these steps. Each
+attachments, the M67 grenade, field radio, spent hull, ammo pickup case, intel
+case and soldiers in Blender, then procedural textures and soldier staging.
+Bun world generation and validation run alongside these steps. Each
 Blender step reruns only when its declared inputs (scripts,
 authored JSON, upstream steps) change; hashes live in ignored `.cache/assets/`
 and `--force` rebuilds all. These products are ignored, not committed; weapon

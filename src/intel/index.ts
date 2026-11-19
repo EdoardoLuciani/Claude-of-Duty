@@ -2,7 +2,6 @@
  * Limits live in tuning.ts; event contracts live in ARCHITECTURE.md.
  */
 import * as THREE from 'three';
-import { MeshBasicNodeMaterial } from 'three/webgpu';
 
 import type { AudioSystem } from '../audio/index.ts';
 import { bindingLabel } from '../core/bindings.ts';
@@ -13,7 +12,7 @@ import type { MarketSystem } from '../market/index.ts';
 import type { PhysicsSystem } from '../physics/index.ts';
 import type { PlayerSystem } from '../player/index.ts';
 import type { WorldSystem } from '../world/index.ts';
-import { makeKit, makeCrate } from './prop.ts';
+import { loadIntelScene, makeKit, makeCrate } from './prop.ts';
 import { randomMarker, rollBudget } from './spawn.ts';
 import { INTEL, lureInterval } from './tuning.ts';
 
@@ -59,7 +58,6 @@ export class IntelSystem {
   _forward: THREE.Vector3 = new THREE.Vector3();
   _anchor: THREE.Vector3 = new THREE.Vector3();
   _soundAt: THREE.Vector3 = new THREE.Vector3();
-  _sparkOffset: THREE.Vector3 = new THREE.Vector3(0.13, 0.245, 0.06);
   _sparkPayload: IntelEventMap['intel:spark'] = { position: new THREE.Vector3() };
   _operationPayload: IntelEventMap['intel:operation'] = {
     active: false,
@@ -85,8 +83,8 @@ export class IntelSystem {
     bus: 'ui',
     priority: 0.5,
   };
-  declare _kit: ReturnType<typeof makeKit>;
-  declare _pool: IntelCache[];
+  _kit: ReturnType<typeof makeKit> | null = null;
+  _pool: IntelCache[] = [];
   _off: Array<() => void> = [];
   declare _holding: IntelCache | null;
   declare _hold: number;
@@ -136,13 +134,14 @@ export class IntelSystem {
     const origin = world.levelToWorld(0, 0, 0);
     const forward = world.levelToWorld(0, 0, -1);
     this._yaw = Math.atan2(origin.x - forward.x, origin.z - forward.z);
-    this._kit = makeKit(ctx.get('materials'));
+    const kit = makeKit(await loadIntelScene());
+    this._kit = kit;
     this._pool = Array.from({ length: INTEL.aliveMax }, (): IntelCache => ({
       id: '',
       x: 0,
       y: 0,
       z: 0,
-      group: makeCrate(this._kit),
+      group: makeCrate(kit),
       open: 0,
       pulse: { x: 0, y: 0, z: 0, radius: INTEL.pulseRadius },
     }));
@@ -188,10 +187,7 @@ export class IntelSystem {
     // HDR lens feeds the existing bloom; no extra point-light shader variants.
     const pulse = 0.5 - 0.5 * Math.cos((ctx.time.elapsed * 2 * Math.PI) / INTEL.beaconPeriod);
     const glow = INTEL.beaconDim + (INTEL.beaconBright - INTEL.beaconDim) * pulse * pulse;
-    const beacon = this._kit.mats.beacon;
-    if (!(beacon instanceof MeshBasicNodeMaterial))
-      throw new Error('[intel] beacon must be a basic node material');
-    beacon.color.setRGB(glow, glow * 0.008, glow * 0.002);
+    this._kit?.beacon.color.setRGB(glow, glow * 0.008, glow * 0.002);
     this._tickLure();
     if (this._announceAt && ctx.time.elapsed >= this._announceAt) {
       this._announceAt = 0;
@@ -256,7 +252,7 @@ export class IntelSystem {
       cache.group.lid.rotation.x = cache.open === 0 ? 0 : -INTEL.lidAngle * ease;
       if (!operating || cache.open < INTEL.sparkOpen || ctx.time.elapsed < this._sparkAt) continue;
       this._sparkAt = ctx.time.elapsed + INTEL.sparkEvery;
-      cache.group.localToWorld(this._sparkPayload.position.copy(this._sparkOffset));
+      cache.group.spark.getWorldPosition(this._sparkPayload.position);
       ctx.events.emit('intel:spark', this._sparkPayload);
     }
   }
@@ -479,7 +475,9 @@ export class IntelSystem {
     this._clearPrompt();
     for (const cache of this._pool) cache.group.removeFromParent();
     this._alive.length = 0;
-    this._kit.dispose();
+    this._pool.length = 0;
+    this._kit?.dispose();
+    this._kit = null;
     for (const off of this._off) off();
     this._off.length = 0;
   }
