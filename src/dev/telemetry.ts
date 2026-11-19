@@ -390,7 +390,7 @@ function recordField(key: string, value: unknown): unknown {
   return ENTITY_FIELDS.has(key) ? entityId(value) : undefined;
 }
 
-function isInstancedMesh(mesh: THREE.Object3D): mesh is THREE.InstancedMesh<THREE.BufferGeometry> {
+function isInstancedMesh(mesh: THREE.Object3D): mesh is THREE.InstancedMesh {
   return mesh instanceof THREE.InstancedMesh;
 }
 

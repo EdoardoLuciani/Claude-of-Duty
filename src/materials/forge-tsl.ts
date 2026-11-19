@@ -1,4 +1,3 @@
-import type { RenderTargetEventMap, Texture } from 'three';
 import { float, uv, vec2, vec3 } from 'three/tsl';
 import {
   HalfFloatType,
@@ -28,11 +27,7 @@ interface SurfaceBakeInput {
 }
 
 /** Bake the shared, linear RGBA macro map on the initialized WebGPU renderer. */
-export function bakeMacro(
-  renderer: Renderer,
-  size = 256,
-  seed = 2
-): RenderTarget<Texture, RenderTargetEventMap> {
+export function bakeMacro(renderer: Renderer, size = 256, seed = 2): RenderTarget {
   const target = new RenderTarget(size, size, {
     depthBuffer: false,
     generateMipmaps: true,
@@ -75,8 +70,8 @@ export function bakeDetail(
   size = 1024,
   seed = 1
 ): {
-  albedo: RenderTarget<Texture, RenderTargetEventMap>;
-  normal: RenderTarget<Texture, RenderTargetEventMap>;
+  albedo: RenderTarget;
+  normal: RenderTarget;
 } {
   const options = {
     depthBuffer: false,
@@ -144,9 +139,9 @@ export function bakeSurface(
   renderer: Renderer,
   { size, worldSize, relief, surface }: SurfaceBakeInput
 ): {
-  albedo: RenderTarget<Texture, RenderTargetEventMap>;
-  orm: RenderTarget<Texture, RenderTargetEventMap>;
-  normal: RenderTarget<Texture, RenderTargetEventMap>;
+  albedo: RenderTarget;
+  orm: RenderTarget;
+  normal: RenderTarget;
 } {
   const options = {
     depthBuffer: false,

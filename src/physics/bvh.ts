@@ -831,7 +831,7 @@ export class StaticWorld {
     return n;
   }
 
-  get candidates(): Int32Array<ArrayBufferLike> {
+  get candidates(): Int32Array {
     return this._cand;
   }
 

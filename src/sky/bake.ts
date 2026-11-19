@@ -1,4 +1,3 @@
-import type { RenderTargetEventMap, Texture } from 'three';
 import {
   ClampToEdgeWrapping,
   FloatType,
@@ -56,11 +55,7 @@ export class BakePass {
 
 /** Half-float colour target. Sky radiance is HDR and physically scaled. */
 type TargetOptions = ConstructorParameters<typeof RenderTarget>[2] & { name?: string };
-export function hdrTarget(
-  width: number,
-  height: number,
-  opts: TargetOptions = {}
-): RenderTarget<Texture, RenderTargetEventMap> {
+export function hdrTarget(width: number, height: number, opts: TargetOptions = {}): RenderTarget {
   const rt = new RenderTarget(Math.max(1, width | 0), Math.max(1, height | 0), {
     type: HalfFloatType,
     format: RGBAFormat,
@@ -77,10 +72,6 @@ export function hdrTarget(
 }
 
 /** Float32 target — used for the transmittance LUT, where banding shows. */
-export function floatTarget(
-  width: number,
-  height: number,
-  opts: TargetOptions = {}
-): RenderTarget<Texture, RenderTargetEventMap> {
+export function floatTarget(width: number, height: number, opts: TargetOptions = {}): RenderTarget {
   return hdrTarget(width, height, { ...opts, type: FloatType });
 }

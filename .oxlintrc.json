@@ -39,6 +39,7 @@
     "no-unused-vars": ["error", { "args": "after-used" }],
     "typescript/no-unnecessary-condition": "error",
     "typescript/no-unnecessary-type-assertion": "error",
-    "typescript/no-unnecessary-boolean-literal-compare": "error"
+    "typescript/no-unnecessary-boolean-literal-compare": "error",
+    "typescript/no-unnecessary-type-arguments": "error"
   }
 }

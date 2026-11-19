@@ -149,10 +149,7 @@ export function mergeAll(
   const clean = list.filter((geo): geo is THREE.BufferGeometry => Boolean(geo));
   if (!clean.length) return null;
   if (clean.length === 1) return clean[0];
-  const nonIndexed = clean.map(
-    (g): THREE.BufferGeometry<THREE.NormalBufferAttributes, THREE.BufferGeometryEventMap> =>
-      g.getIndex() ? g.toNonIndexed() : g
-  );
+  const nonIndexed = clean.map((g): THREE.BufferGeometry => (g.getIndex() ? g.toNonIndexed() : g));
   for (const g of nonIndexed) normalizeAttributes(g);
   // three returns null for incompatible attribute sets; its types omit that.
   const merged = mergeGeometries(nonIndexed, false) as THREE.BufferGeometry | null;

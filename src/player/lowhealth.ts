@@ -35,7 +35,7 @@ export class LowHealthPass {
   }
 
   /** Compile once; the uniform zero state is an exact healthy-player no-op. */
-  asNode(colorTexture: TextureNode<'vec4'>, exposure: TslNode<'float'>): TslNode<'vec4'> {
+  asNode(colorTexture: TextureNode, exposure: TslNode<'float'>): TslNode<'vec4'> {
     return this.asColorNode(colorTexture.sample(screenUV), exposure);
   }
 
