@@ -89,11 +89,11 @@ def finish():
     surface = base.copy()
     # Display-space paint/ink colors; bare metal reflects colored light only as a conductor.
     finishes = {
-        'deck': ((.32, .38, .29), .57, 0), 'front': ((.28, .33, .25), .62, 0),
-        'shell': ((.27, .32, .24), .63, 0), 'paint': ((.26, .31, .23), .51, 0),
+        'deck': ((.17, .32, .165), .57, 0), 'front': ((.15, .285, .145), .62, 0),
+        'shell': ((.14, .27, .14), .63, 0), 'paint': ((.135, .26, .135), .51, 0),
         'seal': ((.081, .092, .078), .82, 0), 'steel': ((.38, .39, .36), .41, .92),
-        'grip': ((.14, .15, .135), .72, 0), 'catch': ((.74, .55, .28), .47, 0),
-        'lever': ((.34, .35, .31), .46, .9),
+        'grip': ((.14, .15, .135), .72, 0), 'catch': ((.61, .40, .18), .47, 0),
+        'lever': ((.31, .32, .30), .46, .9),
     }
     for name, (x, y, w, h) in TILES.items():
         color, rough, metal = finishes[name]
@@ -127,10 +127,10 @@ def finish():
                 drag = (u > px) & (u < px + length) & (abs(v - py - (u-px) * .17) < .85)
                 wear |= drag & (grain < .8)
             primer = wear & (grain >= .09)
-            color_patch[primer] = (.38, .42, .35)
+            color_patch[primer] = (.29, .32, .23)
             data_patch[primer] = (1, .76, 0)
             bare = wear & ~primer
-            color_patch[bare] = (.44, .46, .43)
+            color_patch[bare] = (.39, .41, .39)
             data_patch[bare] = (1, .42, .86)
     mat = bpy.data.materials.new('Field supply · painted steel')
     mat.use_nodes = mat.use_backface_culling = True

@@ -48,7 +48,7 @@ buffers.
 | Opaque materials / draws per pass | 3 | 1 |
 | Indexed triangles | 48 | 442 |
 | Exported runtime vertices | 96 | 728 |
-| Cooked asset on disk | — | 92,244 B |
+| Cooked asset on disk | — | 87,072 B |
 | Shared atlas payload on BC-capable WebGPU, including mips | 0 B | 109,280 B |
 
 The 256² sRGB base-color and 128² linear packed roughness (G) / metalness (B)
