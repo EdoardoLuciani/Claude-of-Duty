@@ -78,12 +78,16 @@ const BANDAGE_R = {
   release: 0.12,
 };
 
-/** Radio hold: walkie at chest height, screen toward the eye. Left hand hangs. */
+/** Camera-space radio close-up, independent of the equipped weapon's hip
+ *  transform: the LCD faces the eye just right of and below centre. The rig
+ *  rises from `drop` over `raiseTime`. Left hand hangs out of frame. */
 const RADIO_HOLD = {
-  hand: [0.07, -0.06, -0.23],
-  finger: [0.16, 0.92, -0.36],
-  back: [0.22, 0.32, -0.92],
-  lhand: [-0.16, -0.12, -0.08],
+  hand: [0.0529, -0.1814, -0.1825],
+  finger: [0.1104, 0.8571, -0.5032],
+  back: [0.2314, -0.5146, -0.8256],
+  drop: 0.3,
+  raiseTime: 0.24,
+  lhand: [-0.2, -0.36, -0.1],
   lfinger: [0.35, 0.55, -0.76],
   lback: [-0.4, 0.55, 0.73],
 };
@@ -267,6 +271,7 @@ export class Viewmodel {
   _grenadeFingerL: Float32Array = new Float32Array(3);
   _grenadeBackL: Float32Array = new Float32Array(3);
   _radioState: number = 0; // 0 = stowed, 1 = held
+  _radioRaise: number = 0;
   bandageAsset: Awaited<ReturnType<typeof loadBandage>> | null = null;
   _bandageState: number = 0;
   _bandageProgress: number = 0;
@@ -653,6 +658,7 @@ export class Viewmodel {
     if (this._grenadeState === 1) this.endGrenade();
     if (this._bandageState === 1) this.endBandage();
     this._radioState = 1;
+    this._radioRaise = 0;
     this.radio.visible = true;
     const w = this.active;
     if (w) w.group.visible = false;
@@ -776,7 +782,7 @@ export class Viewmodel {
     this._applyGrenadePose(GRENADE_HOLD, cook, w);
   }
 
-  /** Static radio hold: right hand grips it at chest height, left hangs. */
+  /** Static radio hold: right hand presents the LCD, left hangs. */
   _solveRadioHands(): void {
     this._handPos.set(RADIO_HOLD.hand[0], RADIO_HOLD.hand[1], RADIO_HOLD.hand[2]);
     handBasis(this._handQuat, RADIO_HOLD.finger, RADIO_HOLD.back);
@@ -1192,6 +1198,11 @@ export class Viewmodel {
       const stow = smootherstep(0, 1, (this._bandageProgress - 0.93) / 0.07);
       this.rig.position.set(0, -0.35 * (1 - present + stow), 0);
       this.rig.quaternion.identity();
+    } else if (this._radioState) {
+      // A fixed close-up keeps the LCD readable: no sway, bob or recoil.
+      this._radioRaise = clamp01(this._radioRaise + dt / RADIO_HOLD.raiseTime);
+      this.rig.position.set(0, -RADIO_HOLD.drop * (1 - smootherstep(0, 1, this._radioRaise)), 0);
+      this.rig.quaternion.identity();
     }
     this.rig.updateMatrix();
     this.rig.updateMatrixWorld(true);
@@ -1249,8 +1260,7 @@ export class Viewmodel {
       return;
     }
 
-    // Radio state: the right hand holds the radio at the chest; the left
-    // hangs free. Mutually exclusive with the grenade by construction.
+    // Radio state: the right hand presents the radio; the left hangs free. Mutually exclusive with the grenade by construction.
     if (this._radioState) {
       this._solveRadioHands();
       return;

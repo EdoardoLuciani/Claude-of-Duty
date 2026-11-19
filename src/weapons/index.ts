@@ -1572,7 +1572,7 @@ export class WeaponSystem {
     this._grenades.length = 0;
   }
 
-  /** X toggles the radio. Its open panel uses Digit1-3 for request selection. */
+  /** X toggles the radio. While its LCD is up, Digit1-3 select requests. */
   _updateRadio(input: EngineContext['input'], live: boolean): void {
     if (!live) return;
     if (input.actionPressed('radio')) {
@@ -1580,6 +1580,7 @@ export class WeaponSystem {
       this._interruptHeal('radio');
       if (this.radioEquipped) {
         this._stowRadio();
+        this._viewmodel?.play('draw');
         return;
       }
       this.radioEquipped = true;
@@ -1619,6 +1620,7 @@ export class WeaponSystem {
         return;
       }
       this._stowRadio();
+      this._viewmodel?.play('draw');
       // The accepted radio:strike event owns the UI/audio acknowledgment once.
       return;
     }

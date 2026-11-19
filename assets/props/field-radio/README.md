@@ -41,9 +41,11 @@ The native and cooked GLBs from two clean same-host builds were byte-identical.
   19.8 mm. UV0 spans the aperture with the rounded corners trimmed. glTF top-left
   UVs receive a `CanvasTexture` with `flipY = false`.
 - `viewmodel.ts` seats the case against the glove; the tilt and thumb offset
-  keep the upper controls out of the closed hand. The existing wrist target and
-  accessory state machine are unchanged. `radio-mesh.ts` binds the 256 × 128 sRGB
-  canvas to the LCD emissive map. It redraws only when the visible count changes.
+  keep the upper controls out of the closed hand. The wrist target is a fixed
+  camera-space close-up that turns the LCD toward the eye. `radio-mesh.ts` binds
+  the 256 × 128 sRGB canvas to the LCD emissive map; it is the radio interface
+  (charges or empty, request bindings and locks, stow binding) and redraws only
+  when the visible count changes.
   Stow, pause and restart retain the same model and canvas; viewmodel teardown
   disposes the owned geometry, materials and textures.
 

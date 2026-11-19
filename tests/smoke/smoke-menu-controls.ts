@@ -5,8 +5,6 @@ import type { ActionId } from '../../src/core/bindings.ts';
 import { CONTROL_SECTIONS } from '../../src/ui/controls.ts';
 import { PauseMenu } from '../../src/ui/menu.ts';
 import { Prompt } from '../../src/ui/prompts.ts';
-import { RadioPanel } from '../../src/ui/radio.ts';
-import { WeaponSystem } from '../../src/weapons/index.ts';
 import { createTestContext, createTestInput } from '../lib/context.ts';
 import type { TestProviders } from '../lib/context.ts';
 import { installUiDocument, UiPlayer } from '../lib/ui-fixture.ts';
@@ -148,21 +146,6 @@ assert(prompt.hasProgress);
 prompt.set({ key: bindingLabel('heal'), text: 'bandaging' });
 assert.equal(prompt.key, bindingLabel('heal'), 'contextual prompt override preserved');
 assert.equal(prompt.hasProgress, false);
-const weapons = new WeaponSystem();
-weapons.radioEquipped = true;
-weapons.carpetBombs = 2;
-providers.weapons = weapons;
-const radio = new RadioPanel(makeEl(), ctx);
-const radioNodes = flatten(radio.root);
-assert.ok(
-  radioNodes.some((node): boolean => node.textContent === `${bindingLabel('radio')} STOWS`)
-);
-for (const action of ['slot1', 'slot2', 'slot3'] as const) {
-  assert.ok(radioNodes.some((node): boolean => node.textContent === bindingLabel(action)));
-}
-radio.update(1);
-assert.equal(radio.rows[0].charge.textContent, 'x2');
-radio.dispose();
 console.log(
-  'smoke-menu-controls: ok (concise reference, canonical labels, native rows, contextual prompts and radio labels)'
+  'smoke-menu-controls: ok (concise reference, canonical labels, native rows, contextual prompts)'
 );

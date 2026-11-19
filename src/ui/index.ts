@@ -18,7 +18,6 @@ import { PauseMenu } from './menu.ts';
 import { Minimap } from './minimap.ts';
 import type { PixiHud } from './pixi-hud.ts';
 import { Prompt, Banner } from './prompts.ts';
-import { RadioPanel } from './radio.ts';
 import { StartGate } from './start.ts';
 import { installStyles, removeStyles } from './style.ts';
 import { el, setStyle } from './util.ts';
@@ -84,7 +83,7 @@ interface MinimapFrame {
 }
 type UiContext = EngineContext;
 
-/** Shared-device Pixi HUD with native menus/radio; lateUpdate follows the final camera pose.
+/** Shared-device Pixi HUD with native menus; lateUpdate follows the final camera pose.
  * Controllers retain animation/derived state and read complete optional-provider snapshots.
  * UI raw-time animation and gameplay-scaled animation remain distinct for pause/captures.
  * Canonical APIs and event payloads live in subsystem types and ARCHITECTURE.md.
@@ -96,7 +95,6 @@ export class UiSystem {
   rng!: import('../core/rng.ts').Rng;
   root!: HTMLElement;
   centreLayer!: HTMLElement;
-  chromeLayer!: HTMLElement;
   health: HealthFx = new HealthFx();
   arcs: DamageArcs = new DamageArcs();
   crosshair: Crosshair = new Crosshair();
@@ -114,7 +112,6 @@ export class UiSystem {
   gameOver!: GameOverScreen;
   shop!: MarketOverlay;
   marketCountdown!: MarketCountdown;
-  radio!: RadioPanel;
   _fpsSince: number | null = null;
   _fpsFrames = 0;
   fpsText = '— FPS';
@@ -148,7 +145,6 @@ export class UiSystem {
 
     // Stacking order: hurt overlays sit under the HUD, the menu over everything.
     this.centreLayer = el('div', 'ow-layer', this.root);
-    this.chromeLayer = el('div', 'ow-layer', this.root);
 
     this.rng.fork(); // Keep the minimap's noise stream unchanged after removing damage popups.
     this.minimap = new Minimap(this.rng.fork());
@@ -162,7 +158,6 @@ export class UiSystem {
     });
     this.shop = new MarketOverlay(this.root, ctx);
     this.marketCountdown = new MarketCountdown(ctx.get('market').delay);
-    this.radio = new RadioPanel(this.chromeLayer, ctx);
 
     this.hudTarget = 1;
     this._lastRaw = ctx.time.raw;
@@ -549,7 +544,6 @@ export class UiSystem {
     const hudGoal = this.hudTarget * (this.menu.open ? 0.15 : 1);
     this.hudVisible = damp(this.hudVisible, hudGoal, 10, rawDt);
     const hudOp = this.hudVisible.toFixed(3);
-    setStyle(this.chromeLayer, 'opacity', hudOp);
     setStyle(this.centreLayer, 'opacity', hudOp);
 
     this.crosshair.update(dt, s);
@@ -573,7 +567,6 @@ export class UiSystem {
     this.prompt.update(dt);
     this.banner.update(dt);
     this.marketCountdown.update(rawDt, s.marketIn);
-    this.radio.update(rawDt);
 
     this.compass.update(heading, dt);
 
@@ -659,7 +652,6 @@ export class UiSystem {
       this.menu.dispose();
       this.gameOver.dispose();
       this.shop.dispose();
-      this.radio.dispose();
       this.root.remove();
       removeStyles();
     }
