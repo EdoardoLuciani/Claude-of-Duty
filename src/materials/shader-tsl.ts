@@ -119,7 +119,7 @@ const tint = (hex: number | string): ConstNode<'vec3', Vector3> => {
   const c = new Color(hex);
   return vec3(c.r, c.g, c.b);
 };
-const sample = (map: Texture | TextureNode, coords: Node<'vec2'>): TextureNode<'vec4'> =>
+const sample = (map: Texture | TextureNode, coords: Node<'vec2'>): TextureNode =>
   texture(map, coords);
 const axisNormal = (n: Node<'vec3'>, axis: 0 | 1 | 2, sign: Node<'float'>): JoinNode<'vec3'> =>
   axis === 0
@@ -331,7 +331,7 @@ export function createSurfaceNodeMaterial(
           tex.b.mul(2).sub(1)
         )
       );
-    const mapAt = (f: { uv: Node<'vec2'> }): TextureNode<'vec4'> => sample(set.albedo, f.uv);
+    const mapAt = (f: { uv: Node<'vec2'> }): TextureNode => sample(set.albedo, f.uv);
     const ormAt = (f: { uv: Node<'vec2'> }): Node<'vec3'> => sample(set.orm, f.uv).rgb;
     const normalAt = (f: { uv: Node<'vec2'>; sign: Node<'float'> }): Node<'vec3'> =>
       unpack(sample(set.normal, f.uv));

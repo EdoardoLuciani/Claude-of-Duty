@@ -13,7 +13,7 @@ type FogBuilder = (inputs: VolumetricBuildOptions) => Node<'vec3'> | Node<'vec4'
 export function createFogCompute(
   fog: FogBuilder,
   inputs: VolumetricBuildOptions
-): { computeNode: ComputeNode; textureNode: TextureNode<'vec4'>; dispose(): void } {
+): { computeNode: ComputeNode; textureNode: TextureNode; dispose(): void } {
   const output = new StorageTexture();
   output.type = HalfFloatType;
   output.generateMipmaps = false;

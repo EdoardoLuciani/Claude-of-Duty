@@ -162,7 +162,7 @@ export function bindArmAsset(arm: Arm, asset: Pick<ArmAsset, 'meshes'>): void {
     arm.scale
   );
   const names = first.skeleton.bones.map((b): string => b.name);
-  const bones = names.map((name: string): THREE.Bone<THREE.Object3DEventMap> => {
+  const bones = names.map((name: string): THREE.Bone => {
     const control = controls[name] as THREE.Bone | undefined;
     if (!control) throw new Error(`Player arms: unknown Blender bone ${name}`);
     return control;

@@ -1,4 +1,4 @@
-import type { DepthTextureImageData, Vector3 } from 'three';
+import type { Vector3 } from 'three';
 import type { DirectionalLight } from 'three';
 import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js';
 import type { FnNode } from 'three/src/nodes/tsl/TSLCore.js';
@@ -72,7 +72,7 @@ export function createVolumetricShadow(render: CascadeRender): {
       index
     ): {
       matrix: UniformNode<'mat4', Matrix4>;
-      depth: TextureNode<'vec4'>;
+      depth: TextureNode;
       params: UniformNode<'vec2', Vector2>;
       split: UniformNode<'float', number>;
     } => {
@@ -87,7 +87,7 @@ export function createVolumetricShadow(render: CascadeRender): {
         .setGroup(renderGroup)
         .onRenderUpdate((): Matrix4 => shadow()?.matrix ?? identity);
       const depth = uniformTexture(empty).onRenderUpdate(
-        (): DepthTexture<DepthTextureImageData> => shadow()?.map?.depthTexture ?? empty
+        (): DepthTexture => shadow()?.map?.depthTexture ?? empty
       );
       const params = uniform(new Vector2())
         .setGroup(renderGroup)

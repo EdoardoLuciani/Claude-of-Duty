@@ -391,10 +391,7 @@ export class AiSystem {
 
   /** Matching position, normal, UV, colour and skinning attributes are required
    *  to compile the same shader permutations as a soldier. */
-  _dummySkinGeometry(): THREE.BufferGeometry<
-    THREE.NormalBufferAttributes,
-    THREE.BufferGeometryEventMap
-  > {
+  _dummySkinGeometry(): THREE.BufferGeometry {
     const g = new THREE.BufferGeometry();
     const n = 3;
     g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
