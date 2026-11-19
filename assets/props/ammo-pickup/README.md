@@ -70,4 +70,3 @@ presentation, and fluctuate with the host. The confirmed optimization is draw
 consolidation, not a claim of faster GPU frame time. Review normal approach and
 close-up views in native WebGPU, in daylight and darkness, with the ring enabled
 and all slots occupied for the pool view.
-EOF
