@@ -1,10 +1,11 @@
 # Al-Maktaba MK-IV field terminal
 
-Original game art: a two-shell molded instrument case with over-center latches,
-folding grip, elastomer feet, a gasketed rim and two coaxial sleeve hinges. The
-interior is a suspended controller and battery tray; the cable harness terminates
-in keyed plugs, and the service header is the spark source. The exterior data
-plate, lid checklist and PCB screen print are authored inks, not runtime overlays.
+Original game art: a two-shell molded instrument case with dark olive polymer,
+charcoal rubber, lighter corner guards, over-center latches, a folding grip,
+elastomer feet, a gasketed rim and two coaxial sleeve hinges. The interior is a
+suspended controller and battery tray; the cable harness terminates in keyed
+plugs, and the service header is the spark source. The exterior data plate, lid
+checklist and PCB screen print are authored inks, not runtime overlays.
 
 ## Author, check, cook
 
@@ -72,8 +73,8 @@ counts the case's own canvas only, not the shared procedural material library.
 | Runtime materials | 8 | 3 |
 | Shared geometry bytes | 263,624 | 184,532 |
 | Case-owned texture bytes with mips | 699,052 | 873,816 |
-| Native / cooked GLB bytes | Not applicable | 430,332 / 108,664 |
-| Cooked embedded WebP bytes | Not applicable | 46,524 |
+| Native / cooked GLB bytes | Not applicable | 430,164 / 108,576 |
+| Cooked embedded WebP bytes | Not applicable | 46,438 |
 
 The new finish needs distinct UVs and normals at material and bevel seams,
 so there are more vertex entries despite fewer triangles and smaller buffers.

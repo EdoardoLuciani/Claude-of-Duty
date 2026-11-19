@@ -7,9 +7,9 @@ import bpy
 WIDTH, HEIGHT = 512, 256
 # sRGB tint, roughness, metalness, RMS-scale grain in code values.
 SWATCHES = {
-    'polymer': ((98, 111, 95), .68, .02, 5),
-    'edge': ((129, 137, 116), .60, .02, 5),
-    'rubber': ((43, 47, 43), .88, 0, 5),
+    'polymer': ((68, 87, 54), .68, .02, 5),
+    'edge': ((96, 109, 72), .60, .02, 5),
+    'rubber': ((40, 43, 41), .88, 0, 5),
     'anodized': ((70, 77, 77), .50, .63, 6),
     'bare': ((158, 159, 145), .42, .80, 6),
     'latch': ((181, 108, 48), .49, .16, 6),
@@ -171,8 +171,8 @@ def material():
     shell, rough, metal, grain = SWATCHES['polymer']
     rect(0, 0, 110, 86, shell, grain, rough, metal)
     # Abrasion follows high contact edges and travels in short dragged streaks.
-    rect(0, 0, 110, 12, (104, 114, 97), 5, .74, metal)
-    rect(0, 76, 110, 10, (105, 116, 99), 5, .75, metal)
+    rect(0, 0, 110, 12, (76, 93, 59), 5, .74, metal)
+    rect(0, 76, 110, 10, (77, 95, 61), 5, .75, metal)
     for _ in range(82):
         y = rng.choice((rng.randrange(2, 18), rng.randrange(67, 84), rng.randrange(10, 80)))
         x = rng.randrange(2, 105)
@@ -180,7 +180,7 @@ def material():
         rect(x, y, rng.randrange(1, 8), 1, tuple(c+shine for c in shell), 4, .58, metal)
     for _ in range(65):
         x, y = rng.randrange(2, 108), rng.randrange(4, 82)
-        rect(x, y, 1, 1, (63, 73, 60), 9, .77, metal)
+        rect(x, y, 1, 1, (43, 57, 35), 9, .77, metal)
 
     tile = 'pad'
     rect(0, 0, 88, 47, (58, 63, 56), 6, .95)
@@ -197,7 +197,7 @@ def material():
         return img
 
     mat = bpy.data.materials.new('Case finish atlas')
-    mat.diffuse_color = (.19, .23, .18, 1)
+    mat.diffuse_color = (.10, .15, .07, 1)
     mat.use_nodes = True
     mat.use_backface_culling = True
     nodes, links = mat.node_tree.nodes, mat.node_tree.links
