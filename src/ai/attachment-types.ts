@@ -5,7 +5,7 @@ import type { CharacterController } from '../physics/character.ts';
 import { MASK } from '../physics/surfaces.ts';
 import { LADDER, LADDER_MOTOR_VERSION, ladderMoveBudget } from './ladder.ts';
 import type { LadderDescriptor, LadderDirection, LadderCursor } from './ladder.ts';
-import { isRecord, isNumber, isNumberArray } from './validation.ts';
+import { isRecord, isNumber, isNumberArray, parseFinitePoint } from './validation.ts';
 
 export interface AttachmentOracle {
   physics: {
@@ -51,11 +51,8 @@ export type QueryKey = number[] | LadderQuery;
 export const LADDER_QUERY_MAX_ITERATIONS = 32;
 export const LADDER_QUERY_MAX_MOVES =
   Math.ceil((12 + LADDER.lowerOffset + LADDER.upperOffset) / (LADDER.speed * LADDER.step)) + 6;
-function point(value: unknown): Vector3Like {
-  if (!isRecord(value) || !isNumber(value.x) || !isNumber(value.y) || !isNumber(value.z))
-    throw new Error('[ai worker] invalid ladder point');
-  return { x: value.x, y: value.y, z: value.z };
-}
+const point = (value: unknown): Vector3Like =>
+  parseFinitePoint(value, '[ai worker] invalid ladder point');
 const distance3 = (a: Vector3Like, b: Vector3Like): number =>
   Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
 

@@ -12,6 +12,12 @@ export function isVector3Like(value: unknown): value is Vector3Like {
     typeof value.z === 'number'
   );
 }
+/** A finite {x, y, z} copy of `value`; throws `message` otherwise. */
+export function parseFinitePoint(value: unknown, message: string): Vector3Like {
+  if (!isRecord(value) || !isNumber(value.x) || !isNumber(value.y) || !isNumber(value.z))
+    throw new Error(message);
+  return { x: value.x, y: value.y, z: value.z };
+}
 export function isNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }

@@ -1,8 +1,10 @@
 // Versioned, checked envelope around the pinned 32-bit Detour tile-set format.
 // Kept separate from the WASM module so invalid assets fail before native import.
+import type { Vector3Like } from 'three';
+
 import { INFANTRY } from './capabilities.ts';
 import { LADDER, LADDER_MOTOR_VERSION, type LadderDescriptor } from './ladder.ts';
-import { isRecord, isNumberArray, isNumber } from './validation.ts';
+import { isRecord, isNumberArray, parseFinitePoint } from './validation.ts';
 export const NAV_VERSION = 2;
 export const NAV_LADDER_FLAG = 2,
   NAV_LINK_RADIUS = 0.7;
@@ -80,11 +82,8 @@ export async function navHash(buffer: ByteInput): Promise<string> {
   ).join('');
 }
 
-const parseLadderPoint = (p: unknown): { x: number; y: number; z: number } => {
-  if (!isRecord(p) || !isNumber(p.x) || !isNumber(p.y) || !isNumber(p.z))
-    throw new Error('[nav] invalid ladder point');
-  return { x: p.x, y: p.y, z: p.z };
-};
+const parseLadderPoint = (value: unknown): Vector3Like =>
+  parseFinitePoint(value, '[nav] invalid ladder point');
 
 // Full-precision motor geometry is authoritative; native endpoints are float32
 // topology only. Do not recover motor coordinates from Detour vertices.

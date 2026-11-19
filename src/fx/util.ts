@@ -158,7 +158,7 @@ export function clampCone<T extends VectorTriple>(
 /** cos(55 deg) — the ejecta cone half-angle shared by impacts and the muzzle. */
 export const COS55 = 0.5735764;
 
-// sRGB -> linear, then normalise on the peak so the caller controls radiance
+/** sRGB -> linear for one 0..1 channel. */
 const srgbToLinear = (c: number): number =>
   c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
 
@@ -186,6 +186,7 @@ export function blackbody<T extends RGB>(out: T, kelvin: number): T {
   r = srgbToLinear(r);
   g = srgbToLinear(g);
   b = srgbToLinear(b);
+  // Normalise on the peak so the caller controls radiance.
   const m = Math.max(r, g, b, 1e-4);
   out.r = r / m;
   out.g = g / m;

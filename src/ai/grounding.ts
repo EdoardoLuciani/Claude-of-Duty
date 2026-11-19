@@ -43,11 +43,8 @@ interface GroundedAgent {
 // Not pure black: a contact shadow is lit by the sky it is occluding less
 // of, so it keeps a trace of the sky's blue. 0.05 linear, i.e. deep but not
 // a hole.
-const contactShadowMaterial = (
-  tex: THREE.DataTexture,
-  opacity: number
-): THREE.MeshBasicMaterial => {
-  const m = new THREE.MeshBasicMaterial({
+const contactShadowMaterial = (tex: THREE.DataTexture, opacity: number): THREE.MeshBasicMaterial =>
+  new THREE.MeshBasicMaterial({
     color: new THREE.Color(0.045, 0.05, 0.062),
     map: tex,
     transparent: true,
@@ -58,8 +55,6 @@ const contactShadowMaterial = (
     toneMapped: false,
     fog: false,
   });
-  return m;
-};
 
 export class GroundShadows {
   capacity: number;
