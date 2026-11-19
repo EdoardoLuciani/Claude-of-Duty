@@ -13,7 +13,7 @@ bun run typecheck
 bun run lint
 bun run build
 bun run build:ci     # CI build: generates the world, skips Blender/model assets
-bun run check        # everything CI runs: format:check, build:ci, test
+bun run verify       # pre-push gate: format:check, build:ci, test
 ```
 
 Bun (version pinned by `packageManager` in `package.json`) is the only toolchain:
@@ -51,7 +51,7 @@ the spent hull and the world are generated, not committed. Each step reruns only
 its inputs change or an output is missing; the first build needs **Blender 5.2.2** and
 **gltfpack 1.3** on `PATH` (or `BLENDER`/`GLTFPACK`) and takes several minutes.
 `bun run test` and `bun run build:ci` generate the world with Bun, without Blender.
-Browser capture, profiling and world-smoke tools show asset-build progress and allow
+Browser capture, profiling and world-smoke (`bun tests/e2e/world-smoke.ts`) tools show asset-build progress and allow
 15 minutes for server startup. Set `OW_STARTUP_TIMEOUT_MS` (milliseconds) for slower
 machines; this is separate from browser/page timeouts. An already-running server is reused.
 Change map content in

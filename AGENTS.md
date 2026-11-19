@@ -31,7 +31,7 @@ before subsystem changes: it owns directory assignments, APIs and event contract
 
 ```sh
 bun ci                    # preferred clean install
-bun run check             # everything CI runs: format:check, build:ci, test
+bun run verify            # pre-push gate: format:check, build:ci, test
 bun run test              # Bun runs tests/smoke/ scripts in isolated parallel processes
 bun run typecheck         # src, tools, build and tests
 bun run lint              # type-aware Oxlint; warnings fail

@@ -32,8 +32,7 @@ Run from the repository root after `bun ci`:
 ```sh
 bun tools/export-world.ts
 bun tools/export-world.ts --check
-bun run test
-bun run build
+bun run verify
 ```
 
 Use `bun tools/export-world.ts --out=/tmp/world-review` for isolated output.
