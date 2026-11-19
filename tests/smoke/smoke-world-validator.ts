@@ -35,7 +35,7 @@ try {
   };
   const good = run(baseline);
   assert.equal(good.status, 0, good.stdout + good.stderr);
-  assert.match(good.stdout, /\[world:validate\] ok/);
+  assert.match(good.stdout, /\[validate-world\] ok/);
 
   // Schema errors come from the runtime parser; cross-record errors are aggregated.
   const malformed = run({ ...baseline, transform: [1, 2] });

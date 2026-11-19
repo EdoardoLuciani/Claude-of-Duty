@@ -19,7 +19,7 @@ const output = execFileSync(BUN, ['tools/export-world.ts', `--out=${directory}`]
   timeout: 20000,
 });
 assert.match(output, /\[world\] up to date/);
-assert.match(output, /\[world:validate\] ok/);
+assert.match(output, /\[validate-world\] ok/);
 assert.deepEqual(
   files.map((name): number => statSync(join(directory, name)).mtimeMs),
   mtimes,

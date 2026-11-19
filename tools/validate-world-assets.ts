@@ -294,7 +294,7 @@ function compareStat(stats: unknown, actual: AssetStats | null, key: keyof Asset
 }
 
 if (!existsSync(manifestPath)) {
-  console.error(`[world:validate] manifest does not exist: ${manifestPath}`);
+  console.error(`[validate-world] manifest does not exist: ${manifestPath}`);
   process.exit(1);
 }
 
@@ -304,7 +304,7 @@ try {
   if (!isRecord(parsed)) throw new Error('expected a manifest object');
   manifest = parsed;
 } catch (error) {
-  console.error(`[world:validate] cannot parse ${manifestPath}: ${errorMessage(error)}`);
+  console.error(`[validate-world] cannot parse ${manifestPath}: ${errorMessage(error)}`);
   process.exit(1);
 }
 
@@ -462,9 +462,9 @@ for (const key of ['staticTris', 'instTris', 'instances', 'drawCalls', 'collideT
 }
 
 if (errors.length) {
-  for (const message of errors) console.error(`[world:validate] ${message}`);
+  for (const message of errors) console.error(`[validate-world] ${message}`);
   console.error(
-    `[world:validate] failed with ${errors.length} error${errors.length === 1 ? '' : 's'}`
+    `[validate-world] failed with ${errors.length} error${errors.length === 1 ? '' : 's'}`
   );
   process.exit(1);
 }
@@ -476,7 +476,7 @@ const compressedMiB = (
   1048576
 ).toFixed(1);
 console.log(
-  `[world:validate] ok — ${visual!.drawCalls} draws, ${visual!.instances} instances, ` +
+  `[validate-world] ok — ${visual!.drawCalls} draws, ${visual!.instances} instances, ` +
     `${collision!.collideTris} collision tris, ${compressedMiB} MiB compressed` +
     (navAsset ? `, nav ${navAsset.bake.components.size} polygons` : '')
 );

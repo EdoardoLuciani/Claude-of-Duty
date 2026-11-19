@@ -2,7 +2,7 @@
  * Bun bundler and servers: `bun build/bun.ts dev|build|preview [--port N]`.
  * dev and build first run the Bun asset tasks (tools/build-assets.ts, which honours
  * OW_SKIP_ASSETS); preview serves the existing dist/. Dev plugins live in bunfig.toml.
- * Env: OW_SOURCEMAP=1 emits linked sourcemaps; OW_NO_HMR=1 disables dev HMR.
+ * Env: OW_NO_HMR=1 disables dev HMR.
  */
 import { spawnSync } from 'node:child_process';
 import { cpSync, rmSync } from 'node:fs';
@@ -74,7 +74,6 @@ if (command === 'build') {
     minify: true,
     splitting: true,
     publicPath: '/',
-    sourcemap: process.env.OW_SOURCEMAP === '1' ? 'linked' : 'none',
     naming: { chunk: 'assets/[name]-[hash].[ext]', asset: 'assets/[name]-[hash].[ext]' },
     plugins: [plugin],
   });

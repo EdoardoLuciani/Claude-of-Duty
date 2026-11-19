@@ -13,7 +13,7 @@ bun run typecheck
 bun run lint
 bun run build
 bun run build:ci     # CI build: generates the world, skips Blender/model assets
-bun run verify       # pre-push gate: format:check, build:ci, test
+bun run verify       # CI gate: format:check, build:ci, test
 ```
 
 Bun (version pinned by `packageManager` in `package.json`) is the only toolchain:
@@ -177,6 +177,8 @@ Tests are not final human visual acceptance; see each asset's remaining limits.
 - `bun tools/profile.ts`: sustained living-combat frame/CPU percentiles and hitches.
   GPU timestamps are unavailable; node-builder activity is not GPU compilation time.
   Compare matched runs only; there is no cross-hardware frame-time threshold.
+  `--production` profiles the existing `dist/` (`bun run build` first) via
+  `bun build/bun.ts preview`.
 
 Keep capture/profile primitives and focused correctness checks; task-specific
 screenshot matrices, reels and investigation scripts are temporary and not committed. `bun run test` is the correctness gate; it is not visual or combat-
@@ -196,6 +198,6 @@ continues unless it failed; the reload-required error is exposed through
 
 ## Automation
 
-The `Validate` GitHub Actions workflow runs on pull requests and pushes to `main`
-and `develop`. It checks formatting, types, lint, tests and the production build.
+The `Validate` GitHub Actions workflow runs `bun run verify` on pull requests and pushes to `main`
+and `develop`: formatting, types, lint, the production build and tests.
 Changes go through pull requests into `develop`; only the owner promotes to `main`.
