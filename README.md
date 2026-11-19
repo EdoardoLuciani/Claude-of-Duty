@@ -7,14 +7,11 @@ Blender-authored assets load locally, with no runtime CDN.
 
 ```sh
 bun ci
-bun run dev          # builds stale generated assets, validates world assets, serves :5173
-bun run test
-bun run typecheck
-bun run lint
-bun run build
-bun run build:ci     # CI build: generates the world, skips Blender/model assets
-bun run verify       # CI gate: format:check, build:ci, test
+bun run dev     # builds stale generated assets, validates world assets, serves :5173
+bun run verify  # CI gate: format:check, build:ci, test
 ```
+
+The full command list is in [AGENTS.md](AGENTS.md#commands-and-invariants).
 
 Bun (version pinned by `packageManager` in `package.json`) is the only toolchain:
 it installs, type-checks (`bun check`), formats, lints, bundles, serves, runs the
@@ -56,9 +53,7 @@ Browser capture, profiling and world-smoke (`bun tests/e2e/world-smoke.ts`) tool
 machines; this is separate from browser/page timeouts. An already-running server is reused.
 Change map content in
 `tools/worldgen/level/`; the [world editing map](tools/worldgen/README.md) identifies
-shape, placement and build locations. Regenerate and validate with
-`bun tools/export-world.ts`. Use `bun tools/export-world.ts --force` to rebuild unchanged inputs;
-`bun tools/export-world.ts --check` verifies a fresh rebuild against the generated outputs.
+shape, placement and build locations, and the `bun tools/export-world.ts` options.
 The seven authored weapons use the [shared gltfpack build recipe](build/README.md);
 `bun build/models.ts p320` reruns one cook. The [spent hull](assets/fx/spent-hull/README.md)
 keeps its validated native export to preserve the casing pool's vertex attributes.
