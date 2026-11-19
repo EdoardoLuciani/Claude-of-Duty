@@ -128,6 +128,7 @@ const SHARED_TOOLS: Partial<Record<ModelId, string[]>> = {
   mpx: ['tools/blender/review_hands.py', 'tools/blender/hand-reference.ts'],
 };
 const STANDALONE_TOOLS: Partial<Record<ModelId, string[]>> = {
+  ammo_pickup: ['tools/blender/ammo_pickup'],
   m67: ['tools/blender/m67'],
   srd762ti: ['tools/blender/suppressor', 'tools/blender/can.py'],
   suppressor9mm: ['tools/blender/suppressor9mm', 'tools/blender/can.py'],
@@ -158,7 +159,7 @@ function cookStep(id: ModelId, salt: string[]): AssetStep {
         ? tools
         : [
             ...tools,
-            ...(id === 'm67' ? [] : ['tools/blender/picatinny.py']),
+            ...(id === 'm67' || id === 'ammo_pickup' ? [] : ['tools/blender/picatinny.py']),
             ...authoredJson(directory),
           ],
     // Only this model's cook settings, so one profile edit rebuilds one model.

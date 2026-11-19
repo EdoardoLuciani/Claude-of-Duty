@@ -8,9 +8,9 @@ import { Rng } from '../../src/core/rng.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
 import { PlayerSystem } from '../../src/player/index.ts';
 import { RenderSystem } from '../../src/render/index-webgpu.ts';
-import { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
 import type { WeaponEntry } from '../../src/weapons/runtime-types.ts';
+import { ammoPickupFixture } from '../lib/ammo-pickup-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
 import { fixture } from '../lib/fixture.ts';
 
@@ -106,7 +106,7 @@ system.ctx = createTestContext({
   viewCamera: new THREE.PerspectiveCamera(),
   providers: { player: fixture<PlayerSystem>({ flashlight }), render },
 });
-system.pickups = new AmmoPickups(system);
+system.pickups = ammoPickupFixture(system);
 let loaded = (): void => {
   throw Error('asset resolver missing');
 };

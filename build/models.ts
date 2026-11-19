@@ -52,6 +52,12 @@ const attachment = (
   flags,
 });
 export const MODEL_COOKS = {
+  ammo_pickup: {
+    directory: 'assets/props/ammo-pickup',
+    source: 'ammo-pickup.glb',
+    output: 'public/models/props/ammo-pickup.runtime.glb',
+    flags: [],
+  },
   field_radio: {
     directory: 'assets/props/field-radio',
     source: 'field-radio.glb',

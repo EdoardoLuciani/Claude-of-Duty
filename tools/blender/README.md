@@ -30,6 +30,8 @@ Standalone attachments: [EXPS3-0](../../assets/attachments/eotech-exps3-0/README
 The [field radio](../../assets/props/field-radio/README.md) is a standalone
 first-person prop with a native export and separate live LCD binding.
 Standalone FX: [spent shotgun hull](../../assets/fx/spent-hull/README.md).
+The independently built [ammo pickup case](../../assets/props/ammo-pickup/README.md)
+uses the same native export and cook workflow; it has no rig or animation.
 
 ## Build timing and profiling
 

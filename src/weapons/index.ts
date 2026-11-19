@@ -338,6 +338,7 @@ export class WeaponSystem {
           this._attachments
         ).tris;
       }
+      this._pickups = await AmmoPickups.load(this, renderer);
       this._restTask = (async (): Promise<void> => {
         try {
           await this._mountRest(rest, load);
@@ -353,7 +354,6 @@ export class WeaponSystem {
     }
     this.viewmodel.setActive(this.activeId);
     this.viewmodel.play('draw');
-    this._pickups = new AmmoPickups(this);
 
     // Player hooks (all optional: the viewmodel works standalone).
     this.player = ctx.peek('player');
