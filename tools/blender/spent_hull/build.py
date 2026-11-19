@@ -13,8 +13,9 @@ SIDES = 24
 # In-game visual proportions from the M590 insertion mesh, not physical specifications.
 RADIUS_SCALE = .00495 / 11.05
 LENGTH_SCALE = .045 / 70
-RED = (.28, .032, .019)
-BRASS = (.48, .29, .09)
+# Scene-linear vertex albedos; wear and burnish modulate these below.
+RED = (.19, .015, .012)
+BRASS = (.38, .205, .060)
 PRIMER = (.39, .32, .21)
 
 
