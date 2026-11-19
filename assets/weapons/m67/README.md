@@ -43,7 +43,7 @@ and own the asset through restart; AI never loads or disposes it.
 | Draws per visible prop per pass / distinct materials | 6 / 5 | 1 / 1 |
 | Geometry typed-array bytes, shared | 86,864 | 43,512 |
 | Hardware BC7 texture payload with mips, shared | 0 B | 349,600 B |
-| Downloaded model file | None | 169,280 B |
+| Downloaded model file | None | 169,592 B |
 
 The two 512 × 256 maps add a fixed shared cost to make paint, bare metal and wear
 respond differently to light and retain legible markings in first person. Listed

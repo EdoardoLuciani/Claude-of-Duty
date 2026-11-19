@@ -11,7 +11,7 @@ SHELL = (4, 4, 508, 172)
 SHELVES = {
     # pixel rect, sRGB, roughness, metallic
     'housing': ((4, 180, 128, 218), (108, 110, 98), .66, .62),
-    'spoon': ((136, 180, 308, 252), (76, 80, 59), .54, .03),
+    'spoon': ((136, 180, 308, 252), (68, 71, 39), .54, .03),
     'wire': ((316, 180, 508, 210), (146, 145, 132), .36, .92),
     'clip': ((316, 218, 508, 252), (70, 72, 64), .48, .84),
 }
@@ -59,7 +59,7 @@ def make_material():
             grain = rng.uniform(-3, 3) + 2*sin(x*.075+y*.043) + 1.5*sin(x*.19-y*.21)
             if y <= 175:
                 ridge = 3 if 81 <= y <= 83 else (-4 if 78 <= y <= 80 else 0)
-                color, rough, metal = (83+ridge, 90+ridge, 64+ridge), .63, .015
+                color, rough, metal = (74+ridge, 79+ridge, 38+ridge), .63, .015
                 border = 154 + (1 if sin(x*.061) > .8 else 0)
                 if border <= y < 163 or ((x, y) in letters and rng.random() > .105):
                     color, rough, metal = (177, 150, 69), .71, .01
