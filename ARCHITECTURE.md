@@ -280,9 +280,9 @@ The held field radio is a standalone authored GLB. `radio-mesh.ts` loads it duri
 weapons boot and binds one retained canvas emissive texture to `SCREEN_radio`.
 The viewmodel mounts it at `GRIP_radio`, owns the asset lifetime, and keeps the
 same model through stow, pause and restart. Equipping raises it into a fixed
-camera-space close-up; the LCD is the only radio interface, showing charges or the
-empty state, request bindings and locks, and the stow binding. Request state does
-not depend on the model. [Radio asset contract](assets/props/field-radio/README.md).
+camera-space close-up; the LCD is the only radio interface, showing the select,
+send and stow bindings, charges or the empty state, request locks and the request
+cursor. Weapon keys stow the radio. Request state does not depend on the model. [Radio asset contract](assets/props/field-radio/README.md).
 
 `weapons.createInspectionModel(id, config)` returns an independent rest-pose clone
 with `dispose()` for the market's demand-rendered WebGPU studio. Inspection owns

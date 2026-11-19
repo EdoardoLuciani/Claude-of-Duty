@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { bindingLabel } from '../core/bindings.ts';
 import type { SystemId, EngineContext, EngineSystems } from '../core/context.ts';
 import type { ReloadPhase } from '../core/events.ts';
-import { DEG, lerp } from '../core/math.ts';
+import { DEG, clamp, lerp } from '../core/math.ts';
 import { Rng } from '../core/rng.ts';
 import { AmmoPickups } from './ammo-pickups.ts';
 import { disposeWeaponLoader } from './asset-loader.ts';
@@ -40,6 +40,7 @@ import { ReticleMaterials } from './materials-tsl.ts';
 import { MCX_EJECT_DELAY } from './mcx.ts';
 import { MPX_EJECT_DELAY } from './mpx.ts';
 import { P320_EJECT_DELAY } from './p320.ts';
+import { RADIO_REQUESTS } from './radio-mesh.ts';
 import type { ViewState, WeaponModelRecord, WeaponState } from './runtime-types.ts';
 import { Viewmodel } from './viewmodel.ts';
 import type { ViewModel } from './viewmodel.ts';
@@ -244,6 +245,8 @@ export class WeaponSystem {
    *  free — stowing (any weapon selection) spends nothing. */
   grenadeEquipped: boolean = false;
   radioEquipped: boolean = false;
+  /** Highlighted LCD request row; 0 is the carpet bomb. */
+  _radioCursor: number = 0;
   healing: boolean = false;
   carpetBombs: number = CARPET_STRIKES_PER_LIFE;
   /** The initiating fire/ADS action is held; the fuse burns. Releasing
@@ -757,7 +760,6 @@ export class WeaponSystem {
   /** Buy carpet-bomb strikes at the market: +n up to the cap. */
   addCarpetBombs(n: number): void {
     this.carpetBombs = Math.min(CARPET_STRIKES_MAX, this.carpetBombs + n);
-    if (this.radioEquipped) this._viewmodel?.setRadioScreen(this.carpetBombs);
   }
 
   /** Reset the complete loadout and transient combat state for a fresh run. */
@@ -811,9 +813,11 @@ export class WeaponSystem {
   setWeapon(id: string): boolean {
     if (!isWeaponId(id) || this.disabled || !this.owned.has(id) || this._switchTo) return false;
     if (id === this.activeId) {
-      // Selecting the active weapon draws it back from a held grenade.
-      if (!this.grenadeEquipped || this.cooking || this._throwing) return false;
+      // Selecting the active weapon draws it back from a held grenade or radio.
+      const held = this.grenadeEquipped || this.radioEquipped;
+      if (!held || this.cooking || this._throwing) return false;
       this._stowGrenade();
+      this._stowRadio();
       this._viewmodel?.play('draw');
       return true;
     }
@@ -1563,46 +1567,32 @@ export class WeaponSystem {
     this._grenades.length = 0;
   }
 
-  /** X toggles the radio. While its LCD is up, Digit1-3 select requests. */
+  /** X equips the radio; weapon keys stow it. Arrows move the LCD cursor, Enter sends. */
   _updateRadio(input: EngineContext['input'], live: boolean): void {
     if (!live) return;
+    const busy = this.cooking || this._throwing || this.switching || this.grenadeEquipped;
     if (input.actionPressed('radio')) {
-      if (this.cooking || this._throwing || this.switching || this.grenadeEquipped) return;
-      this._interruptHeal('radio');
-      if (this.radioEquipped) {
-        this._stowRadio();
-        this._viewmodel?.play('draw');
-        return;
+      if (!this.radioEquipped && !busy) {
+        this._interruptHeal('radio');
+        this.radioEquipped = true;
+        this._radioCursor = 0;
+        if (this.reloading) this._viewmodel?.stopClip();
+        this._viewmodel?.holdRadio();
+        this.audio?.playUi('radio_open', 0.9);
       }
-      this.radioEquipped = true;
-      if (this.reloading) this._viewmodel?.stopClip();
-      this._viewmodel?.holdRadio();
-      this._viewmodel?.setRadioScreen(this.carpetBombs);
-      this.audio?.playUi('radio_open', 0.9);
-      return;
+    } else if (this.radioEquipped) {
+      const step =
+        Number(input.actionPressed('radioDown')) - Number(input.actionPressed('radioUp'));
+      this._radioCursor = clamp(this._radioCursor + step, 0, RADIO_REQUESTS - 1);
+      if (input.actionPressed('radioSend')) this._sendRequest();
     }
-    if (!this.radioEquipped) return;
-    const sel = input.actionPressed('slot1')
-      ? 1
-      : input.actionPressed('slot2')
-        ? 2
-        : input.actionPressed('slot3')
-          ? 3
-          : 0;
-    if (sel) this._selectRequest(sel);
+    // The LCD redraws only when the count or cursor actually changes.
+    if (this.radioEquipped) this._viewmodel?.setRadioScreen(this.carpetBombs, this._radioCursor);
   }
 
-  _selectRequest(n: number): void {
-    if (n === 1) {
-      if (this.carpetBombs <= 0) {
-        this.audio?.playUi('radio_denied', 0.9);
-        this.ui?.setPrompt({
-          key: bindingLabel('slot1'),
-          text: 'NO CHARGES',
-          sub: 'BUY CARPET BOMB STRIKES AT THE MARKET',
-        });
-        return;
-      }
+  _sendRequest(): void {
+    const carpet = this._radioCursor === 0;
+    if (carpet && this.carpetBombs > 0) {
       this.carpetBombs--;
       this.radioSys ??= this.ctx.peek('radio');
       if (!this.radioSys?.callStrike()) {
@@ -1610,16 +1600,15 @@ export class WeaponSystem {
         this.audio?.playUi('radio_denied', 0.9);
         return;
       }
-      this._stowRadio();
-      this._viewmodel?.play('draw');
-      // The accepted radio:strike event owns the UI/audio acknowledgment once.
+      // Back to the weapon; the accepted radio:strike event owns the UI/audio acknowledgment once.
+      this.setWeapon(this.activeId);
       return;
     }
     this.audio?.playUi('radio_denied', 0.9);
     this.ui?.setPrompt({
-      key: bindingLabel(n === 2 ? 'slot2' : 'slot3'),
-      text: 'TOP-SECRET',
-      sub: 'REQUEST LOCKED BY HIGHER AUTHORITY',
+      key: bindingLabel('radioSend'),
+      text: carpet ? 'NO CHARGES' : 'TOP-SECRET',
+      sub: carpet ? 'BUY CARPET BOMB STRIKES AT THE MARKET' : 'REQUEST LOCKED BY HIGHER AUTHORITY',
     });
   }
 
@@ -1696,15 +1685,13 @@ export class WeaponSystem {
       if (input.actionPressed('reload')) this.reload();
       if (input.actionPressed('fireMode')) this.cycleFireMode();
       if (input.actionPressed('inspect')) this.inspect();
-      if (!this.radioEquipped) {
-        if (input.actionPressed('slot1')) {
-          const primary = PRIMARY_IDS.find((id): boolean => this.owned.has(id));
-          if (primary) this.setWeapon(primary);
-        }
-        if (input.actionPressed('slot2')) {
-          const secondary = SECONDARY_IDS.find((id): boolean => this.owned.has(id));
-          if (secondary) this.setWeapon(secondary);
-        }
+      if (input.actionPressed('slot1')) {
+        const primary = PRIMARY_IDS.find((id): boolean => this.owned.has(id));
+        if (primary) this.setWeapon(primary);
+      }
+      if (input.actionPressed('slot2')) {
+        const secondary = SECONDARY_IDS.find((id): boolean => this.owned.has(id));
+        if (secondary) this.setWeapon(secondary);
       }
       if (input.actionPressed('cycleWeapon')) this.nextWeapon();
       if (input.wheel) this.nextWeapon();

@@ -80,7 +80,7 @@ w.audio.playUi = (id): boolean => {
   return true;
 };
 w.ui = fixture<UiSystem>({ clearPrompt(): void {}, setPrompt(): void {} });
-w._selectRequest(1);
+w._sendRequest();
 assert.equal(w.carpetBombs, 1);
 assert.deepEqual(
   calls,
@@ -89,12 +89,12 @@ assert.deepEqual(
 );
 w.radioSys.callStrike = (): boolean => false;
 calls.length = 0;
-w._selectRequest(1);
+w._sendRequest();
 assert.equal(w.carpetBombs, 1);
 assert.deepEqual(calls, ['radio_denied']);
 w.carpetBombs = 0;
 calls.length = 0;
-w._selectRequest(1);
+w._sendRequest();
 assert.deepEqual(calls, ['radio_denied']);
 console.log(
   'Required radio components, variants, rate/timing, retained functional tones and sole accepted-strike acknowledgment'

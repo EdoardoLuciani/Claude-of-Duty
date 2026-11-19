@@ -84,17 +84,17 @@ Bindings are fixed defaults in `src/core/bindings.ts`.
 
 | Keys                    | Action                                                 |
 | ----------------------- | ------------------------------------------------------ |
-| WASD / arrows, mouse    | Move and look; forward/back climb ladders              |
+| WASD, mouse             | Move and look; forward/back climb ladders              |
 | Space                   | Jump / mantle / vault / ladder jump-off                |
 | Left/Right Ctrl or C, Z | Toggle crouch/slide, prone                             |
 | Left Shift, Q / E       | Sprint (double-tap for tactical sprint), lean          |
 | LMB / RMB               | Fire / hold ADS                                        |
 | R / B / I               | Reload / fire mode / inspect                           |
-| 1 / 2, Tab / wheel      | Equipped primary/secondary, cycle pair; stow grenade   |
+| 1 / 2, Tab / wheel      | Primary/secondary, cycle pair; stow grenade/radio      |
 | Hold T, F, L            | Ammo/intel, flashlight / mounted laser toggle          |
 | Hold H                  | Bandage (3 seconds; +50 HP on completion)              |
 | G, then LMB / RMB       | Equip grenade; cook long/short throw, release to throw |
-| X, then 1 / 2 / 3       | Radio; immediate carpet-bomb request / locked requests |
+| X, then ↑ / ↓, Enter    | Radio; select a request, send it                       |
 | Esc                     | Pause/resume; closes the shop instead while shopping   |
 
 Intel takes priority over ammo and requires a four-second stationary, visible,

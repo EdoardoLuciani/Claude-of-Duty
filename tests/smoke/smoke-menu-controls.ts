@@ -17,17 +17,9 @@ function isActionId(value: string): value is ActionId {
 const controls = CONTROL_SECTIONS.flatMap(
   (section): (typeof CONTROL_SECTIONS)[number]['controls'] => section.controls
 );
-const movementActions: ActionId[] = ['forward', 'left', 'back', 'right'];
-assert.deepEqual(
-  controls[0].keys,
-  [0, 1].map((alias): string =>
-    movementActions.map((action): string => bindingLabels(action)[alias]).join(' ')
-  ),
-  'movement groups retain every canonical alias'
-);
 const labels = new Set(controls.flatMap((control): readonly string[] => control.keys));
 for (const action of Object.keys(DEFAULT_BINDINGS)) {
-  if (!isActionId(action) || movementActions.includes(action)) continue;
+  if (!isActionId(action)) continue;
   for (const label of bindingLabels(action))
     assert.ok(labels.has(label), `${action}: missing ${label}`);
 }
@@ -98,9 +90,9 @@ for (const distinction of [
   'Bandage (hold 3s)',
   'Equip grenade (weapon keys stow)',
   'Grenade out: cook long / short (hold); release to throw',
-  'Equip / stow radio (toggle)',
-  'Radio out: carpet-bomb request (immediate)',
-  'Radio out: locked requests',
+  'Equip radio (weapon keys stow)',
+  'Radio out: select request',
+  'Radio out: send selected request',
   'Request weapon cycle',
   'in shop: close shop',
 ])
