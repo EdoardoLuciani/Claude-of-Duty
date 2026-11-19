@@ -93,6 +93,7 @@ physics.addRigidBody = (opts): RigidBody => {
 };
 physics.removeRigidBody = (): void => {};
 const wp = new WeaponSystem();
+wp.createGrenade = (): THREE.Mesh => new THREE.Mesh();
 wp.ctx = createTestContext({
   input: ctx.input,
   camera: ctx.camera,
@@ -286,7 +287,9 @@ input.fire = false;
 
 // ---- a live grenade detonates on fuse expiry with the same blast ----------
 resetLive();
-wp._spawnGrenade(new THREE.Vector3(0, 1.6, 0), { x: 0, y: 0, z: 0 }, 0.001);
+const releaseOrigin = new THREE.Vector3(0, 1.6, 0);
+wp._spawnGrenade(releaseOrigin, { x: 0, y: 0, z: 0 }, 0.001);
+assert(wp._grenades[0].mesh.position.equals(releaseOrigin), 'draw at release before physics sync');
 step(); // fuse expires: the blast fires
 const dets = events.filter((e): e is ExplosionEvent => e.type === 'explosion');
 assert.equal(dets.length, 1, 'fuse expiry emits exactly one explosion');

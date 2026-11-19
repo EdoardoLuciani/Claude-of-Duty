@@ -16,7 +16,6 @@ import { PlayerSystem } from '../../src/player/index.ts';
 import { Movement } from '../../src/player/movement.ts';
 import type { RadioSystem } from '../../src/radio/index.ts';
 import type { UiSystem } from '../../src/ui/index.ts';
-import { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
 import { BASE_ATTACHMENTS } from '../../src/weapons/attachments.ts';
 import { ProjectileSim } from '../../src/weapons/ballistics.ts';
 import { buildManifestClips, Clip } from '../../src/weapons/clips.ts';
@@ -25,6 +24,7 @@ import type { WeaponId } from '../../src/weapons/defs.ts';
 import { GRENADE_FUSE, MAX_SHOTS_PER_FRAME } from '../../src/weapons/index.ts';
 import type { WeaponEntry } from '../../src/weapons/runtime-types.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
+import { ammoPickupFixture } from '../lib/ammo-pickup-fixture.ts';
 import { ArmedWeaponSystem, weaponState } from '../lib/ballistics-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
 import { fixture } from '../lib/fixture.ts';
@@ -60,6 +60,7 @@ function makeHarness(): WeaponHarness {
     };
   }
   const wp = new ArmedWeaponSystem();
+  wp.createGrenade = (): THREE.Mesh => new THREE.Mesh();
   const clips: string[] = [],
     prompts: Array<Parameters<UiSystem['setPrompt']>[0] & { owner: unknown }> = [],
     cancellations: string[] = [],
@@ -942,7 +943,7 @@ for (const blocked of ['disabled', 'frozen', 'dead', 'controls', 'input']) {
 {
   const { wp, frame, prompts } = makeHarness();
   wp.state.reserve = 0;
-  const pickups = new AmmoPickups(wp);
+  const pickups = ammoPickupFixture(wp);
   wp.pickups = pickups;
   try {
     pickups.spawn(new THREE.Vector3());

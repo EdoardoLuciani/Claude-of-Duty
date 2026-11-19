@@ -62,6 +62,11 @@ Blender 5.2.2 and the pinned gltfpack encoder are needed by `bun run dev` /
 [cooking recipe](../build/README.md). Committed weapon manifests may name old tool
 paths from their last export; current README commands supersede those notes.
 
+The rigid [M67 grenade prop](../assets/weapons/m67/README.md) is authored in
+[`tools/blender/m67/`](../tools/blender/m67/) and cooked with `bun run models:cook -- m67`.
+It has no arm or animation inputs; the held, player-thrown and AI visuals share
+its one rigid runtime mesh through [`grenade-mesh.ts`](../src/weapons/grenade-mesh.ts).
+
 Gameplay tuning belongs in [`src/weapons/defs.ts`](../src/weapons/defs.ts);
 runtime handling/IK stays in `src/weapons/`, separate from Blender-authored motion.
 
@@ -87,6 +92,16 @@ intel sites and explicit placement records. This is the world source—not
   AI navigation consume the cooked data.
 
 ## Other model and texture families
+
+| Family                      | Authoritative editing location                                                                                                                                    | Regenerate / validate                                                                           | Products and consumers                                                                                                                                        |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Arms and bandage            | [`player_arms.py`](../tools/blender/player_arms.py), [`player_bandage.py`](../tools/blender/player_bandage.py); [asset contract](../assets/player/arms/README.md) | Follow the asset's Blender commands; review in engine                                           | `assets/player/arms/`, `public/models/player/`, generated poses/paths in `src/weapons/`; loaded by weapon arm/bandage adapters                                |
+| Held field radio            | [`tools/blender/field_radio/`](../tools/blender/field_radio/); [asset contract](../assets/props/field-radio/README.md)                                            | Independent Blender build/check and `bun run models:cook -- field_radio`; review `--shot=radio` | `public/models/player/field-radio.runtime.glb`, bound by [`radio-mesh.ts`](../src/weapons/radio-mesh.ts)                                                      |
+| Soldiers                    | [`tools/blender/soldiers/`](../tools/blender/soldiers/); [asset contract](../assets/soldiers/README.md). Runtime RIG/registry/surfaces remain in `src/ai/`        | Explicit Blender author/cook; `bun run models` stages                                           | Generated `assets/soldiers/` products stage to ignored `public/models/soldiers/*.glb` + JSON; loaded by `ModelSystem` and AI                                  |
+| Spent shotgun hull          | [`tools/blender/spent_hull/`](../tools/blender/spent_hull/); [asset contract](../assets/fx/spent-hull/README.md)                                                  | Standalone Blender build, source check and native cook                                          | `public/models/fx/spent12g.glb`, consumed by FX                                                                                                               |
+| Ammo pickup case            | [`tools/blender/ammo_pickup/`](../tools/blender/ammo_pickup/); [asset contract](../assets/props/ammo-pickup/README.md)                                            | Standalone Blender author/check and `bun run models:cook -- ammo_pickup`                        | `public/models/props/ammo-pickup.runtime.glb`, instanced by weapons; separate runtime recognition ring                                                        |
+| Procedural textures         | [`tools/export-proc-textures.ts`](../tools/export-proc-textures.ts) and its declared AI/FX inputs                                                                 | `bun tools/export-proc-textures.ts`; `bun run test`                                             | Generated `public/models/proc/`, consumed by AI materials and FX                                                                                              |
+| Standalone EXPS3 attachment | [`exps3.py`](../tools/blender/exps3.py), [`exps3_bake.py`](../tools/blender/exps3_bake.py); [asset contract](../assets/attachments/eotech-exps3-0/README.md)      | Asset Blender commands; `bun run models:cook -- exps3`                                          | Native products: `assets/attachments/eotech-exps3-0/`; cooked: `public/models/attachments/exps3.runtime.glb`; shared gameplay/inspection (except on the P320) |
 
 The [Al-Maktaba intel case](../assets/props/intel-case/README.md) is authored in
 [`tools/blender/intel_case/`](../tools/blender/intel_case/) and cooked with
@@ -116,8 +131,9 @@ helpers in `tools/blender/can.py`. Weapon fit checks load built attachments thro
 
 Normal `bun run dev` / `bun run build` (and `bun run assets`) run
 `tools/build-assets.ts`: arms and bandage, each weapon and its cook, standalone
-attachments, the intel case and soldiers in Blender, then procedural textures and soldier/hull
-staging. The Bun world generation/validation runs alongside these steps. Each
+attachments, the M67 grenade, field radio, spent hull, ammo pickup case, intel
+case and soldiers in Blender, then procedural textures and soldier staging.
+Bun world generation and validation run alongside these steps. Each
 Blender step reruns only when its declared inputs (scripts,
 authored JSON, upstream steps) change; hashes live in ignored `.cache/assets/`
 and `--force` rebuilds all. These products are ignored, not committed; weapon

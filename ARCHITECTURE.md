@@ -185,8 +185,9 @@ Prepass layer 1 contains opaque meshes/lights, not sky/transparent FX. Schedule 
 exactly once before world rendering at every quality, even without AO.
 `afterDepth` draws haze against current-frame depth; soft particles borrow it.
 Mesh opt-outs: `userData.owNoPrepass = true`, native `castShadow = false`.
-Pickup instances keep stable slots; the world camera's layer-1 prepass callback
-validates their birth/reuse history.
+Ammo pickups share one Blender-authored opaque instanced case and a separate
+runtime-owned glow ring. Instances keep stable slots; the world camera's layer-1
+prepass callback validates their birth/reuse history.
 Refresh CSM frustums when the unjittered projection changes. Bias depends on slope/
 cascade texels. Fog borrows native cascade depth/matrices, adding no shadow draw.
 Hoist noise outside the fog march; its uniform uses application frames. Haze keeps
@@ -269,7 +270,17 @@ opaque material per skeleton with packed texture arrays.
 `src/weapons/asset-loader.ts` fetches models concurrently, bounds parsing memory and
 shares one Basis transcoder per renderer during boot, released at boot end, failure
 or teardown. Static map clones are shared only when source, UV, color space and
-sampler match.
+sampler match. The Blender-authored grenade is a required boot asset owned by
+weapons. `weapons.createGrenade()` gives AI and player throws independent transforms
+that borrow the same geometry, material and maps as the held prop. Weapons warm
+both render passes; restart removes live instances, and teardown releases the
+shared asset after AI and the viewmodel have detached their visuals.
+
+The held field radio is a standalone authored GLB. `radio-mesh.ts` loads it during
+weapons boot and binds one retained canvas emissive texture to `SCREEN_radio`.
+The viewmodel mounts it at `GRIP_radio`, owns the asset lifetime, and keeps the
+same model through stow, pause and restart. The radio request state and native
+DOM panel do not depend on the model. [Radio asset contract](assets/props/field-radio/README.md).
 
 `weapons.createInspectionModel(id, config)` returns an independent rest-pose clone
 with `dispose()` for the market's demand-rendered WebGPU studio. Inspection owns
@@ -349,8 +360,9 @@ The laser changes no AI perception; the flashlight keeps separate light ownershi
 
 `tools/blender/soldiers/` builds seeded parametric soldiers; a Bun GLTFExporter cook
 preserves the runtime joint/attribute format. `tools/export-models.ts` validates and
-stages them and generates the spent hull; missing/stale/corrupt products fail rather
-than triggering Blender or a fallback. `models.getSoldier(name)` returns
+stages them; missing/stale/corrupt products fail rather than triggering Blender or a
+fallback. `tools/blender/spent_hull/` authors and validates one native spent hull GLB
+for the FX casing pool. `models.getSoldier(name)` returns
 `{ name, geometry, slots, boneNames, weapon, stats, variant }` as one skinned geometry
 with slot groups. Bone order must match `RIG.createSkeleton()`; mismatches fail boot.
 AI owns the soldier texture arrays and finish lookup textures.
