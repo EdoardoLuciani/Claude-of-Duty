@@ -814,7 +814,7 @@ export class WeaponSystem {
       // Selecting the active weapon draws it back from a held grenade.
       if (!this.grenadeEquipped || this.cooking || this._throwing) return false;
       this._stowGrenade();
-      this.viewmodel.play('draw');
+      this._viewmodel?.play('draw');
       return true;
     }
     if (!this._hasMesh(id)) return false;
