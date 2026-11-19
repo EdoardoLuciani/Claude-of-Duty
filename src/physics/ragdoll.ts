@@ -75,7 +75,7 @@ function isBone(object: THREE.Object3D | null): object is THREE.Bone {
  * A 15-capsule humanoid sized from a total height, in the actor's local frame
  * (feet at y = 0, +Z forward). Proportions are the standard 7.5-head figure.
  */
-export function humanoidSpec(height = 1.8, scaleMass = 82): BoneSpec[] {
+function humanoidSpec(height = 1.8, scaleMass = 82): BoneSpec[] {
   const h = height;
   const M = scaleMass;
   const y = (f: number): number => h * f;

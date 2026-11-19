@@ -124,7 +124,7 @@ export class FixtureBufferSource extends FixtureAudioNode implements AudioBuffer
     this.stopped = true;
   }
 }
-export class FixtureOscillator extends FixtureAudioNode implements OscillatorNode {
+class FixtureOscillator extends FixtureAudioNode implements OscillatorNode {
   frequency = new FixtureAudioParam();
   detune = new FixtureAudioParam();
   type: OscillatorType = 'sine';

@@ -8,7 +8,7 @@ Blender-authored assets load locally, with no runtime CDN.
 ```sh
 bun ci
 bun run dev     # builds stale generated assets, validates world assets, serves :5173
-bun run verify  # CI gate: format:check, build:ci, test
+bun run verify  # CI gate: format:check, knip, build:ci, test
 ```
 
 The full command list is in [AGENTS.md](AGENTS.md#commands-and-invariants).
@@ -21,7 +21,9 @@ All first-party code is strict TypeScript with explicit `.ts` imports. The root
 `tsconfig.json` checks the browser game (`src/`); `tools/`, `build/` and `tests/`
 each have their own `tsconfig.json` adding Bun/Node types (a new Bun-side folder
 copies one). Type-aware Oxlint (`.oxlintrc.json`) enforces explicit return types and
-bans `any`, unsafe assertions and floating promises. Validate unknown data at runtime
+bans `any`, unsafe assertions and floating promises. Knip (`knip.json`) rejects
+exports, files and dependencies nothing uses; scripts run directly belong in its
+`entry` list. Validate unknown data at runtime
 boundaries. In tests, prefer real instances and shared typed fixtures; only
 `tests/lib/fixture.ts` may assert `Partial<T>` as `T` (issue
 [#621](https://github.com/EdoardoLuciani/Claude-of-Duty/issues/621)).

@@ -150,7 +150,7 @@ function axisFrame(
 
 // Explicit gradients remain stable inside the divergent height march; sampling
 // the alpha of the authored albedo tile without grad chooses the wrong mip.
-export function parallaxUV(
+function parallaxUV(
   map: Texture,
   uv0: Node<'vec2'>,
   vt: Node<'vec3'>,

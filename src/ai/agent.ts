@@ -61,7 +61,7 @@ export const FIRE_BLOCK = Object.freeze({
   FRIENDLY: 'friendly',
 });
 
-export const SEARCH_OUTCOME = Object.freeze({
+const SEARCH_OUTCOME = Object.freeze({
   ACTIVE: 'active',
   COMPLETE: 'complete',
   FAILED: 'failed',

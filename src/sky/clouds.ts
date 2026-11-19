@@ -10,7 +10,7 @@
  * draws. float32 vs float64 differ in the last few bits; nothing here is
  * sensitive to that.
  */
-export function cloudMacro(x: number, y: number): number {
+function cloudMacro(x: number, y: number): number {
   const a = Math.sin(x * 0.412 + 0.7) * Math.cos(y * 0.331 - 0.4);
   const b = Math.sin(x * 0.173 - y * 0.209 + 1.9);
   const c = Math.cos(x * 0.0871 + y * 0.1123 - 0.6);

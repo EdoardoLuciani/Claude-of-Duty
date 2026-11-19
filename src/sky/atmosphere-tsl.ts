@@ -98,7 +98,7 @@ export const skMiePhase = Fn<[Node<'float'>], Node<'float'>>(([cosTheta]): Node<
     .div(pow(float(1 + g * g).sub(cosTheta.mul(2 * g)), 1.5));
 });
 
-export const skRayleighPhase = Fn<[Node<'float'>], Node<'float'>>(([cosTheta]): Node<'float'> =>
+const skRayleighPhase = Fn<[Node<'float'>], Node<'float'>>(([cosTheta]): Node<'float'> =>
   float(3 / (16 * PI)).mul(float(1).add(cosTheta.mul(cosTheta)))
 );
 

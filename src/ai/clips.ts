@@ -20,7 +20,7 @@ const lobe = (x: number, k = 1.4): number => {
 };
 
 /** Weight on the left leg, knees soft, weapon at low ready. */
-export function idle(P: PoseWriter, ph: number): void {
+function idle(P: PoseWriter, ph: number): void {
   const t = ph * TAU;
   const breath = sin(t * 0.55);
   const sway = sin(t * 0.31 + 1.1);
@@ -177,24 +177,24 @@ const CROUCH = {
   armSwing: 2,
 };
 
-export function walk(P: PoseWriter, ph: number): void {
+function walk(P: PoseWriter, ph: number): void {
   gait(P, ph, WALK);
 }
 
-export function run(P: PoseWriter, ph: number): void {
+function run(P: PoseWriter, ph: number): void {
   gait(P, ph, RUN);
   // head stabilises against the bigger bounce
   P.d('Head', -3, 0, 0);
 }
 
-export function crouchWalk(P: PoseWriter, ph: number): void {
+function crouchWalk(P: PoseWriter, ph: number): void {
   gait(P, ph, CROUCH);
   P.hip(0, -0.3, -0.02);
   P.d('Spine2', 4, 0, 0);
 }
 
 /** Static crouch — knees loaded, torso upright behind the weapon. */
-export function crouchIdle(P: PoseWriter, ph: number): void {
+function crouchIdle(P: PoseWriter, ph: number): void {
   const t = ph * TAU;
   const breath = sin(t * 0.6);
   P.hip(0.004 * sin(t * 0.4), -0.315 + 0.004 * breath, -0.02);
@@ -214,7 +214,7 @@ export function crouchIdle(P: PoseWriter, ph: number): void {
 }
 
 /** Prone-ish crawl is out of scope; a wounded low stance stands in for it. */
-export function hurtIdle(P: PoseWriter, ph: number): void {
+function hurtIdle(P: PoseWriter, ph: number): void {
   const t = ph * TAU;
   P.hip(0, -0.1, -0.03);
   P.d('Hips', 10, 0, 4);

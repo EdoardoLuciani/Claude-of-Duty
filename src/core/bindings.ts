@@ -31,7 +31,7 @@ export const DEFAULT_BINDINGS = {
 } as const;
 
 export type ActionId = keyof typeof DEFAULT_BINDINGS;
-export type PhysicalBinding = (typeof DEFAULT_BINDINGS)[ActionId][number];
+type PhysicalBinding = (typeof DEFAULT_BINDINGS)[ActionId][number];
 
 const BINDING_LABELS: Readonly<Record<PhysicalBinding, string>> = {
   KeyW: 'W',

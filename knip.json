@@ -1,0 +1,12 @@
+{
+  "entry": [
+    "src/bootstrap.ts",
+    "tools/*.ts",
+    "tools/blender/*/{hand-reference,cook}.ts",
+    "build/*.ts",
+    "tests/smoke/*.ts",
+    "tests/e2e/*.ts",
+    "tests/**/*.test.ts"
+  ],
+  "project": ["src/**/*.ts", "tools/**/*.ts", "build/**/*.ts", "tests/**/*.ts"]
+}

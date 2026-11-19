@@ -11,7 +11,7 @@ import { MOVE } from './tuning.ts';
 
 export const LEDGE_NONE = 0;
 export const LEDGE_VAULT = 1; // over the obstacle, land on the far side
-export const LEDGE_MANTLE = 2; // up onto the top face
+const LEDGE_MANTLE = 2; // up onto the top face
 type LedgeKind = typeof LEDGE_NONE | typeof LEDGE_VAULT | typeof LEDGE_MANTLE;
 interface LedgeResult {
   kind: LedgeKind;

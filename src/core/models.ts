@@ -8,17 +8,7 @@ import { parseSoldierMetadata, parseWorldManifest, parseWorldAssets } from './mo
 import type { SoldierRecord, WorldPrefetch } from './model-metadata.ts';
 /** Loads cached soldier GLBs/metadata and the cooked world; player weapons own their adapters. */
 import { isSkinnedMesh } from './three-guards.ts';
-export type {
-  SoldierRecord,
-  SoldierMetadata,
-  SoldierWeapon,
-  SoldierVariant,
-  WorldManifest,
-  WorldPrefetch,
-  WorldBuilding,
-  WorldLadder,
-  ModelVec3,
-} from './model-metadata.ts';
+export type { SoldierRecord, WorldPrefetch } from './model-metadata.ts';
 
 const BASE = 'models';
 

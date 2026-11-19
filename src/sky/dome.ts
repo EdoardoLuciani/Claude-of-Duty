@@ -334,7 +334,7 @@ export function createSkyDome(skyScreen: SkyNodeFn): Mesh {
 }
 
 /** World ray through a screen UV, using the live camera matrices. */
-export const dirFromCamera = Fn<[Node<'vec2'>], Node<'vec3'>>(([uv]): Node<'vec3'> => {
+const dirFromCamera = Fn<[Node<'vec2'>], Node<'vec3'>>(([uv]): Node<'vec3'> => {
   const ndc = uv.mul(2).sub(1);
   const h = cameraProjectionMatrixInverse.mul(vec4(ndc, 1, 1));
   const vd = h.xyz.div(h.w);

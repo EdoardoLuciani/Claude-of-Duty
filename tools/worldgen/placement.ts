@@ -6,7 +6,7 @@ import { PLACEMENT_ROWS } from './level/placements/index.ts';
 import type { InstanceMasks, RectXZ } from './util.ts';
 
 type Vec3 = [number, number, number];
-export interface Placement {
+interface Placement {
   id: string;
   prototype: string;
   position: Vec3;

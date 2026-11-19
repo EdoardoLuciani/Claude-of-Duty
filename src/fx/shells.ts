@@ -66,11 +66,7 @@ export async function loadSpentHullGeometry(): Promise<THREE.BufferGeometry> {
   return mesh.geometry;
 }
 
-export function setCaseScale<T extends CaseScale>(
-  out: T,
-  caseLen?: number,
-  caseRadius?: number
-): T {
+function setCaseScale<T extends CaseScale>(out: T, caseLen?: number, caseRadius?: number): T {
   out.lengthScale = (caseLen !== undefined && caseLen > 0 ? caseLen : CASE_LEN) / CASE_LEN;
   out.radiusScale = (caseRadius !== undefined && caseRadius > 0 ? caseRadius : CASE_RIM) / CASE_RIM;
   return out;

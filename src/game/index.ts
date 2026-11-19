@@ -20,7 +20,7 @@ interface HudState {
 
 type GameInputEvent = 'damage:dealt' | 'wave:complete' | 'player:death' | 'game:restart';
 
-export const SCORE = Object.freeze({
+const SCORE = Object.freeze({
   elimination: 100,
   headshot: 50,
   wave: 250,

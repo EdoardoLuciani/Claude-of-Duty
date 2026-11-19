@@ -31,7 +31,7 @@ before subsystem changes: it owns directory assignments, APIs and event contract
 
 ```sh
 bun ci                    # preferred clean install
-bun run verify            # CI gate: format:check, build:ci, test
+bun run verify            # CI gate: format:check, knip, build:ci, test
 bun run test              # Bun runs tests/smoke/ scripts in isolated parallel processes
 bun run typecheck         # src, tools, build and tests
 bun run lint              # type-aware Oxlint; warnings fail
@@ -48,7 +48,7 @@ bun run dev               # local server; not needed for CI-only work
   are documented in README.md. All first-party runtime, test, tool and world-authoring
   ES modules use checked `.ts` source.
 - No new runtime dependencies without approval. Approved: `three` and pinned
-  `@recast-navigation/core` + `@recast-navigation/wasm` for offline-baked navigation.
+  `@recast-navigation/core` (which pins its `@recast-navigation/wasm`) for offline-baked navigation.
 - Avoid hot-path allocations; keep draw calls/state changes low. Put tuning in
   `tuning.ts` modules or weapon/world data, not scattered literals. Weapon changes must consider both
   definitions and animation/handling code in `src/weapons/`.

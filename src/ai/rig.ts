@@ -64,7 +64,7 @@ const ELBOW_R = solveElbow(SHOULDER_R, GRIP_R, UPPER_ARM, FOREARM, [-0.35, -1, -
 const ELBOW_L = solveElbow(SHOULDER_L, GRIP_L, UPPER_ARM, FOREARM, [0.55, -1, -0.2]);
 
 /** name, parent, bind world position, optional up hint, optional leaf dir. */
-export const BONES: BoneSpec[] = [
+const BONES: BoneSpec[] = [
   ['Hips', null, [0, 0.98, -0.005]],
   ['Spine', 'Hips', [0, 1.09, -0.012]],
   ['Spine1', 'Spine', [0, 1.215, 0.0]],

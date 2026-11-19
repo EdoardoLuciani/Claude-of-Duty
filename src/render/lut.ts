@@ -24,7 +24,7 @@ interface GradePreset {
 
 const LUM: readonly [number, number, number] = [0.2126, 0.7152, 0.0722];
 
-export const GRADE_PRESETS = {
+const GRADE_PRESETS = {
   // Neutral-but-cinematic default: slightly cool shadows, warm highlights,
   // a touch of contrast, mild highlight desaturation.
   default: {

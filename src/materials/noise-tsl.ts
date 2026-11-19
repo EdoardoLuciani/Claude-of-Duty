@@ -79,7 +79,7 @@ const grad2 = Fn<[Node<'vec2'>, Node<'vec2'>], Node<'vec2'>>(([i, period]): Join
   ],
 });
 
-export const periodicNoise = Fn<[Node<'vec2'>, Node<'vec2'>], Node<'float'>>(
+const periodicNoise = Fn<[Node<'vec2'>, Node<'vec2'>], Node<'float'>>(
   ([p, period]): Node<'float'> => {
     const i = floor(p);
     const f = fract(p);
@@ -201,7 +201,7 @@ export const warp = (
 };
 
 // Two-pass periodic Voronoi edge distance (Quilez), used for physical cracks.
-export const voronoiEdge = Fn<[Node<'vec2'>, Node<'vec2'>, Node<'float'>], Node<'float'>>(
+const voronoiEdge = Fn<[Node<'vec2'>, Node<'vec2'>, Node<'float'>], Node<'float'>>(
   ([p, period, jitter]): VarNode<'float', ConstNode<'float', number>> => {
     const ip = floor(p),
       fp = fract(p);

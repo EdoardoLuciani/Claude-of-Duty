@@ -47,14 +47,14 @@ import type { DepthTexture, DirectionalLightShadow, Node } from 'three/webgpu';
 // PCF spans neighboring depth texels on a sloping receiver. Express the
 // conservative receiver bias in cascade texels, not a resolution-independent
 // normalized-depth constant. Keep the authored normal offset and base bias.
-export const CSM_BIAS = Object.freeze({ texels: 0.5, slopeTexels: 1.5, maxSlope: 5 });
+const CSM_BIAS = Object.freeze({ texels: 0.5, slopeTexels: 1.5, maxSlope: 5 });
 type GroupedReference<T extends string> = Node<T> & {
   setGroup(group: typeof renderGroup): GroupedReference<T>;
 };
 function hasReferenceGroup<T extends string>(node: Node<T>): node is GroupedReference<T> {
   return 'setGroup' in node && typeof node.setGroup === 'function';
 }
-export function groupedReference<T extends 'float' | 'vec2'>(
+function groupedReference<T extends 'float' | 'vec2'>(
   name: string,
   type: T,
   object: object
@@ -103,7 +103,7 @@ interface PCFNodes {
   radius: GroupedReference<'float'>;
 }
 const shadowFields = new WeakMap<CascadeShadow, PCFNodes>();
-export const stablePCFShadowFilter = Fn<PCFArguments, Node<'float'>>(
+const stablePCFShadowFilter = Fn<PCFArguments, Node<'float'>>(
   ({ depthTexture, shadowCoord, shadow, depthLayer }): Node<'float'> => {
     let fields = shadowFields.get(shadow);
     if (!fields) {

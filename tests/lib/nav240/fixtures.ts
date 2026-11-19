@@ -30,7 +30,7 @@ export interface MapFixture extends NavigationFixture {
   surfaceRaw: Uint8Array;
 }
 // Measured physical outcomes for anchors 0–7, not merely query results.
-export const RECORDED: Array<[number, [number, number, number], string[]]> = [
+const RECORDED: Array<[number, [number, number, number], string[]]> = [
   [
     20,
     [7.772, 0.077, 2.833],
