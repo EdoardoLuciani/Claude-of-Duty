@@ -373,7 +373,7 @@ export class PlayerSystem {
   }
 
   setFlashlightEnabled(enabled: boolean): void {
-    this.flashlightOn = !!enabled && !this.health.dead;
+    this.flashlightOn = enabled && !this.health.dead;
     this.flashlight.intensity = this.flashlightOn ? FLASHLIGHT.intensity : 0;
     this.flashlight.shadow.needsUpdate = this.flashlightOn;
   }
@@ -856,7 +856,7 @@ export class PlayerSystem {
   }
 
   setControlEnabled(on: boolean): void {
-    this.controlEnabled = !!on;
+    this.controlEnabled = on;
     this.movement.controlEnabled = this.controlEnabled;
     if (!on) {
       this.healCtrl.cancel('interrupt');

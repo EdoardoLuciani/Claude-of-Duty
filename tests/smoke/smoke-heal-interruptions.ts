@@ -103,7 +103,7 @@ for (const request of ['Digit1', 'Digit2', 'Tab', 'wheel-up', 'wheel-down']) {
       player.healCtrl.update(1 / 60);
       weapons.update(1 / 60, ctx);
       assert.deepEqual([player.health.value, player.healCtrl.bandages], [40, 2]);
-      assert.equal(events.filter((e): boolean => e.name === 'player:heal').at(-1)?.phase, 'cancel');
+      assert.equal(events.findLast((e): boolean => e.name === 'player:heal')?.phase, 'cancel');
       assert.equal(weapons._switchTo, request === 'Digit1' ? 'rifle' : 'pistol');
     });
 }
@@ -245,7 +245,7 @@ for (const motion of [
     player.healCtrl.update(1);
     assert.equal(player.healCtrl.active, false);
     assert.deepEqual([player.health.value, player.healCtrl.bandages], [40, 2]);
-    assert.equal(events.filter((e): boolean => e.name === 'player:heal').at(-1)?.reason, 'move');
+    assert.equal(events.findLast((e): boolean => e.name === 'player:heal')?.reason, 'move');
   });
 }
 

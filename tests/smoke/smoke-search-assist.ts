@@ -97,9 +97,9 @@ function tick(
     assert.equal(sectorLabel(deg), name);
   }
   // Every finite bearing maps to one of the eight labels, including wrap and negatives.
-  const labels = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  const labels = new Set(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']);
   for (let deg = -720; deg <= 720; deg += 7.5)
-    assert.ok(labels.includes(sectorLabel(deg)), `${deg} is labeled`);
+    assert.ok(labels.has(sectorLabel(deg)), `${deg} is labeled`);
   assert.equal(sectorLabel(359), 'N');
   assert.equal(sectorLabel(-45), 'NW');
   for (const bad of [NaN, Infinity, -Infinity])

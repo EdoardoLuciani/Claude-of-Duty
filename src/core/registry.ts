@@ -193,7 +193,7 @@ export class EventBus<Events extends object = EngineEventMap> {
         fn(payload);
       } catch (err) {
         if (type === 'engine:error') {
-          console.error(`[events] handler for "${String(type)}" threw:`, err);
+          console.error('[events] handler for "engine:error" threw:', err);
           continue;
         }
         this.#onError?.(type, err);

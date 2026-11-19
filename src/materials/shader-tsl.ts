@@ -165,6 +165,7 @@ function parallaxUV(
     dy = vec2(0).toVar();
   dx.assign(dFdx(uv0));
   dy.assign(dFdy(uv0));
+  const height = (at: Node<'vec2'>): Node<'float'> => texture(map, at).grad(dx, dy).a.oneMinus();
   If(depthNode.greaterThan(0).and(fade.greaterThan(0.001)), (): void => {
     const nl = max(mix(float(maxLayers), 8, clamp(abs(vt.z), 0, 1)).mul(fade), 4).toVar();
     const layer = float(1).div(nl).toVar();
@@ -174,7 +175,6 @@ function parallaxUV(
       .mul(fade)
       .mul(layer)
       .toVar();
-    const height = (at: Node<'vec2'>): Node<'float'> => texture(map, at).grad(dx, dy).a.oneMinus();
     const cur = float(0).toVar();
     const h = height(coords).toVar();
     Loop(48, ({ i }): void => {
@@ -209,7 +209,7 @@ function runoff(
   const r1 = hash11(cell.mul(2.71).add(11.7));
   const src = smoothstep(0.3, 0.62, r0)
     .mul(r1.mul(0.45).add(0.55))
-    .mul(lat.mul(3.14159265).sin().pow(2))
+    .mul(lat.mul(Math.PI).sin().pow(2))
     .mul(r0.mul(0.45).add(0.8));
   const jitter = r1.mul(1.2).add(r0.mul(0.5));
   const below = y

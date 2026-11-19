@@ -9,6 +9,11 @@
 import { DEFAULT_BINDINGS, type ActionId } from './bindings.ts';
 import { hasOwn } from './guards.ts';
 
+/** Gamepad stick dead zone, rescaled so output still spans 0..1. */
+const dz = (v: number): number => (Math.abs(v) < 0.16 ? 0 : (v - Math.sign(v) * 0.16) / 0.84);
+/** Look-stick response curve: fine aim near centre, fast flicks at the edge. */
+const curve = (v: number): number => Math.sign(v) * Math.abs(v) ** 2.4;
+
 const ACTION_BY_BINDING = new Map<string, ActionId>();
 for (const name of Object.keys(DEFAULT_BINDINGS)) {
   if (!hasOwn(DEFAULT_BINDINGS, name)) continue;
@@ -295,11 +300,8 @@ export class Input {
       this.stick.moveX = this.stick.moveY = this.stick.lookX = this.stick.lookY = 0;
       return;
     }
-    const dz = (v: number): number => (Math.abs(v) < 0.16 ? 0 : (v - Math.sign(v) * 0.16) / 0.84);
     this.stick.moveX = dz(pad.axes[0] ?? 0);
     this.stick.moveY = dz(pad.axes[1] ?? 0);
-    // Cubic response curve on the look stick — fine aim near centre, fast flicks at the edge.
-    const curve = (v: number): number => Math.sign(v) * Math.abs(v) ** 2.4;
     this.stick.lookX = curve(dz(pad.axes[2] ?? 0));
     this.stick.lookY = curve(dz(pad.axes[3] ?? 0));
   }

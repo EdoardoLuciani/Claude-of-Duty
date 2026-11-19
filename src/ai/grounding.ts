@@ -40,6 +40,27 @@ interface GroundedAgent {
   animator?: { bonePos(name: string, out: THREE.Vector3): void };
 }
 
+// Not pure black: a contact shadow is lit by the sky it is occluding less
+// of, so it keeps a trace of the sky's blue. 0.05 linear, i.e. deep but not
+// a hole.
+const contactShadowMaterial = (
+  tex: THREE.DataTexture,
+  opacity: number
+): THREE.MeshBasicMaterial => {
+  const m = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(0.045, 0.05, 0.062),
+    map: tex,
+    transparent: true,
+    opacity,
+    depthWrite: false,
+    depthTest: true,
+    side: THREE.DoubleSide,
+    toneMapped: false,
+    fog: false,
+  });
+  return m;
+};
+
 export class GroundShadows {
   capacity: number;
   texture: THREE.DataTexture;
@@ -69,25 +90,8 @@ export class GroundShadows {
     this.footTexture = buildTexture(64, 4.6);
 
     this._src = new THREE.PlaneGeometry(1, 1, 1, 1);
-    // Not pure black: a contact shadow is lit by the sky it is occluding less
-    // of, so it keeps a trace of the sky's blue. 0.05 linear, i.e. deep but not
-    // a hole.
-    const mk = (tex: THREE.DataTexture, opacity: number): THREE.MeshBasicMaterial => {
-      const m = new THREE.MeshBasicMaterial({
-        color: new THREE.Color(0.045, 0.05, 0.062),
-        map: tex,
-        transparent: true,
-        opacity,
-        depthWrite: false,
-        depthTest: true,
-        side: THREE.DoubleSide,
-        toneMapped: false,
-        fog: false,
-      });
-      return m;
-    };
-    this.bodyMat = mk(this.texture, 0.62);
-    this.footMat = mk(this.footTexture, 0.85);
+    this.bodyMat = contactShadowMaterial(this.texture, 0.62);
+    this.footMat = contactShadowMaterial(this.footTexture, 0.85);
 
     this.body = this._mesh(this._src, this.bodyMat, this.capacity, 'ai-ground-ao-body');
     this.feet = this._mesh(this._src, this.footMat, this.capacity * 2, 'ai-ground-ao-feet');

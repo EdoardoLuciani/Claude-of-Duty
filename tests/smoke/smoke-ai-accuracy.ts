@@ -137,7 +137,7 @@ function recordShots(ai: AiSystem, world = phys): boolean[] {
       cap,
       world.LAYER.PLAYER
     );
-    shots.push(!!hit.hit);
+    shots.push(hit.hit);
     return true;
   };
   return shots;

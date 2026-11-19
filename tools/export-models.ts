@@ -108,7 +108,8 @@ async function withLock(fn: () => Promise<void>): Promise<void> {
       }
       if (waitingMs > LOCK_TIMEOUT_MS) {
         throw new Error(
-          `[models] exporter lock held for >${LOCK_TIMEOUT_MS / 1000}s by pid ${pid ?? '<unknown>'} — remove ${LOCK_DIR}`
+          `[models] exporter lock held for >${LOCK_TIMEOUT_MS / 1000}s by pid ${pid ?? '<unknown>'} — remove ${LOCK_DIR}`,
+          { cause: err }
         );
       }
       await sleep(200);

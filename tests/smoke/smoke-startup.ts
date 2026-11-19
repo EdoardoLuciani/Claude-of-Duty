@@ -15,6 +15,8 @@ for (const failure of [null, 'update', 'render', 'missing']) {
   // Synthetic lifecycle providers use the standalone registry's hook contract.
   const registry = new Registry();
   Object.defineProperty(engine, 'registry', { value: registry });
+  // The generic skips excess-property checks for the stubs' fake `constructor: { id }`.
+  // oxlint-disable-next-line typescript/no-unnecessary-type-parameters
   const add = <T extends Subsystem>(id: string, system: T): void => {
     registry.add(id, system);
   };

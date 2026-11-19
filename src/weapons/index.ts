@@ -1306,7 +1306,7 @@ export class WeaponSystem {
   }
 
   _setDeathDisabled(on: boolean): void {
-    this.disabled = !!on;
+    this.disabled = on;
     if (!this._viewmodel) return;
     this._viewmodel.anchor.visible = !this.disabled;
     if (this.disabled) {

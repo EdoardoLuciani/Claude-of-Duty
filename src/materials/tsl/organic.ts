@@ -195,8 +195,8 @@ export const fabricSurface = Fn<
   const cell = floor(t).toVar();
   const f = fract(t).sub(0.5).toVar();
   const over = mod(cell.x.add(cell.y), 2.0).toVar();
-  const warpProfile = cos(f.x.mul(3.14159)).toVar();
-  const weftProfile = cos(f.y.mul(3.14159)).toVar();
+  const warpProfile = cos(f.x.mul(Math.PI)).toVar();
+  const weftProfile = cos(f.y.mul(Math.PI)).toVar();
   const top = mix(warpProfile, weftProfile, over).toVar();
   const bot = mix(weftProfile, warpProfile, over).mul(0.45).toVar();
   const weave = max(top, bot).toVar();
@@ -284,8 +284,8 @@ export const burlapSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<typeof
     const twy = float(0.62)
       .add(float(0.3).mul(hash12(vec2(0.0, cell.y).add(seed.mul(1.7)))))
       .toVar();
-    const warpP = cos(clamp(f.x.div(twx), float(0.5).negate(), 0.5).mul(3.14159)).toVar();
-    const weftP = cos(clamp(f.y.div(twy), float(0.5).negate(), 0.5).mul(3.14159)).toVar();
+    const warpP = cos(clamp(f.x.div(twx), float(0.5).negate(), 0.5).mul(Math.PI)).toVar();
+    const weftP = cos(clamp(f.y.div(twy), float(0.5).negate(), 0.5).mul(Math.PI)).toVar();
     const top = mix(warpP, weftP, over).toVar();
     const bot = mix(weftP, warpP, over).mul(0.4).toVar();
     const weave = max(top, bot).toVar();

@@ -56,6 +56,9 @@ function point(value: unknown): Vector3Like {
     throw new Error('[ai worker] invalid ladder point');
   return { x: value.x, y: value.y, z: value.z };
 }
+const distance3 = (a: Vector3Like, b: Vector3Like): number =>
+  Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
+
 export function parseQueryKey(value: unknown): QueryKey {
   if (isNumberArray(value) && value.length === 9) return value;
   if (
@@ -90,9 +93,7 @@ export function parseQueryKey(value: unknown): QueryKey {
       point(d.points[2]),
       point(d.points[3]),
     ];
-  const span = (a: Vector3Like, b: Vector3Like): number =>
-    Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
-  const spans = points.slice(1).map((p, i): number => span(points[i], p));
+  const spans = points.slice(1).map((p, i): number => distance3(points[i], p));
   if (
     normal.y !== 0 ||
     Math.abs(Math.hypot(normal.x, normal.z) - 1) > 1e-6 ||

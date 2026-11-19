@@ -80,6 +80,12 @@ export async function navHash(buffer: ByteInput): Promise<string> {
   ).join('');
 }
 
+const parseLadderPoint = (p: unknown): { x: number; y: number; z: number } => {
+  if (!isRecord(p) || !isNumber(p.x) || !isNumber(p.y) || !isNumber(p.z))
+    throw new Error('[nav] invalid ladder point');
+  return { x: p.x, y: p.y, z: p.z };
+};
+
 // Full-precision motor geometry is authoritative; native endpoints are float32
 // topology only. Do not recover motor coordinates from Detour vertices.
 function checkedLadders(
@@ -112,17 +118,12 @@ function checkedLadders(
           v.points.length !== 4
         )
           throw new Error('[nav] invalid ladder descriptor');
-        const point = (p: unknown): { x: number; y: number; z: number } => {
-          if (!isRecord(p) || !isNumber(p.x) || !isNumber(p.y) || !isNumber(p.z))
-            throw new Error('[nav] invalid ladder point');
-          return { x: p.x, y: p.y, z: p.z };
-        };
-        const normal = point(v.normal),
+        const normal = parseLadderPoint(v.normal),
           points: LadderDescriptor['points'] = [
-            point(v.points[0]),
-            point(v.points[1]),
-            point(v.points[2]),
-            point(v.points[3]),
+            parseLadderPoint(v.points[0]),
+            parseLadderPoint(v.points[1]),
+            parseLadderPoint(v.points[2]),
+            parseLadderPoint(v.points[3]),
           ];
         const [lower, bottom, top, upper] = points;
         check(

@@ -100,7 +100,7 @@ function profileFor(weapon?: string | MuzzleWeapon): MuzzleProfile {
   const key =
     typeof weapon === 'string' ? weapon : (weapon.class ?? weapon.id ?? weapon.kind ?? weapon.name);
   if (!key) return MUZZLE_PROFILES.rifle;
-  const k = String(key).toLowerCase();
+  const k = key.toLowerCase();
   for (const [name, profile] of PROFILE_ENTRIES) if (k.includes(name)) return profile;
   return MUZZLE_PROFILES.rifle;
 }

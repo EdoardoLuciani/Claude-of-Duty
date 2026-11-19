@@ -178,7 +178,7 @@ export function biquad(
   actx: BaseAudioContext,
   type: BiquadFilterType,
   freq: number,
-  Q = 0.7071,
+  Q = Math.SQRT1_2,
   gainDb = 0
 ): BiquadFilterNode {
   const f = actx.createBiquadFilter();

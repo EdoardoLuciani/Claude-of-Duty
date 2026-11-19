@@ -156,6 +156,23 @@ export const MATERIAL_SLOTS = Object.freeze([
   'steel',
 ]);
 
+const detailLayer = (
+  set: string,
+  matName: string,
+  normal: number,
+  rough: number
+): { set: string; scale: number; normal: number; rough: number } => ({
+  set,
+  scale: MATERIALS[matName].tile / DETAIL_TILE,
+  normal,
+  rough,
+});
+
+const materialOptions = (
+  set: string,
+  value: SoldierMaterialOptions = {}
+): { set: string; options: SoldierMaterialOptions } => ({ set, options: value });
+
 /** Keep authored finishes as data, not separate runtime draws. */
 export function soldierSurface(
   name: VariantName,
@@ -165,62 +182,47 @@ export function soldierSurface(
   options: SoldierMaterialOptions;
 } {
   const V = VARIANTS[name];
-  const detail = (
-    set: string,
-    matName: string,
-    normal: number,
-    rough: number
-  ): { set: string; scale: number; normal: number; rough: number } => ({
-    set,
-    scale: MATERIALS[matName].tile / DETAIL_TILE,
-    normal,
-    rough,
-  });
-  const options = (
-    set: string,
-    value: SoldierMaterialOptions = {}
-  ): { set: string; options: SoldierMaterialOptions } => ({ set, options: value });
   switch (slot) {
     case 'cloth':
-      return options(`camo_${V.camo}`, {
+      return materialOptions(`camo_${V.camo}`, {
         tint: V.clothTint,
         rough: ROUGH.cloth,
         metal: 1,
         // 1.15, not 1.0: the base tile now carries a 1-2 cm crease field and
         // the folds have to actually catch the key light at 25 m.
         normalScale: 1.15,
-        detail: detail('cloth', 'cloth', 0.45, 0.16),
+        detail: detailLayer('cloth', 'cloth', 0.45, 0.16),
       });
     case 'plate':
-      return options('plate', {
+      return materialOptions('plate', {
         tint: V.plateTint,
         rough: ROUGH.plate,
         normalScale: 1.0,
-        detail: detail('nylon', 'plate', 0.45, 0.1),
+        detail: detailLayer('nylon', 'plate', 0.45, 0.1),
       });
     case 'gear':
-      return options('nylon', {
+      return materialOptions('nylon', {
         tint: V.gearTint,
         normalScale: 1.1,
-        detail: detail('nylon', 'gear', 0.5, 0.14),
+        detail: detailLayer('nylon', 'gear', 0.5, 0.14),
       });
     case 'boot':
-      return options('nylon', {
+      return materialOptions('nylon', {
         tint: V.gearTint,
         rough: ROUGH.boot,
         normalScale: 1.1,
-        detail: detail('nylon', 'boot', 0.5, 0.1),
+        detail: detailLayer('nylon', 'boot', 0.5, 0.1),
       });
     case 'skin':
-      return options('skin', { tint: V.skinTint, normalScale: 0.8, ao: 0.6 });
+      return materialOptions('skin', { tint: V.skinTint, normalScale: 0.8, ao: 0.6 });
     case 'polymer':
-      return options('polymer', { normalScale: 1.0 });
+      return materialOptions('polymer', { normalScale: 1.0 });
     case 'steel':
-      return options('steel', { normalScale: 1.0 });
+      return materialOptions('steel', { normalScale: 1.0 });
     case 'rubber':
-      return options('rubber', { normalScale: 1.2 });
+      return materialOptions('rubber', { normalScale: 1.2 });
     case 'glass':
-      return options('glass', {
+      return materialOptions('glass', {
         tint: [0.06, 0.07, 0.08],
         rough: 0.11,
         metal: 0,
@@ -228,7 +230,7 @@ export function soldierSurface(
         normalScale: 0,
       });
     default:
-      return options('polymer');
+      return materialOptions('polymer');
   }
 }
 
