@@ -698,8 +698,8 @@ export class Viewmodel {
     if (w) w.group.visible = true;
   }
 
-  setRadioScreen(count: number): void {
-    this.radioAsset?.setScreen(count);
+  setRadioScreen(count: number, cursor: number): void {
+    this.radioAsset?.setScreen(count, cursor);
   }
 
   /**

@@ -44,8 +44,8 @@ The native and cooked GLBs from two clean same-host builds were byte-identical.
   keep the upper controls out of the closed hand. The wrist target is a fixed
   camera-space close-up that turns the LCD toward the eye. `radio-mesh.ts` binds
   the 256 × 128 sRGB canvas to the LCD emissive map; it is the radio interface
-  (charges or empty, request bindings and locks, stow binding) and redraws only
-  when the visible count changes.
+  (select/send/stow bindings, charges or empty, request locks and cursor) and
+  redraws only when the visible count or cursor changes.
   Stow, pause and restart retain the same model and canvas; viewmodel teardown
   disposes the owned geometry, materials and textures.
 

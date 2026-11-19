@@ -11,10 +11,11 @@ import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts'
 const SCREEN_W = 256;
 const SCREEN_H = 128;
 
-/** The LCD is the radio interface: charges, request bindings/locks and stow. */
-function drawScreen(g: CanvasRenderingContext2D, count: number): void {
+/** The LCD is the radio interface: controls, charges, request locks and a cursor. */
+function drawScreen(g: CanvasRenderingContext2D, count: number, cursor: number): void {
   g.fillStyle = '#04100a';
   g.fillRect(0, 0, SCREEN_W, SCREEN_H);
+  g.textBaseline = 'middle';
 
   const row = (
     y: number,
@@ -27,33 +28,48 @@ function drawScreen(g: CanvasRenderingContext2D, count: number): void {
     g.fillStyle = band;
     g.fillRect(6, y, SCREEN_W - 12, h);
     g.fillStyle = ink;
-    g.textBaseline = 'middle';
     g.textAlign = 'left';
-    g.fillText(left, 14, y + h / 2 + 1);
+    g.fillText(left, 12, y + h / 2 + 1);
     g.textAlign = 'right';
     g.fillText(right, SCREEN_W - 14, y + h / 2 + 1);
   };
 
-  g.font = '700 17px ui-monospace, monospace';
-  row(4, 26, 'rgba(140,255,180,0.10)', 'FIELD RADIO', `${bindingLabel('radio')} STOW`, '#a8ffc4');
-  g.font = '700 19px ui-monospace, monospace';
+  g.font = '700 15px ui-monospace, monospace';
+  const select =
+    `${bindingLabel('radioUp')}${bindingLabel('radioDown')} ${bindingLabel('radioSend')} SEND`.toUpperCase();
+  const stow = `${bindingLabel('slot1')}/${bindingLabel('slot2')} STOW`;
+  row(4, 24, 'rgba(140,255,180,0.10)', select, stow, '#a8ffc4');
+
   const ready = count > 0;
-  row(
-    34,
-    30,
-    ready ? 'rgba(70,255,125,0.22)' : 'rgba(255,90,90,0.16)',
-    `${bindingLabel('slot1')} CARPET BOMB`,
-    ready ? `x${count}` : 'EMPTY',
-    ready ? '#5cff8f' : '#ff8a84'
-  );
+  const requests = [
+    ['CARPET BOMB', ready ? `x${count}` : 'EMPTY', ready ? '#5cff8f' : '#ff8a84'],
+    ['REQUEST', 'LOCKED', '#ffc27b'],
+    ['REQUEST', 'LOCKED', '#ffc27b'],
+  ];
   g.font = '700 18px ui-monospace, monospace';
-  row(66, 28, 'rgba(255,190,90,0.12)', `${bindingLabel('slot2')} REQUEST`, 'LOCKED', '#ffc27b');
-  row(96, 28, 'rgba(255,190,90,0.12)', `${bindingLabel('slot3')} REQUEST`, 'LOCKED', '#ffc27b');
+  g.lineWidth = 2;
+  for (let i = 0; i < requests.length; i++) {
+    const [name, state, ink] = requests[i];
+    const y = 32 + i * 31;
+    const on = i === cursor;
+    row(
+      y,
+      29,
+      on ? 'rgba(140,255,180,0.24)' : 'rgba(140,255,180,0.06)',
+      `${on ? '>' : ' '} ${name}`,
+      state,
+      ink
+    );
+    if (on) {
+      g.strokeStyle = ink;
+      g.strokeRect(7, y + 1, SCREEN_W - 14, 27);
+    }
+  }
 }
 
 export async function loadRadio(renderer: Parameters<typeof loadWeaponGLTF>[0]): Promise<{
   scene: THREE.Group;
-  setScreen(count: number): void;
+  setScreen(count: number, cursor: number): void;
   dispose(): void;
 }> {
   const { scene } = await loadWeaponGLTF(renderer, '/models/player/field-radio.runtime.glb');
@@ -104,14 +120,16 @@ export async function loadRadio(renderer: Parameters<typeof loadWeaponGLTF>[0]):
     material.emissiveIntensity = 1.15;
     material.emissiveMap = live;
     let displayed = -1;
-    const setScreen = (count: number): void => {
+    let displayedCursor = -1;
+    const setScreen = (count: number, cursor: number): void => {
       const next = Math.min(99, Math.max(0, count));
-      if (next === displayed) return;
-      drawScreen(ctx, next);
+      if (next === displayed && cursor === displayedCursor) return;
+      drawScreen(ctx, next, cursor);
       live.needsUpdate = true;
       displayed = next;
+      displayedCursor = cursor;
     };
-    setScreen(1);
+    setScreen(1, 0);
     return { scene, setScreen, dispose };
   } catch (error) {
     dispose();

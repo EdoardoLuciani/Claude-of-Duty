@@ -176,7 +176,7 @@ export const SHOTS: Record<string, ShotDefinition> = {
       if (w) {
         w.radioEquipped = true;
         w.viewmodel.holdRadio();
-        w.viewmodel.setRadioScreen(1);
+        w.viewmodel.setRadioScreen(1, 0);
       }
     },
     doc: 'Field radio held — accessory screen, hand pose, charge readout.',

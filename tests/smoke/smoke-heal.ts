@@ -258,7 +258,7 @@ for (const guard of ['release', 'frozen', 'disabled', 'dead']) {
   );
 }
 
-for (const request of ['flashlight', 'use', 'slot3']) {
+for (const request of ['flashlight', 'use', 'radioSend']) {
   const { player, input, events } = makePlayer();
   player.health.value = 40;
   input._healPressed = true;

@@ -20,10 +20,8 @@ const controls = CONTROL_SECTIONS.flatMap(
 const movementActions: ActionId[] = ['forward', 'left', 'back', 'right'];
 assert.deepEqual(
   controls[0].keys,
-  [0, 1].map((alias): string =>
-    movementActions.map((action): string => bindingLabels(action)[alias]).join(' ')
-  ),
-  'movement groups retain every canonical alias'
+  movementActions.flatMap((action): readonly string[] => bindingLabels(action)),
+  'movement lists every canonical binding'
 );
 const labels = new Set(controls.flatMap((control): readonly string[] => control.keys));
 for (const action of Object.keys(DEFAULT_BINDINGS)) {
@@ -98,9 +96,9 @@ for (const distinction of [
   'Bandage (hold 3s)',
   'Equip grenade (weapon keys stow)',
   'Grenade out: cook long / short (hold); release to throw',
-  'Equip / stow radio (toggle)',
-  'Radio out: carpet-bomb request (immediate)',
-  'Radio out: locked requests',
+  'Equip radio (weapon keys stow)',
+  'Radio out: select request',
+  'Radio out: send selected request',
   'Request weapon cycle',
   'in shop: close shop',
 ])
