@@ -77,7 +77,7 @@ function beamHitsVoid(
 }
 
 /** True when the full footprint is backed by wall, excluding openings. */
-export function wallBacking(
+function wallBacking(
   r: Pick<
     RoomSpec,
     'x0' | 'x1' | 'z0' | 'z1' | 'y' | 'envelope' | 'facadeOpenings' | 'partitions' | 'doors'

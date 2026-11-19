@@ -29,7 +29,7 @@ import type { ClearanceBox } from './placement.ts';
 import type { RectXZ, WallOpening } from './util.ts';
 import { fbm3, keyedRng, runoffStreak } from './util.ts';
 
-export interface StairFlight extends StairOptions {
+interface StairFlight extends StairOptions {
   floor: number;
   x: number;
   z: number;
@@ -38,7 +38,7 @@ export interface StairFlight extends StairOptions {
   run?: number;
   landing?: boolean;
 }
-export interface ExteriorStair extends StairOptions {
+interface ExteriorStair extends StairOptions {
   side: number;
   doorX: number;
   toFloor?: number;
@@ -50,16 +50,16 @@ export interface ExteriorStair extends StairOptions {
   endRail?: boolean;
   clearBalconies?: boolean;
 }
-export interface StairHole extends RectXZ {
+interface StairHole extends RectXZ {
   rails?: ('east' | 'west' | 'north' | 'south')[];
   railKey?: string;
 }
 export type RoomKind = 'living' | 'shop' | 'storage' | 'workshop' | 'ruin';
-export interface RoomPlan {
+interface RoomPlan {
   walls: [number, number, number, number, (number | null)?][];
   furnish?: ({ kind: RoomKind } & RectXZ)[];
 }
-export type BayKind = 'blank' | 'door' | 'shop' | 'window' | 'arch' | 'balconyDoor' | 'ragged';
+type BayKind = 'blank' | 'door' | 'shop' | 'window' | 'arch' | 'balconyDoor' | 'ragged';
 interface BayOverride {
   kind: BayKind;
   drop?: number;

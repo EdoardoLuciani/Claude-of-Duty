@@ -191,7 +191,7 @@ export function queryIdentity(key: QueryKey): string {
         typeof value === 'number' && Object.is(value, -0) ? '-0' : value
       );
 }
-export interface QueryRequest {
+interface QueryRequest {
   id: number;
   key: QueryKey;
   actor: number;
@@ -268,7 +268,7 @@ export type AttachmentSnapshot = Pick<
   | 'nodeMeta'
   | '_taabb'
 > & { stackSize: number };
-export type ControllerSettings = Pick<
+type ControllerSettings = Pick<
   CharacterController,
   | 'radius'
   | 'height'

@@ -12,7 +12,7 @@ export interface SoldierWeapon {
   ejection: ModelVec3;
   stockTop: ModelVec3;
 }
-export interface SoldierVariant {
+interface SoldierVariant {
   camo: string;
   clothTint: ModelVec3;
   gearTint: ModelVec3;
@@ -46,7 +46,7 @@ export interface SoldierRecord extends SoldierMetadata {
   geometry: BufferGeometry;
   boneNames: string[];
 }
-export interface WorldBuilding {
+interface WorldBuilding {
   spec: {
     x: number;
     z: number;
@@ -75,17 +75,17 @@ export interface WorldIntelMarker {
   tag?: string | undefined;
   position: ModelVec3;
 }
-export interface WorldMarkerData {
+interface WorldMarkerData {
   MARKERS?: { INTEL?: WorldIntelMarker[] | undefined } | undefined;
 }
-export interface WorldStreet {
+interface WorldStreet {
   halfWidth: number;
   kerb: number;
   walkH: number;
   zMin: number;
   zMax: number;
 }
-export interface WorldQueryData {
+interface WorldQueryData {
   street?: WorldStreet | undefined;
   alleys?: Array<{ rect: [number, number, number, number]; surface: string }> | undefined;
 }

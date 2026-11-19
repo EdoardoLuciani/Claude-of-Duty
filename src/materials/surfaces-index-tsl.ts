@@ -47,7 +47,7 @@ const GENERATED_NAMES = [
   'fabric',
   'burlap',
 ] as const;
-export const GENERATED_SURFACES = new Set<string>(GENERATED_NAMES);
+const GENERATED_SURFACES = new Set<string>(GENERATED_NAMES);
 export function isGeneratedSurface(
   name: keyof typeof SURFACES_TSL
 ): name is (typeof GENERATED_NAMES)[number] {

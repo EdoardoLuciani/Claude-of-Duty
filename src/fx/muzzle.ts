@@ -78,7 +78,7 @@ export function screenAngle(
 /** Per-class signature; unknown weapons use rifle. `light` is reference peak candela.
  * World spill applies a separate gain and cutoff; the view flash scales against REF_LIGHT.
  */
-export const MUZZLE_PROFILES = {
+const MUZZLE_PROFILES = {
   rifle: { scale: 1.0, lobes: 3, jet: 1.0, light: 200, smoke: 1.0, temp: 1.0, sparks: 8 },
   carbine: { scale: 0.92, lobes: 3, jet: 0.9, light: 175, smoke: 0.9, temp: 1.02, sparks: 7 },
   smg: { scale: 0.78, lobes: 3, jet: 0.75, light: 135, smoke: 0.7, temp: 1.05, sparks: 6 },

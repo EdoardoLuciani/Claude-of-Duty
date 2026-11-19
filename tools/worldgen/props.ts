@@ -71,11 +71,7 @@ function mat(
 }
 
 /** Generic convex-edge detector: verts near two or more bounding faces. */
-export function autoEdgeWear(
-  geo: THREE.BufferGeometry,
-  margin = 0.02,
-  amount = 1
-): THREE.BufferGeometry {
+function autoEdgeWear(geo: THREE.BufferGeometry, margin = 0.02, amount = 1): THREE.BufferGeometry {
   geo.computeBoundingBox();
   const bb = geo.boundingBox!;
   const sx = bb.max.x - bb.min.x;

@@ -24,7 +24,6 @@ import {
 } from './bandage-path.ts';
 import type { Clip } from './clips.ts';
 import type { WeaponDef } from './defs.ts';
-import { triCount } from './geometry.ts';
 import { HAND_POSES } from './hand-poses.ts';
 import { Arm } from './hands.ts';
 import type { ReticleMaterials } from './materials-tsl.ts';
@@ -517,7 +516,8 @@ export class Viewmodel {
     model.scene.traverse((node: THREE.Object3D): void => {
       if (!isMesh(node)) return;
       meshes.push(node);
-      tris += triCount(node.geometry);
+      const index = node.geometry.getIndex();
+      tris += (index ? index.count : node.geometry.getAttribute('position').count) / 3;
     });
     // Adapters expose only detachable, cartridge-free magazine shells here.
     const parts = { magazine: animation.magazineBody };

@@ -1847,5 +1847,3 @@ export class AiSystem {
   }
   /* oxlint-enable typescript/no-unnecessary-condition */
 }
-
-export { VARIANTS, STATE };

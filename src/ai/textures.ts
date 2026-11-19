@@ -33,7 +33,7 @@ interface MaterialsOptions {
   camo?: string[];
 }
 
-export class TileNoise {
+class TileNoise {
   tab: Float32Array = new Float32Array(4096);
   perm: Uint16Array = new Uint16Array(4096);
   constructor(rng: NoiseRandom) {
@@ -253,7 +253,7 @@ function bakeDetail(
  */
 export const CLOTH_TILE = 0.78;
 
-export const CAMO = {
+const CAMO = {
   // family luminances: pale 0.335 / base 0.275 / mid 0.205 / dark 0.125 /
   // olive 0.19 — a 2.7:1 macro value ratio inside the 0.18-0.32 window real
   // printed multicam occupies, with the dark blotches allowed below it. The
@@ -349,7 +349,7 @@ function garmentRelief(nz: TileNoise, u: number, v: number): number {
  * Values are matched to the authored environment, not raw real-world cloth reflectance.
  * If environment albedo changes, retune CLOTH_BUDGET and KIT_CAL together.
  */
-export const CLOTH_BUDGET = { mean: 0.104, min: 0.04, max: 0.152, contrast: 1.5, sat: 1.35 };
+const CLOTH_BUDGET = { mean: 0.104, min: 0.04, max: 0.152, contrast: 1.5, sat: 1.35 };
 
 /**
  * Per-pattern budget. Only the MEAN moves: the 0.085-0.325 window, the contrast
@@ -360,11 +360,11 @@ export const CLOTH_BUDGET = { mean: 0.104, min: 0.04, max: 0.152, contrast: 1.5,
  * (cloth > pouches > webbing > boots). The calibrated factor is 0.104/0.205, about 0.51.
  * Retune alongside CLOTH_BUDGET if world albedo changes.
  */
-export const KIT_CAL = 0.51;
+const KIT_CAL = 0.51;
 
 type CamoConfig = (typeof CAMO)[keyof typeof CAMO];
 type CamoBudget = typeof CLOTH_BUDGET;
-export function budgetFor(cfg?: CamoConfig): CamoBudget {
+function budgetFor(cfg?: CamoConfig): CamoBudget {
   const mean = cfg?.budget ?? CLOTH_BUDGET.mean;
   if (mean === CLOTH_BUDGET.mean) return CLOTH_BUDGET;
   return { ...CLOTH_BUDGET, mean };
@@ -373,7 +373,7 @@ export function budgetFor(cfg?: CamoConfig): CamoBudget {
 const lum3 = (r: number, g: number, b: number): number => 0.2126 * r + 0.7152 * g + 0.0722 * b;
 
 /** Mean/sd of a camo pattern's linear luminance, sampled on a coarse grid. */
-export function measureCamo(
+function measureCamo(
   nz: TileNoise,
   cfg: CamoConfig,
   n = 96
@@ -399,7 +399,7 @@ export function measureCamo(
 
 /** Finished cloth sampling: raw pattern -> recentered/stretched budget -> clamp/hue adjustment. */
 type CamoSampler = ((u: number, v: number, out: Texel) => void) & { srcMean: number };
-export function makeCamoSampler(
+function makeCamoSampler(
   nz: TileNoise,
   cfg: CamoConfig,
   B: CamoBudget = budgetFor(cfg)
@@ -429,7 +429,7 @@ function applyBudget(out: Texel, srcMean: number, B: CamoBudget): void {
   out.b = b * k2;
 }
 
-export function camoTexel(nz: TileNoise, cfg: CamoConfig, u: number, v: number, out: Texel): void {
+function camoTexel(nz: TileNoise, cfg: CamoConfig, u: number, v: number, out: Texel): void {
   const M = cfg.macro;
   // domain warp so the blotches get organic, elongated shapes instead of the
   // round blobs raw value noise thresholds into

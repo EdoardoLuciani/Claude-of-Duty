@@ -4,7 +4,7 @@ import { isRecord } from '../../src/core/guards.ts';
 import type { ModelVec3, WorldManifest } from '../../src/core/model-metadata.ts';
 import { parseWorldManifest } from '../../src/core/model-metadata.ts';
 
-export interface NavigationBuilding {
+interface NavigationBuilding {
   spec: BuildingSpec;
   floorY: number[];
   roofY: number;

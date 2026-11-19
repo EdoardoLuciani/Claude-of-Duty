@@ -5,7 +5,7 @@ import * as THREE from 'three';
  * The authored 45N solstice site places sunset near 19.71 solar hours.
  */
 
-export const SITE = {
+const SITE = {
   latitudeDeg: 45.0,
   dayOfYear: 172, // summer solstice
   /** Rotates north in world space. 0 keeps north at -Z. */
@@ -31,7 +31,7 @@ interface AltAzResult {
 const DEG = Math.PI / 180;
 
 /** Solar declination, Cooper's approximation. */
-export function solarDeclination(dayOfYear: number): number {
+function solarDeclination(dayOfYear: number): number {
   return 23.44 * DEG * Math.sin(((2 * Math.PI) / 365) * (284 + dayOfYear));
 }
 
@@ -39,7 +39,7 @@ export function solarDeclination(dayOfYear: number): number {
  * Altitude/azimuth for a body at a given hour angle and declination.
  * `hourAngle` in radians, 0 at local meridian, positive in the afternoon.
  */
-export function altAz(
+function altAz(
   hourAngle: number,
   declination: number,
   latitudeDeg: number,
@@ -66,7 +66,7 @@ export function altAz(
 }
 
 /** World-space unit vector from altitude/azimuth. Points *toward* the body. */
-export function dirFromAltAz(
+function dirFromAltAz(
   alt: number,
   az: number,
   northAngleRad: number,

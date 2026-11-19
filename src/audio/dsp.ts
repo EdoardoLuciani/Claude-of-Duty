@@ -26,7 +26,7 @@ interface ResonatorPartial {
  *  white  — flat spectrum, the raw material of cracks and hiss
  *  pink   — -3 dB/oct (Paul Kellet's economy filter), city beds, tails
  */
-export function fillNoise(out: Float32Array, kind: NoiseKind, rng: AudioRandom): Float32Array {
+function fillNoise(out: Float32Array, kind: NoiseKind, rng: AudioRandom): Float32Array {
   const n = out.length;
   switch (kind) {
     case 'pink': {

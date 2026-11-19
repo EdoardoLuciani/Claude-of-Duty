@@ -9,7 +9,7 @@ import type { SampleKind, WeaponProfile } from './types.ts';
 
 /** Approved +12 dB positional presentation vs the previous 0.5 reference.
  * Own reports bypass this gain. Not a measured microphone distance or SPL. */
-export const REPORT_DISTANCE = {
+const REPORT_DISTANCE = {
   reference: 0.5 * 10 ** (12 / 20),
   blendStart: 20,
   blendEnd: 140,

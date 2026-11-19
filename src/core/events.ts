@@ -6,8 +6,8 @@ import type { PlayerStance } from '../player/tuning.ts';
 import type { WeaponClass, WeaponId } from '../weapons/defs.ts';
 
 /** Gameplay and AI identities are closed; compact descriptors must identify a weapon. */
-export type EventWeaponId = WeaponId | 'ai_rifle';
-export interface EventWeaponDescriptor {
+type EventWeaponId = WeaponId | 'ai_rifle';
+interface EventWeaponDescriptor {
   id: EventWeaponId;
   class?: WeaponClass;
   audio?: string;
