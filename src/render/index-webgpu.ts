@@ -453,7 +453,7 @@ export class RenderSystem {
       this._releaseGraph();
     };
   }
-  /** True once the production graph exists, i.e. warmGraph() can run. */
+  /** True while the production graph exists, i.e. warmGraph() can run. */
   hasGraph(): boolean {
     return this._graph !== null;
   }

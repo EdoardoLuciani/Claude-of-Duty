@@ -11,7 +11,7 @@ Subsystems reach each other through `ctx.get(id)`, not imports; the constant cou
 `ai` → `weapons` is the one exception. `src/core/`, `src/main.ts`, `src/dev/`,
 `tools/` and `build/` are shared infrastructure used by every subsystem.
 A leading `_` marks a member internal to its subsystem: files in the same directory,
-`src/dev/` and `tests/` may use it; other subsystems use public members only.
+`src/dev/`, `tools/` and `tests/` may use it; other subsystems use public members only.
 
 | id / directory                                     | responsibility                                              |
 | -------------------------------------------------- | ----------------------------------------------------------- |
@@ -148,9 +148,9 @@ geometry. Validate with `bun tools/export-world.ts --check`, world/physics tests
 
 `src/ai/attachment.ts` owns the shared native attachment oracle; authoring and
 runtime use the same controller/BVH algorithm. Physics builds immutable collision
-snapshots in `src/physics/query-snapshot.ts`. AI owns one module worker, its
-scratch/controller, revisions, bounded queues and lifetime. Initialize before AI
-readiness; transfer copies, never live collision buffers.
+snapshots and restores them as worker query worlds in `src/physics/query-snapshot.ts`.
+AI owns one module worker, its scratch/controller, revisions, bounded queues and
+lifetime. Initialize before AI readiness; transfer copies, never live collision buffers.
 
 `src/ai/attachment-*.ts` owns the caller map, proof/pending/cancellation semantics,
 bounded native budgets and tactical revalidation. Unknown is never provisional

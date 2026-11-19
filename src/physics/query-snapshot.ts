@@ -121,5 +121,6 @@ export function restoreSnapshot({ stackSize, ...data }: QuerySnapshot): StaticWo
   const world = new StaticWorld();
   Object.assign(world, data);
   world._stackNode = new Int32Array(stackSize);
+  world._stackT = new Float32Array(stackSize);
   return world;
 }
