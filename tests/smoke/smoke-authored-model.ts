@@ -11,12 +11,14 @@ import { CameraRig } from '../../src/player/camera.ts';
 import type { RenderSystem } from '../../src/render/index-webgpu.ts';
 import {
   BASE_ATTACHMENTS,
+  isAttachmentConfig,
+  type AttachmentConfig,
+} from '../../src/weapons/attachment-rules.ts';
+import {
   configureWeaponAttachments,
   hasAttachmentAssets,
   mountAttachments,
   releaseAttachmentMounts,
-  isAttachmentConfig,
-  type AttachmentConfig,
 } from '../../src/weapons/attachments.ts';
 import {
   authoredModel,

@@ -1,5 +1,5 @@
 import { DEG } from '../core/math.ts';
-import { buildDef, type AttachmentConfig } from '../weapons/attachments.ts';
+import { buildDef, type AttachmentConfig } from '../weapons/attachment-rules.ts';
 import { shotInterval, WEAPON_DEFS, type WeaponDef, type WeaponId } from '../weapons/defs.ts';
 import { el, setClass, setText } from './util.ts';
 

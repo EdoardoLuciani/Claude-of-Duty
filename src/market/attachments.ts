@@ -1,4 +1,4 @@
-import type { AttachmentConfig } from '../weapons/attachments.ts';
+import type { AttachmentConfig } from '../weapons/attachment-rules.ts';
 
 type AttachmentId = NonNullable<AttachmentConfig[keyof AttachmentConfig]>;
 

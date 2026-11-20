@@ -35,5 +35,5 @@ offset; `check_picatinny.py` verifies every clamp and weapon rail.
 
 Body/glass remain separate with three PBR maps. Glass is thin alpha, without a
 scene-transmission pass. The ring/dot reticle is drawn by the live-axis viewmodel
-reticle (catalog data in `src/weapons/attachments.ts`), not baked into the mesh;
+reticle (catalog data in `src/weapons/attachment-rules.ts`), not baked into the mesh;
 the ring keeps its world-angular size and hides once it would leave the clear opening.

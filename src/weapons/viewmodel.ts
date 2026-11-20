@@ -5,10 +5,10 @@ import type { Node, UniformNode } from 'three/webgpu';
 
 import { Spring, TAU, clamp, clamp01, damp, lerp, smootherstep } from '../core/math.ts';
 import { loadArmAsset } from './arm-asset.ts';
+import type { AttachmentConfig } from './attachment-rules.ts';
 import {
   configureWeaponAttachments,
   releaseAttachmentMounts,
-  type AttachmentConfig,
   type AttachmentAssets,
 } from './attachments.ts';
 import { createWeaponAnimation } from './authored-animation.ts';

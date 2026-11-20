@@ -8,7 +8,7 @@ import { Health } from '../../src/player/health.ts';
 import { PlayerSystem } from '../../src/player/index.ts';
 import { Movement } from '../../src/player/movement.ts';
 import type { ArmAsset } from '../../src/weapons/arm-asset.ts';
-import { BASE_ATTACHMENTS, buildDef } from '../../src/weapons/attachments.ts';
+import { BASE_ATTACHMENTS, buildDef } from '../../src/weapons/attachment-rules.ts';
 import { ProjectileSim } from '../../src/weapons/ballistics.ts';
 import { Clip } from '../../src/weapons/clips.ts';
 import { buildRecoilPattern, WEAPON_IDS } from '../../src/weapons/defs.ts';

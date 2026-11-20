@@ -10,14 +10,16 @@ import { disposeWeaponLoader } from './asset-loader.ts';
 import {
   BASE_ATTACHMENTS,
   buildDef,
+  isAttachmentConfig,
+  SLOTS,
+  type AttachmentConfig,
+} from './attachment-rules.ts';
+import {
   configureWeaponAttachments,
   REPLACED_SLOTS,
   replacedNodes,
-  isAttachmentConfig,
   hasAttachmentAssets,
-  SLOTS,
   loadAttachments,
-  type AttachmentConfig,
   type AttachmentAssets,
 } from './attachments.ts';
 import { ProjectileSim, dropAt } from './ballistics.ts';

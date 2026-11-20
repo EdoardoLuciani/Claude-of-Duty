@@ -1,4 +1,4 @@
-import { isAttachmentConfig } from '../weapons/attachments.ts';
+import { isAttachmentConfig } from '../weapons/attachment-rules.ts';
 import { isWeaponId } from '../weapons/defs.ts';
 import type { WeaponSystem } from '../weapons/index.ts';
 
