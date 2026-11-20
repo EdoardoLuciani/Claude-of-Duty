@@ -243,7 +243,6 @@ export class WeaponSystem {
   _radioCursor: number = 0;
   carpetBombs: number = CARPET_STRIKES_PER_LIFE;
   _throwPos: THREE.Vector3 = new THREE.Vector3();
-  _boomPos: THREE.Vector3 = new THREE.Vector3();
   _state: WeaponPoseState = {
     ads: false,
     sprint: false,
@@ -1361,7 +1360,7 @@ export class WeaponSystem {
       this.ui?.clearPrompt();
       this.ctx.events.emit('explosion', {
         kind: 'grenade',
-        position: this._boomPos.copy(this._throwOrigin()),
+        position: this._throwOrigin().clone(),
         radius: GRENADE_RADIUS,
         damage: GRENADE_DAMAGE,
         source: this.player,
@@ -1380,7 +1379,9 @@ export class WeaponSystem {
   /** Free when equipped; a forced stow releases a committed throw before ending its clip. */
   _stowGrenade(force = false): boolean {
     if (force) this._releaseGrenade();
-    if (!this._hands.stow('grenade') && !(force && this._hands.finishThrow())) return false;
+    let stowed = this._hands.stow('grenade');
+    if (force && !stowed) stowed = this._hands.finishThrow();
+    if (!stowed) return false;
     this._viewmodel?.endGrenade();
     this.ui?.clearPrompt();
     return true;
@@ -1414,6 +1415,7 @@ export class WeaponSystem {
     velocity: { x: number; y: number; z: number },
     fuse: number
   ): void {
+    const source = this.player ?? this.ctx.peek('player');
     const mesh = this.createGrenade();
     // Release can occur after this frame's physics-to-render sync.
     mesh.position.set(position.x, position.y, position.z);
@@ -1430,7 +1432,7 @@ export class WeaponSystem {
       object3D: mesh,
       surfaceType: 'metal',
     });
-    this._grenades.push({ body, mesh, fuse });
+    this._grenades.push({ body, mesh, fuse, source });
   }
 
   /** Launch a live grenade from the hand at the release beat. The long throw
@@ -1559,7 +1561,7 @@ export class WeaponSystem {
     const player = this.player ?? (this.player = ctx.peek('player'));
     const st = this._state;
 
-    updateGrenades(this._grenades, dt, this.ctx, this.physics, this.player);
+    updateGrenades(this._grenades, dt, this.ctx, this.physics);
 
     this._sinceShot += dt;
     if (this._fireTimer > 0) this._fireTimer -= dt;

@@ -250,14 +250,19 @@ wp.audio.playUi = (kind): boolean => {
   return true;
 };
 wp.grenades = 2; // a market pack — the harness skipped init()
-pressG();
-input.firePressed = true;
-step(); // cook starts
-input.firePressed = false;
-input.down.add('Mouse0');
-input.fire = true;
-const fuseFrames = Math.ceil(GRENADE_FUSE / (1 / 60));
-for (let i = 0; i < fuseFrames + 5; i++) step();
+const overcook = (): void => {
+  pressG();
+  input.firePressed = true;
+  step(); // cook starts
+  input.firePressed = false;
+  input.down.add('Mouse0');
+  input.fire = true;
+  const fuseFrames = Math.ceil(GRENADE_FUSE / (1 / 60));
+  for (let i = 0; i < fuseFrames + 5; i++) step();
+  input.down.delete('Mouse0');
+  input.fire = false;
+};
+overcook();
 assert.equal(wp.cooking, false, 'overcook ends the cook');
 assert.equal(wp.grenadeEquipped, false, 'overcook drops the grenade in the hand');
 const booms = events.filter((e): e is ExplosionEvent => e.type === 'explosion');
@@ -272,8 +277,20 @@ assert.equal(booms[0].payload.kind, 'grenade', 'overcook selects grenade audio')
 assert.equal(booms[0].payload.damage, GRENADE_DAMAGE, 'blast carries the tuned damage');
 assert.equal(booms[0].payload.radius, GRENADE_RADIUS, 'blast carries the tuned radius');
 assert.equal(wp.grenades, 1, 'the overcooked grenade stays spent');
-input.down.delete('Mouse0');
-input.fire = false;
+
+const firstBlast = booms[0].payload;
+const firstPosition = firstBlast.position.clone();
+const eyeX = player.rig.eyePosition.x;
+player.rig.eyePosition.x += 2;
+overcook();
+player.rig.eyePosition.x = eyeX;
+assert.equal(events.length, 2, 'the second overcook emits one more explosion');
+assert.equal(
+  events[1].payload.position.x - firstPosition.x,
+  2,
+  'the second blast moves with the player'
+);
+assert.deepEqual(firstBlast.position, firstPosition, 'the retained first blast does not move');
 
 // ---- simultaneous fuse expiry emits one stable blast per grenade ----------
 resetLive();

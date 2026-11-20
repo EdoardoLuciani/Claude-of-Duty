@@ -294,9 +294,9 @@ weapons. `weapons.createGrenade()` gives AI and player throws independent transf
 that borrow the same geometry, material and maps as the held prop. Weapons warm
 both render passes. AI and weapons retain their own launch logic and tick their
 own live lists with `src/core/grenades.ts` on scaled time. It emits a blast with a
-position snapshot before removing the body and mesh; restart and disposal clear
-live grenades without detonating them. Teardown releases the shared asset after AI
-and the viewmodel have detached their visuals.
+position snapshot and the source captured at spawn, then removes the body and mesh.
+Restart and disposal clear live grenades without detonating them. Teardown releases
+the shared asset after AI and the viewmodel have detached their visuals.
 
 `src/weapons/hand-equipment.ts` owns the mutually exclusive gameplay hand states:
 weapon, bandage, radio, and a grenade from free equip through cooking, commitment,
