@@ -1,7 +1,7 @@
 /** Bun smoke: deferred mounts must not sell ghosts. */
 import assert from 'node:assert/strict';
 
-import { BASE_ATTACHMENTS } from '../../src/weapons/attachments.ts';
+import { BASE_ATTACHMENTS } from '../../src/weapons/attachment-rules.ts';
 import { WEAPON_IDS } from '../../src/weapons/defs.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
 import type { AuthoredWeaponModel, WeaponEntry } from '../../src/weapons/runtime-types.ts';

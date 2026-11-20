@@ -304,13 +304,15 @@ artwork is mapped in `src/ui/market-art.ts`; its offline sources live in
 `{ optic, muzzle, rail }` snapshot; null slots retain the base weapon, and
 `optic: null` uses irons. Viewmodel entries hold the mounted instances and their
 resolved data, never a copy of the build.
-`src/weapons/attachments.ts` owns the finite catalog (`rmr | acog | scope | exps3`
-optics, TOR Mini `laser`, one `suppressor`), validation, loading and the shared
-gameplay/inspection mount solver. `src/market/attachments.ts` owns prices, not
-compatibility. Market holds one unconfirmed build; selecting, inspecting or editing
-never changes gameplay or credits. Confirmation rechecks credits, shop state and
-asset readiness, then calls `weapons.applyBuild()` before charging. New weapons are
-configured before replacing ownership, so a rejected build never drops the old gun.
+`src/weapons/attachment-rules.ts` owns the finite catalog (`rmr | acog | scope | exps3`
+optics, TOR Mini `laser`, one `suppressor`), compatibility and effective-definition
+resolution without importing weapon loading or mounting. `src/weapons/attachments.ts`
+owns asset loading and the shared gameplay/inspection mount solver.
+`src/market/attachments.ts` owns prices, not compatibility. Market holds one
+unconfirmed build; selecting, inspecting or editing never changes gameplay or credits.
+Confirmation rechecks credits, shop state and asset readiness, then calls
+`weapons.applyBuild()` before charging. New weapons are configured before replacing
+ownership, so a rejected build never drops the old gun.
 
 `WeaponDef.fits` is a per-slot partial record keyed by attachment ID: each entry
 enables a verified fit and holds its data (`fits.optic[id].eyeRelief`, optional

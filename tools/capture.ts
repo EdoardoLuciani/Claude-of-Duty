@@ -10,7 +10,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
 import type { Engine } from '../src/core/engine.ts';
-import { isAttachmentConfig, type AttachmentConfig } from '../src/weapons/attachments.ts';
+import { isAttachmentConfig, type AttachmentConfig } from '../src/weapons/attachment-rules.ts';
 import { isWeaponId } from '../src/weapons/defs.ts';
 import {
   ensureDevServer,

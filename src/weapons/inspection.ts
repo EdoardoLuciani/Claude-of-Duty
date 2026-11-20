@@ -2,12 +2,12 @@ import * as THREE from 'three';
 import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 import { isGroup } from '../core/three-guards.ts';
+import type { AttachmentConfig } from './attachment-rules.ts';
 import {
   mountAttachments,
   releaseAttachmentMounts,
   releaseClonedMounts,
   type AttachmentAssets,
-  type AttachmentConfig,
 } from './attachments.ts';
 import { createWeaponAnimation } from './authored-animation.ts';
 import type { WeaponEntry } from './runtime-types.ts';

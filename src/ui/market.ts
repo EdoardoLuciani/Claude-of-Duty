@@ -1,7 +1,7 @@
 import type { EngineContext } from '../core/context.ts';
 import { damp } from '../core/math.ts';
 import type { MarketSystem } from '../market/index.ts';
-import { isAttachmentConfig, SLOTS } from '../weapons/attachments.ts';
+import { isAttachmentConfig, SLOTS } from '../weapons/attachment-rules.ts';
 import { isWeaponId } from '../weapons/defs.ts';
 import { marketIcon } from './market-icons.ts';
 import { MarketInspection } from './market-inspection.ts';

@@ -13,7 +13,7 @@ import {
   isAttachmentConfig,
   SLOTS,
   type AttachmentConfig,
-} from '../weapons/attachments.ts';
+} from '../weapons/attachment-rules.ts';
 import type { WeaponId } from '../weapons/defs.ts';
 import type { WeaponSystem } from '../weapons/index.ts';
 import { ATTACHMENT_CATALOG, ATTACHMENT_OFFERS } from './attachments.ts';

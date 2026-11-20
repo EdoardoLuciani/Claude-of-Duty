@@ -20,7 +20,7 @@ import { Rng } from '../../src/core/rng.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
 import { RigidBody } from '../../src/physics/rigidbody.ts';
 import { RadioSystem, CARPET } from '../../src/radio/index.ts';
-import { BASE_ATTACHMENTS } from '../../src/weapons/attachments.ts';
+import { BASE_ATTACHMENTS } from '../../src/weapons/attachment-rules.ts';
 import {
   WeaponSystem,
   GRENADE_RADIUS,
