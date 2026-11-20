@@ -91,7 +91,7 @@ const periodicNoise = Fn<[Node<'vec2'>, Node<'vec2'>], Node<'float'>>(
     const b = dot(grad2(i.add(vec2(1, 0)), period), f.sub(vec2(1, 0)));
     const c = dot(grad2(i.add(vec2(0, 1)), period), f.sub(vec2(0, 1)));
     const d = dot(grad2(i.add(vec2(1, 1)), period), f.sub(vec2(1, 1)));
-    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y).mul(1.4142);
+    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y).mul(Math.SQRT2);
   }
 ).setLayout({
   name: 'ow_periodicNoise',

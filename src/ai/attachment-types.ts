@@ -5,7 +5,7 @@ import type { CharacterController } from '../physics/character.ts';
 import { MASK } from '../physics/surfaces.ts';
 import { LADDER, LADDER_MOTOR_VERSION, ladderMoveBudget } from './ladder.ts';
 import type { LadderDescriptor, LadderDirection, LadderCursor } from './ladder.ts';
-import { isRecord, isNumber, isNumberArray } from './validation.ts';
+import { isRecord, isNumber, isNumberArray, parseFinitePoint } from './validation.ts';
 
 export interface AttachmentOracle {
   physics: {
@@ -51,11 +51,11 @@ export type QueryKey = number[] | LadderQuery;
 export const LADDER_QUERY_MAX_ITERATIONS = 32;
 export const LADDER_QUERY_MAX_MOVES =
   Math.ceil((12 + LADDER.lowerOffset + LADDER.upperOffset) / (LADDER.speed * LADDER.step)) + 6;
-function point(value: unknown): Vector3Like {
-  if (!isRecord(value) || !isNumber(value.x) || !isNumber(value.y) || !isNumber(value.z))
-    throw new Error('[ai worker] invalid ladder point');
-  return { x: value.x, y: value.y, z: value.z };
-}
+const point = (value: unknown): Vector3Like =>
+  parseFinitePoint(value, '[ai worker] invalid ladder point');
+const distance3 = (a: Vector3Like, b: Vector3Like): number =>
+  Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
+
 export function parseQueryKey(value: unknown): QueryKey {
   if (isNumberArray(value) && value.length === 9) return value;
   if (
@@ -90,9 +90,7 @@ export function parseQueryKey(value: unknown): QueryKey {
       point(d.points[2]),
       point(d.points[3]),
     ];
-  const span = (a: Vector3Like, b: Vector3Like): number =>
-    Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
-  const spans = points.slice(1).map((p, i): number => span(points[i], p));
+  const spans = points.slice(1).map((p, i): number => distance3(points[i], p));
   if (
     normal.y !== 0 ||
     Math.abs(Math.hypot(normal.x, normal.z) - 1) > 1e-6 ||

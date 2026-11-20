@@ -52,6 +52,46 @@ interface ShadowLayer {
   split: Node<'float'>;
 }
 
+const sampleShadowLayer = (
+  layer: ShadowLayer,
+  point: Node<'vec3'>,
+  phi: Node<'float'>
+): VarNode<'float', ConstNode<'float', number>> =>
+  Fn((): VarNode<'float', ConstNode<'float', number>> => {
+    const h = layer.matrix.mul(vec4(point, 1)).toVar();
+    const uvz = h.xyz.div(h.w).toVar();
+    const result = float(1).toVar();
+    If(
+      uvz.x
+        .greaterThanEqual(0)
+        .and(uvz.x.lessThanEqual(1))
+        .and(uvz.y.greaterThanEqual(0))
+        .and(uvz.y.lessThanEqual(1))
+        .and(uvz.z.greaterThan(0))
+        .and(uvz.z.lessThan(1)),
+      (): void => {
+        const uv = vec2(uvz.x, uvz.y.oneMinus());
+        const receiver = max(0, uvz.z.sub(layer.params.x));
+        const tap = (i: number): Node<'float'> => {
+          const tapUV = uv.add(vogelDiskSample(float(i), float(4), phi).mul(layer.params.y));
+          return Fn<[], Node<'float'>>((_, builder): Node<'float'> =>
+            builder.shaderStage === 'compute'
+              ? compareLevel({
+                  depth: layer.depth,
+                  comparison: layer.depth,
+                  uv: tapUV,
+                  receiver,
+                }).toFloat()
+              : layer.depth.sample(tapUV).compare(receiver).toFloat()
+          )();
+        };
+        // Four Vogel taps, built in order 0..3 as before.
+        result.assign(tap(0).add(tap(1)).add(tap(2)).add(tap(3)).mul(0.25));
+      }
+    );
+    return result;
+  })();
+
 export function createVolumetricShadow(render: CascadeRender): {
   visibility: FnNode<
     [Vector3 | Node<'vec3'>, number | Node<'float'> | Node<'uint'> | undefined],
@@ -112,45 +152,6 @@ export function createVolumetricShadow(render: CascadeRender): {
     }
   );
   const view = uniform(render.ctx.camera.matrixWorldInverse).setGroup(renderGroup);
-  const sample = (
-    layer: ShadowLayer,
-    point: Node<'vec3'>,
-    phi: Node<'float'>
-  ): VarNode<'float', ConstNode<'float', number>> =>
-    Fn((): VarNode<'float', ConstNode<'float', number>> => {
-      const h = layer.matrix.mul(vec4(point, 1)).toVar();
-      const uvz = h.xyz.div(h.w).toVar();
-      const result = float(1).toVar();
-      If(
-        uvz.x
-          .greaterThanEqual(0)
-          .and(uvz.x.lessThanEqual(1))
-          .and(uvz.y.greaterThanEqual(0))
-          .and(uvz.y.lessThanEqual(1))
-          .and(uvz.z.greaterThan(0))
-          .and(uvz.z.lessThan(1)),
-        (): void => {
-          const uv = vec2(uvz.x, uvz.y.oneMinus());
-          const receiver = max(0, uvz.z.sub(layer.params.x));
-          const tap = (i: number): Node<'float'> => {
-            const tapUV = uv.add(vogelDiskSample(float(i), float(4), phi).mul(layer.params.y));
-            return Fn<[], Node<'float'>>((_, builder): Node<'float'> =>
-              builder.shaderStage === 'compute'
-                ? compareLevel({
-                    depth: layer.depth,
-                    comparison: layer.depth,
-                    uv: tapUV,
-                    receiver,
-                  }).toFloat()
-                : layer.depth.sample(tapUV).compare(receiver).toFloat()
-            )();
-          };
-          // Four Vogel taps, built in order 0..3 as before.
-          result.assign(tap(0).add(tap(1)).add(tap(2)).add(tap(3)).mul(0.25));
-        }
-      );
-      return result;
-    })();
   const visibility = Fn<[Node<'vec3'>, Node<'float'> | undefined], Node<'float'>>(
     ([point, noise = interleavedGradientNoise(screenCoordinate.xy)]): VarNode<
       'float',
@@ -164,7 +165,7 @@ export function createVolumetricShadow(render: CascadeRender): {
         const condition = distance.lessThan(layer.split);
         // A void body: returning the assign node would emit `return` in this inline Fn().
         const body = (): void => {
-          result.assign(sample(layer, point, phi));
+          result.assign(sampleShadowLayer(layer, point, phi));
         };
         branch = branch ? branch.ElseIf(condition, body) : If(condition, body);
       }

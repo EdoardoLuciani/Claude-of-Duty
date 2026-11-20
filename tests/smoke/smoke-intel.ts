@@ -492,7 +492,8 @@ const h = await harness();
 const { intel, ctx, player, step, aimAt, sounds, emitted } = h;
 const cache = intel._spawn(markers[0]);
 assert(cache);
-const [spare] = intel._pool.filter((slot): boolean => slot !== cache);
+const spare = intel._pool.find((slot): boolean => slot !== cache);
+assert(spare);
 const beacon = cache.group.lid.getObjectByName('INTEL_BEACON');
 const spareBeacon = spare.group.lid.getObjectByName('INTEL_BEACON');
 assert(isSingleMaterialMesh(beacon) && isSingleMaterialMesh(spareBeacon));
@@ -745,11 +746,9 @@ for (const [reason, discovery, setBlock] of [
   assert.equal(announcements(), announced + Number(discovery), `${reason}: discovery announcement`);
   assert.equal(beeps(), pinged + Number(discovery), `${reason}: detector ping`);
   assert.equal(
-    emitted
-      .filter(
-        (e): e is Extract<IntelRecord, { type: 'intel:operation' }> => e.type === 'intel:operation'
-      )
-      .at(-1)?.active,
+    emitted.findLast(
+      (e): e is Extract<IntelRecord, { type: 'intel:operation' }> => e.type === 'intel:operation'
+    )?.active,
     false,
     reason
   );
@@ -836,9 +835,9 @@ for (let i = 0; i < 7; i++) {
   const spawned = intel._spawn({ id: `cache-${i}`, x: i * 2, y: 0, z: 0 });
   assert(spawned);
   intel._secure(spawned);
-  const event = emitted
-    .filter((e): e is Extract<IntelRecord, { type: 'intel:secured' }> => e.type === 'intel:secured')
-    .at(-1);
+  const event = emitted.findLast(
+    (e): e is Extract<IntelRecord, { type: 'intel:secured' }> => e.type === 'intel:secured'
+  );
   assert(event);
   assert.equal(event.credits, INTEL.credits);
   assert.equal(event.id, `cache-${i}`);

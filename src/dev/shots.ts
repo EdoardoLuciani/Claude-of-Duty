@@ -418,5 +418,5 @@ export function installShotApi(
     requestAnimationFrame(info);
   }
 
-  return { pump: window.__PUMP__, present: window.__PRESENT__, lockstep: !!lockstep };
+  return { pump: window.__PUMP__, present: window.__PRESENT__, lockstep };
 }

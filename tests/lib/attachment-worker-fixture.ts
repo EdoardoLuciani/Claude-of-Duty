@@ -43,17 +43,17 @@ export class NativeWorker extends EventTarget implements Worker {
       const data = parseWorkerMessage(value);
       if (record && data.type === 'result') this.results.push(data);
       const event = new MessageEvent<WorkerMessage>('message', { data });
-      this.onmessage?.call(this, event);
+      this.onmessage?.(event);
       this.dispatchEvent(event);
     });
     this.thread.on('messageerror', (error: Error): void => {
       const event = new MessageEvent<unknown>('messageerror', { data: error });
-      this.onmessageerror?.call(this, event);
+      this.onmessageerror?.(event);
       this.dispatchEvent(event);
     });
     this.thread.on('error', (error: Error): void => {
       const event = new WorkerErrorEvent(error);
-      this.onerror?.call(this, event);
+      this.onerror?.(event);
       this.dispatchEvent(event);
     });
   }

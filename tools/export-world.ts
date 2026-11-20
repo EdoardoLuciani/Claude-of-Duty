@@ -35,7 +35,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const { values: args } = parseArgs({
   options: { out: { type: 'string' }, force: { type: 'boolean' }, check: { type: 'boolean' } },
 });
-const OUT = resolve(ROOT, String(args.out ?? 'public/models/world'));
+const OUT = resolve(ROOT, args.out ?? 'public/models/world');
 const CACHE = resolve(ROOT, 'node_modules/.cache');
 const LOCK = join(CACHE, 'claude-of-duty-world.lock');
 const sleep = (ms: number): Promise<void> =>
@@ -72,7 +72,7 @@ async function withLock(fn: () => Promise<void>): Promise<void> {
           !Number.isSafeInteger(owner.pid) ||
           owner.pid <= 0
         )
-          throw new Error('invalid lock owner');
+          throw new Error('invalid lock owner', { cause: error });
         try {
           process.kill(owner.pid, 0);
         } catch (signalError) {
@@ -86,7 +86,7 @@ async function withLock(fn: () => Promise<void>): Promise<void> {
         continue;
       }
       if (Date.now() - started > 120000)
-        throw new Error('[world] timed out waiting for export lock');
+        throw new Error('[world] timed out waiting for export lock', { cause: error });
       await sleep(150);
     }
   }

@@ -187,10 +187,10 @@ try {
       const stages: ProfileStage[] = [];
       const restores: Array<() => void> = [];
       let sampleIndex = -1;
-      const observe = <T extends object, K extends keyof T & string>(
+      const observe = <T extends object>(
         owner: T | null | undefined,
         id: string,
-        phase: K,
+        phase: keyof T & string,
         countOnly = false
       ): void => {
         if (!owner) return;

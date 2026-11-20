@@ -8,6 +8,9 @@ export interface Point2 {
   y: number;
 }
 
+/** 32-bit rotate left. */
+const rot = (x: number, k: number): number => ((x << k) | (x >>> (32 - k))) >>> 0;
+
 export class Rng {
   s0 = 0;
   s1 = 0;
@@ -38,7 +41,6 @@ export class Rng {
 
   /** Uniform uint32. */
   u32(): number {
-    const rot = (x: number, k: number): number => ((x << k) | (x >>> (32 - k))) >>> 0;
     const result = Math.imul(rot(Math.imul(this.s1, 5) >>> 0, 7), 9) >>> 0;
     const t = (this.s1 << 9) >>> 0;
     this.s2 ^= this.s0;

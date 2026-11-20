@@ -26,9 +26,7 @@ function events(node: AudioNode): Array<Array<string | number>> {
   return node.gain.events;
 }
 function lastTarget(node: AudioNode): number | string | undefined {
-  return events(node)
-    .filter((event): boolean => event[0] === 'target')
-    .at(-1)?.[1];
+  return events(node).findLast((event): boolean => event[0] === 'target')?.[1];
 }
 
 try {

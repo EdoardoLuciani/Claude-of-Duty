@@ -207,6 +207,22 @@ function handBasis(
   return out.setFromRotationMatrix(_m);
 }
 
+// Distance from p to the segment a-b, then the authored w-feathered edge.
+const segmentEdge = (
+  p: Node<'vec2'>,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  w: number
+): Node<'float'> => {
+  const a = TSL.vec2(ax, ay);
+  const pa = p.sub(a);
+  const ba = TSL.vec2(bx, by).sub(a);
+  const h = TSL.clamp(TSL.dot(pa, ba).div(TSL.dot(ba, ba)), 0, 1);
+  return TSL.smoothstep(0, w, TSL.length(pa.sub(ba.mul(h)))).oneMinus();
+};
+
 export class Viewmodel {
   declare ctx: ViewmodelContext;
   declare maskUniforms: {
@@ -430,21 +446,6 @@ export class Viewmodel {
     this.scopeOverlay.add(mask);
     this.scopeMask = mask;
 
-    // Distance from p to the segment a-b, then the authored w-feathered edge.
-    const line = (
-      p: Node<'vec2'>,
-      ax: number,
-      ay: number,
-      bx: number,
-      by: number,
-      w: number
-    ): Node<'float'> => {
-      const a = TSL.vec2(ax, ay);
-      const pa = p.sub(a);
-      const ba = TSL.vec2(bx, by).sub(a);
-      const h = TSL.clamp(TSL.dot(pa, ba).div(TSL.dot(ba, ba)), 0, 1);
-      return TSL.smoothstep(0, w, TSL.length(pa.sub(ba.mul(h)))).oneMinus();
-    };
     const retU = (this.reticleUniforms = {
       uAlpha: TSL.uniform(1),
       uChevron: TSL.uniform(0),
@@ -453,12 +454,14 @@ export class Viewmodel {
     });
     const rp = TSL.uv().mul(2).sub(1).toVar();
     const rc = TSL.vec2(rp.x.mul(retU.uAspect), rp.y);
-    let chevron = line(rc, -0.07, -0.07, 0, 0, 0.012).add(line(rc, 0, 0, 0.07, -0.07, 0.012));
-    let stadia = line(rc, 0, -0.13, 0, -0.63, 0.006);
+    let chevron = segmentEdge(rc, -0.07, -0.07, 0, 0, 0.012).add(
+      segmentEdge(rc, 0, 0, 0.07, -0.07, 0.012)
+    );
+    let stadia = segmentEdge(rc, 0, -0.13, 0, -0.63, 0.006);
     for (let i = 1; i <= 4; i++) {
       const y = -0.14 - i * 0.1;
       const w = 0.12 - i * 0.018;
-      stadia = stadia.add(line(rc, -w, y, w, y, 0.006));
+      stadia = stadia.add(segmentEdge(rc, -w, y, w, y, 0.006));
     }
     const mil = sniperReticleCoverage(rc.div(retU.uMradScale));
     // The sniper quad reaches the aperture, unlike the original small overlay.
