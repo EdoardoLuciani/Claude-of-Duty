@@ -319,7 +319,9 @@ export class WeaponSystem {
     });
     const grenade = loadGrenade(renderer).then((asset): void => {
       this._grenadeAsset = asset;
-      this.viewmodel.grenade.add(asset.instantiate());
+      const held = asset.instantiate();
+      held.frustumCulled = false; // like the other first-person meshes
+      this.viewmodel.grenade.add(held);
     });
     const radio = this.viewmodel.loadRadio(renderer);
     const mounts = Promise.all([Promise.all(spawn.map(load)), attachments]).then(
