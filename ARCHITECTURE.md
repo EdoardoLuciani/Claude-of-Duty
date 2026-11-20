@@ -12,6 +12,18 @@ Subsystems reach live instances through `ctx.get(id)`. `src/core/`, `src/main.ts
 A leading `_` marks a member internal to its subsystem: files in the same directory,
 `src/dev/`, `tools/` and `tests/` may use it; other subsystems use public members only.
 
+- **Live instances and types:** `src/main.ts` registers subsystem implementations.
+  Market may `import type { WeaponSystem }` but uses `ctx.get('weapons')` for the
+  live instance; it must not import and construct a `WeaponSystem` itself.
+- **Shared data and rules:** `src/ui/market-stats.ts` computes stats using
+  `src/weapons/defs.ts` and `buildDef()` from `src/weapons/attachment-rules.ts`.
+  Lint rejects runtime imports of `src/weapons/attachments.ts` and
+  `src/weapons/asset-loader.ts` from that file.
+- **Worker-owned algorithms:** `src/ai/attachment-worker.ts` restores its own
+  `StaticWorld` through `src/physics/query-snapshot.ts` and constructs its own
+  `CharacterController` from `src/physics/character.ts`. These are worker-owned
+  objects, not access to the live physics subsystem.
+
 | id / directory                                     | responsibility                                              |
 | -------------------------------------------------- | ----------------------------------------------------------- |
 | `models` (core/models.ts + tools/export-models.ts) | GLB export/loading                                          |
