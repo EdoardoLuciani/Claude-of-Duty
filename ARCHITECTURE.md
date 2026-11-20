@@ -7,9 +7,8 @@ Gameplay numbers (timings, distances, rewards) live in code: `src/*/tuning.ts`,
 
 ## Subsystems
 
-Subsystems reach each other through `ctx.get(id)`, not imports; the constant coupling
-`ai` → `weapons` is the one exception. `src/core/`, `src/main.ts`, `src/dev/`,
-`tools/` and `build/` are shared infrastructure used by every subsystem.
+Subsystems reach live instances through `ctx.get(id)`. `src/core/`, `src/main.ts`,
+`src/dev/`, `tools/` and `build/` are shared infrastructure used by every subsystem.
 A leading `_` marks a member internal to its subsystem: files in the same directory,
 `src/dev/`, `tools/` and `tests/` may use it; other subsystems use public members only.
 
@@ -276,8 +275,11 @@ or teardown. Static map clones are shared only when source, UV, color space and
 sampler match. The Blender-authored grenade is a required boot asset owned by
 weapons. `weapons.createGrenade()` gives AI and player throws independent transforms
 that borrow the same geometry, material and maps as the held prop. Weapons warm
-both render passes; restart removes live instances, and teardown releases the
-shared asset after AI and the viewmodel have detached their visuals.
+both render passes. AI and weapons retain their own launch logic and tick their
+own live lists with `src/core/grenades.ts` on scaled time. It emits a blast with a
+position snapshot before removing the body and mesh; restart and disposal clear
+live grenades without detonating them. Teardown releases the shared asset after AI
+and the viewmodel have detached their visuals.
 
 `src/weapons/hand-equipment.ts` owns the mutually exclusive gameplay hand states:
 weapon, bandage, radio, and a grenade from free equip through cooking, commitment,

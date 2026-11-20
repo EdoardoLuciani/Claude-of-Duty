@@ -3,6 +3,14 @@ import * as THREE from 'three';
 import { bindingLabel } from '../core/bindings.ts';
 import type { SystemId, EngineContext, EngineSystems } from '../core/context.ts';
 import type { ReloadPhase } from '../core/events.ts';
+import {
+  GRENADE_DAMAGE,
+  GRENADE_FUSE,
+  GRENADE_RADIUS,
+  clearGrenades,
+  updateGrenades,
+  type LiveGrenade,
+} from '../core/grenades.ts';
 import { DEG, clamp, lerp } from '../core/math.ts';
 import { Rng } from '../core/rng.ts';
 import { AmmoPickups } from './ammo-pickups.ts';
@@ -55,18 +63,9 @@ const SLOT_IDS = [...PRIMARY_IDS, ...SECONDARY_IDS];
  *  dt to 0.1 s, which needs at most two 1100 rpm rounds; due rounds beyond the
  *  bound are dropped rather than banked into later frames. */
 export const MAX_SHOTS_PER_FRAME = 3;
-/** s — must exceed the flight time of any LONG throw so it lands before it
- *  goes off. A 30 m/s heave aimed straight up stays airborne ~3.2 s under
- *  the world's -20.6 gravity, so anything shorter airbursts mid-arc.
- *  Shared with the AI throw (ai/index.ts). */
-export const GRENADE_FUSE = 3.5;
 /** Carpet-bomb strikes: one per life, up to 3 with market purchases. */
 const CARPET_STRIKES_PER_LIFE = 1;
 const CARPET_STRIKES_MAX = 3;
-// M67-style blast: ~4 m kill radius, wounds out to 10 m. Shared with the AI
-// grenades (ai/index.ts imports these) so player and enemy blasts match.
-export const GRENADE_RADIUS = 10; // m
-export const GRENADE_DAMAGE = 250;
 const GRENADE_SPEED = 15; // m/s — SHORT throw keeps roughly today's reach
 const GRENADE_LONG_SPEED = 30; // m/s — LONG throw, over double the reach
 const GRENADE_SHORT_UP = 1.2; // vertical bias (m/s) of the short toss
@@ -113,11 +112,6 @@ interface DroppedMagazine {
   group: THREE.Object3D;
   body: ReturnType<EngineSystems['physics']['spawnDebris']> | null;
   until: number;
-}
-interface LiveGrenade {
-  body: ReturnType<EngineSystems['physics']['addRigidBody']> | undefined;
-  mesh: THREE.Object3D;
-  fuse: number;
 }
 
 /** Weapons, loadout, handling, authored animation and timed projectile flight.
@@ -241,7 +235,7 @@ export class WeaponSystem {
   // Deferred shell ejections (a case leaves the port a few ms after the shot).
   _shellQueue: Array<{ t: number; weapon: WeaponId | null }> = [];
   _droppedMags: DroppedMagazine[] = [];
-  _grenades: LiveGrenade[] = []; // live thrown grenades: { body, mesh, fuse }
+  _grenades: LiveGrenade[] = [];
   private _grenadeAsset: GrenadeAsset | null = null;
   grenades: number = GRENADES_PER_LIFE;
   private readonly _hands = new HandEquipment();
@@ -1496,32 +1490,8 @@ export class WeaponSystem {
     this._setDeathDisabled(true);
   }
 
-  /** Fuse countdown for every live grenade; detonation emits `explosion`. */
-  _updateGrenades(dt: number): void {
-    for (let i = this._grenades.length - 1; i >= 0; i--) {
-      const g = this._grenades[i];
-      g.fuse -= dt;
-      if (g.fuse > 0) continue;
-      const p = g.body?.position ?? g.mesh.position;
-      this.ctx.events.emit('explosion', {
-        kind: 'grenade',
-        position: this._boomPos.copy(p),
-        radius: GRENADE_RADIUS,
-        damage: GRENADE_DAMAGE,
-        source: this.player,
-      });
-      if (g.body && this.physics?.removeRigidBody) this.physics.removeRigidBody(g.body);
-      g.mesh.removeFromParent();
-      this._grenades.splice(i, 1);
-    }
-  }
-
   _clearGrenades(): void {
-    for (const g of this._grenades) {
-      if (g.body && this.physics?.removeRigidBody) this.physics.removeRigidBody(g.body);
-      g.mesh.removeFromParent();
-    }
-    this._grenades.length = 0;
+    clearGrenades(this._grenades, this.physics);
   }
 
   /** X equips the radio; weapon keys stow it. Arrows move the LCD cursor, Enter sends. */
@@ -1589,7 +1559,7 @@ export class WeaponSystem {
     const player = this.player ?? (this.player = ctx.peek('player'));
     const st = this._state;
 
-    this._updateGrenades(dt);
+    updateGrenades(this._grenades, dt, this.ctx, this.physics, this.player);
 
     this._sinceShot += dt;
     if (this._fireTimer > 0) this._fireTimer -= dt;
