@@ -4,9 +4,10 @@ import type { Renderer } from 'three/webgpu';
 
 import handReference from '../../assets/weapons/p320-compact/hand-reference.json' with { type: 'json' };
 import manifest from '../../assets/weapons/p320-compact/manifest.json' with { type: 'json' };
+import { disposeMaterials } from '../core/dispose-materials.ts';
 import { isSkinnedMesh } from '../core/three-guards.ts';
 import { loadWeaponGLTF } from './asset-loader.ts';
-import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
+import { convertWeaponScene } from './asset-material.ts';
 import { sampleAuthoredFire, MAGAZINE_ALIASES, disposeAuthoredMixer } from './authored-actions.ts';
 import { authoredModel, requiredNode, type AuthoredModelData } from './authored-model.ts';
 import { createAuthoredRig, sampleAuthoredPose } from './authored-rig.ts';
@@ -127,7 +128,7 @@ export function createP320Animation(model: P320Model): WeaponAnimation {
     dispose(): void {
       disposeAuthoredMixer(this);
       skin.skeleton.dispose();
-      disposeWeaponMaterials(this.model);
+      disposeMaterials(this.model);
     },
   };
   animation.reset();

@@ -9,8 +9,9 @@ import {
 } from 'three';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { MeshBasicNodeMaterial } from 'three/webgpu';
+import { MeshBasicNodeMaterial, MeshStandardNodeMaterial } from 'three/webgpu';
 
+import { disposeMaterials } from '../core/dispose-materials.ts';
 import { isSingleMaterialMesh, isTexture } from '../core/three-guards.ts';
 
 const URL = 'models/props/intel-case.runtime.glb';
@@ -51,16 +52,8 @@ export function makeKit(scene: Group): IntelKit {
   });
   const dispose = (): void => {
     for (const geometry of geometries) geometry.dispose();
-    for (const material of materials) material.dispose();
-    for (const texture of textures) texture.dispose();
-    // GLTFLoader may share an ImageBitmap between multiple texture objects.
-    const images = new Set(Array.from(textures, (texture): unknown => texture.image));
-    if (typeof ImageBitmap !== 'undefined') {
-      for (const image of images) if (image instanceof ImageBitmap) image.close();
-    }
     geometries.clear();
-    materials.clear();
-    textures.clear();
+    disposeMaterials({ materials, textures });
   };
   try {
     const root = node(scene, 'INTEL_CASE');
@@ -78,6 +71,9 @@ export function makeKit(scene: Group): IntelKit {
     ) {
       throw new Error('[intel] expected a shared PBR finish with color and packed surface maps');
     }
+    // The world renderer patches node materials with room-aware indirect lighting.
+    body.material = lidMesh.material = new MeshStandardNodeMaterial().copy(finish);
+    materials.add(body.material);
     for (const solid of [body, lidMesh]) solid.castShadow = solid.receiveShadow = true;
     const lens = mesh(lid, 'INTEL_BEACON');
     const leds = mesh(root, 'INTEL_LEDS');

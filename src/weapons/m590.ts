@@ -4,9 +4,10 @@ import type { Renderer } from 'three/webgpu';
 
 import handReference from '../../assets/weapons/m590/hand-reference.json' with { type: 'json' };
 import manifest from '../../assets/weapons/m590/manifest.json' with { type: 'json' };
+import { disposeMaterials } from '../core/dispose-materials.ts';
 import { isSkinnedMesh } from '../core/three-guards.ts';
 import { loadWeaponGLTF } from './asset-loader.ts';
-import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
+import { convertWeaponScene } from './asset-material.ts';
 import { disposeAuthoredMixer } from './authored-actions.ts';
 import { authoredModel, requiredNode, type AuthoredModelData } from './authored-model.ts';
 import { createAuthoredRig, sampleAuthoredPose } from './authored-rig.ts';
@@ -99,7 +100,7 @@ export function createM590Animation(model: M590Model): WeaponAnimation {
       disposeAuthoredMixer(this);
       for (const skeleton of skeletons) skeleton.dispose();
       skeletons.clear();
-      disposeWeaponMaterials(this.model);
+      disposeMaterials(this.model);
     },
   };
   animation.reset();

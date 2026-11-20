@@ -285,7 +285,9 @@ The viewmodel mounts it at `GRIP_radio`, owns the asset lifetime, and keeps the
 same model through stow, pause and restart. Equipping raises it into a fixed
 camera-space close-up; the LCD is the only radio interface, showing the select,
 send and stow bindings, charges or the empty state, request locks and the request
-cursor. Weapon keys stow the radio. Request state does not depend on the model. [Radio asset contract](assets/props/field-radio/README.md).
+cursor. Weapon keys stow the radio. Neither radio nor grenade equip interrupts a bolt cycle.
+Once equipped, the equip key does not consume the accessory's other inputs.
+Request state does not depend on the model. [Radio asset contract](assets/props/field-radio/README.md).
 
 `weapons.createInspectionModel(id, config)` returns an independent rest-pose clone
 with `dispose()` for the market's demand-rendered WebGPU studio. Inspection owns

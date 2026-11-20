@@ -2,14 +2,11 @@ import * as THREE from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Renderer } from 'three/webgpu';
 
+import { disposeMaterials } from '../core/dispose-materials.ts';
 import { hasOwn, isRecord } from '../core/guards.ts';
 import { isGroup, isMesh } from '../core/three-guards.ts';
 import { loadWeaponGLTF } from './asset-loader.ts';
-import {
-  convertWeaponScene,
-  disposeWeaponMaterials,
-  type WeaponSceneMaterials,
-} from './asset-material.ts';
+import { convertWeaponScene, type WeaponSceneMaterials } from './asset-material.ts';
 import { requiredNode } from './authored-model.ts';
 import { WEAPON_DEFS, type WeaponDef, type WeaponId } from './defs.ts';
 import type { OpticData, WeaponEntry, WeaponModelRecord } from './runtime-types.ts';
@@ -104,7 +101,7 @@ function disposeAttachmentAsset(scene: THREE.Group, finishes: WeaponSceneMateria
     if (isMesh(node)) geometries.add(node.geometry);
   });
   for (const geometry of geometries) geometry.dispose();
-  disposeWeaponMaterials(finishes);
+  disposeMaterials(finishes);
 }
 
 /** One owned asset; mounted/inspection instances borrow its geometry and finishes. */

@@ -58,50 +58,6 @@ No bundled lights or runtime-mesh fallback. Each pool slot clones the transforms
 not the buffers, maps or materials. Restart reuses them; IntelSystem disposes
 them on teardown. Gameplay uses the same authored sites and interaction target.
 
-## Measured budget and review
-
-One shared kit at **High** quality (measured from the loaded meshes). Geometry
-bytes are the unique typed-buffer payload, not renderer/driver allocations.
-Texture bytes are RGBA8 payload estimates with full mip chains. The baseline
-counts the case's own canvas only, not the shared procedural material library.
-
-| Metric | Procedural baseline | Authored case |
-| ------ | ------------------- | ------------- |
-| Triangles | 5,922 | 5,634 |
-| Vertex entries | 5,185 | 6,351 |
-| Beauty draws / prepass draws / eligible shadow casters | 11 / 9 / 9 | 4 / 2 / 2 |
-| Runtime materials | 8 | 3 |
-| Shared geometry bytes | 263,624 | 184,532 |
-| Case-owned texture bytes with mips | 699,052 | 873,816 |
-| Native / cooked GLB bytes | Not applicable | 430,164 / 108,576 |
-| Cooked embedded WebP bytes | Not applicable | 46,438 |
-
-The new finish needs distinct UVs and normals at material and bevel seams,
-so there are more vertex entries despite fewer triangles and smaller buffers.
-The extra roughness/metalness map buys visible separation between polymer,
-rubber, hardware and electronics; its cooked resolution is half the albedo's
-on each axis. The LED and lens batches stay out of prepass and shadow passes.
-
-Hardware review: Chromium WebGPU on AMD RDNA 4 (no fallback), 1280 × 720, DPR 1,
-E2 roof. Matching camera, time, fixed exposure and lid angles for each pair:
-noon without flashlight and midnight with the stock player flashlight. The
-viewmodel and HUD are hidden for the prop comparisons. The full native render
-path was timed at the open pose, with 48 measured frames per visible/hidden
-case condition, alternated in blocks. CPU milliseconds are main-thread render
-submission, GPU milliseconds are native render/compute pass timestamp sums
-(excluding copies, queue waits and presentation). Medians below include the
-visible case; the draw delta is visible minus hidden within each build.
-
-| Open pose | CPU ms (before → after) | GPU render ms | GPU compute ms | Added full-frame draws |
-| --------- | ----------------------- | ------------- | -------------- | ---------------------- |
-| Day, close | 5.10 → 5.20 | 2.621 → 2.563 | 0.938 → 0.939 | 47 → 12 |
-| Day, approach | 4.45 → 4.00 | 2.918 → 2.905 | 0.808 → 0.809 | 47 → 12 |
-| Night, close | 3.75 → 5.35 | 2.649 → 2.588 | 0.939 → 0.940 | 56 → 14 |
-| Night, approach | 3.75 → 4.40 | 2.985 → 2.975 | 0.807 → 0.808 | 56 → 14 |
-
-The draw reduction is repeatable; the whole-frame timings do not establish a
-case-only speedup. For example, the hidden-case night close CPU median also
-moved from 3.40 to 5.20 ms. Do not treat these timings as a frame-rate claim.
-The matched front views cover closed, partial and open; rear views show the
-hinges in the closed and open poses. Final visual judgment at gameplay distance
-and site-specific clearance still need human review.
+Keep the LED and lens batches out of prepass and shadow passes. The
+[export check](../../../tools/blender/intel_case/check.py) enforces the triangle budget.
+Review the hinge sweep and clearance at the authored sites.

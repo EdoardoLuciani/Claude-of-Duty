@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import type { Material, Texture } from 'three';
 import { MeshPhysicalNodeMaterial } from 'three/webgpu';
 
-import { isClosable } from '../core/guards.ts';
 import { isMesh, isTexture } from '../core/three-guards.ts';
 
 /** Native PBR without changing the authored factors/maps. Textures stay shared
@@ -92,27 +91,4 @@ export function convertWeaponScene(
     mesh.receiveShadow = true;
   });
   return result;
-}
-
-/** Dispose the adapter's owned finishes, closing shared decoded images once. */
-export function disposeWeaponMaterials(model: {
-  materials: Set<Material>;
-  textures: Set<Texture>;
-}): void {
-  for (const material of model.materials) material.dispose();
-  const images = new Set<object>();
-  for (const texture of model.textures) {
-    const image: unknown = texture.source.data;
-    if (
-      typeof image === 'object' &&
-      image !== null &&
-      'close' in image &&
-      typeof image.close === 'function'
-    )
-      images.add(image);
-    texture.dispose();
-  }
-  for (const image of images) if (isClosable(image)) image.close();
-  model.materials.clear();
-  model.textures.clear();
 }

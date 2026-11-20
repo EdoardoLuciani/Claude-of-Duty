@@ -35,20 +35,6 @@ and physics bounds are unchanged. The held, player-thrown and AI instances borro
 one geometry, material and map pair. Weapons warm both render passes before play
 and own the asset through restart; AI never loads or disposes it.
 
-## Runtime budget
-
-| Measured per prop / shared asset | Previous procedural | Cooked M67 |
-| --- | ---: | ---: |
-| Triangles / position vertices | 2,280 / 2,287 | 2,100 / 1,288 |
-| Draws per visible prop per pass / distinct materials | 6 / 5 | 1 / 1 |
-| Geometry typed-array bytes, shared | 86,864 | 43,512 |
-| Hardware BC7 texture payload with mips, shared | 0 B | 349,600 B |
-| Downloaded model file | None | 169,592 B |
-
-The two 512 × 256 maps add a fixed shared cost to make paint, bare metal and wear
-respond differently to light and retain legible markings in first person. Listed
-bytes exclude GPU alignment/allocator overhead. Verify with the named in-engine
-`grenade`, `grenadeCook*` and `grenadeThrow*` shots, live short/long releases,
-and player/AI world instances in daylight and under artificial light. The source
-check covers the envelope and exterior topology, not glove clearance or visual
-approval.
+The [source check](../../../tools/blender/m67/check.py) enforces the triangle
+budget. Use the `grenade`, `grenadeCook*` and `grenadeThrow*` shots to check the
+held pose, then review player and AI world instances in daylight and artificial light.

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-import { disposeWeaponMaterials } from './asset-material.ts';
+import { disposeMaterials } from '../core/dispose-materials.ts';
 import {
   createAuthoredActions,
   disposeAuthoredMixer,
@@ -71,7 +71,7 @@ export function createAuthoredRig(model: RigModel): AuthoredRig {
     applyHands: applyAuthoredHands,
     dispose(): void {
       disposeAuthoredMixer(this);
-      disposeWeaponMaterials(model);
+      disposeMaterials(model);
     },
   };
 }

@@ -43,30 +43,6 @@ shadow passes and the ring do not. Restart retains the shared GPU resources;
 weapon-system teardown releases the geometry, materials, atlases and instance
 buffers.
 
-| Per case, excluding the unchanged ring | Procedural baseline | Authored |
-| --- | ---: | ---: |
-| Opaque materials / draws per pass | 3 | 1 |
-| Indexed triangles | 48 | 442 |
-| Exported runtime vertices | 96 | 728 |
-| Cooked asset on disk | — | 87,072 B |
-| Shared atlas payload on BC-capable WebGPU, including mips | 0 B | 109,280 B |
-
-The 256² sRGB base-color and 128² linear packed roughness (G) / metalness (B)
-atlases retain markings and directional wear without decal meshes, extra
-materials or a normal-map sample. Geometry is reserved for the stepped lid,
-corner normals, side presses and hardware that change the silhouette or catch
-light. The case/ring together submit 24,896 triangles in one beauty pass with
-all 32 slots populated (12,288 for the procedural baseline). The same scene
-submits 6 instead of 16 pickup draws including beauty, opaque prepass and the
-three observed shadow cascades. The two instance buffers reserve 4,096 B total
-instead of 8,192 B (excluding Three's internal previous-matrix buffers).
-
-A 1280×720 High-quality full-pool diagnostic on hardware RDNA 4 alternated the
-baseline and authored pools in the same renderer (192 frames each). CPU submit
-including pickup matrix/bounds sync was 5.20/6.80 ms vs 4.40/6.20 ms (p50/p95);
-native render-pass sums were 3.208/4.024 ms vs 3.109/4.024 ms. These measurements
-include surrounding world work, exclude GPU copies, compute, queue wait and
-presentation, and fluctuate with the host. The confirmed optimization is draw
-consolidation, not a claim of faster GPU frame time. Review normal approach and
-close-up views in native WebGPU, in daylight and darkness, with the ring enabled
-and all slots occupied for the pool view.
+Keep one draw per batch, with a 256² sRGB base-color map and a 128² packed
+roughness/metalness map on the case. The [export check](../../../tools/blender/ammo_pickup/check.py)
+enforces vertex and triangle limits. Review with the ring enabled and all slots occupied.

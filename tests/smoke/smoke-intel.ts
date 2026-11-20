@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import * as THREE from 'three';
-import { MeshBasicNodeMaterial } from 'three/webgpu';
+import { MeshBasicNodeMaterial, MeshStandardNodeMaterial } from 'three/webgpu';
 
 import { INTEL_POINTS } from '#worldgen/level/intel';
 
@@ -502,7 +502,12 @@ assert.notEqual(cache.group.lid, spare.group.lid, 'pooled hinges move independen
 assert.equal(spareBeacon.geometry, beacon.geometry, 'pooled cases share geometry');
 assert.equal(spareBeacon.material, beacon.material, 'pooled cases share the pulsed material');
 const body = cache.group.getObjectByName('INTEL_BODY');
-assert(isSingleMaterialMesh(body) && body.material instanceof THREE.MeshStandardMaterial);
+assert(isSingleMaterialMesh(body) && body.material instanceof MeshStandardNodeMaterial);
+const lid = cache.group.lid.getObjectByName('INTEL_LID');
+assert(
+  isSingleMaterialMesh(lid) && lid.material === body.material,
+  'one room-lit finish for both shells'
+);
 let released = 0;
 for (const resource of [beacon.geometry, beacon.material, body.material, body.material.map]) {
   assert(resource);

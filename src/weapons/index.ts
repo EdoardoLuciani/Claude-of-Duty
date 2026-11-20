@@ -1322,6 +1322,10 @@ export class WeaponSystem {
     this.sim.fixedUpdate(h);
   }
 
+  private canEquipAccessory(): boolean {
+    return !this.cooking && !this._throwing && !this.switching && !this.cycling;
+  }
+
   /**
    * Grenade flow: G equips the grenade (weapon stowed). While it is in hand,
    * LMB cooks and throws LONG, RMB cooks and throws SHORT. The fuse burns only
@@ -1334,9 +1338,8 @@ export class WeaponSystem {
     if (!live) return; // death drops the grenade via its own listener
 
     // G equips the grenade; weapon keys stow it.
-    if (input.actionPressed('grenade')) {
-      if (this.cooking || this._throwing || this.switching) return; // hands are busy
-      if (this.grenadeEquipped) return;
+    if (!this.grenadeEquipped && input.actionPressed('grenade')) {
+      if (!this.canEquipAccessory()) return;
       this._interruptHeal('grenade');
       if (this.grenades > 0) {
         if (this.radioEquipped) this._stowRadio();
@@ -1570,24 +1573,23 @@ export class WeaponSystem {
   /** X equips the radio; weapon keys stow it. Arrows move the LCD cursor, Enter sends. */
   _updateRadio(input: EngineContext['input'], live: boolean): void {
     if (!live) return;
-    const busy = this.cooking || this._throwing || this.switching || this.grenadeEquipped;
-    if (input.actionPressed('radio')) {
-      if (!this.radioEquipped && !busy) {
-        this._interruptHeal('radio');
-        this.radioEquipped = true;
-        this._radioCursor = 0;
-        if (this.reloading) this._viewmodel?.stopClip();
-        this._viewmodel?.holdRadio();
-        this.audio?.playUi('radio_open', 0.9);
-      }
-    } else if (this.radioEquipped) {
+    if (!this.radioEquipped) {
+      if (!input.actionPressed('radio') || this.grenadeEquipped || !this.canEquipAccessory())
+        return;
+      this._interruptHeal('radio');
+      this.radioEquipped = true;
+      this._radioCursor = 0;
+      if (this.reloading) this._viewmodel?.stopClip();
+      this._viewmodel?.holdRadio();
+      this.audio?.playUi('radio_open', 0.9);
+    } else {
       const step =
         Number(input.actionPressed('radioDown')) - Number(input.actionPressed('radioUp'));
       this._radioCursor = clamp(this._radioCursor + step, 0, RADIO_REQUESTS - 1);
       if (input.actionPressed('radioSend')) this._sendRequest();
     }
     // The LCD redraws only when the count or cursor actually changes.
-    if (this.radioEquipped) this._viewmodel?.setRadioScreen(this.carpetBombs, this._radioCursor);
+    this._viewmodel?.setRadioScreen(this.carpetBombs, this._radioCursor);
   }
 
   _sendRequest(): void {
