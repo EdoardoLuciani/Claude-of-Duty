@@ -293,7 +293,7 @@ for (const request of ['KeyI', 'Digit1', 'Digit2', 'Tab', 'wheel-up', 'wheel-dow
     `${request} interrupts completion from the real snapshot`
   );
   assert.deepEqual([player.health.value, player.bandages], [40, 2]);
-  assert.equal(events.filter((e): boolean => e.name === 'player:heal').at(-1)?.reason, 'interrupt');
+  assert.equal(events.findLast((e): boolean => e.name === 'player:heal')?.reason, 'interrupt');
 }
 for (const motion of ['sprint', 'jump']) {
   const { player, events, frame } = fixture();
@@ -308,7 +308,7 @@ for (const motion of ['sprint', 'jump']) {
     `${motion} interrupts after fixed movement, before completion`
   );
   assert.deepEqual([player.health.value, player.bandages], [40, 2]);
-  assert.equal(events.filter((e): boolean => e.name === 'player:heal').at(-1)?.reason, 'move');
+  assert.equal(events.findLast((e): boolean => e.name === 'player:heal')?.reason, 'move');
   if (motion === 'jump') {
     assert.equal(player.movement.jumped, false, 'update drains the jump event before heal');
     assert.equal(player.airborne, true, 'airborne guard still prevents final-frame healing');

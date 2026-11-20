@@ -12,7 +12,7 @@ GLB are generated products. References, rights and visual limitations live in
 Run from the repository root with Blender 5.2.2, compatible AgX and gltfpack 1.3:
 
 ```sh
-bun run assets
+bun tools/build-assets.ts
 blender -b -t 2 --python-exit-code 1 --python tools/blender/check_picatinny.py
 # Then run each weapon's saved-source check.py (commands beside each asset).
 bun tools/capture.ts --weapon=rifle --optic=exps3 --rail=laser --muzzle=suppressor --shot=ads --out=/tmp/m4-exps3.png
@@ -20,7 +20,7 @@ bun tools/capture.ts --weapon=rifle --optic=exps3 --rail=laser --muzzle=suppress
 
 The cook writes `public/models/attachments/exps3.runtime.glb`. Standalone review
 is available with `blender -b -t 8 --python-exit-code 1 --python tools/blender/exps3.py -- --output /tmp/exps3-review --render`;
-`bun run models:cook -- exps3 /tmp/exps3-review` cooks that scratch native export.
+`bun build/models.ts exps3 /tmp/exps3-review` cooks that scratch native export.
 
 ## Mechanical interface
 

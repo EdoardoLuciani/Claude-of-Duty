@@ -95,6 +95,7 @@ export class StaticWorld {
   solid: Int32Array = new Int32Array(0);
   triIndex: Uint32Array = new Uint32Array(0);
   nodeBounds: Float32Array = new Float32Array(0);
+  triBounds: Float32Array = new Float32Array(0);
   nodeMeta: Int32Array = new Int32Array(0);
   nodeCount: number = 0;
   maxDepth: number = 0;
@@ -103,7 +104,6 @@ export class StaticWorld {
   version: number = 0;
   // scratch
   _cent: Float32Array = new Float32Array(0);
-  _taabb: Float32Array = new Float32Array(0);
   _stackNode: Int32Array = new Int32Array(128);
   _stackT: Float32Array = new Float32Array(128);
   _buildStack: Int32Array = new Int32Array(3 * 4096);
@@ -210,7 +210,7 @@ export class StaticWorld {
       this.solid = new Int32Array(total);
       this.triIndex = new Uint32Array(total);
       this._cent = new Float32Array(total * 3);
-      this._taabb = new Float32Array(total * 6);
+      this.triBounds = new Float32Array(total * 6);
       const maxNodes = 2 * total + 8;
       this.nodeBounds = new Float32Array(maxNodes * 6);
       this.nodeMeta = new Int32Array(maxNodes * 2);
@@ -233,7 +233,7 @@ export class StaticWorld {
 
     // Per-triangle normals, centroids, bounds.
     const cent = this._cent;
-    const ta = this._taabb;
+    const ta = this.triBounds;
     const nrm = this.nrm;
     const worldMin = new Float64Array(3).fill(Infinity);
     const worldMax = new Float64Array(3).fill(-Infinity);
@@ -299,7 +299,7 @@ export class StaticWorld {
     const meta = this.nodeMeta;
     const bounds = this.nodeBounds;
     const idx = this.triIndex;
-    const ta = this._taabb;
+    const ta = this.triBounds;
     const cent = this._cent;
 
     this.nodeCount = 1;
@@ -481,7 +481,7 @@ export class StaticWorld {
   }
 
   _nodeBoundsFromRange(node: number, start: number, count: number): void {
-    const ta = this._taabb;
+    const ta = this.triBounds;
     const idx = this.triIndex;
     // Float32 storage can round a bound inwards; retain the original padding.
     const padding = 1e-5;
@@ -796,7 +796,7 @@ export class StaticWorld {
     const nb = this.nodeBounds;
     const meta = this.nodeMeta;
     const idx = this.triIndex;
-    const ta = this._taabb;
+    const ta = this.triBounds;
     const stack = this._stackNode;
     let sp = 0;
     if (!overlapsBounds(nb, 0, minx, miny, minz, maxx, maxy, maxz)) return 0;
@@ -831,7 +831,7 @@ export class StaticWorld {
     return n;
   }
 
-  get candidates(): Int32Array<ArrayBufferLike> {
+  get candidates(): Int32Array {
     return this._cand;
   }
 

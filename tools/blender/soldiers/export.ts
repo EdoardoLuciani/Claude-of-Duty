@@ -18,7 +18,7 @@ import { soldierReference } from './reference.ts';
 
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 export const ASSET_ROOT = path.join(ROOT, 'assets/soldiers');
-export const DEFAULT_SEED = 0x5eed1234;
+const DEFAULT_SEED = 0x5eed1234;
 export const SOURCE_INPUTS = Object.freeze([
   'tools/blender/soldiers/build.py',
   'tools/blender/soldiers/reference.ts',
@@ -77,7 +77,7 @@ export function soldierInputHash(root = ROOT): string {
   return hash.digest('hex');
 }
 
-export function validateGLB(glb: unknown): asserts glb is Buffer {
+function validateGLB(glb: unknown): asserts glb is Buffer {
   assert(Buffer.isBuffer(glb) && glb.length >= 12, 'GLB header');
   assert.equal(glb.readUInt32LE(0), 0x46546c67, 'GLB magic');
   assert.equal(glb.readUInt32LE(4), 2, 'GLB version');

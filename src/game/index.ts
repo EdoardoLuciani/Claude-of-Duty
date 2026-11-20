@@ -20,7 +20,7 @@ interface HudState {
 
 type GameInputEvent = 'damage:dealt' | 'wave:complete' | 'player:death' | 'game:restart';
 
-export const SCORE = Object.freeze({
+const SCORE = Object.freeze({
   elimination: 100,
   headshot: 50,
   wave: 250,
@@ -104,7 +104,7 @@ export class GameSystem {
   }
 
   addScore(points: number, reason = 'bonus'): number {
-    const delta = Math.max(0, Math.round(Number(points) || 0));
+    const delta = Math.max(0, Math.round(points || 0));
     if (!delta) return this.score;
     this.score += delta;
     this.ctx.events.emit('score:change', {

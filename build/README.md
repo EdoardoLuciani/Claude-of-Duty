@@ -9,22 +9,24 @@ Install native **gltfpack 1.3 with BasisU support** from the
 [official release](https://github.com/zeux/meshoptimizer/releases/tag/v1.3), then:
 
 ```sh
-GLTFPACK=/absolute/path/gltfpack bun run models:cook -- p320
-# All registered profiles (seven weapons, standalone EXPS3 and TOR Mini):
-bun run models:cook
+GLTFPACK=/absolute/path/gltfpack bun build/models.ts p320
+# All registered profiles:
+bun build/models.ts
 # Use the same profile on a scratch native export:
-bun run models:cook -- p320 /tmp/p320-review
+bun build/models.ts p320 /tmp/p320-review
 ```
 
 The encoder writes to a temporary directory before replacing the destination.
 Runtime outputs use `.runtime.glb`; their container is still GLB, regardless of
-embedded texture formats. Textures use UASTC quality 8 at their authored resolutions.
+embedded texture formats. Weapon/attachment textures use UASTC quality 8 at their
+authored resolutions. The [intel case](../assets/props/intel-case/README.md) uses
+meshopt and embedded WebP atlases, with a half-resolution roughness/metalness map.
 Each cook gets one quarter of the available CPUs (at least one thread), sharing
 the CPU budget with the asset pipeline's bounded model pool.
 
 To opt in another model, register its source directory, native export, runtime
 output and any model-specific flags in `MODEL_COOKS`. Wire its loader to the
-runtime output with KTX2/meshopt support, then validate its named mechanics,
+runtime output with the required texture and geometry decoders, then validate its named mechanics,
 materials/UVs, animation/contacts, resource ownership and visual fidelity.
 Simplification is opt-in **per model**; P320's tight-error profile is not a global
 triangle-reduction policy. M4 disables geometry quantization to preserve its iron

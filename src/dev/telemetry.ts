@@ -390,7 +390,7 @@ function recordField(key: string, value: unknown): unknown {
   return ENTITY_FIELDS.has(key) ? entityId(value) : undefined;
 }
 
-function isInstancedMesh(mesh: THREE.Object3D): mesh is THREE.InstancedMesh<THREE.BufferGeometry> {
+function isInstancedMesh(mesh: THREE.Object3D): mesh is THREE.InstancedMesh {
   return mesh instanceof THREE.InstancedMesh;
 }
 
@@ -659,7 +659,7 @@ export class TelemetrySystem {
     const api = {
       start: (): { recording: boolean; startedAt: string } => this.start(),
       stop: (): TelemetrySummary => this.stop(),
-      mark: (label?: string): TelemetryMark | null => this.mark(label),
+      mark: (label?: unknown): TelemetryMark | null => this.mark(label),
       download: (): Promise<{
         filename: string;
         bytes: number;
@@ -720,7 +720,7 @@ export class TelemetrySystem {
       schema: SCHEMA,
       startedAt: new Date().toISOString(),
       quality: this.ctx.config.quality,
-      deterministic: !!this.ctx.config.deterministic,
+      deterministic: this.ctx.config.deterministic,
       viewport: [innerWidth, innerHeight],
       userAgent: navigator.userAgent,
       playerHz: PLAYER_HZ,
@@ -746,9 +746,12 @@ export class TelemetrySystem {
     return this.summary();
   }
 
-  mark(label: string = 'manual'): TelemetryMark | null {
+  mark(label: unknown = 'manual'): TelemetryMark | null {
     if (!this.recording) return null;
-    const m = this._createMark(label);
+    // Console input: keep strings and numbers, as String() did; ignore anything else.
+    const m = this._createMark(
+      typeof label === 'string' || typeof label === 'number' ? String(label) : 'manual'
+    );
     this.markers.push(m);
     this._grabQueue.push(m);
     this.badge.textContent = `MARK ${this.markers.length} SAVED · F8 EXPORT`;
@@ -763,7 +766,7 @@ export class TelemetrySystem {
       raw: this._rawTime(),
       frame: this.ctx.time.frame,
       wall: this._wall(),
-      label: String(label || 'manual').slice(0, 80),
+      label: (label || 'manual').slice(0, 80),
       note: '',
       screenshot: null as string | null,
       player: vec(player.feetPosition),
@@ -1294,14 +1297,14 @@ export class TelemetrySystem {
       state: p.state ?? null,
       stance: p.stance,
       grounded: p.grounded,
-      sprinting: !!p.sprinting,
-      tacticalSprint: !!p.tacticalSprint,
-      sliding: !!p.sliding,
-      mantling: !!p.mantling,
+      sprinting: p.sprinting,
+      tacticalSprint: p.tacticalSprint,
+      sliding: p.sliding,
+      mantling: p.mantling,
       health: n3(hp.value),
       armour: n3(hp.armour),
       suppression: n3(hp.suppression),
-      dead: !!hp.dead,
+      dead: hp.dead,
       bandages: p.bandages,
       healing: p.healCtrl.active,
       healProgress: n3(p.healCtrl.progress),
@@ -1309,7 +1312,7 @@ export class TelemetrySystem {
       mode: ws?.mode ?? null,
       ammo: ws?.mag ?? null,
       reserve: ws?.reserve ?? null,
-      reloading: !!w.reloading,
+      reloading: w.reloading,
       ads: w.adsProgress > 0.5,
       grenades: w.grenades,
       actions,
@@ -1317,10 +1320,10 @@ export class TelemetrySystem {
       look: [n3(input.look.x), n3(input.look.y)],
       wave: wave.number,
       remaining: wave.remaining,
-      incoming: !!wave.incoming,
+      incoming: wave.incoming,
       score: game.score,
       kills: game.kills,
-      marketOpen: !!market.open,
+      marketOpen: market.open,
       credits: market.credits,
       contacts: this._contacts.size,
       dt: n3(ctx.time.dt),
@@ -1394,19 +1397,19 @@ export class TelemetrySystem {
         stateTime: n3(a.stateTime),
         squad: a.squad?.id ?? null,
         role: a.role,
-        crouch: !!a.crouch,
-        peeking: !!a.peeking,
-        wantFire: !!a.wantFire,
+        crouch: a.crouch,
+        peeking: a.peeking,
+        wantFire: a.wantFire,
         suppression: n3(a.suppression),
-        hasTarget: !!a.hasTarget,
-        targetVisible: !!a.targetVisible,
+        hasTarget: a.hasTarget,
+        targetVisible: a.targetVisible,
         lastKnown: vec(a.lastKnown),
         lastKnownAge: n3(a.lastKnownAge),
         visualAge: n3(a.visualAge),
         combatAction: a.combatAction ?? null,
         contactKind: a.lastKnownKind ?? null,
         targetSample: a.targetSample,
-        observationSearch: !!a._observationSearch,
+        observationSearch: a._observationSearch,
         coverFailure: a.coverFailure ?? null,
         elevatedRole: a.squad?.elevated === a,
         elevationStatus: a.squad?.elevationStatus ?? null,
@@ -1428,7 +1431,7 @@ export class TelemetrySystem {
         rollback: a.lastRollback ?? null,
         searchTravelUntil: n3(a._searchTravelUntil),
         searchUntil: n3(a._searchUntil),
-        pathPending: !!a.pathPending,
+        pathPending: a.pathPending,
         stuckTime: n3(a.stuckTimer),
         fireBlock: a.fireBlock ?? null,
         pathOutcome: a.pathOutcome ?? null,
@@ -1442,7 +1445,7 @@ export class TelemetrySystem {
         pathStartSurface: a.pathStartSurface || null,
         pathGoalSurface: a.pathGoalSurface || null,
         search: a.searchOutcome ?? null,
-        lodIrrelevant: !!a.lodIrrelevant,
+        lodIrrelevant: a.lodIrrelevant,
         hudContact: contact,
         hudPosition: contact ? [n3(a.hudX), n3(a.hudZ)] : null,
         hudFade: contact ? n3(a.hudFade) : null,
@@ -1459,7 +1462,7 @@ export class TelemetrySystem {
         intent: s.intent,
         why: s.why,
         contactAge: n3(s.contactAge),
-        planted: !!s.planted,
+        planted: s.planted,
         wrapper: s.wrapper?.id ?? null,
         flanker: s.flanker?.id ?? null,
       });

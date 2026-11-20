@@ -112,7 +112,7 @@ export function overlapsRect(box: THREE.Box3, rect: RectXZ, pad = 0): boolean {
 
 // ------------------------------------------------------------------ noise --
 /** Deterministic 3D value hash in [0,1). No Math.random anywhere. */
-export function hash3(x: number, y: number, z: number): number {
+function hash3(x: number, y: number, z: number): number {
   let h = Math.imul(Math.round(x * 1013) ^ 0x27d4eb2d, 0x85ebca6b);
   h = Math.imul(h ^ Math.round(y * 1619), 0xc2b2ae35);
   h = Math.imul(h ^ Math.round(z * 31337), 0x27d4eb2f);
@@ -125,7 +125,7 @@ function fade(t: number): number {
 }
 
 /** Smooth value noise, period ~1 unit. */
-export function noise3(x: number, y: number, z: number): number {
+function noise3(x: number, y: number, z: number): number {
   const xi = Math.floor(x);
   const yi = Math.floor(y);
   const zi = Math.floor(z);
@@ -510,7 +510,7 @@ export function quad(w = 1, h = 1): THREE.PlaneGeometry {
  *   { x, y, w, h, arch?:0..1, sill?:number, ragged?:number }
  * x/y is the hole centre in panel space (panel spans -w/2..w/2, 0..h).
  */
-export function holePath(o: WallOpening, rng: Rng | null): THREE.Path {
+function holePath(o: WallOpening, rng: Rng | null): THREE.Path {
   const p = new THREE.Path();
   const x0 = o.x - o.w / 2;
   const x1 = o.x + o.w / 2;

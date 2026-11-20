@@ -10,7 +10,7 @@
 
 import { applyDefinedPatch } from './patch.ts';
 
-export const PHYSICS_HZ = 120;
+const PHYSICS_HZ = 120;
 export const FIXED_DT = 1 / PHYSICS_HZ;
 /** Never simulate more than this many physics steps in one frame (spiral-of-death guard). */
 export const MAX_SUBSTEPS = 8;
@@ -79,7 +79,7 @@ export const QUALITY_PRESETS = {
   },
 };
 
-export const DEFAULTS = {
+const DEFAULTS = {
   // 'high' balances GPU cost; 'ultra' retains an extra shadow cascade and
   // larger particle/decal budgets, one click away.
   quality: 'high' as const,
@@ -98,8 +98,8 @@ export const DEFAULTS = {
   deterministic: false,
 };
 
-export type QualityName = keyof typeof QUALITY_PRESETS;
-export type QualityPreset = (typeof QUALITY_PRESETS)[QualityName];
+type QualityName = keyof typeof QUALITY_PRESETS;
+type QualityPreset = (typeof QUALITY_PRESETS)[QualityName];
 export interface RuntimeConfig extends Omit<typeof DEFAULTS, 'quality'> {
   quality: QualityName;
   q: QualityPreset;

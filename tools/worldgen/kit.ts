@@ -3,13 +3,7 @@ import * as THREE from 'three';
 import type { Rng } from '../../src/core/rng.ts';
 import type { Assembler } from './builder.ts';
 import { STREET } from './level/layout.ts';
-import type {
-  AssemblyOptions,
-  ClothOptions,
-  MaskPainter,
-  WallOpening,
-  WallPanelOptions,
-} from './util.ts';
+import type { ClothOptions, MaskPainter, WallOpening, WallPanelOptions } from './util.ts';
 import {
   chamferBox,
   plainBox,
@@ -119,25 +113,6 @@ const _mm = new THREE.Matrix4();
 /** Shared identity for elements authored straight in level space. */
 export const IDENT = new THREE.Matrix4();
 
-/** local -> level matrix, composed onto the panel matrix. */
-function L(
-  pm: THREE.Matrix4,
-  x: number,
-  y: number,
-  z: number,
-  ry = 0,
-  sx = 1,
-  sy = 1,
-  sz = 1,
-  rx = 0,
-  rz = 0
-): THREE.Matrix4 {
-  _mm.makeRotationFromEuler(new THREE.Euler(rx, ry, rz, 'YXZ'));
-  _mm.scale(new THREE.Vector3(sx, sy, sz));
-  _mm.setPosition(x, y, z);
-  return _m.copy(pm).multiply(_mm);
-}
-
 // A tiny allocation-light path for the common case (no rotation).
 const _e = new THREE.Euler(0, 0, 0, 'YXZ');
 const _q = new THREE.Quaternion();
@@ -173,7 +148,7 @@ export const BOX_SOFT = (A: GeometrySink): THREE.BufferGeometry =>
 export const BOX_THIN = (A: GeometrySink): THREE.BufferGeometry =>
   A.cache('box:plain', (): THREE.BufferGeometry => plainBox());
 /** Single quad for glass panes. */
-export const PANE = (A: GeometrySink): THREE.BufferGeometry =>
+const PANE = (A: GeometrySink): THREE.BufferGeometry =>
   A.cache('pane', (): THREE.BufferGeometry => quad(1, 1));
 /**
  * Centimetre-rounded size for cache keys. Cached shapes are built from the
@@ -181,23 +156,6 @@ export const PANE = (A: GeometrySink): THREE.BufferGeometry =>
  * so editing one building cannot reshape a leaf on another.
  */
 const cm = (v: number): number => Math.round(v * 100) / 100;
-
-/** Merge a unit chamfer box scaled to a slab. */
-export function slab(
-  A: GeometrySink,
-  key: string,
-  pm: THREE.Matrix4,
-  x: number,
-  y: number,
-  z: number,
-  sx: number,
-  sy: number,
-  sz: number,
-  opts: AssemblyOptions | null = null,
-  ry = 0
-): void {
-  A.add(key, BOX(A), LL(pm, x, y, z, ry, sx, sy, sz), opts);
-}
 
 // ============================================================== facade wall ==
 /**
@@ -1433,4 +1391,4 @@ export function ryOf(pm: THREE.Matrix4): number {
   return Math.atan2(e[8], e[10]);
 }
 
-export { L, LL };
+export { LL };

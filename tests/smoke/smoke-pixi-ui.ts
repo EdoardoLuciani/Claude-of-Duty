@@ -20,7 +20,6 @@ import { PixiHud } from '../../src/ui/pixi-hud.ts';
 import { PixiMinimap } from '../../src/ui/pixi-minimap.ts';
 import { setHudTextResolution } from '../../src/ui/pixi-type.ts';
 import { Prompt, Banner } from '../../src/ui/prompts.ts';
-import type { RadioPanel } from '../../src/ui/radio.ts';
 import type { StartGate } from '../../src/ui/start.ts';
 import { fixture } from '../lib/fixture.ts';
 import {
@@ -205,7 +204,7 @@ ui._unsubs = [
     cleaned.push('events');
   },
 ];
-const widgets = ['minimap', 'menu', 'gameOver', 'shop', 'radio'];
+const widgets = ['minimap', 'menu', 'gameOver', 'shop'];
 ui.minimap = new Minimap(new Rng(1));
 ui.minimap.dispose = (): void => {
   cleaned.push('minimap');
@@ -223,11 +222,6 @@ ui.gameOver = fixture<GameOverScreen>({
 ui.shop = fixture<MarketOverlay>({
   dispose(): void {
     cleaned.push('shop');
-  },
-});
-ui.radio = fixture<RadioPanel>({
-  dispose(): void {
-    cleaned.push('radio');
   },
 });
 ui.root = document.createElement('div');

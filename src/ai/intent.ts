@@ -15,7 +15,7 @@ export const PLANT_RADIUS = 8;
 export const PLANT_WRAP_AGE = 5;
 export const FLUSH_KNOWN = 1.5;
 export const PEEK_DEATHS_NEEDED = 2;
-export const CLUSTER_RADIUS = 6;
+const CLUSTER_RADIUS = 6;
 export const CLUSTER_MAX_AGE = 16;
 export const GRENADE_CLOSE_SPEED = 4.6;
 export const FRIENDLY_HOLD = 0.7;
@@ -114,6 +114,11 @@ export function decideIntent(s: IntentState): {
 export interface RankedAnchor {
   s: { position: { x: number; z: number } };
 }
+const angleBetween = (a: number, b: number): number => {
+  let d = Math.abs(a - b) % (Math.PI * 2);
+  return d > Math.PI ? Math.PI * 2 - d : d;
+};
+
 export function pickSquadAnchors<T extends RankedAnchor>(
   ranked: readonly T[],
   player: { x: number; z: number },
@@ -123,10 +128,6 @@ export function pickSquadAnchors<T extends RankedAnchor>(
   const px = player.x,
     pz = player.z;
   const bearing = (e: T): number => Math.atan2(e.s.position.x - px, e.s.position.z - pz);
-  const ang = (a: number, b: number): number => {
-    let d = Math.abs(a - b) % (Math.PI * 2);
-    return d > Math.PI ? Math.PI * 2 - d : d;
-  };
   const picked = [ranked[0]];
   while (picked.length < n && picked.length < ranked.length) {
     let bestI = -1,
@@ -136,7 +137,7 @@ export function pickSquadAnchors<T extends RankedAnchor>(
       const b = bearing(ranked[i]);
       let minA = Infinity;
       for (let k = 0; k < picked.length; k++) {
-        const a = ang(b, bearing(picked[k]));
+        const a = angleBetween(b, bearing(picked[k]));
         if (a < minA) minA = a;
       }
       if (minA > best) {

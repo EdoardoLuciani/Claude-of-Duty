@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
- * Stage Blender-authored soldiers and generate the offline spent hull. This script
- * never runs Blender: tools/build-assets.ts regenerates assets/soldiers/ first.
+ * Stage Blender-authored soldiers. This script never runs Blender:
+ * tools/build-assets.ts regenerates assets/soldiers/ first.
  *
  * Content hashing covers shared inputs and canonical products. Missing outputs
  * force a full restage; --force bypasses the cache. Keep the pid lock and atomic
@@ -22,9 +22,7 @@ import {
   soldierInputPaths,
   soldierProductPaths,
 } from './blender/soldiers/export.ts';
-import { exportGlb } from './lib/export-glb.ts';
 import { hashFiles, sourceClosure } from './lib/source-hash.ts';
-import { buildSpentHull } from './lib/spent-hull.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'public', 'models');
@@ -110,7 +108,8 @@ async function withLock(fn: () => Promise<void>): Promise<void> {
       }
       if (waitingMs > LOCK_TIMEOUT_MS) {
         throw new Error(
-          `[models] exporter lock held for >${LOCK_TIMEOUT_MS / 1000}s by pid ${pid ?? '<unknown>'} — remove ${LOCK_DIR}`
+          `[models] exporter lock held for >${LOCK_TIMEOUT_MS / 1000}s by pid ${pid ?? '<unknown>'} — remove ${LOCK_DIR}`,
+          { cause: err }
         );
       }
       await sleep(200);
@@ -160,16 +159,13 @@ function modelSourceHash(): string {
 
 function assertInputsStable(expected: string): void {
   if (modelSourceHash() !== expected)
-    throw new Error('[models] inputs changed during staging; rerun bun run models');
+    throw new Error('[models] inputs changed during staging; rerun bun tools/export-models.ts');
 }
 
 function outputsPresent(): boolean {
   const stems = Object.keys(VARIANTS).map((name): string => `soldiers/${name}`);
-  return (
-    existsSync(join(OUT, 'fx/spent12g.glb')) &&
-    stems.every(
-      (p): boolean => existsSync(join(OUT, `${p}.glb`)) && existsSync(join(OUT, `${p}.json`))
-    )
+  return stems.every(
+    (p): boolean => existsSync(join(OUT, `${p}.glb`)) && existsSync(join(OUT, `${p}.json`))
   );
 }
 
@@ -202,10 +198,6 @@ await withLock(async (): Promise<void> => {
   rmSync(HASH_STAMP, { force: true });
 
   for (const product of soldiers) stageSoldier(product);
-  const hull = buildSpentHull();
-  writeAtomic(join(OUT, 'fx/spent12g.glb'), await exportGlb(hull));
-  hull.geometry.dispose();
-  hull.material.dispose();
 
   // Bone order is load-bearing (agents bind the exported geometry to their own
   // RIG skeleton by index); assert it once at export time.

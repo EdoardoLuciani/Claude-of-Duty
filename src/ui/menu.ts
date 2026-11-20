@@ -287,7 +287,7 @@ export class PauseMenu {
     const cfg = this.ctx.config;
     for (let i = 0; i < this.qBtns.length; i++)
       this.qBtns[i].classList.toggle('on', PRESETS[i] === cfg.quality);
-    for (const [b, v] of this.invBtns) b.classList.toggle('on', !!cfg.invertY === v);
+    for (const [b, v] of this.invBtns) b.classList.toggle('on', cfg.invertY === v);
     this.sens.set(cfg.sensitivity / 0.0022);
     this.fov.set(cfg.fov);
     this.shake.set(cfg.firingShake);

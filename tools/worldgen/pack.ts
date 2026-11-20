@@ -120,7 +120,7 @@ export async function buildCollision(
     const geometry = geometryFor(object);
     const ballisticSurface: unknown = object.userData.ballisticSurface ?? surface;
     const sheetThickness: unknown = object.userData.sheetThickness ?? 0;
-    const groupKey = `${String(surface)}|${String(ballisticSurface)}|${String(sheetThickness)}`;
+    const groupKey = `${surface}|${String(ballisticSurface)}|${String(sheetThickness)}`;
     if (object instanceof THREE.InstancedMesh) {
       const mesh = new THREE.InstancedMesh(geometry, material, object.count);
       mesh.name = `collide_${object.name}`;
@@ -156,9 +156,9 @@ export async function buildCollision(
 
   for (const { surface, ballisticSurface, sheetThickness, parts } of staticGroups.values()) {
     const geometry = parts.length === 1 ? parts[0] : mergeGeometries(parts, false);
-    if (!geometry) throw new Error(`[world] could not merge collision surface ${String(surface)}`);
+    if (!geometry) throw new Error(`[world] could not merge collision surface ${surface}`);
     const mesh = new THREE.Mesh(geometry, material);
-    mesh.name = `collide_${String(surface)}`;
+    mesh.name = `collide_${surface}`;
     mesh.userData = { surface, ballisticSurface, sheetThickness };
     mesh.matrixAutoUpdate = false;
     mesh.updateMatrix();

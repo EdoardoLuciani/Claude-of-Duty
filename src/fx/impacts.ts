@@ -1110,7 +1110,7 @@ type ImpactRecipe = (
 ) => void;
 
 /** One recipe per canonical surface; the checker enforces full coverage. */
-export const IMPACTS = {
+const IMPACTS = {
   concrete,
   plaster,
   metal,

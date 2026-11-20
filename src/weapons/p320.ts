@@ -4,20 +4,21 @@ import type { Renderer } from 'three/webgpu';
 
 import handReference from '../../assets/weapons/p320-compact/hand-reference.json' with { type: 'json' };
 import manifest from '../../assets/weapons/p320-compact/manifest.json' with { type: 'json' };
+import { disposeMaterials } from '../core/dispose-materials.ts';
 import { isSkinnedMesh } from '../core/three-guards.ts';
 import { loadWeaponGLTF } from './asset-loader.ts';
-import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
+import { convertWeaponScene } from './asset-material.ts';
 import { sampleAuthoredFire, MAGAZINE_ALIASES, disposeAuthoredMixer } from './authored-actions.ts';
 import { authoredModel, requiredNode, type AuthoredModelData } from './authored-model.ts';
 import { createAuthoredRig, sampleAuthoredPose } from './authored-rig.ts';
 import { buildMagazineClips, type Clip } from './clips.ts';
 import type { WeaponAnimation } from './runtime-types.ts';
 
-export const P320_URL = '/models/weapons/p320-compact.runtime.glb';
+const P320_URL = '/models/weapons/p320-compact.runtime.glb';
 export const P320_EJECT_DELAY = 2 / 60;
 const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(MAGAZINE_ALIASES)];
 
-export function makeP320Model(gltf: GLTF): P320Model {
+function makeP320Model(gltf: GLTF): P320Model {
   const scene = gltf.scene;
   const { root, opticMountRest, animations, point } = authoredModel(
     gltf,
@@ -127,7 +128,7 @@ export function createP320Animation(model: P320Model): WeaponAnimation {
     dispose(): void {
       disposeAuthoredMixer(this);
       skin.skeleton.dispose();
-      disposeWeaponMaterials(this.model);
+      disposeMaterials(this.model);
     },
   };
   animation.reset();

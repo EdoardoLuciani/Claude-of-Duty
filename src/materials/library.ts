@@ -383,7 +383,7 @@ export const LIBRARY: Record<MaterialName, MaterialDefinition> = {
 };
 
 /** Alias -> library key, so callers can ask for the physics surface name. */
-export const ALIASES = {
+const ALIASES = {
   metal: 'metal_painted',
   steel: 'metal_brushed',
   rust: 'metal_rust',

@@ -1,19 +1,27 @@
 // Query-only collision snapshots: copy used geometry, never live buffers or
 // unused BVH capacity. Scratch remains worker-owned.
-import type { AttachmentSnapshot } from '../ai/attachment-types.ts';
-import type { StaticWorld } from './bvh.ts';
+import { StaticWorld } from './bvh.ts';
 
-type BufferKey =
-  | 'pos'
-  | 'nrm'
-  | 'surface'
-  | 'mask'
-  | 'object'
-  | 'triIndex'
-  | 'nodeBounds'
-  | 'nodeMeta'
-  | '_taabb';
-type SnapshotBuffer = AttachmentSnapshot[BufferKey];
+const BUFFER_KEYS = [
+  'pos',
+  'nrm',
+  'surface',
+  'mask',
+  'object',
+  'triIndex',
+  'nodeBounds',
+  'nodeMeta',
+  'triBounds',
+] as const;
+type BufferKey = (typeof BUFFER_KEYS)[number];
+
+/** Query-only copy of a StaticWorld, sent to the AI attachment worker. */
+export type QuerySnapshot = Pick<
+  StaticWorld,
+  BufferKey | 'version' | 'dirty' | 'nodeCount' | 'triCount'
+> & { stackSize: number };
+
+type SnapshotBuffer = QuerySnapshot[BufferKey];
 
 function sameBuffer<T extends SnapshotBuffer>(value: unknown, source: T): value is T {
   return ArrayBuffer.isView(value) && value.constructor === source.constructor;
@@ -22,7 +30,7 @@ function sameBuffer<T extends SnapshotBuffer>(value: unknown, source: T): value 
 export async function querySnapshot(
   world: StaticWorld,
   current: () => boolean = (): boolean => true
-): Promise<{ snapshot: AttachmentSnapshot; transfer: ArrayBuffer[]; bytes: number } | null> {
+): Promise<{ snapshot: QuerySnapshot; transfer: ArrayBuffer[]; bytes: number } | null> {
   const { version, nodeCount, triCount } = world;
   const valid = (): boolean =>
     current() &&
@@ -30,7 +38,7 @@ export async function querySnapshot(
     world.version === version &&
     world.nodeCount === nodeCount &&
     world.triCount === triCount;
-  const snapshot: AttachmentSnapshot = {
+  const snapshot: QuerySnapshot = {
     version,
     dirty: false,
     nodeCount,
@@ -45,7 +53,7 @@ export async function querySnapshot(
     triIndex: world.triIndex,
     nodeBounds: world.nodeBounds,
     nodeMeta: world.nodeMeta,
-    _taabb: world._taabb,
+    triBounds: world.triBounds,
   };
   const lengths = {
     pos: triCount * 9,
@@ -56,26 +64,16 @@ export async function querySnapshot(
     triIndex: triCount,
     nodeBounds: nodeCount * 6,
     nodeMeta: nodeCount * 2,
-    _taabb: triCount * 6,
+    triBounds: triCount * 6,
   };
   const transfer: ArrayBuffer[] = [];
   let bytes = 0;
   // Cooperative target, not a hard bound on allocation/GC or one copy chunk.
   let yieldAt = performance.now() + 2;
-  function storeBuffer<K extends BufferKey>(name: K, copy: AttachmentSnapshot[K]): void {
+  function storeBuffer<K extends BufferKey>(name: K, copy: QuerySnapshot[K]): void {
     snapshot[name] = copy;
   }
-  for (const name of [
-    'pos',
-    'nrm',
-    'surface',
-    'mask',
-    'object',
-    'triIndex',
-    'nodeBounds',
-    'nodeMeta',
-    '_taabb',
-  ] as const) {
+  for (const name of BUFFER_KEYS) {
     const length = lengths[name];
     if (!valid()) return null;
     const source = world[name];
@@ -97,4 +95,13 @@ export async function querySnapshot(
   }
   if (!valid()) return null;
   return { snapshot, transfer, bytes };
+}
+
+/** Rebuild a query-only world from a snapshot; its traversal scratch is the caller's own. */
+export function restoreSnapshot({ stackSize, ...data }: QuerySnapshot): StaticWorld {
+  const world = new StaticWorld();
+  Object.assign(world, data);
+  world._stackNode = new Int32Array(stackSize);
+  world._stackT = new Float32Array(stackSize);
+  return world;
 }

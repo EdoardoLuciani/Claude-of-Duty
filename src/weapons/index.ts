@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { bindingLabel } from '../core/bindings.ts';
 import type { SystemId, EngineContext, EngineSystems } from '../core/context.ts';
 import type { ReloadPhase } from '../core/events.ts';
-import { DEG, lerp } from '../core/math.ts';
+import { DEG, clamp, lerp } from '../core/math.ts';
 import { Rng } from '../core/rng.ts';
 import { AmmoPickups } from './ammo-pickups.ts';
 import { disposeWeaponLoader } from './asset-loader.ts';
@@ -32,7 +32,7 @@ import {
   shotInterval,
 } from './defs.ts';
 import type { WeaponDef, WeaponId, WeaponMode } from './defs.ts';
-import { grenadeMesh } from './grenade-mesh.ts';
+import { loadGrenade, type GrenadeAsset } from './grenade-mesh.ts';
 import { createWeaponInspection } from './inspection.ts';
 import { WeaponLaser } from './laser.ts';
 import { loadWeapon } from './loaders.ts';
@@ -40,6 +40,7 @@ import { ReticleMaterials } from './materials-tsl.ts';
 import { MCX_EJECT_DELAY } from './mcx.ts';
 import { MPX_EJECT_DELAY } from './mpx.ts';
 import { P320_EJECT_DELAY } from './p320.ts';
+import { RADIO_REQUESTS } from './radio-mesh.ts';
 import type { ViewState, WeaponModelRecord, WeaponState } from './runtime-types.ts';
 import { Viewmodel } from './viewmodel.ts';
 import type { ViewModel } from './viewmodel.ts';
@@ -80,7 +81,7 @@ interface AmmoSnapshot {
 }
 
 interface WeaponWarmupReport {
-  graphWarm: Awaited<ReturnType<EngineSystems['render']['_warmGraph']>>;
+  graphWarm: Awaited<ReturnType<EngineSystems['render']['warmGraph']>>;
 }
 
 type WeaponPoseState = Required<ViewState>;
@@ -98,8 +99,6 @@ interface WeaponHudState {
   lethalCount: number;
   cooking: boolean;
   grenadeEquipped: boolean;
-  radioEquipped: boolean;
-  carpetCount: number;
 }
 interface WeaponStats {
   tris: number;
@@ -240,11 +239,14 @@ export class WeaponSystem {
   _shellQueue: Array<{ t: number; weapon: WeaponId | null }> = [];
   _droppedMags: DroppedMagazine[] = [];
   _grenades: LiveGrenade[] = []; // live thrown grenades: { body, mesh, fuse }
+  private _grenadeAsset: GrenadeAsset | null = null;
   grenades: number = GRENADES_PER_LIFE;
   /** Grenade in the hand: G drew it, the weapon is stowed. Equipping is
-   *  free — stowing (G again, or a weapon switch) spends nothing. */
+   *  free — stowing (any weapon selection) spends nothing. */
   grenadeEquipped: boolean = false;
   radioEquipped: boolean = false;
+  /** Highlighted LCD request row; 0 is the carpet bomb. */
+  _radioCursor: number = 0;
   healing: boolean = false;
   carpetBombs: number = CARPET_STRIKES_PER_LIFE;
   /** The initiating fire/ADS action is held; the fuse burns. Releasing
@@ -284,8 +286,6 @@ export class WeaponSystem {
     lethalCount: GRENADES_PER_LIFE,
     cooking: false,
     grenadeEquipped: false,
-    radioEquipped: false,
-    carpetCount: CARPET_STRIKES_PER_LIFE,
   };
 
   constructor() {
@@ -317,17 +317,32 @@ export class WeaponSystem {
     const attachments = loadAttachments(renderer).then((assets): void => {
       this._attachments = assets;
     });
-    try {
-      const records = await Promise.all(spawn.map(load));
-      await attachments;
-      for (let i = 0; i < spawn.length; i++) {
-        tris += this.viewmodel.addWeapon(
-          records[i],
-          this._requireState(spawn[i]).def,
-          this._requireState(spawn[i]).attachments,
-          this._attachments
-        ).tris;
+    const grenade = loadGrenade(renderer).then((asset): void => {
+      this._grenadeAsset = asset;
+      const held = asset.instantiate();
+      held.frustumCulled = false; // like the other first-person meshes
+      this.viewmodel.grenade.add(held);
+    });
+    const radio = this.viewmodel.loadRadio(renderer);
+    const mounts = Promise.all([Promise.all(spawn.map(load)), attachments]).then(
+      ([records]): void => {
+        for (let i = 0; i < spawn.length; i++) {
+          tris += this.viewmodel.addWeapon(
+            records[i],
+            this._requireState(spawn[i]).def,
+            this._requireState(spawn[i]).attachments,
+            this._attachments
+          ).tris;
+        }
       }
+    );
+    // Queue pickup parsing after the spawn weapons, but fetch its bytes alongside theirs.
+    const pickups = AmmoPickups.load(this, renderer).then((pool): void => {
+      this._pickups = pool;
+    });
+    const startup = [mounts, attachments, grenade, radio, pickups];
+    try {
+      await Promise.all(startup);
       this._restTask = (async (): Promise<void> => {
         try {
           await this._mountRest(rest, load);
@@ -336,14 +351,13 @@ export class WeaponSystem {
         }
       })();
     } catch (error) {
-      // Never rejects; settle it so a following dispose() owns every loaded asset.
-      await attachments;
+      // Finish mounting/claiming successful loads before teardown.
+      await Promise.allSettled(startup);
       await disposeWeaponLoader(renderer);
       throw error;
     }
     this.viewmodel.setActive(this.activeId);
     this.viewmodel.play('draw');
-    this._pickups = new AmmoPickups(this);
 
     // Player hooks (all optional: the viewmodel works standalone).
     this.player = ctx.peek('player');
@@ -523,7 +537,7 @@ export class WeaponSystem {
     const render = this.ctx.peek('render');
     // An early caller may try again after initialization. Once work starts, all
     // callers share its result, including failure: boot warmup never retries in gameplay.
-    if (!render?._graph || !this._viewmodel?.radio)
+    if (!render?.hasGraph() || !this._viewmodel?.grenade.children.length)
       return Promise.reject(new Error('[weapons] warmup graph or viewmodel not ready'));
     this._warmTask = this._prewarmMaterials(render);
     return this._warmTask;
@@ -532,6 +546,7 @@ export class WeaponSystem {
   private async _prewarmMaterials(render: EngineSystems['render']): Promise<WeaponWarmupReport> {
     const visible: Array<[THREE.Object3D, boolean]> = [];
     let pickup;
+    let worldGrenade;
     const attachments: THREE.Group[] = [];
     try {
       // Deferred assets must finish before the loading screen is released.
@@ -584,16 +599,21 @@ export class WeaponSystem {
         this.ctx.scene.add(pickup);
         render.patchMaterials(pickup);
       }
+      // A held instance alone misses the world depth and lighting shader variants.
+      worldGrenade = this.createGrenade();
+      this.ctx.scene.add(worldGrenade);
+      render.patchMaterials(worldGrenade);
       // Include the temporary pickup and dropped magazines in the flashlight's
       // real shadow pass, not only in the CSM warmup while the light is off.
       const flashlight = this.ctx.peek('player')?.flashlight;
       const graphWarm = flashlight
         ? await render.prewarmLightShadow(flashlight)
-        : await render._warmGraph();
+        : await render.warmGraph();
       return { graphWarm };
     } finally {
       for (const [group, value] of visible) group.visible = value;
       pickup?.removeFromParent();
+      worldGrenade?.removeFromParent();
       for (const attachment of attachments) attachment.removeFromParent();
     }
   }
@@ -730,8 +750,6 @@ export class WeaponSystem {
     h.lethalCount = this.grenades;
     h.cooking = this.cooking;
     h.grenadeEquipped = this.grenadeEquipped;
-    h.radioEquipped = this.radioEquipped;
-    h.carpetCount = this.carpetBombs;
     return h;
   }
 
@@ -747,7 +765,6 @@ export class WeaponSystem {
   /** Buy carpet-bomb strikes at the market: +n up to the cap. */
   addCarpetBombs(n: number): void {
     this.carpetBombs = Math.min(CARPET_STRIKES_MAX, this.carpetBombs + n);
-    if (this.radioEquipped) this._viewmodel?.setRadioScreen(this.carpetBombs);
   }
 
   /** Reset the complete loadout and transient combat state for a fresh run. */
@@ -799,14 +816,16 @@ export class WeaponSystem {
   }
 
   setWeapon(id: string): boolean {
-    if (
-      !isWeaponId(id) ||
-      this.disabled ||
-      !this.owned.has(id) ||
-      id === this.activeId ||
-      this._switchTo
-    )
-      return false;
+    if (!isWeaponId(id) || this.disabled || !this.owned.has(id) || this._switchTo) return false;
+    if (id === this.activeId) {
+      // Selecting the active weapon draws it back from a held grenade or radio.
+      const held = this.grenadeEquipped || this.radioEquipped;
+      if (!held || this.cooking || this._throwing) return false;
+      this._stowGrenade();
+      this._stowRadio();
+      this._viewmodel?.play('draw');
+      return true;
+    }
     if (!this._hasMesh(id)) return false;
     if (this.cycling) return false;
     if (this.cooking || this._throwing) return false; // committed to the throw — no mid-throw swap
@@ -1292,7 +1311,7 @@ export class WeaponSystem {
   }
 
   _setDeathDisabled(on: boolean): void {
-    this.disabled = !!on;
+    this.disabled = on;
     if (!this._viewmodel) return;
     this._viewmodel.anchor.visible = !this.disabled;
     if (this.disabled) {
@@ -1308,25 +1327,25 @@ export class WeaponSystem {
     this.sim.fixedUpdate(h);
   }
 
+  private canEquipAccessory(): boolean {
+    return !this.cooking && !this._throwing && !this.switching && !this.cycling;
+  }
+
   /**
    * Grenade flow: G equips the grenade (weapon stowed). While it is in hand,
    * LMB cooks and throws LONG, RMB cooks and throws SHORT. The fuse burns only
    * while a mouse button is held — releasing commits the throw with whatever
    * fuse is left. Overcooking detonates in your hand. Equipping is free:
-   * pressing G again (or switching weapons) stows the grenade unspent, so the
-   * G key never throws — it only arms and stows.
+   * selecting a weapon stows the grenade unspent. G only arms; it never
+   * throws or stows.
    */
   _updateGrenade(dt: number, input: EngineContext['input'], live: boolean): void {
     if (!live) return; // death drops the grenade via its own listener
 
-    // G toggles the grenade in and out of the hand.
-    if (input.actionPressed('grenade')) {
-      if (this.cooking || this._throwing || this.switching) return; // hands are busy
+    // G equips the grenade; weapon keys stow it.
+    if (!this.grenadeEquipped && input.actionPressed('grenade')) {
+      if (!this.canEquipAccessory()) return;
       this._interruptHeal('grenade');
-      if (this.grenadeEquipped) {
-        this._stowGrenade();
-        return;
-      }
       if (this.grenades > 0) {
         if (this.radioEquipped) this._stowRadio();
         this.grenadeEquipped = true;
@@ -1336,7 +1355,7 @@ export class WeaponSystem {
         this.ui?.setPrompt({
           key: bindingLabel('fire'),
           text: 'LONG THROW',
-          sub: `${bindingLabel('ads')} SHORT THROW · ${bindingLabel('grenade')} STOWS`,
+          sub: `${bindingLabel('ads')} SHORT THROW · ${bindingLabel('slot1')}/${bindingLabel('slot2')} STOWS`,
         });
       }
       return;
@@ -1429,13 +1448,21 @@ export class WeaponSystem {
     return this._throwPos;
   }
 
+  /** Only the transform belongs to the caller; weapons own the shared asset. */
+  createGrenade(): THREE.Mesh {
+    if (!this._grenadeAsset) throw new Error('[weapons] M67 asset not ready');
+    return this._grenadeAsset.instantiate();
+  }
+
   /** Add a live grenade to the world with the shared rigid-body setup. */
   _spawnGrenade(
     position: { x: number; y: number; z: number },
     velocity: { x: number; y: number; z: number },
     fuse: number
   ): void {
-    const mesh = grenadeMesh();
+    const mesh = this.createGrenade();
+    // Release can occur after this frame's physics-to-render sync.
+    mesh.position.set(position.x, position.y, position.z);
     this.ctx.scene.add(mesh);
     const body = this.physics?.addRigidBody({
       shape: 'sphere',
@@ -1548,45 +1575,31 @@ export class WeaponSystem {
     this._grenades.length = 0;
   }
 
-  /** X toggles the radio. Its open panel uses Digit1-3 for request selection. */
+  /** X equips the radio; weapon keys stow it. Arrows move the LCD cursor, Enter sends. */
   _updateRadio(input: EngineContext['input'], live: boolean): void {
     if (!live) return;
-    if (input.actionPressed('radio')) {
-      if (this.cooking || this._throwing || this.switching || this.grenadeEquipped) return;
-      this._interruptHeal('radio');
-      if (this.radioEquipped) {
-        this._stowRadio();
+    if (!this.radioEquipped) {
+      if (!input.actionPressed('radio') || this.grenadeEquipped || !this.canEquipAccessory())
         return;
-      }
+      this._interruptHeal('radio');
       this.radioEquipped = true;
+      this._radioCursor = 0;
       if (this.reloading) this._viewmodel?.stopClip();
       this._viewmodel?.holdRadio();
-      this._viewmodel?.setRadioScreen(this.carpetBombs);
       this.audio?.playUi('radio_open', 0.9);
-      return;
+    } else {
+      const step =
+        Number(input.actionPressed('radioDown')) - Number(input.actionPressed('radioUp'));
+      this._radioCursor = clamp(this._radioCursor + step, 0, RADIO_REQUESTS - 1);
+      if (input.actionPressed('radioSend')) this._sendRequest();
     }
-    if (!this.radioEquipped) return;
-    const sel = input.actionPressed('slot1')
-      ? 1
-      : input.actionPressed('slot2')
-        ? 2
-        : input.actionPressed('slot3')
-          ? 3
-          : 0;
-    if (sel) this._selectRequest(sel);
+    // The LCD redraws only when the count or cursor actually changes.
+    this._viewmodel?.setRadioScreen(this.carpetBombs, this._radioCursor);
   }
 
-  _selectRequest(n: number): void {
-    if (n === 1) {
-      if (this.carpetBombs <= 0) {
-        this.audio?.playUi('radio_denied', 0.9);
-        this.ui?.setPrompt({
-          key: bindingLabel('slot1'),
-          text: 'NO CHARGES',
-          sub: 'BUY CARPET BOMB STRIKES AT THE MARKET',
-        });
-        return;
-      }
+  _sendRequest(): void {
+    const carpet = this._radioCursor === 0;
+    if (carpet && this.carpetBombs > 0) {
       this.carpetBombs--;
       this.radioSys ??= this.ctx.peek('radio');
       if (!this.radioSys?.callStrike()) {
@@ -1594,15 +1607,16 @@ export class WeaponSystem {
         this.audio?.playUi('radio_denied', 0.9);
         return;
       }
+      // Back to the weapon; the accepted radio:strike event owns the UI/audio acknowledgment once.
       this._stowRadio();
-      // The accepted radio:strike event owns the UI/audio acknowledgment once.
+      this._viewmodel?.play('draw');
       return;
     }
     this.audio?.playUi('radio_denied', 0.9);
     this.ui?.setPrompt({
-      key: bindingLabel(n === 2 ? 'slot2' : 'slot3'),
-      text: 'TOP-SECRET',
-      sub: 'REQUEST LOCKED BY HIGHER AUTHORITY',
+      key: bindingLabel('radioSend'),
+      text: carpet ? 'NO CHARGES' : 'TOP-SECRET',
+      sub: carpet ? 'BUY CARPET BOMB STRIKES AT THE MARKET' : 'REQUEST LOCKED BY HIGHER AUTHORITY',
     });
   }
 
@@ -1679,15 +1693,13 @@ export class WeaponSystem {
       if (input.actionPressed('reload')) this.reload();
       if (input.actionPressed('fireMode')) this.cycleFireMode();
       if (input.actionPressed('inspect')) this.inspect();
-      if (!this.radioEquipped) {
-        if (input.actionPressed('slot1')) {
-          const primary = PRIMARY_IDS.find((id): boolean => this.owned.has(id));
-          if (primary) this.setWeapon(primary);
-        }
-        if (input.actionPressed('slot2')) {
-          const secondary = SECONDARY_IDS.find((id): boolean => this.owned.has(id));
-          if (secondary) this.setWeapon(secondary);
-        }
+      if (input.actionPressed('slot1')) {
+        const primary = PRIMARY_IDS.find((id): boolean => this.owned.has(id));
+        if (primary) this.setWeapon(primary);
+      }
+      if (input.actionPressed('slot2')) {
+        const secondary = SECONDARY_IDS.find((id): boolean => this.owned.has(id));
+        if (secondary) this.setWeapon(secondary);
       }
       if (input.actionPressed('cycleWeapon')) this.nextWeapon();
       if (input.wheel) this.nextWeapon();
@@ -1999,6 +2011,8 @@ export class WeaponSystem {
     this._pickups?.dispose();
     this._pickups = null;
     this._viewmodel?.dispose();
+    this._grenadeAsset?.dispose();
+    this._grenadeAsset = null;
     this._laser?.dispose();
     this._laser = null;
     for (const asset of Object.values(this._attachments)) asset.dispose();

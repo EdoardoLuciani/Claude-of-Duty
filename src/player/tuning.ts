@@ -6,7 +6,7 @@ import { UNITS } from '../core/config.ts';
 import { DEG } from '../core/math.ts';
 
 export const GRAVITY = UNITS.gravity; // negative
-export const JUMP_APEX = 0.6;
+const JUMP_APEX = 0.6;
 /** v = sqrt(2 g h) — solved from the apex so tuning the apex is meaningful. */
 export const JUMP_SPEED = Math.sqrt(2 * Math.abs(GRAVITY) * JUMP_APEX);
 

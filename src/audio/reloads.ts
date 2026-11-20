@@ -29,7 +29,7 @@ export const RELOAD_URLS = {
 export type ReloadKind = keyof typeof RELOAD_URLS;
 
 /** Explicit acoustic donors, not claims of exact-model recordings. */
-export const RELOAD_CUES: Record<string, Partial<Record<ReloadPhase, ReloadKind>>> = {
+const RELOAD_CUES: Record<string, Partial<Record<ReloadPhase, ReloadKind>>> = {
   rifle: { magout: 'ar-out', magin: 'ar-in', charge: 'ar-charge', boltclose: 'ar-close' },
   mcx: { magout: 'ar-out', magin: 'ar-in', boltclose: 'ar-close' },
   pistol: { magout: 'pistol-out', magin: 'pistol-in', slide: 'pistol-close' },

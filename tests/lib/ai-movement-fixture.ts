@@ -26,7 +26,7 @@ export class MovementWorker extends EventTarget implements Worker {
   }
 
   deliver(data: unknown): void {
-    this.onmessage?.call(this, new MessageEvent<unknown>('message', { data }));
+    this.onmessage?.(new MessageEvent<unknown>('message', { data }));
   }
 
   terminate(): void {

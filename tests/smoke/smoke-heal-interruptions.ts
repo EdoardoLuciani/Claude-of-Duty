@@ -103,7 +103,7 @@ for (const request of ['Digit1', 'Digit2', 'Tab', 'wheel-up', 'wheel-down']) {
       player.healCtrl.update(1 / 60);
       weapons.update(1 / 60, ctx);
       assert.deepEqual([player.health.value, player.healCtrl.bandages], [40, 2]);
-      assert.equal(events.filter((e): boolean => e.name === 'player:heal').at(-1)?.phase, 'cancel');
+      assert.equal(events.findLast((e): boolean => e.name === 'player:heal')?.phase, 'cancel');
       assert.equal(weapons._switchTo, request === 'Digit1' ? 'rifle' : 'pistol');
     });
 }
@@ -148,7 +148,6 @@ for (const ending of ['release', 'complete', 'grenade'])
     ui.menu = partialFixture<UiSystem['menu']>({ open: false, update: noop });
     ui.gameOver = partialFixture<UiSystem['gameOver']>({ update: noop });
     ui.shop = partialFixture<UiSystem['shop']>({ update: noop });
-    ui.radio = partialFixture<UiSystem['radio']>({ update: noop });
     ui.crosshair = new Crosshair();
     ui.hit = new Hitmarkers();
     ui.arcs = new DamageArcs();
@@ -170,11 +169,10 @@ for (const ending of ['release', 'complete', 'grenade'])
       ui.marketCountdown.update =
       ui.compass.update =
         noop;
-    for (const name of ['chromeLayer', 'centreLayer'] as const)
-      ui[name] = partialFixture<HTMLElement & { _ows: Map<string, string> }>({
-        _ows: new Map(),
-        style: partialFixture<CSSStyleDeclaration>({ setProperty: noop }),
-      });
+    ui.centreLayer = partialFixture<HTMLElement & { _ows: Map<string, string> }>({
+      _ows: new Map(),
+      style: partialFixture<CSSStyleDeclaration>({ setProperty: noop }),
+    });
     ui.minimap = new Minimap(ctx.rng);
     ui.minimap.bakeDone = true;
     const prompt = new RecordingPrompt();
@@ -247,7 +245,7 @@ for (const motion of [
     player.healCtrl.update(1);
     assert.equal(player.healCtrl.active, false);
     assert.deepEqual([player.health.value, player.healCtrl.bandages], [40, 2]);
-    assert.equal(events.filter((e): boolean => e.name === 'player:heal').at(-1)?.reason, 'move');
+    assert.equal(events.findLast((e): boolean => e.name === 'player:heal')?.reason, 'move');
   });
 }
 

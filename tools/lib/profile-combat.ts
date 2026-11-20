@@ -4,7 +4,7 @@
 import type { Engine } from '../../src/core/engine.ts';
 import type { combatLane as CombatLane } from './combat-fixture.ts';
 
-export interface CombatBlock {
+interface CombatBlock {
   start: number;
   frames: number;
   livingFrames: number;

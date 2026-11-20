@@ -6,8 +6,9 @@ import type { EngineEventMap } from '../../src/core/events.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { IntelSystem } from '../../src/intel/index.ts';
 import { UiSystem } from '../../src/ui/index.ts';
-import { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
+import type { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
+import { ammoPickupFixture } from '../lib/ammo-pickup-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
 import type { TestProviders } from '../lib/context.ts';
 import { fixture } from '../lib/fixture.ts';
@@ -92,7 +93,7 @@ function harness(): AmmoHarness {
     },
   };
   return {
-    pickups: new AmmoPickups(owner),
+    pickups: ammoPickupFixture(owner),
     owner,
     ctx,
     input,
@@ -138,8 +139,7 @@ function matricesMatch(pickups: AmmoPickups): void {
   }
 }
 
-// The actual boot visual is retained for gameplay, with four native finish
-// batches, no lights, and exactly the old vertex positions/normals/UVs baked in.
+// Boot warms the same shared case and ring batches gameplay later reuses.
 {
   const { pickups, owner } = harness();
   const rngBefore = rngState(owner.rng);
@@ -149,33 +149,19 @@ function matricesMatch(pickups: AmmoPickups): void {
   assert.equal(pickups._nextId, 1);
   assert.deepEqual(rngState(owner.rng), rngBefore);
   assert.equal(visual.parent, null);
-  assert.equal(visual.children.length, 4);
-  const old = {
-    case: [new THREE.BoxGeometry(0.38, 0.19, 0.27).translate(0, 0.12, 0)],
-    edge: [
-      new THREE.BoxGeometry(0.4, 0.045, 0.29).translate(0, 0.235, 0),
-      new THREE.BoxGeometry(0.045, 0.205, 0.282).translate(0.1, 0.13, 0),
-    ],
-    latch: [new THREE.BoxGeometry(0.075, 0.065, 0.035).translate(0, 0.18, 0.155)],
-    ring: [new THREE.TorusGeometry(0.29, 0.011, 6, 28).rotateX(Math.PI / 2).translate(0, 0.035, 0)],
-  };
-  for (const [i, name] of (['case', 'edge', 'latch', 'ring'] as const).entries()) {
+  assert.equal(visual.children.length, 2);
+  for (const [i, name] of (['case', 'ring'] as const).entries()) {
     const mesh = visual.children[i];
+    const ring = name === 'ring';
     assert(isInstancedMesh(mesh));
+    assert.equal(mesh.geometry, pickups.geometries[name]);
+    assert.equal(mesh.material, pickups.materials[ring ? 'glow' : 'case']);
     assert.equal(mesh.instanceMatrix.usage, THREE.DynamicDrawUsage);
     assert.equal(mesh.instanceMatrix.count, 32);
-    assert.equal(mesh.castShadow, name !== 'ring');
-    assert.equal(mesh.receiveShadow, name !== 'ring');
-    assert.equal(!!mesh.userData.owNoPrepass, name === 'ring');
-    if (name === 'edge')
-      assert.equal(mesh.geometry.groups.length, 0, 'merged edge is one draw, not material groups');
-    for (const attribute of ['position', 'normal', 'uv']) {
-      const expected = old[name].flatMap((g): number[] => [...g.attributes[attribute].array]);
-      const actual: number[] = [...mesh.geometry.attributes[attribute].array];
-      assert.equal(actual.length, expected.length);
-      actual.forEach((n, j): void => assert(Math.abs(n - expected[j]) < 1e-7));
-    }
-    old[name].forEach((g): void => g.dispose());
+    assert.equal(mesh.castShadow, !ring);
+    assert.equal(mesh.receiveShadow, !ring);
+    assert.equal(!!mesh.userData.owNoPrepass, ring);
+    assert.equal(mesh.geometry.hasAttribute('ammoHistoryValid'), !ring);
   }
   pickups.dispose();
 }
@@ -201,7 +187,7 @@ function matricesMatch(pickups: AmmoPickups): void {
     Array.from({ length: 32 }, (_, i): number => i + 2)
   );
   assert.equal(ctx.scene.children.length, 1);
-  assert.equal(ctx.scene.children[0].children.length, 4);
+  assert.equal(ctx.scene.children[0].children.length, 2);
   for (const index of [0, 15, 29]) {
     const removed = pickups.items[index];
     const ids = pickups.items.filter((p): boolean => p !== removed).map((p): number => p.id);
@@ -242,11 +228,17 @@ function matricesMatch(pickups: AmmoPickups): void {
   pickups.update(0.01);
   assert.equal(pickups.items.length, 0);
   matricesMatch(pickups);
+  const base = new THREE.Texture();
+  const metalRough = new THREE.Texture();
+  pickups.materials.case.map = base;
+  pickups.materials.case.roughnessMap = pickups.materials.case.metalnessMap = metalRough;
   const disposed: unknown[] = [];
   for (const resource of [
     ...batches,
     ...Object.values(pickups.geometries),
     ...Object.values(pickups.materials),
+    base,
+    metalRough,
   ]) {
     const listener = (): void => {
       disposed.push(resource);
@@ -255,8 +247,8 @@ function matricesMatch(pickups: AmmoPickups): void {
     dispatcher.addEventListener('dispose', listener);
   }
   pickups.dispose();
-  assert.equal(disposed.length, 12, 'all four instance buffers, geometries and materials disposed');
-  assert.equal(new Set(disposed).size, 12);
+  assert.equal(disposed.length, 8, 'both buffers, geometries, materials and atlases disposed');
+  assert.equal(new Set(disposed).size, 8, 'the shared metal/roughness map is disposed once');
   assert.equal(ctx.scene.children.length, 0);
 }
 
@@ -316,50 +308,41 @@ function matricesMatch(pickups: AmmoPickups): void {
   pickups.dispose();
 }
 
-// History becomes valid only after the actual world prepass has rendered that
-// family. Removal cannot move survivors; reused/restarted identities start fresh.
+// History becomes valid only after the actual world prepass has rendered the
+// opaque case batch. Removal cannot move survivors; reused/restarted identities start fresh.
 {
   const { pickups, ctx } = harness();
   const a = pickups.spawn({ x: 2, y: 0, z: 0 });
   const b = pickups.spawn({ x: 3, y: 0, z: 0 });
   const renderer = fixture<THREE.WebGLRenderer>({});
   const material = new THREE.MeshBasicMaterial();
+  const [caseMesh] = pickups._batches;
+  const group = new THREE.Group();
   const markRendered = (): void => {
     ctx.camera.layers.set(1);
-    for (const mesh of pickups._batches.slice(0, 3))
-      mesh.onAfterRender(
-        renderer,
-        ctx.scene,
-        ctx.camera,
-        mesh.geometry,
-        material,
-        new THREE.Group()
-      );
+    caseMesh.onAfterRender(renderer, ctx.scene, ctx.camera, caseMesh.geometry, material, group);
     pickups._syncVisuals();
   };
-  const flags = (slot: number): number[] =>
-    pickups._batches
-      .slice(0, 3)
-      .map((m): number => m.geometry.getAttribute('ammoHistoryValid').getX(slot));
-  assert.deepEqual(flags(a.slot), [0, 0, 0]);
+  const flag = (slot: number): number =>
+    caseMesh.geometry.getAttribute('ammoHistoryValid').getX(slot);
+  assert.equal(flag(a.slot), 0);
   const shadow = new THREE.PerspectiveCamera();
   shadow.layers.set(1);
-  for (const mesh of pickups._batches.slice(0, 3))
-    mesh.onAfterRender(renderer, ctx.scene, shadow, mesh.geometry, material, new THREE.Group());
+  caseMesh.onAfterRender(renderer, ctx.scene, shadow, caseMesh.geometry, material, group);
   pickups._syncVisuals();
-  assert.deepEqual(flags(a.slot), [0, 0, 0], 'shadow callbacks cannot validate velocity history');
+  assert.equal(flag(a.slot), 0, 'shadow callbacks cannot validate velocity history');
   markRendered();
-  assert.deepEqual(flags(a.slot), [1, 1, 1]);
+  assert.equal(flag(a.slot), 1);
   b.group.position.x += 0.2;
   pickups._remove(a);
   assert.equal(b.slot, 1);
-  assert.deepEqual(flags(b.slot), [1, 1, 1], 'moving survivor keeps its legitimate native history');
+  assert.equal(flag(b.slot), 1, 'moving survivor keeps its legitimate native history');
   const replacement = pickups.spawn({ x: -2, y: 0, z: 0 });
   assert.equal(replacement.slot, a.slot);
-  assert.deepEqual(flags(replacement.slot), [0, 0, 0]);
-  assert.deepEqual(flags(b.slot), [1, 1, 1]);
+  assert.equal(flag(replacement.slot), 0);
+  assert.equal(flag(b.slot), 1);
   markRendered();
-  assert.deepEqual(flags(replacement.slot), [1, 1, 1]);
+  assert.equal(flag(replacement.slot), 1);
   pickups.clear();
   const versions = pickups._batches.map((m): number => m.instanceMatrix.version);
   pickups.update(0);
@@ -371,7 +354,7 @@ function matricesMatch(pickups: AmmoPickups): void {
   );
   const restarted = pickups.spawn({ x: 10, y: 0, z: 0 });
   assert.equal(restarted.slot, 0);
-  assert.deepEqual(flags(restarted.slot), [0, 0, 0]);
+  assert.equal(flag(restarted.slot), 0);
   matricesMatch(pickups);
   pickups.dispose();
 }

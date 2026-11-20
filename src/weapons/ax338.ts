@@ -12,11 +12,11 @@ import { createAuthoredRig } from './authored-rig.ts';
 import { buildManifestClips, type Clip } from './clips.ts';
 import type { WeaponAnimation } from './runtime-types.ts';
 
-export const AX338_URL = '/models/weapons/ax338.runtime.glb';
+const AX338_URL = '/models/weapons/ax338.runtime.glb';
 const ALIASES = { ...MAGAZINE_ALIASES, cycle: 'Bolt_Cycle' };
 const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(ALIASES)];
 
-export function makeAX338Model(gltf: GLTF): AX338Model {
+function makeAX338Model(gltf: GLTF): AX338Model {
   const scene = gltf.scene;
   const { root, opticMountRest, animations, point } = authoredModel(
     gltf,

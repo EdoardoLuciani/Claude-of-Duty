@@ -2,6 +2,10 @@
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "overrides": [
     {
+      "files": ["tools/worldgen/level/placements/**"],
+      "rules": { "oxc/approx-constant": "off" }
+    },
+    {
       "files": ["tests/lib/fixture.ts"],
       "rules": { "typescript/no-unsafe-type-assertion": "off" }
     },
@@ -10,7 +14,8 @@
       "rules": {
         "typescript/no-unnecessary-condition": "off",
         "typescript/no-unnecessary-type-assertion": "off",
-        "typescript/no-unnecessary-boolean-literal-compare": "off"
+        "typescript/no-unnecessary-boolean-literal-compare": "off",
+        "unicorn/consistent-function-scoping": "off"
       }
     }
   ],
@@ -39,6 +44,15 @@
     "no-unused-vars": ["error", { "args": "after-used" }],
     "typescript/no-unnecessary-condition": "error",
     "typescript/no-unnecessary-type-assertion": "error",
-    "typescript/no-unnecessary-boolean-literal-compare": "error"
+    "typescript/no-unnecessary-boolean-literal-compare": "error",
+    "typescript/no-unnecessary-type-arguments": "error",
+    "typescript/no-unnecessary-type-conversion": "error",
+    "typescript/no-unnecessary-type-parameters": "error",
+    "unicorn/consistent-function-scoping": "error",
+    "unicorn/prefer-array-find": "error",
+    "unicorn/prefer-set-has": "error",
+    "oxc/approx-constant": "error",
+    "no-useless-call": "error",
+    "preserve-caught-error": "error"
   }
 }

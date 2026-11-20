@@ -1,11 +1,11 @@
 import type { Vector3, Vector3Like } from 'three';
 
-import type { StaticWorld } from '../physics/bvh.ts';
 import type { CharacterController } from '../physics/character.ts';
+import type { QuerySnapshot } from '../physics/query-snapshot.ts';
 import { MASK } from '../physics/surfaces.ts';
 import { LADDER, LADDER_MOTOR_VERSION, ladderMoveBudget } from './ladder.ts';
 import type { LadderDescriptor, LadderDirection, LadderCursor } from './ladder.ts';
-import { isRecord, isNumber, isNumberArray } from './validation.ts';
+import { isRecord, isNumber, isNumberArray, parseFinitePoint } from './validation.ts';
 
 export interface AttachmentOracle {
   physics: {
@@ -51,11 +51,11 @@ export type QueryKey = number[] | LadderQuery;
 export const LADDER_QUERY_MAX_ITERATIONS = 32;
 export const LADDER_QUERY_MAX_MOVES =
   Math.ceil((12 + LADDER.lowerOffset + LADDER.upperOffset) / (LADDER.speed * LADDER.step)) + 6;
-function point(value: unknown): Vector3Like {
-  if (!isRecord(value) || !isNumber(value.x) || !isNumber(value.y) || !isNumber(value.z))
-    throw new Error('[ai worker] invalid ladder point');
-  return { x: value.x, y: value.y, z: value.z };
-}
+const point = (value: unknown): Vector3Like =>
+  parseFinitePoint(value, '[ai worker] invalid ladder point');
+const distance3 = (a: Vector3Like, b: Vector3Like): number =>
+  Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
+
 export function parseQueryKey(value: unknown): QueryKey {
   if (isNumberArray(value) && value.length === 9) return value;
   if (
@@ -90,9 +90,7 @@ export function parseQueryKey(value: unknown): QueryKey {
       point(d.points[2]),
       point(d.points[3]),
     ];
-  const span = (a: Vector3Like, b: Vector3Like): number =>
-    Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
-  const spans = points.slice(1).map((p, i): number => span(points[i], p));
+  const spans = points.slice(1).map((p, i): number => distance3(points[i], p));
   if (
     normal.y !== 0 ||
     Math.abs(Math.hypot(normal.x, normal.z) - 1) > 1e-6 ||
@@ -191,7 +189,7 @@ export function queryIdentity(key: QueryKey): string {
         typeof value === 'number' && Object.is(value, -0) ? '-0' : value
       );
 }
-export interface QueryRequest {
+interface QueryRequest {
   id: number;
   key: QueryKey;
   actor: number;
@@ -252,23 +250,7 @@ export type QuerySample =
       attempts: number;
       gapFrames: number;
     };
-export type AttachmentSnapshot = Pick<
-  StaticWorld,
-  | 'version'
-  | 'dirty'
-  | 'nodeCount'
-  | 'triCount'
-  | 'pos'
-  | 'nrm'
-  | 'surface'
-  | 'mask'
-  | 'object'
-  | 'triIndex'
-  | 'nodeBounds'
-  | 'nodeMeta'
-  | '_taabb'
-> & { stackSize: number };
-export type ControllerSettings = Pick<
+type ControllerSettings = Pick<
   CharacterController,
   | 'radius'
   | 'height'
@@ -281,7 +263,7 @@ export type ControllerSettings = Pick<
 >;
 export interface InitMessage {
   type: 'init';
-  world: AttachmentSnapshot;
+  world: QuerySnapshot;
   controller: ControllerSettings;
   gravity: number;
   mask: { CHARACTER: number };
@@ -306,7 +288,7 @@ export type WorkerMessage =
       queueMs?: number | undefined;
       costs?: QueryCosts | null;
     };
-function snapshot(value: unknown): value is AttachmentSnapshot {
+function snapshot(value: unknown): value is QuerySnapshot {
   return (
     isRecord(value) &&
     isNumber(value.version) &&
@@ -322,7 +304,7 @@ function snapshot(value: unknown): value is AttachmentSnapshot {
     value.triIndex instanceof Uint32Array &&
     value.nodeBounds instanceof Float32Array &&
     value.nodeMeta instanceof Int32Array &&
-    value._taabb instanceof Float32Array
+    value.triBounds instanceof Float32Array
   );
 }
 function settings(value: unknown): value is ControllerSettings & Record<string, unknown> {
@@ -412,7 +394,7 @@ export function parseWorkerMessage(value: unknown): WorkerMessage {
 }
 export function parseSnapshotCopy(
   value: unknown
-): { snapshot: AttachmentSnapshot; transfer: ArrayBuffer[]; bytes: number } | null {
+): { snapshot: QuerySnapshot; transfer: ArrayBuffer[]; bytes: number } | null {
   if (value === null) return null;
   if (
     !isRecord(value) ||

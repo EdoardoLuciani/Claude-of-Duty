@@ -10,6 +10,8 @@ Gameplay numbers (timings, distances, rewards) live in code: `src/*/tuning.ts`,
 Subsystems reach each other through `ctx.get(id)`, not imports; the constant coupling
 `ai` → `weapons` is the one exception. `src/core/`, `src/main.ts`, `src/dev/`,
 `tools/` and `build/` are shared infrastructure used by every subsystem.
+A leading `_` marks a member internal to its subsystem: files in the same directory,
+`src/dev/`, `tools/` and `tests/` may use it; other subsystems use public members only.
 
 | id / directory                                     | responsibility                                              |
 | -------------------------------------------------- | ----------------------------------------------------------- |
@@ -133,22 +135,22 @@ as `unknown-thickness`, overlapping solids as `overlapping-solids`.
 Checked TypeScript in `tools/worldgen/` is the world source. Map layout,
 configuration, intel sites and prop transforms live in `level/`; `level/placements/`
 is data-only and `placement.ts` owns validation, placement and clutter clearance.
-See the [world editing map](tools/worldgen/README.md). `bun run world` builds meshes
+See the [world editing map](tools/worldgen/README.md). `bun tools/export-world.ts` builds meshes
 and cooks collision with meshoptimizer from canonical instance buckets. Visual-only
 coalescing may join whole non-distance-LOD buckets within a bounded X/Z span
 independent of the canonical grid. It never changes collision or navigation inputs.
 A prototype's optional `visualGeo` is visual only; support, collision and navigation
 use canonical `geo`, topology and RNG/instance inputs. Manifest v2 and content-hashed GLBs are generated into ignored
 `public/models/world/`. Preserve instancing/masks; never author separate collision
-geometry. Validate with `bun run world -- --check`, world/physics tests and screenshots.
+geometry. Validate with `bun tools/export-world.ts --check`, world/physics tests and screenshots.
 
 ## AI physical planning
 
 `src/ai/attachment.ts` owns the shared native attachment oracle; authoring and
 runtime use the same controller/BVH algorithm. Physics builds immutable collision
-snapshots in `src/physics/query-snapshot.ts`. AI owns one module worker, its
-scratch/controller, revisions, bounded queues and lifetime. Initialize before AI
-readiness; transfer copies, never live collision buffers.
+snapshots and restores them as worker query worlds in `src/physics/query-snapshot.ts`.
+AI owns one module worker, its scratch/controller, revisions, bounded queues and
+lifetime. Initialize before AI readiness; transfer copies, never live collision buffers.
 
 `src/ai/attachment-*.ts` owns the caller map, proof/pending/cancellation semantics,
 bounded native budgets and tactical revalidation. Unknown is never provisional
@@ -162,6 +164,7 @@ Public render surface:
 - `renderer`: initialized strict-WebGPU renderer.
 - `registerPass({ order, asNode(color, exposure), resize, dispose })`.
 - `addLight(light)`, `prewarmLightShadow(light)`.
+- `hasGraph()`, `warmGraph()`: prewarm hooks warm the actual graph through these.
 - `viewLightLevel`; borrowed `sunDir` (never mutate).
 - `screenSize`; `depthTexture` (positive view-space metres),
   `velocityTexture`, `hdrTexture` (world only).
@@ -185,8 +188,9 @@ Prepass layer 1 contains opaque meshes/lights, not sky/transparent FX. Schedule 
 exactly once before world rendering at every quality, even without AO.
 `afterDepth` draws haze against current-frame depth; soft particles borrow it.
 Mesh opt-outs: `userData.owNoPrepass = true`, native `castShadow = false`.
-Pickup instances keep stable slots; the world camera's layer-1 prepass callback
-validates their birth/reuse history.
+Ammo pickups share one Blender-authored opaque instanced case and a separate
+runtime-owned glow ring. Instances keep stable slots; the world camera's layer-1
+prepass callback validates their birth/reuse history.
 Refresh CSM frustums when the unjittered projection changes. Bias depends on slope/
 cascade texels. Fog borrows native cascade depth/matrices, adding no shadow draw.
 Hoist noise outside the fog march; its uniform uses application frames. Haze keeps
@@ -231,8 +235,8 @@ layers. Only Three destroys the device; Pixi owns its stage, geometry, shaders,
 textures and canvas. Gameplay snapshots/events are the authority; controllers own
 prompts, progress, banners and status priority, and presenters redraw only changed
 visible values. HUD initialization failure goes to the native reload dialog; the
-game never starts without a HUD. Start/error controls, menus, shop, game-over and
-the field-radio panel are native DOM. Details: [docs/hud.md](docs/hud.md).
+game never starts without a HUD. Start/error controls, menus, shop and game-over
+are native DOM. Details: [docs/hud.md](docs/hud.md).
 
 ## Models
 
@@ -241,8 +245,11 @@ and runtime consumers. Each weapon's authoring lives in `tools/blender/<weapon>/
 (`build.py`, `check.py`).
 
 `build/models.ts` owns gltfpack runtime cooking and per-model profiles
-(`bun run models:cook`); `tools/build-assets.ts` rebuilds stale models during
-dev/build. New profiles need adapter, animation and visual validation.
+(`bun build/models.ts`); `tools/build-assets.ts` rebuilds stale models during
+dev/build. New profiles need adapter, animation and visual validation. The
+[intel case](assets/props/intel-case/README.md) has a standalone Blender recipe;
+IntelSystem loads and owns one shared GLB kit, moves its named hinge, pulses the
+beacon and emits sparks at the effect socket during the pooled interaction.
 All seven weapons (M4, MCX, P320, EVOLYS, MPX, AX338, M590) use generated GLBs with
 weapon-owned adapters in `src/weapons/`. M4/MCX adapters decode packed finish
 metadata. Rigid assemblies use ordinary meshes (EVOLYS skins only its belt); keep
@@ -266,7 +273,21 @@ opaque material per skeleton with packed texture arrays.
 `src/weapons/asset-loader.ts` fetches models concurrently, bounds parsing memory and
 shares one Basis transcoder per renderer during boot, released at boot end, failure
 or teardown. Static map clones are shared only when source, UV, color space and
-sampler match.
+sampler match. The Blender-authored grenade is a required boot asset owned by
+weapons. `weapons.createGrenade()` gives AI and player throws independent transforms
+that borrow the same geometry, material and maps as the held prop. Weapons warm
+both render passes; restart removes live instances, and teardown releases the
+shared asset after AI and the viewmodel have detached their visuals.
+
+The held field radio is a standalone authored GLB. `radio-mesh.ts` loads it during
+weapons boot and binds one retained canvas emissive texture to `SCREEN_radio`.
+The viewmodel mounts it at `GRIP_radio`, owns the asset lifetime, and keeps the
+same model through stow, pause and restart. Equipping raises it into a fixed
+camera-space close-up; the LCD is the only radio interface, showing the select,
+send and stow bindings, charges or the empty state, request locks and the request
+cursor. Weapon keys stow the radio. Neither radio nor grenade equip interrupts a bolt cycle.
+Once equipped, the equip key does not consume the accessory's other inputs.
+Request state does not depend on the model. [Radio asset contract](assets/props/field-radio/README.md).
 
 `weapons.createInspectionModel(id, config)` returns an independent rest-pose clone
 with `dispose()` for the market's demand-rendered WebGPU studio. Inspection owns
@@ -347,8 +368,9 @@ The laser changes no AI perception; the flashlight keeps separate light ownershi
 
 `tools/blender/soldiers/` builds seeded parametric soldiers; a Bun GLTFExporter cook
 preserves the runtime joint/attribute format. `tools/export-models.ts` validates and
-stages them and generates the spent hull; missing/stale/corrupt products fail rather
-than triggering Blender or a fallback. `models.getSoldier(name)` returns
+stages them; missing/stale/corrupt products fail rather than triggering Blender or a
+fallback. `tools/blender/spent_hull/` authors and validates one native spent hull GLB
+for the FX casing pool. `models.getSoldier(name)` returns
 `{ name, geometry, slots, boneNames, weapon, stats, variant }` as one skinned geometry
 with slot groups. Bone order must match `RIG.createSkeleton()`; mismatches fail boot.
 AI owns the soldier texture arrays and finish lookup textures.

@@ -45,11 +45,17 @@ assets/attachments/*/*.blend
 assets/attachments/*/*.glb
 assets/attachments/*/*.png
 assets/attachments/*/manifest.json
+assets/props/field-radio/*.blend
+assets/props/field-radio/*.glb
 assets/player/arms/*.blend
 assets/player/arms/manifest.json
 assets/soldiers/*.blend
 assets/soldiers/*.glb
 assets/soldiers/*.json
+assets/props/intel-case/*.blend
+assets/props/intel-case/*.glb
+assets/fx/spent-hull/*.blend
+assets/fx/spent-hull/*.glb
 .cache/
 
 # Standalone ACOG packed source maps.

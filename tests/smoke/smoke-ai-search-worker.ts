@@ -20,7 +20,7 @@ function fakeWorker(): Worker {
       messages.push(structuredClone(message));
       if (message.type === 'init')
         queueMicrotask((): void => {
-          this.onmessage?.call(this, new MessageEvent('message', { data: { type: 'ready' } }));
+          this.onmessage?.(new MessageEvent('message', { data: { type: 'ready' } }));
         });
     },
     terminate(): void {},

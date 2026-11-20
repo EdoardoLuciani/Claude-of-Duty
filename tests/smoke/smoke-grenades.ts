@@ -5,10 +5,11 @@ import * as THREE from 'three';
 /**
  * Bun smoke test for the grenade launch flow — no browser.
  *
- * Issue #83: G no longer throws. G equips the grenade (weapon stowed, free to
- * stow back); LMB held + release cooks and LONG-throws; RMB held + release
- * cooks and SHORT-throws; each throw type has its own viewmodel animation and
- * its own launch velocity. Overcooking detonates in the hand.
+ * Issue #83: G no longer throws. G equips the grenade (weapon stowed; a
+ * weapon key stows it back); LMB held + release cooks and LONG-throws; RMB
+ * held + release cooks and SHORT-throws; each throw type has its own
+ * viewmodel animation and its own launch velocity. Overcooking detonates in
+ * the hand.
  *
  *   bun test ./tests/smoke/smoke-grenades.ts
  */
@@ -54,8 +55,10 @@ const input = {
   _rmbPressed: false,
   _xPressed: false,
   _digit: 0,
+  _action: '',
   ads: false,
   actionPressed(name: string): boolean {
+    if (name === this._action) return true;
     if (name === 'grenade') return this._gPressed;
     if (name === 'radio') return this._xPressed;
     if (name === 'fire') return this.firePressed;
@@ -93,6 +96,7 @@ physics.addRigidBody = (opts): RigidBody => {
 };
 physics.removeRigidBody = (): void => {};
 const wp = new WeaponSystem();
+wp.createGrenade = (): THREE.Mesh => new THREE.Mesh();
 wp.ctx = createTestContext({
   input: ctx.input,
   camera: ctx.camera,
@@ -134,9 +138,6 @@ wp.setWeaponImmediate('rifle');
 pressDigit(2);
 assert.equal(wp._switchTo, 'pistol', '2 selects the starting secondary');
 wp.setWeaponImmediate('rifle');
-pressDigit(3);
-assert.equal(wp._switchTo, null, '3 has no normal weapon binding');
-assert.equal(wp.radioEquipped, false, '3 does not equip utility equipment');
 assert.equal(wp.nextWeapon(), true);
 assert.equal(wp._switchTo, 'pistol');
 wp.setWeaponImmediate('pistol');
@@ -157,7 +158,7 @@ pressDigit(2);
 assert.equal(wp._switchTo, 'shotgun', '2 follows the shotgun secondary');
 wp.resetForNewGame();
 
-// ---- G equips, never throws; stowing is free ------------------------------
+// ---- G equips, never throws or stows; the weapon key stows for free --------
 pressG();
 assert.equal(wp.grenadeEquipped, true, 'G equips the grenade');
 assert.equal(wp.grenades, 2, 'equipping spends nothing');
@@ -165,9 +166,12 @@ assert(calls.includes('hold'), 'viewmodel holds the grenade');
 assert(!calls.includes('throw:'), 'G does not throw');
 
 pressG();
-assert.equal(wp.grenadeEquipped, false, 'G again stows the equipped grenade');
+assert.equal(wp.grenadeEquipped, true, 'G again keeps the grenade out');
+pressDigit(1);
+assert.equal(wp.grenadeEquipped, false, 'the active weapon slot stows the grenade');
 assert.equal(wp.grenades, 2, 'stowing spends nothing');
 assert(calls.at(-1) === 'end', 'viewmodel stows the grenade');
+assert.equal(wp.viewmodel.clipName, 'draw', 'the active weapon is drawn back');
 
 // ---- switching weapons while equipped stows the grenade --------------------
 pressG();
@@ -286,7 +290,9 @@ input.fire = false;
 
 // ---- a live grenade detonates on fuse expiry with the same blast ----------
 resetLive();
-wp._spawnGrenade(new THREE.Vector3(0, 1.6, 0), { x: 0, y: 0, z: 0 }, 0.001);
+const releaseOrigin = new THREE.Vector3(0, 1.6, 0);
+wp._spawnGrenade(releaseOrigin, { x: 0, y: 0, z: 0 }, 0.001);
+assert(wp._grenades[0].mesh.position.equals(releaseOrigin), 'draw at release before physics sync');
 step(); // fuse expires: the blast fires
 const dets = events.filter((e): e is ExplosionEvent => e.type === 'explosion');
 assert.equal(dets.length, 1, 'fuse expiry emits exactly one explosion');
@@ -454,14 +460,20 @@ const pressX = (): void => {
   step();
   input._xPressed = false;
 };
+const pressAction = (action: string): void => {
+  input._action = action;
+  step();
+  input._action = '';
+};
 let strikeCalls = 0;
+wp.setWeaponImmediate('rifle'); // the market case above left an unowned SMG active
 wp.radioSys = new RadioSystem();
 wp.radioSys.callStrike = (): boolean => {
   strikeCalls++;
   return true;
 };
 
-// ---- X equips the radio; stowing is free ----------------------------------
+// ---- X equips the radio; the weapon key stows it for free -----------------
 pressX();
 assert.equal(wp.radioEquipped, true, 'X equips the radio');
 assert.equal(wp.carpetBombs, 1, 'player spawns with 1 carpet-bomb charge');
@@ -472,7 +484,9 @@ assert.equal(wp.reload(), false, 'reload is blocked while the radio is out');
 assert.equal(wp.inspect(), false, 'inspect is blocked while the radio is out');
 
 pressX();
-assert.equal(wp.radioEquipped, false, 'X again stows the radio');
+assert.equal(wp.radioEquipped, true, 'X again keeps the radio out');
+pressDigit(1);
+assert.equal(wp.radioEquipped, false, 'the active weapon slot stows the radio');
 assert(calls.at(-1) === 'endRadio', 'viewmodel stows the radio');
 assert.equal(wp.canFire(), true, 'the rifle fires again after stowing');
 
@@ -483,8 +497,8 @@ assert.equal(wp.grenadeEquipped, false, 'grenade is not out');
 pressG();
 assert.equal(wp.grenadeEquipped, true, 'G equips the grenade while the radio is out');
 assert.equal(wp.radioEquipped, false, 'equipping the grenade stows the radio');
-pressG(); // stow again for the next case
-assert.equal(wp.grenadeEquipped, false, 'G stows the grenade');
+pressDigit(1); // stow again for the next case
+assert.equal(wp.grenadeEquipped, false, '1 stows the grenade');
 
 // ---- ...and G then X: X is refused while the grenade holds the hand -----
 pressG();
@@ -492,8 +506,8 @@ assert.equal(wp.grenadeEquipped, true, 'grenade is out');
 pressX();
 assert.equal(wp.radioEquipped, false, 'X is refused while the grenade is out');
 assert.equal(wp.grenadeEquipped, true, 'the grenade stays equipped');
-pressG(); // stow
-assert.equal(wp.grenadeEquipped, false, 'G stows the grenade');
+pressDigit(1); // stow
+assert.equal(wp.grenadeEquipped, false, '1 stows the grenade');
 
 // ---- switching weapons while the radio is out stows it --------------------
 pressX();
@@ -504,35 +518,37 @@ assert.equal(wp.radioEquipped, false, 'the switch stows the radio');
 assert(calls.includes('endRadio'));
 wp._switchTo = null; // the harness has no holster clip to complete
 
-// ---- request 1: carpet bomb spends a charge and calls the strike -----------
+// Capture can present a mounted weapon without buying it; stowing is not a purchase.
+assert(!wp.owns('smg') && wp.setWeaponImmediate('smg'));
 pressX();
-pressDigit(1);
+pressAction('radioSend');
 assert.equal(wp.radioEquipped, false, 'calling a strike stows the radio');
 assert.equal(wp.carpetBombs, 0, 'the charge is spent');
 assert.equal(strikeCalls, 1, 'the strike system was invoked exactly once');
 
-// ---- out of charges: request 1 is denied and spends nothing ---------------
+// ---- out of charges: the carpet bomb is denied and spends nothing ---------
 pressX();
-pressDigit(1);
+pressAction('radioSend');
 assert.equal(wp.radioEquipped, true, 'a denied request keeps the radio out');
 assert.equal(wp.carpetBombs, 0, 'a denied request spends nothing');
 assert.equal(strikeCalls, 1, 'no strike without a charge');
 
-// ---- requests 2/3 are top-secret: denied, never a weapon switch ------------
-const activeBeforeRadioRequest = wp.activeId;
-pressDigit(2);
+// ---- requests 2/3 are top-secret: denied ---------------------------------
+pressAction('radioDown');
+pressAction('radioSend');
 assert.equal(wp.radioEquipped, true, 'request 2 keeps the radio out');
-assert.equal(wp.activeId, activeBeforeRadioRequest, 'radio request 2 does not select a secondary');
-pressDigit(3);
+pressAction('radioDown');
+pressAction('radioSend');
 assert.equal(wp.radioEquipped, true, 'request 3 keeps the radio out');
-assert.equal(wp.activeId, activeBeforeRadioRequest, 'radio request 3 does not select a secondary');
 assert.equal(strikeCalls, 1, 'top-secret requests never call a strike');
 assert.equal(wp.carpetBombs, 0, 'top-secret requests spend nothing');
+pressAction('radioUp');
+pressAction('radioUp');
 
 // ---- market purchases cap at 3 --------------------------------------------
 wp.addCarpetBombs(5);
 assert.equal(wp.carpetBombs, 3, 'market purchases cap at 3 charges');
-pressDigit(1);
+pressAction('radioSend');
 assert.equal(wp.carpetBombs, 2, 'a strike spends a purchased charge');
 assert.equal(strikeCalls, 2);
 // The strike stowed the radio; it is not out right now.
@@ -543,11 +559,11 @@ wp.radioSys = new RadioSystem();
 wp.radioSys.callStrike = (): boolean => false;
 pressX();
 assert.equal(wp.radioEquipped, true, 'radio is out again');
-pressDigit(1);
+pressAction('radioSend');
 assert.equal(wp.carpetBombs, 2, 'a refused strike keeps the charge');
 assert.equal(wp.radioEquipped, true, 'the radio stays out for a retry');
 assert.equal(strikeCalls, 2, 'no strike was attempted twice');
-pressX(); // stow
+pressDigit(1); // stow
 
 // ---- the radio never leaves the weapon slot on a reset ---------------------
 wp.radioEquipped = true;

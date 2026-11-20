@@ -256,7 +256,7 @@ export class SoldierMaterialsNode {
       rim
     );
     const coords = uv();
-    const sample = (map: DataArrayTexture): TextureNode<'vec4'> => texture(map, coords).depth(c.w);
+    const sample = (map: DataArrayTexture): TextureNode => texture(map, coords).depth(c.w);
     const orm = sample(this.arrays.orm);
     const micro = texture(this.arrays.detail, coords.mul(d.x)).depth(d.y);
     mat.colorNode = sample(this.arrays.albedo).rgb.mul(c.rgb);

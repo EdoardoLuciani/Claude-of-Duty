@@ -75,7 +75,7 @@ function isBone(object: THREE.Object3D | null): object is THREE.Bone {
  * A 15-capsule humanoid sized from a total height, in the actor's local frame
  * (feet at y = 0, +Z forward). Proportions are the standard 7.5-head figure.
  */
-export function humanoidSpec(height = 1.8, scaleMass = 82): BoneSpec[] {
+function humanoidSpec(height = 1.8, scaleMass = 82): BoneSpec[] {
   const h = height;
   const M = scaleMass;
   const y = (f: number): number => h * f;
@@ -141,6 +141,9 @@ const SLEEP_MOTION = 0.0022;
 const SLEEP_TIME = 0.6;
 
 let _nextRagdollId = 1;
+
+const vertexKey = (x: number, y: number, z: number): string =>
+  `${Math.round(x * 1000)},${Math.round(y * 1000)},${Math.round(z * 1000)}`;
 
 export class Ragdoll {
   id: number = _nextRagdollId++;
@@ -221,15 +224,13 @@ export class Ragdoll {
       py: number[] = [],
       pz: number[] = [],
       pm: number[] = [];
-    const key = (x: number, y: number, z: number): string =>
-      `${Math.round(x * 1000)},${Math.round(y * 1000)},${Math.round(z * 1000)}`;
     const map = new Map<string, number>();
     const mat = opts.transform ?? null;
     const _v = new THREE.Vector3();
     const addPoint = (arr: XYZ): number => {
       _v.set(arr[0], arr[1], arr[2]);
       if (mat) _v.applyMatrix4(mat);
-      const k = key(_v.x, _v.y, _v.z);
+      const k = vertexKey(_v.x, _v.y, _v.z);
       let i = map.get(k);
       if (i === undefined) {
         i = px.length;

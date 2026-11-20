@@ -7,13 +7,11 @@ Blender-authored assets load locally, with no runtime CDN.
 
 ```sh
 bun ci
-bun run dev          # builds stale generated assets, validates world assets, serves :5173
-bun run test
-bun run typecheck
-bun run lint
-bun run build
-bun run build:ci     # CI build: generates the world, skips Blender/model assets
+bun run dev     # builds stale generated assets, validates world assets, serves :5173
+bun run verify  # CI gate: format:check, knip, build:ci, test
 ```
+
+The full command list is in [AGENTS.md](AGENTS.md#commands-and-invariants).
 
 Bun (version pinned by `packageManager` in `package.json`) is the only toolchain:
 it installs, type-checks (`bun check`), formats, lints, bundles, serves, runs the
@@ -23,7 +21,9 @@ All first-party code is strict TypeScript with explicit `.ts` imports. The root
 `tsconfig.json` checks the browser game (`src/`); `tools/`, `build/` and `tests/`
 each have their own `tsconfig.json` adding Bun/Node types (a new Bun-side folder
 copies one). Type-aware Oxlint (`.oxlintrc.json`) enforces explicit return types and
-bans `any`, unsafe assertions and floating promises. Validate unknown data at runtime
+bans `any`, unsafe assertions and floating promises. Knip (`knip.json`) rejects
+exports, files and dependencies nothing uses; scripts run directly belong in its
+`entry` list. Validate unknown data at runtime
 boundaries. In tests, prefer real instances and shared typed fixtures; only
 `tests/lib/fixture.ts` may assert `Partial<T>` as `T` (issue
 [#621](https://github.com/EdoardoLuciani/Claude-of-Duty/issues/621)).
@@ -50,18 +50,16 @@ the spent hull and the world are generated, not committed. Each step reruns only
 its inputs change or an output is missing; the first build needs **Blender 5.2.2** and
 **gltfpack 1.3** on `PATH` (or `BLENDER`/`GLTFPACK`) and takes several minutes.
 `bun run test` and `bun run build:ci` generate the world with Bun, without Blender.
-Browser capture, profiling and world-smoke tools show asset-build progress and allow
+Browser capture, profiling and world-smoke (`bun tests/e2e/world-smoke.ts`) tools show asset-build progress and allow
 15 minutes for server startup. Set `OW_STARTUP_TIMEOUT_MS` (milliseconds) for slower
 machines; this is separate from browser/page timeouts. An already-running server is reused.
 Change map content in
 `tools/worldgen/level/`; the [world editing map](tools/worldgen/README.md) identifies
-shape, placement and build locations. Regenerate with `bun run world`, then run
-`bun run world:validate`. Use `bun run world -- --force` to rebuild unchanged inputs;
-`bun run world -- --check` verifies a fresh rebuild against the generated outputs.
-Runtime models are cooked with the [shared gltfpack build recipe](build/README.md)
-during dev/build; `bun run models:cook -- p320` reruns one cook. All seven authored weapons
-use cooked runtime assets. Native exports remain authoring references; each model
-has its own geometry, material and animation acceptance gates.
+shape, placement and build locations, and the `bun tools/export-world.ts` options.
+The seven authored weapons use the [shared gltfpack build recipe](build/README.md);
+`bun build/models.ts p320` reruns one cook. The [spent hull](assets/fx/spent-hull/README.md)
+keeps its validated native export to preserve the casing pool's vertex attributes.
+Each model has its own geometry, material and animation acceptance gates.
 
 **Three.js pin:** `three@0.187.0` with matching `@types/three@0.187.0`, unmodified.
 On upgrade, review `src/render/three-types.d.ts` and keep the renderer smoke guards
@@ -70,9 +68,9 @@ passing. Renderer follow-ups: [#370](https://github.com/EdoardoLuciani/Claude-of
 
 ## Play
 
-The gameplay HUD is drawn with PixiJS on WebGPU; menus, startup/error controls and
-the field-radio panel are native DOM. If the HUD fails to initialize, a Reload error
-dialog appears.
+The gameplay HUD is drawn with PixiJS on WebGPU; menus and startup/error controls
+are native DOM. The field radio has no HUD panel: its handheld LCD is the interface.
+If the HUD fails to initialize, a Reload error dialog appears.
 [HUD ownership, boundaries and checks](docs/hud.md).
 
 After loading, select **Start** to capture the mouse and begin. Pending or denied
@@ -84,17 +82,17 @@ Bindings are fixed defaults in `src/core/bindings.ts`.
 
 | Keys                    | Action                                                 |
 | ----------------------- | ------------------------------------------------------ |
-| WASD / arrows, mouse    | Move and look; forward/back climb ladders              |
+| WASD, mouse             | Move and look; forward/back climb ladders              |
 | Space                   | Jump / mantle / vault / ladder jump-off                |
 | Left/Right Ctrl or C, Z | Toggle crouch/slide, prone                             |
 | Left Shift, Q / E       | Sprint (double-tap for tactical sprint), lean          |
 | LMB / RMB               | Fire / hold ADS                                        |
 | R / B / I               | Reload / fire mode / inspect                           |
-| 1 / 2, Tab / wheel      | Equipped primary/secondary, cycle pair                 |
+| 1 / 2, Tab / wheel      | Primary/secondary, cycle pair; stow grenade/radio      |
 | Hold T, F, L            | Ammo/intel, flashlight / mounted laser toggle          |
 | Hold H                  | Bandage (3 seconds; +50 HP on completion)              |
 | G, then LMB / RMB       | Equip grenade; cook long/short throw, release to throw |
-| X, then 1 / 2 / 3       | Radio; immediate carpet-bomb request / locked requests |
+| X, then ↑ / ↓, Enter    | Radio; select a request, send it                       |
 | Esc                     | Pause/resume; closes the shop instead while shopping   |
 
 Intel takes priority over ammo and requires a four-second stationary, visible,
@@ -176,6 +174,8 @@ Tests are not final human visual acceptance; see each asset's remaining limits.
 - `bun tools/profile.ts`: sustained living-combat frame/CPU percentiles and hitches.
   GPU timestamps are unavailable; node-builder activity is not GPU compilation time.
   Compare matched runs only; there is no cross-hardware frame-time threshold.
+  `--production` profiles the existing `dist/` (`bun run build` first) via
+  `bun build/bun.ts preview`.
 
 Keep capture/profile primitives and focused correctness checks; task-specific
 screenshot matrices, reels and investigation scripts are temporary and not committed. `bun run test` is the correctness gate; it is not visual or combat-
@@ -195,6 +195,6 @@ continues unless it failed; the reload-required error is exposed through
 
 ## Automation
 
-The `Validate` GitHub Actions workflow runs on pull requests and pushes to `main`
-and `develop`. It checks formatting, types, lint, tests and the production build.
+The `Validate` GitHub Actions workflow runs `bun run verify` on pull requests and pushes to `main`
+and `develop`: formatting, types, lint, the production build and tests.
 Changes go through pull requests into `develop`; only the owner promotes to `main`.

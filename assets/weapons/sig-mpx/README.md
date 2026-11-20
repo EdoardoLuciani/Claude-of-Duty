@@ -20,10 +20,10 @@ Run from the repository root with Blender 5.2.2 and gltfpack 1.3:
 
 ```sh
 blender -b -t 2 --python-exit-code 1 --python tools/blender/mpx/build.py
-# Build the catalog attachments with bun run assets before running source checks.
+# Build the catalog attachments with bun tools/build-assets.ts before running source checks.
 blender -b -t 2 assets/weapons/sig-mpx/mpx.blend \
   --python-exit-code 1 --python tools/blender/mpx/check.py
-bun run models:cook -- mpx
+bun build/models.ts mpx
 ```
 
 Use `--output /tmp/mpx-review` for scratch builds. The registered cook retains

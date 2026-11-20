@@ -4,9 +4,10 @@ import type { Renderer } from 'three/webgpu';
 
 import handReference from '../../assets/weapons/mcx-virtus/hand-reference.json' with { type: 'json' };
 import manifest from '../../assets/weapons/mcx-virtus/manifest.json' with { type: 'json' };
+import { disposeMaterials } from '../core/dispose-materials.ts';
 import { isSkinnedMesh } from '../core/three-guards.ts';
 import { loadWeaponGLTF } from './asset-loader.ts';
-import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
+import { convertWeaponScene } from './asset-material.ts';
 import { disposeAuthoredMixer, MAGAZINE_ALIASES } from './authored-actions.ts';
 import {
   authoredModel,
@@ -20,7 +21,7 @@ import type { WeaponDef } from './defs.ts';
 import { configureMCXFinishes } from './mcx-finishes.ts';
 import type { WeaponAnimation } from './runtime-types.ts';
 
-export const MCX_URL = '/models/weapons/mcx-virtus.runtime.glb';
+const MCX_URL = '/models/weapons/mcx-virtus.runtime.glb';
 const SHOT_START = 2 / 60;
 export const MCX_EJECT_DELAY = 4 / 60 - SHOT_START;
 
@@ -120,7 +121,7 @@ export function createMCXAnimation(model: MCXModel, def: WeaponDef): WeaponAnima
     dispose(): void {
       disposeAuthoredMixer(this);
       for (const skeleton of skeletons) skeleton.dispose();
-      disposeWeaponMaterials(model);
+      disposeMaterials(model);
     },
   };
   animation.reset();

@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import type { Vector3Like } from 'three';
 
-import { StaticWorld } from '../physics/bvh.ts';
 import { CharacterController } from '../physics/character.ts';
+import { restoreSnapshot } from '../physics/query-snapshot.ts';
 import { instrument, parseClientMessage } from './attachment-types.ts';
 import type {
   AttachmentOracle,
@@ -121,9 +121,7 @@ self.onmessage = ({ data: value }: MessageEvent<unknown>): void => {
     const data = parseClientMessage(value);
     if (data.type === 'init') {
       if (nav) throw new Error('[ai worker] duplicate initialization');
-      const world = new StaticWorld();
-      Object.assign(world, data.world);
-      world._stackNode = new Int32Array(data.world.stackSize);
+      const world = restoreSnapshot(data.world);
       const controller = new CharacterController(world, data.controller);
       controller.enabled = data.controller.enabled;
       ladderController = new CharacterController(world);
@@ -169,15 +167,6 @@ self.onmessage = ({ data: value }: MessageEvent<unknown>): void => {
         controller.probeGround = instrument(
           controller.probeGround.bind(controller),
           timedCost('probeGround')
-        );
-        controller._slide = instrument(controller._slide.bind(controller), timedCost('_slide'));
-        controller._sweepMove = instrument(
-          controller._sweepMove.bind(controller),
-          timedCost('_sweepMove')
-        );
-        controller._sweepDown = instrument(
-          controller._sweepDown.bind(controller),
-          timedCost('_sweepDown')
         );
       }
       post({ type: 'ready' });

@@ -47,7 +47,7 @@ export function authoredHandTarget(
   quaternion.copy(this.root.quaternion).multiply(hand.wrist.quaternion);
 }
 
-export function applyAuthoredHand(arm: HandRig, authored: AuthoredHand): void {
+function applyAuthoredHand(arm: HandRig, authored: AuthoredHand): void {
   for (let i = 0; i < 4; i++) {
     arm.fingers[i].root.quaternion.copy(authored.fingers[i].root.quaternion);
     for (let j = 0; j < 3; j++)

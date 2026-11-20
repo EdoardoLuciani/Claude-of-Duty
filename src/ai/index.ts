@@ -12,7 +12,6 @@ import type { SoldierRecord } from '../core/model-metadata.ts';
 import type { Rng } from '../core/rng.ts';
 import type { PhysicsSystem } from '../physics/index.ts';
 import type { SkySystem } from '../sky/index.ts';
-import { grenadeMesh } from '../weapons/grenade-mesh.ts';
 import { GRENADE_RADIUS, GRENADE_DAMAGE, GRENADE_FUSE } from '../weapons/index.ts';
 import { isAliveTeammate } from './actor.ts';
 import { Agent, STATE, PATH_OUTCOME } from './agent.ts';
@@ -76,7 +75,7 @@ interface AiPrewarm {
   materials: number;
   programs: null;
   ms: number;
-  graphWarm?: Awaited<ReturnType<EngineSystems['render']['_warmGraph']>>;
+  graphWarm?: Awaited<ReturnType<EngineSystems['render']['warmGraph']>>;
   error?: string;
 }
 import {
@@ -214,7 +213,7 @@ export class AiSystem {
   };
   _grenades: {
     body: ReturnType<PhysicsSystem['addRigidBody']>;
-    mesh: ReturnType<typeof grenadeMesh>;
+    mesh: THREE.Mesh;
     fuse: number;
     agent: Agent;
   }[] = [];
@@ -247,7 +246,7 @@ export class AiSystem {
   declare _phys: PhysicsSystem | null;
 
   static readonly id = 'ai';
-  static readonly deps: SystemId[] = ['physics', 'world', 'models'];
+  static readonly deps: SystemId[] = ['physics', 'world', 'models', 'weapons'];
 
   async init(ctx: EngineContext): Promise<void> {
     this.ctx = ctx;
@@ -322,14 +321,12 @@ export class AiSystem {
     try {
       const seen = new Set();
       for (const name in VARIANTS) seen.add(this.variant(name).material);
-      // The shared grenade mesh is built lazily on the first throw; the
-      // material is included here so its shader is warm when that happens.
-      out.materials = seen.size + 1;
+      out.materials = seen.size;
 
       const r = this.ctx.peek('render');
       // init() runs before render's production graph exists. Keep material
       // creation order, but let the later engine hook warm the real variants.
-      if (!r?.renderer || !r._graph) {
+      if (!r?.renderer || !r.hasGraph()) {
         this._prewarmed = null;
         return out;
       }
@@ -348,10 +345,9 @@ export class AiSystem {
           scene.add(mesh);
           mesh.bind(skeleton);
         }
-        scene.add(grenadeMesh());
         this.ctx.scene.add(scene);
         r.patchMaterials(scene);
-        out.graphWarm = await r._warmGraph(); // zero ranges, restored even on failure
+        out.graphWarm = await r.warmGraph(); // zero ranges, restored even on failure
         out.ok = true;
       } finally {
         scene.removeFromParent();
@@ -395,10 +391,7 @@ export class AiSystem {
 
   /** Matching position, normal, UV, colour and skinning attributes are required
    *  to compile the same shader permutations as a soldier. */
-  _dummySkinGeometry(): THREE.BufferGeometry<
-    THREE.NormalBufferAttributes,
-    THREE.BufferGeometryEventMap
-  > {
+  _dummySkinGeometry(): THREE.BufferGeometry {
     const g = new THREE.BufferGeometry();
     const n = 3;
     g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
@@ -575,7 +568,7 @@ export class AiSystem {
       throw new Error(
         `[ai] soldier model "${name}" is incompatible with this build:\n - ` +
           problems.join('\n - ') +
-          '\nRegenerate the assets with: bun run models'
+          '\nRegenerate the assets with: bun tools/export-models.ts'
       );
     }
   }
@@ -587,7 +580,7 @@ export class AiSystem {
       const rec = this._loadedVariants.get(name);
       if (!rec) {
         throw new Error(
-          `[ai] required soldier model "${name}" was not loaded; regenerate assets with: bun run models`
+          `[ai] required soldier model "${name}" was not loaded; regenerate assets with: bun tools/export-models.ts`
         );
       }
       // One native material ignores the GLB's authoring groups when drawing.
@@ -1153,7 +1146,8 @@ export class AiSystem {
     const phys = this.phys;
     const { dx, dz, dist, vy, vh, valid } = this._grenadeLob(from, target);
     if (!valid) return false;
-    const mesh = grenadeMesh();
+    const mesh = this.ctx.get('weapons').createGrenade();
+    mesh.position.copy(from);
     this.root.add(mesh);
     const body = phys.addRigidBody({
       shape: 'sphere',
@@ -1853,5 +1847,3 @@ export class AiSystem {
   }
   /* oxlint-enable typescript/no-unnecessary-condition */
 }
-
-export { VARIANTS, STATE };

@@ -119,7 +119,7 @@ const tint = (hex: number | string): ConstNode<'vec3', Vector3> => {
   const c = new Color(hex);
   return vec3(c.r, c.g, c.b);
 };
-const sample = (map: Texture | TextureNode, coords: Node<'vec2'>): TextureNode<'vec4'> =>
+const sample = (map: Texture | TextureNode, coords: Node<'vec2'>): TextureNode =>
   texture(map, coords);
 const axisNormal = (n: Node<'vec3'>, axis: 0 | 1 | 2, sign: Node<'float'>): JoinNode<'vec3'> =>
   axis === 0
@@ -150,7 +150,7 @@ function axisFrame(
 
 // Explicit gradients remain stable inside the divergent height march; sampling
 // the alpha of the authored albedo tile without grad chooses the wrong mip.
-export function parallaxUV(
+function parallaxUV(
   map: Texture,
   uv0: Node<'vec2'>,
   vt: Node<'vec3'>,
@@ -165,6 +165,7 @@ export function parallaxUV(
     dy = vec2(0).toVar();
   dx.assign(dFdx(uv0));
   dy.assign(dFdy(uv0));
+  const height = (at: Node<'vec2'>): Node<'float'> => texture(map, at).grad(dx, dy).a.oneMinus();
   If(depthNode.greaterThan(0).and(fade.greaterThan(0.001)), (): void => {
     const nl = max(mix(float(maxLayers), 8, clamp(abs(vt.z), 0, 1)).mul(fade), 4).toVar();
     const layer = float(1).div(nl).toVar();
@@ -174,7 +175,6 @@ export function parallaxUV(
       .mul(fade)
       .mul(layer)
       .toVar();
-    const height = (at: Node<'vec2'>): Node<'float'> => texture(map, at).grad(dx, dy).a.oneMinus();
     const cur = float(0).toVar();
     const h = height(coords).toVar();
     Loop(48, ({ i }): void => {
@@ -209,7 +209,7 @@ function runoff(
   const r1 = hash11(cell.mul(2.71).add(11.7));
   const src = smoothstep(0.3, 0.62, r0)
     .mul(r1.mul(0.45).add(0.55))
-    .mul(lat.mul(3.14159265).sin().pow(2))
+    .mul(lat.mul(Math.PI).sin().pow(2))
     .mul(r0.mul(0.45).add(0.8));
   const jitter = r1.mul(1.2).add(r0.mul(0.5));
   const below = y
@@ -331,7 +331,7 @@ export function createSurfaceNodeMaterial(
           tex.b.mul(2).sub(1)
         )
       );
-    const mapAt = (f: { uv: Node<'vec2'> }): TextureNode<'vec4'> => sample(set.albedo, f.uv);
+    const mapAt = (f: { uv: Node<'vec2'> }): TextureNode => sample(set.albedo, f.uv);
     const ormAt = (f: { uv: Node<'vec2'> }): Node<'vec3'> => sample(set.orm, f.uv).rgb;
     const normalAt = (f: { uv: Node<'vec2'>; sign: Node<'float'> }): Node<'vec3'> =>
       unpack(sample(set.normal, f.uv));

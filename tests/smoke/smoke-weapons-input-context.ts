@@ -16,7 +16,6 @@ import { PlayerSystem } from '../../src/player/index.ts';
 import { Movement } from '../../src/player/movement.ts';
 import type { RadioSystem } from '../../src/radio/index.ts';
 import type { UiSystem } from '../../src/ui/index.ts';
-import { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
 import { BASE_ATTACHMENTS } from '../../src/weapons/attachments.ts';
 import { ProjectileSim } from '../../src/weapons/ballistics.ts';
 import { buildManifestClips, Clip } from '../../src/weapons/clips.ts';
@@ -25,6 +24,7 @@ import type { WeaponId } from '../../src/weapons/defs.ts';
 import { GRENADE_FUSE, MAX_SHOTS_PER_FRAME } from '../../src/weapons/index.ts';
 import type { WeaponEntry } from '../../src/weapons/runtime-types.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
+import { ammoPickupFixture } from '../lib/ammo-pickup-fixture.ts';
 import { ArmedWeaponSystem, weaponState } from '../lib/ballistics-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
 import { fixture } from '../lib/fixture.ts';
@@ -60,6 +60,7 @@ function makeHarness(): WeaponHarness {
     };
   }
   const wp = new ArmedWeaponSystem();
+  wp.createGrenade = (): THREE.Mesh => new THREE.Mesh();
   const clips: string[] = [],
     prompts: Array<Parameters<UiSystem['setPrompt']>[0] & { owner: unknown }> = [],
     cancellations: string[] = [],
@@ -289,11 +290,18 @@ for (const [primary, first, second] of [
   assert.equal(wp._pendingShots, 1, 'pellets still produce one accepted-shot event');
 }
 {
-  const { wp } = makeHarness();
+  const { wp, tap } = makeHarness();
   assert(wp.applyBuild('sniper', BASE_ATTACHMENTS) && wp.tryFire());
   assert(
     !wp.state.chambered && !wp.tryFire() && !wp.setWeapon('pistol'),
     'bolt cycle blocks fire/switch'
+  );
+  tap('KeyX');
+  tap('KeyG');
+  tap('Digit1');
+  assert(
+    wp.cycling && !wp.radioEquipped && !wp.grenadeEquipped,
+    'accessories preserve the bolt cycle'
   );
   wp.viewmodel.stopClip();
   wp._fireTimer = 0;
@@ -401,14 +409,16 @@ for (const wheel of [-1, 1]) {
   assert.equal(results.length, 2, 'held Tab and expired wheel do not repeat');
 }
 
-// Slot 3 is inert normally; same-slot selection cannot stow a grenade.
+// Same-slot selection stows a grenade and redraws.
 {
   const { wp, tap } = makeHarness();
-  tap('Digit3');
+  tap('KeyG');
+  tap('KeyG');
+  assert(wp.grenadeEquipped, 'G again is a no-op, not a stow');
+  tap('Digit1');
+  assert(!wp.grenadeEquipped, 'same-slot selection stows the grenade');
   assert.equal(wp._switchTo, null);
   tap('KeyG');
-  tap('Digit1');
-  assert(wp.grenadeEquipped, 'same-slot selection is a no-op, not a stow');
   tap('Digit2');
   assert(!wp.grenadeEquipped);
   assert.equal(wp._switchTo, 'pistol');
@@ -773,7 +783,7 @@ for (const gate of ['frozen', 'disabled']) {
   assert.equal(wp._burstLeft, 2);
 }
 
-// Radio owns 1/2/3 only while open, with request priority 1 > 2 > 3.
+// Radio: arrows move the LCD cursor and Enter sends; weapon keys keep selecting weapons.
 {
   const { wp, tap, prompts } = makeHarness();
   let strikes = 0;
@@ -783,26 +793,35 @@ for (const gate of ['frozen', 'disabled']) {
       return true;
     },
   });
-  tap('KeyX', 'Digit1');
-  assert(wp.radioEquipped && strikes === 0, 'opening frame does not immediately select a request');
-  tap('Digit2');
-  assert.equal(wp._switchTo, null, 'request 2 never selects the secondary');
-  assert.equal(prompts[prompts.length - 1].key, bindingLabel('slot2'));
-  tap('Digit3');
-  assert.equal(prompts[prompts.length - 1].key, bindingLabel('slot3'));
-  tap('Digit3', 'Digit2', 'Digit1');
+  tap('KeyX', 'Enter');
+  assert(wp.radioEquipped && strikes === 0, 'opening frame does not immediately send a request');
+  tap('KeyX');
+  assert(wp.radioEquipped, 'X again keeps the radio out');
+  tap('ArrowUp');
+  assert.equal(wp._radioCursor, 0, 'the cursor stops at the first request');
+  tap('ArrowDown');
+  tap('Enter');
+  assert.equal(prompts[prompts.length - 1].key, bindingLabel('radioSend'));
+  assert.equal(prompts[prompts.length - 1].text, 'TOP-SECRET');
+  tap('ArrowDown');
+  tap('ArrowDown');
+  assert.equal(wp._radioCursor, 2, 'the cursor stops at the last request');
+  tap('ArrowUp');
+  tap('ArrowUp');
+  tap('KeyX', 'Enter');
   assert.equal(strikes, 1);
   assert.equal(wp.carpetBombs, 0);
   assert(!wp.radioEquipped);
   tap('KeyX');
-  tap('Digit1');
+  assert.equal(wp._radioCursor, 0, 'reopening starts on the carpet bomb');
+  tap('Enter');
   assert(wp.radioEquipped);
-  assert.equal(prompts[prompts.length - 1].key, bindingLabel('slot1'));
-  tap('Tab', 'Digit2');
-  assert(
-    !wp.radioEquipped && wp._switchTo === 'pistol',
-    'cycle stows radio before its request phase'
-  );
+  assert.equal(prompts[prompts.length - 1].text, 'NO CHARGES');
+  tap('Digit1');
+  assert(!wp.radioEquipped && wp._switchTo === null, 'the active slot stows the radio');
+  tap('KeyX');
+  tap('Digit2');
+  assert(!wp.radioEquipped && wp._switchTo === 'pistol', 'the other slot stows and switches');
 }
 {
   const { wp, tap } = makeHarness();
@@ -834,7 +853,7 @@ for (const [code, other, action, type] of [
   assert.equal(prompts[prompts.length - 1].key, bindingLabel('fire'));
   assert.equal(
     prompts[prompts.length - 1].sub,
-    `${bindingLabel('ads')} SHORT THROW · ${bindingLabel('grenade')} STOWS`
+    `${bindingLabel('ads')} SHORT THROW · ${bindingLabel('slot1')}/${bindingLabel('slot2')} STOWS`
   );
   frame({ down: [code] });
   assert(wp.cooking);
@@ -860,7 +879,7 @@ for (const [code, other, action, type] of [
 {
   const { wp, tap, frame } = makeHarness();
   tap('KeyG');
-  tap('Mouse0', 'Mouse2');
+  tap('KeyG', 'Mouse0', 'Mouse2');
   assert.equal(wp._cookAction, 'fire', 'fire wins simultaneous cook edges');
   frame();
   assert(wp._throwing, 'same-frame tap commits next update via initiating action no longer held');
@@ -916,14 +935,11 @@ for (const [code, reason] of [
   frame({ wheel: 1 });
   assert.deepEqual(cancellations, ['switch'], 'wheel remains a heal interruption');
 }
-for (const code of ['Digit1', 'Digit3', 'KeyB']) {
+for (const code of ['Digit1', 'KeyB']) {
   const { wp, tap, cancellations } = makeHarness();
   assert(wp.beginHeal());
   tap(code);
-  assert(
-    wp.healing && cancellations.length === 0,
-    'same-slot/unused-slot/fire-mode do not interrupt healing'
-  );
+  assert(wp.healing && cancellations.length === 0, 'same-slot/fire-mode do not interrupt healing');
 }
 for (const blocked of ['disabled', 'frozen', 'dead', 'controls', 'input']) {
   const { wp, input, player, tap } = makeHarness();
@@ -942,7 +958,7 @@ for (const blocked of ['disabled', 'frozen', 'dead', 'controls', 'input']) {
 {
   const { wp, frame, prompts } = makeHarness();
   wp.state.reserve = 0;
-  const pickups = new AmmoPickups(wp);
+  const pickups = ammoPickupFixture(wp);
   wp.pickups = pickups;
   try {
     pickups.spawn(new THREE.Vector3());
@@ -1102,7 +1118,7 @@ const INTERRUPTIONS: Array<
       off: (h): void => h.wp.viewmodel.stopClip(),
     },
   ],
-  ['radio', { on: (h): void => h.tap('KeyX'), off: (h): void => h.tap('KeyX') }],
+  ['radio', { on: (h): void => h.tap('KeyX'), off: (h): void => h.tap('Digit1') }],
   [
     'switch',
     {

@@ -22,14 +22,7 @@ export const CONTROL_SECTIONS: ControlSection[] = [
   {
     title: 'Movement & look',
     controls: [
-      {
-        keys: [0, 1].map((alias): string =>
-          (['forward', 'left', 'back', 'right'] as const)
-            .map((action): string => bindingLabels(action)[alias])
-            .join(' ')
-        ),
-        description: 'Move (hold)',
-      },
+      quick(['forward', 'left', 'back', 'right'], 'Move (hold)'),
       { keys: ['Mouse'], description: 'Look' },
       quick(['jump'], 'Jump (press) · mantle / vault (hold + move forward)'),
       quick(['crouch'], 'Crouch / slide (toggle)'),
@@ -46,7 +39,7 @@ export const CONTROL_SECTIONS: ControlSection[] = [
       quick(['reload'], 'Reload (press; weapon out)'),
       quick(['fireMode'], 'Cycle fire mode'),
       quick(['inspect'], 'Inspect (press; weapon out)'),
-      quick(['slot1', 'slot2'], 'Primary / secondary (weapon out)'),
+      quick(['slot1', 'slot2'], 'Primary / secondary · stows grenade / radio'),
       {
         keys: [...bindingLabels('cycleWeapon'), 'Mouse wheel'],
         description: 'Request weapon cycle',
@@ -60,11 +53,11 @@ export const CONTROL_SECTIONS: ControlSection[] = [
       quick(['flashlight'], 'Flashlight (toggle)'),
       quick(['laser'], 'Mounted weapon laser (toggle; weapon out)'),
       quick(['heal'], 'Bandage (hold 3s)'),
-      quick(['grenade'], 'Equip / stow grenade (toggle)'),
+      quick(['grenade'], 'Equip grenade (weapon keys stow)'),
       quick(['fire', 'ads'], 'Grenade out: cook long / short (hold); release to throw'),
-      quick(['radio'], 'Equip / stow radio (toggle)'),
-      quick(['slot1'], 'Radio out: carpet-bomb request (immediate)'),
-      quick(['slot2', 'slot3'], 'Radio out: locked requests'),
+      quick(['radio'], 'Equip radio (weapon keys stow)'),
+      quick(['radioUp', 'radioDown'], 'Radio out: select request'),
+      quick(['radioSend'], 'Radio out: send selected request'),
     ],
   },
   {

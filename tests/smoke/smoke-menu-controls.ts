@@ -5,8 +5,6 @@ import type { ActionId } from '../../src/core/bindings.ts';
 import { CONTROL_SECTIONS } from '../../src/ui/controls.ts';
 import { PauseMenu } from '../../src/ui/menu.ts';
 import { Prompt } from '../../src/ui/prompts.ts';
-import { RadioPanel } from '../../src/ui/radio.ts';
-import { WeaponSystem } from '../../src/weapons/index.ts';
 import { createTestContext, createTestInput } from '../lib/context.ts';
 import type { TestProviders } from '../lib/context.ts';
 import { installUiDocument, UiPlayer } from '../lib/ui-fixture.ts';
@@ -19,17 +17,9 @@ function isActionId(value: string): value is ActionId {
 const controls = CONTROL_SECTIONS.flatMap(
   (section): (typeof CONTROL_SECTIONS)[number]['controls'] => section.controls
 );
-const movementActions: ActionId[] = ['forward', 'left', 'back', 'right'];
-assert.deepEqual(
-  controls[0].keys,
-  [0, 1].map((alias): string =>
-    movementActions.map((action): string => bindingLabels(action)[alias]).join(' ')
-  ),
-  'movement groups retain every canonical alias'
-);
 const labels = new Set(controls.flatMap((control): readonly string[] => control.keys));
 for (const action of Object.keys(DEFAULT_BINDINGS)) {
-  if (!isActionId(action) || movementActions.includes(action)) continue;
+  if (!isActionId(action)) continue;
   for (const label of bindingLabels(action))
     assert.ok(labels.has(label), `${action}: missing ${label}`);
 }
@@ -98,11 +88,11 @@ for (const distinction of [
   'Flashlight (toggle)',
   'Mounted weapon laser (toggle; weapon out)',
   'Bandage (hold 3s)',
-  'Equip / stow grenade (toggle)',
+  'Equip grenade (weapon keys stow)',
   'Grenade out: cook long / short (hold); release to throw',
-  'Equip / stow radio (toggle)',
-  'Radio out: carpet-bomb request (immediate)',
-  'Radio out: locked requests',
+  'Equip radio (weapon keys stow)',
+  'Radio out: select request',
+  'Radio out: send selected request',
   'Request weapon cycle',
   'in shop: close shop',
 ])
@@ -148,21 +138,6 @@ assert(prompt.hasProgress);
 prompt.set({ key: bindingLabel('heal'), text: 'bandaging' });
 assert.equal(prompt.key, bindingLabel('heal'), 'contextual prompt override preserved');
 assert.equal(prompt.hasProgress, false);
-const weapons = new WeaponSystem();
-weapons.radioEquipped = true;
-weapons.carpetBombs = 2;
-providers.weapons = weapons;
-const radio = new RadioPanel(makeEl(), ctx);
-const radioNodes = flatten(radio.root);
-assert.ok(
-  radioNodes.some((node): boolean => node.textContent === `${bindingLabel('radio')} STOWS`)
-);
-for (const action of ['slot1', 'slot2', 'slot3'] as const) {
-  assert.ok(radioNodes.some((node): boolean => node.textContent === bindingLabel(action)));
-}
-radio.update(1);
-assert.equal(radio.rows[0].charge.textContent, 'x2');
-radio.dispose();
 console.log(
-  'smoke-menu-controls: ok (concise reference, canonical labels, native rows, contextual prompts and radio labels)'
+  'smoke-menu-controls: ok (concise reference, canonical labels, native rows, contextual prompts)'
 );

@@ -1,7 +1,7 @@
 import { clamp } from '../core/math.ts';
 import { Pool } from './util.ts';
 
-export const SPAN_DEG = 120;
+const SPAN_DEG = 120;
 export const STRIP_W = 470;
 export const PPD = STRIP_W / SPAN_DEG;
 export const CARD: Record<number, string> = {

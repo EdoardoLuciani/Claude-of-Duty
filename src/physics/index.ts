@@ -1260,7 +1260,7 @@ export class PhysicsSystem {
     const rd = this.createRagdoll({ ...options, bones: spec });
     rd.adoptSkeleton(
       skeleton,
-      boneMap.map((bone): THREE.Bone<THREE.Object3DEventMap> | null => bone ?? null)
+      boneMap.map((bone): THREE.Bone | null => bone ?? null)
     );
     rd.actor = opts.actor ?? skinnedMesh;
     return rd;

@@ -1,11 +1,10 @@
 import * as THREE from 'three';
 import * as TSL from 'three/tsl';
-import { MeshBasicNodeMaterial, MeshPhysicalNodeMaterial } from 'three/webgpu';
+import { MeshBasicNodeMaterial } from 'three/webgpu';
 import type { Node, UniformNode } from 'three/webgpu';
 
 import { Spring, TAU, clamp, clamp01, damp, lerp, smootherstep } from '../core/math.ts';
 import { loadArmAsset } from './arm-asset.ts';
-import { createWeaponMaterial } from './asset-material.ts';
 import {
   configureWeaponAttachments,
   releaseAttachmentMounts,
@@ -25,12 +24,11 @@ import {
 } from './bandage-path.ts';
 import type { Clip } from './clips.ts';
 import type { WeaponDef } from './defs.ts';
-import { triCount } from './geometry.ts';
-import { grenadeMesh } from './grenade-mesh.ts';
+import { HAND_POSES } from './hand-poses.ts';
 import { Arm } from './hands.ts';
 import type { ReticleMaterials } from './materials-tsl.ts';
 import { Spring3, Noise1, wrapPi } from './mathx.ts';
-import { radioMesh, radioScreenTexture } from './radio-mesh.ts';
+import { loadRadio } from './radio-mesh.ts';
 import type {
   ViewPoseKey,
   ViewState,
@@ -79,12 +77,16 @@ const BANDAGE_R = {
   release: 0.12,
 };
 
-/** Radio hold: walkie at chest height, screen toward the eye. Left hand hangs. */
+/** Camera-space radio close-up, independent of the equipped weapon's hip
+ *  transform: the LCD faces the eye just right of and below centre. The rig
+ *  rises from `drop` over `raiseTime`. Left hand hangs out of frame. */
 const RADIO_HOLD = {
-  hand: [0.07, -0.06, -0.23],
-  finger: [0.16, 0.92, -0.36],
-  back: [0.22, 0.32, -0.92],
-  lhand: [-0.16, -0.12, -0.08],
+  hand: [0.0529, -0.1814, -0.1825],
+  finger: [0.1104, 0.8571, -0.5032],
+  back: [0.2314, -0.5146, -0.8256],
+  drop: 0.3,
+  raiseTime: 0.24,
+  lhand: [-0.2, -0.36, -0.1],
   lfinger: [0.35, 0.55, -0.76],
   lback: [-0.4, 0.55, 0.73],
 };
@@ -205,9 +207,24 @@ function handBasis(
   return out.setFromRotationMatrix(_m);
 }
 
+// Distance from p to the segment a-b, then the authored w-feathered edge.
+const segmentEdge = (
+  p: Node<'vec2'>,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  w: number
+): Node<'float'> => {
+  const a = TSL.vec2(ax, ay);
+  const pa = p.sub(a);
+  const ba = TSL.vec2(bx, by).sub(a);
+  const h = TSL.clamp(TSL.dot(pa, ba).div(TSL.dot(ba, ba)), 0, 1);
+  return TSL.smoothstep(0, w, TSL.length(pa.sub(ba.mul(h)))).oneMinus();
+};
+
 export class Viewmodel {
   declare ctx: ViewmodelContext;
-  declare radioScreen: THREE.Mesh<THREE.BufferGeometry, MeshPhysicalNodeMaterial> | null;
   declare maskUniforms: {
     uAlpha: UniformNode<'float', number>;
     uAspect: UniformNode<'float', number>;
@@ -247,8 +264,9 @@ export class Viewmodel {
   // ---- grenade (held in the right hand while cooking / throwing) --------
   // The shared world mesh, slightly enlarged so it reads at arm's length;
   // parented to the hand so it rides the arm through the throw.
-  grenade: THREE.Object3D = grenadeMesh();
-  radio: THREE.Object3D = radioMesh();
+  grenade: THREE.Group = new THREE.Group();
+  radio: THREE.Group = new THREE.Group();
+  radioAsset: Awaited<ReturnType<typeof loadRadio>> | null = null;
   active: WeaponEntry | null = null;
   // 0 = none, 1 = held / cooking, 2 = throwing. The throw is a short
   // hand-rolled timeline (the clip system animates the weapon, not the arms)
@@ -267,10 +285,8 @@ export class Viewmodel {
   _grenadeBackR: Float32Array = new Float32Array(3);
   _grenadeFingerL: Float32Array = new Float32Array(3);
   _grenadeBackL: Float32Array = new Float32Array(3);
-  // The templates also serve world projectiles/standalone previews. Own only
-  // native view copies, never patch or dispose their global shared materials.
-  _propMaterials: Map<THREE.Material, THREE.Material> = new Map();
   _radioState: number = 0; // 0 = stowed, 1 = held
+  _radioRaise: number = 0;
   bandageAsset: Awaited<ReturnType<typeof loadBandage>> | null = null;
   _bandageState: number = 0;
   _bandageProgress: number = 0;
@@ -354,19 +370,16 @@ export class Viewmodel {
     this.radio.name = 'ow-radio';
     this.radio.position.set(0.0, -0.052, -0.05);
     this.radio.rotation.set(-Math.PI / 2, Math.PI, 0);
+    // Seat the back against the glove while keeping the top controls clear of the fingertips.
+    this.radio.translateZ(-0.025);
+    this.radio.rotateX(0.31);
+    this.armR.poses.radio = {
+      ...HAND_POSES.radio,
+      thumb: [0.16, 0.28],
+      thumbBase: [0.24, 0.25, -0.38],
+    };
     this.radio.visible = false;
     this.armR.hand.add(this.radio);
-    for (const root of [this.grenade, this.radio])
-      root.traverse((o): void => {
-        if (!isMesh(o) || !(o.material instanceof THREE.MeshStandardMaterial)) return;
-        const source = o.material;
-        if (!this._propMaterials.has(source))
-          this._propMaterials.set(source, createWeaponMaterial(source));
-        const material = this._propMaterials.get(source);
-        if (material) o.material = material;
-      });
-    const screen: unknown = this.radio.userData.screen;
-    this.radioScreen = isRadioScreen(screen) ? screen : null;
 
     this.reticle.name = 'ow-reticle';
     this.anchor.add(this.reticle);
@@ -433,21 +446,6 @@ export class Viewmodel {
     this.scopeOverlay.add(mask);
     this.scopeMask = mask;
 
-    // Distance from p to the segment a-b, then the authored w-feathered edge.
-    const line = (
-      p: Node<'vec2'>,
-      ax: number,
-      ay: number,
-      bx: number,
-      by: number,
-      w: number
-    ): Node<'float'> => {
-      const a = TSL.vec2(ax, ay);
-      const pa = p.sub(a);
-      const ba = TSL.vec2(bx, by).sub(a);
-      const h = TSL.clamp(TSL.dot(pa, ba).div(TSL.dot(ba, ba)), 0, 1);
-      return TSL.smoothstep(0, w, TSL.length(pa.sub(ba.mul(h)))).oneMinus();
-    };
     const retU = (this.reticleUniforms = {
       uAlpha: TSL.uniform(1),
       uChevron: TSL.uniform(0),
@@ -456,12 +454,14 @@ export class Viewmodel {
     });
     const rp = TSL.uv().mul(2).sub(1).toVar();
     const rc = TSL.vec2(rp.x.mul(retU.uAspect), rp.y);
-    let chevron = line(rc, -0.07, -0.07, 0, 0, 0.012).add(line(rc, 0, 0, 0.07, -0.07, 0.012));
-    let stadia = line(rc, 0, -0.13, 0, -0.63, 0.006);
+    let chevron = segmentEdge(rc, -0.07, -0.07, 0, 0, 0.012).add(
+      segmentEdge(rc, 0, 0, 0.07, -0.07, 0.012)
+    );
+    let stadia = segmentEdge(rc, 0, -0.13, 0, -0.63, 0.006);
     for (let i = 1; i <= 4; i++) {
       const y = -0.14 - i * 0.1;
       const w = 0.12 - i * 0.018;
-      stadia = stadia.add(line(rc, -w, y, w, y, 0.006));
+      stadia = stadia.add(segmentEdge(rc, -w, y, w, y, 0.006));
     }
     const mil = sniperReticleCoverage(rc.div(retU.uMradScale));
     // The sniper quad reaches the aperture, unlike the original small overlay.
@@ -519,7 +519,8 @@ export class Viewmodel {
     model.scene.traverse((node: THREE.Object3D): void => {
       if (!isMesh(node)) return;
       meshes.push(node);
-      tris += triCount(node.geometry);
+      const index = node.geometry.getIndex();
+      tris += (index ? index.count : node.geometry.getAttribute('position').count) / 3;
     });
     // Adapters expose only detachable, cartridge-free magazine shells here.
     const parts = { magazine: animation.magazineBody };
@@ -660,6 +661,7 @@ export class Viewmodel {
     if (this._grenadeState === 1) this.endGrenade();
     if (this._bandageState === 1) this.endBandage();
     this._radioState = 1;
+    this._radioRaise = 0;
     this.radio.visible = true;
     const w = this.active;
     if (w) w.group.visible = false;
@@ -699,12 +701,8 @@ export class Viewmodel {
     if (w) w.group.visible = true;
   }
 
-  setRadioScreen(count: number): void {
-    const screen = this.radioScreen;
-    if (!screen) return;
-    const old = screen.material.map;
-    screen.material.map = radioScreenTexture(count);
-    old?.dispose();
+  setRadioScreen(count: number, cursor: number): void {
+    this.radioAsset?.setScreen(count, cursor);
   }
 
   /**
@@ -787,7 +785,7 @@ export class Viewmodel {
     this._applyGrenadePose(GRENADE_HOLD, cook, w);
   }
 
-  /** Static radio hold: right hand grips it at chest height, left hangs. */
+  /** Static radio hold: right hand presents the LCD, left hangs. */
   _solveRadioHands(): void {
     this._handPos.set(RADIO_HOLD.hand[0], RADIO_HOLD.hand[1], RADIO_HOLD.hand[2]);
     handBasis(this._handQuat, RADIO_HOLD.finger, RADIO_HOLD.back);
@@ -1000,6 +998,11 @@ export class Viewmodel {
     this.armL.forePivot.add(this.bandageAsset.wrap, this.bandageAsset.tail);
   }
 
+  async loadRadio(renderer: Parameters<typeof loadRadio>[0]): Promise<void> {
+    this.radioAsset = await loadRadio(renderer);
+    this.radio.add(this.radioAsset.scene);
+  }
+
   update(dt: number, s: ViewState): void {
     const w = this.active;
     if (!w) return;
@@ -1198,6 +1201,11 @@ export class Viewmodel {
       const stow = smootherstep(0, 1, (this._bandageProgress - 0.93) / 0.07);
       this.rig.position.set(0, -0.35 * (1 - present + stow), 0);
       this.rig.quaternion.identity();
+    } else if (this._radioState) {
+      // A fixed close-up keeps the LCD readable: no sway, bob or recoil.
+      this._radioRaise = clamp01(this._radioRaise + dt / RADIO_HOLD.raiseTime);
+      this.rig.position.set(0, -RADIO_HOLD.drop * (1 - smootherstep(0, 1, this._radioRaise)), 0);
+      this.rig.quaternion.identity();
     }
     this.rig.updateMatrix();
     this.rig.updateMatrixWorld(true);
@@ -1255,7 +1263,7 @@ export class Viewmodel {
       return;
     }
 
-    // Radio state: the right hand holds the radio at the chest; the left
+    // Radio state: the right hand presents the radio; the left
     // hangs free. Mutually exclusive with the grenade by construction.
     if (this._radioState) {
       this._solveRadioHands();
@@ -1426,13 +1434,10 @@ export class Viewmodel {
     this.armL.dispose();
     this.armR.dispose();
     this.armAsset?.dispose();
-    // Radio geometry is instance-owned; the grenade's geometry is shared with
-    // world projectiles and must not be released with the arm skin.
-    this.radio?.traverse((o): void => {
-      if (isMesh(o)) o.geometry.dispose();
-    });
-    for (const material of this._propMaterials.values()) material.dispose();
-    this._propMaterials.clear();
+    // Detach the held visual before weapons release the shared asset.
+    this.grenade.clear();
+    this.radioAsset?.dispose();
+    this.radioAsset = null;
     this.bandageAsset?.dispose();
     this.bandageAsset?.roll.removeFromParent();
     this.bandageAsset?.wrap.removeFromParent();
@@ -1453,14 +1458,4 @@ export type ViewModel = Viewmodel;
 
 function isMesh(object: THREE.Object3D): object is THREE.Mesh {
   return 'isMesh' in object && object.isMesh === true;
-}
-
-function isRadioScreen(
-  screen: unknown
-): screen is THREE.Mesh<THREE.BufferGeometry, MeshPhysicalNodeMaterial> {
-  return (
-    screen instanceof THREE.Mesh &&
-    screen.geometry instanceof THREE.BufferGeometry &&
-    screen.material instanceof MeshPhysicalNodeMaterial
-  );
 }

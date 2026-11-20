@@ -88,7 +88,7 @@ export function createArmSurfaceMaterial(
       if (i > 0) result = surface.equal(i).select(value, result);
     return result;
   };
-  const sample = (map: THREE.Texture, channel: number): TextureNode<'vec4'> =>
+  const sample = (map: THREE.Texture, channel: number): TextureNode =>
     texture(map, uv(channel)).depth(surface);
   const base = sample(material.map, 1).rgb.mul(
     choose(

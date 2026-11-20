@@ -5,7 +5,7 @@ Original Blender-authored game art; the lens contour is inferred.
 weapon is an input.
 
 Build: `blender -b --python-exit-code 1 --python tools/blender/rmr/build.py`, then
-`bun run models:cook -- rmr`. Dev/build runs both automatically. Generated GLB/blend
+`bun build/models.ts rmr`. Dev/build runs both automatically. Generated GLB/blend
 products are ignored.
 
 Coordinates are metres, +Y up, -Z forward after native glTF export.

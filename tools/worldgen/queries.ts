@@ -13,7 +13,7 @@ for (const alley of ALLEYS) {
 }
 
 /** True inside (or within `margin` of) an authored building footprint. */
-export function inBuilding(x: number, z: number, margin = 0.3): boolean {
+function inBuilding(x: number, z: number, margin = 0.3): boolean {
   for (const b of BUILDINGS) {
     if (
       x > b.x - b.w / 2 - margin &&

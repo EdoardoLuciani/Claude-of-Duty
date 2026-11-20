@@ -135,7 +135,7 @@ for (const fail of [false, true]) {
       });
     });
   };
-  render._warmGraph = (): ReturnType<RenderSystem['_warmGraph']> =>
+  render.warmGraph = (): ReturnType<RenderSystem['warmGraph']> =>
     new Promise((resolve, reject): void => {
       settle = (): void => {
         if (fail) reject(Error('radio compile failure'));

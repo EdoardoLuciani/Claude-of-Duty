@@ -198,8 +198,8 @@ function buildParticleMaterial(o: ParticleOptions): {
   uniforms: {
     uTime: UniformNode<'float', number>;
     uAtlas: UniformNode<'vec2', THREE.Vector2>;
-    uSprite: TextureNode<'vec4'>;
-    uDepth: TextureNode<'vec4'>;
+    uSprite: TextureNode;
+    uDepth: TextureNode;
     uSoftEnable: UniformNode<'vec2', THREE.Vector2>;
     uSunDir: UniformNode<'vec3', THREE.Vector3>;
     uSunCol: UniformNode<'vec3', THREE.Vector3>;

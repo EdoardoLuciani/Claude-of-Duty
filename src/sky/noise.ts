@@ -14,13 +14,13 @@ const rot2 = (p: Node<'vec2'>): JoinNode<'vec2'> =>
 
 // Share pure shader functions across octaves and consumers. Keep the authored
 // arithmetic and octave counts; only the TSL/WGSL expansion changes.
-export const skHash12 = Fn<[Node<'vec2'>], Node<'float'>>(([p]): Node<'float'> => {
+const skHash12 = Fn<[Node<'vec2'>], Node<'float'>>(([p]): Node<'float'> => {
   const p3 = fract(vec3(p.x, p.y, p.x).mul(0.1031)).toVar();
   p3.addAssign(dot(p3, p3.yzx.add(33.33)));
   return fract(p3.x.add(p3.y).mul(p3.z));
 }).setLayout({ name: 'ow_skHash12', type: 'float', inputs: [{ name: 'p', type: 'vec2' }] });
 
-export const skHash13 = Fn<[Node<'vec3'>], Node<'float'>>(([p]): Node<'float'> => {
+const skHash13 = Fn<[Node<'vec3'>], Node<'float'>>(([p]): Node<'float'> => {
   const q = fract(p.mul(0.1031)).toVar();
   q.addAssign(dot(q, q.yzx.add(33.33)));
   return fract(q.x.add(q.y).mul(q.z));

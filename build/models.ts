@@ -12,7 +12,7 @@ export const GLTFPACK_VERSION = 'gltfpack 1.3';
 const ENCODING_THREADS = Math.max(1, Math.floor(availableParallelism() / 4));
 // Preserve named mechanics and authored timing. Float positions/UVs avoid
 // dequantization wrapper nodes and texture-transform clones in the runtime.
-export const GLTFPACK_FLAGS = [
+const GEOMETRY_FLAGS = [
   '-kn',
   '-ke',
   '-ac',
@@ -33,10 +33,8 @@ export const GLTFPACK_FLAGS = [
   '-as',
   '24',
   '-cc',
-  '-tu',
-  '-tq',
-  '8',
 ];
+export const GLTFPACK_FLAGS = [...GEOMETRY_FLAGS, '-tu', '-tq', '8'];
 // Opt assets in here after validating their adapters and visual/animation fidelity.
 // Simplification is model-specific, never a blanket default for all models.
 // `output` is repo-relative; runtime-mounted weapons/attachments are served from public/.
@@ -52,6 +50,25 @@ const attachment = (
   flags,
 });
 export const MODEL_COOKS = {
+  intel_case: {
+    directory: 'assets/props/intel-case',
+    source: 'intel-case.glb',
+    output: 'public/models/props/intel-case.runtime.glb',
+    flags: [],
+  },
+  ammo_pickup: {
+    directory: 'assets/props/ammo-pickup',
+    source: 'ammo-pickup.glb',
+    output: 'public/models/props/ammo-pickup.runtime.glb',
+    flags: [],
+  },
+  field_radio: {
+    directory: 'assets/props/field-radio',
+    source: 'field-radio.glb',
+    output: 'public/models/player/field-radio.runtime.glb',
+    // Keep the LCD's UVs even though its image is only bound at runtime.
+    flags: ['-kv', '-tc', 'color,attrib'],
+  },
   suppressor12g: attachment('12g-suppressor', 'suppressor12g.glb', 'suppressor12g'),
   suppressor9mm: attachment('compact-9mm', 'suppressor9mm.glb', 'suppressor9mm'),
   suppressor338: attachment('suppressor-338', 'suppressor338.glb', 'suppressor338'),
@@ -59,6 +76,12 @@ export const MODEL_COOKS = {
   acog: attachment('trijicon-acog', 'acog.glb', 'acog'),
   scope: attachment('schmidt-bender-pm-ii', 'scope.glb', 'scope'),
   rmr: attachment('trijicon-rmr', 'rmr.glb', 'rmr'),
+  m67: {
+    directory: 'assets/weapons/m67',
+    source: 'm67.glb',
+    output: 'public/models/weapons/m67.runtime.glb',
+    flags: [],
+  },
   m590: {
     directory: 'assets/weapons/m590',
     source: 'm590.glb',
@@ -119,7 +142,14 @@ export function isModelId(value: string): value is ModelId {
   return Object.hasOwn(MODEL_COOKS, value);
 }
 
-function cookModel(input: string, output: string, flags: string[]): void {
+export function modelCookBaseFlags(id: ModelId): string[] {
+  // Two small opaque atlases: use the browser's WebP decoder, not a Basis worker.
+  return id === 'intel_case'
+    ? [...GEOMETRY_FLAGS, '-tw', '-tq', '9', '-ts', 'attrib', '0.5']
+    : GLTFPACK_FLAGS;
+}
+
+function cookModel(id: ModelId, input: string, output: string): void {
   const encoder = process.env.GLTFPACK ?? 'gltfpack';
   assert.notEqual(input, output, 'never overwrite the native authoring export');
   assert.equal(extname(output), '.glb', 'runtime output must be a self-contained GLB');
@@ -135,7 +165,16 @@ function cookModel(input: string, output: string, flags: string[]): void {
     // Scheduling is machine-local, not part of the output-affecting cache flags.
     execFileSync(
       encoder,
-      ['-i', input, '-o', cooked, ...GLTFPACK_FLAGS, '-tj', String(ENCODING_THREADS), ...flags],
+      [
+        '-i',
+        input,
+        '-o',
+        cooked,
+        ...modelCookBaseFlags(id),
+        '-tj',
+        String(ENCODING_THREADS),
+        ...MODEL_COOKS[id].flags,
+      ],
       { stdio: 'inherit' }
     );
     mkdirSync(dirname(output), { recursive: true });
@@ -148,7 +187,7 @@ function cookModel(input: string, output: string, flags: string[]): void {
 
 if (import.meta.main) {
   const [id, directory] = process.argv.slice(2);
-  assert(process.argv.length <= 4, 'usage: bun run models:cook -- [model-id [asset-directory]]');
+  assert(process.argv.length <= 4, 'usage: bun build/models.ts [model-id [asset-directory]]');
   const ids = id ? [id] : Object.keys(MODEL_COOKS);
   for (const name of ids) {
     assert(
@@ -158,9 +197,9 @@ if (import.meta.main) {
     const model = MODEL_COOKS[name];
     const dir = resolve(directory ?? join(ROOT, model.directory));
     cookModel(
+      name,
       join(dir, model.source),
-      directory ? join(dir, basename(model.output)) : join(ROOT, model.output),
-      model.flags
+      directory ? join(dir, basename(model.output)) : join(ROOT, model.output)
     );
   }
 }

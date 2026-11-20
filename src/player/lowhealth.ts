@@ -35,7 +35,7 @@ export class LowHealthPass {
   }
 
   /** Compile once; the uniform zero state is an exact healthy-player no-op. */
-  asNode(colorTexture: TextureNode<'vec4'>, exposure: TslNode<'float'>): TslNode<'vec4'> {
+  asNode(colorTexture: TextureNode, exposure: TslNode<'float'>): TslNode<'vec4'> {
     return this.asColorNode(colorTexture.sample(screenUV), exposure);
   }
 
@@ -49,7 +49,7 @@ export class LowHealthPass {
         pulse = state.y,
         flash = state.z;
       const d = screenUV.sub(vec2(0.5)).mul(this.aspect);
-      const radius = length(d).mul(1.414);
+      const radius = length(d).mul(Math.SQRT2);
       const wide = smoothstep(0.18, 1, radius);
       const rim = smoothstep(0.34, 1.1, radius);
       const beat = amount.mul(float(0.32).add(pulse.mul(0.68)));

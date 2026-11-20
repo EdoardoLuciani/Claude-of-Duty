@@ -154,6 +154,10 @@ export class Engine {
     this._running = false;
   }
 
+  get running(): boolean {
+    return this._running;
+  }
+
   get gameplaySuspended(): boolean {
     return this._gameplaySuspended;
   }
