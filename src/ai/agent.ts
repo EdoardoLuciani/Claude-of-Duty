@@ -8,11 +8,11 @@ import * as THREE from 'three';
 
 import type { EngineContext } from '../core/context.ts';
 import type { EngineEventMap } from '../core/events.ts';
+import { GRENADE_FUSE, GRENADE_RADIUS } from '../core/grenades.ts';
 import type { Rng } from '../core/rng.ts';
 import type { PhysicsSystem } from '../physics/index.ts';
 import { makeHitRecord } from '../physics/math.ts';
 import { MASK } from '../physics/surfaces.ts';
-import { GRENADE_FUSE, GRENADE_RADIUS } from '../weapons/index.ts';
 import { Animator } from './animator.ts';
 import { NAV_PENDING, NAV_CANCELLED } from './attachment-queries.ts';
 import { LADDER_QUERY_MAX_ITERATIONS } from './attachment-types.ts';

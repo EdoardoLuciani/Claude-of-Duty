@@ -5,6 +5,7 @@ import * as THREE from 'three';
 
 import m590Manifest from '../../assets/weapons/m590/manifest.json' with { type: 'json' };
 import { bindingLabel } from '../../src/core/bindings.ts';
+import { GRENADE_FUSE } from '../../src/core/grenades.ts';
 import { Input } from '../../src/core/input.ts';
 import { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
@@ -22,7 +23,7 @@ import { buildManifestClips, Clip } from '../../src/weapons/clips.ts';
 import { WEAPON_IDS } from '../../src/weapons/defs.ts';
 import type { WeaponId } from '../../src/weapons/defs.ts';
 import { HandEquipment } from '../../src/weapons/hand-equipment.ts';
-import { GRENADE_FUSE, MAX_SHOTS_PER_FRAME } from '../../src/weapons/index.ts';
+import { MAX_SHOTS_PER_FRAME } from '../../src/weapons/index.ts';
 import type { WeaponEntry } from '../../src/weapons/runtime-types.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { ammoPickupFixture } from '../lib/ammo-pickup-fixture.ts';

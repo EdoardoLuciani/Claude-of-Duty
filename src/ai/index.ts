@@ -8,11 +8,11 @@ import * as THREE from 'three';
 
 import type { SystemId, EngineContext, EngineSystems } from '../core/context.ts';
 import type { EngineEventMap } from '../core/events.ts';
+import { GRENADE_FUSE, clearGrenades, updateGrenades, type LiveGrenade } from '../core/grenades.ts';
 import type { SoldierRecord } from '../core/model-metadata.ts';
 import type { Rng } from '../core/rng.ts';
 import type { PhysicsSystem } from '../physics/index.ts';
 import type { SkySystem } from '../sky/index.ts';
-import { GRENADE_RADIUS, GRENADE_DAMAGE, GRENADE_FUSE } from '../weapons/index.ts';
 import { isAliveTeammate } from './actor.ts';
 import { Agent, STATE, PATH_OUTCOME } from './agent.ts';
 import type { AgentOptions } from './agent.ts';
@@ -211,12 +211,7 @@ export class AiSystem {
     position: new THREE.Vector3(),
     velocity: new THREE.Vector3(),
   };
-  _grenades: {
-    body: ReturnType<PhysicsSystem['addRigidBody']>;
-    mesh: THREE.Mesh;
-    fuse: number;
-    agent: Agent;
-  }[] = [];
+  _grenades: LiveGrenade<ReturnType<PhysicsSystem['addRigidBody']>>[] = [];
   _grenadeArc: GrenadeArc = { dx: 0, dz: 0, dist: 0, vy: 0, vh: 0, tAir: 0, y: 0, valid: false };
   _grenadePoint: THREE.Vector3 = new THREE.Vector3();
   _grenadeStep: THREE.Vector3 = new THREE.Vector3();
@@ -966,11 +961,7 @@ export class AiSystem {
     this.ladderClaims.clear();
     this._ladderQueue.clear();
     this.squads.length = 0;
-    for (const g of this._grenades) {
-      this.phys.removeRigidBody(g.body);
-      g.mesh.removeFromParent();
-    }
-    this._grenades.length = 0;
+    clearGrenades(this._grenades, this._phys);
     this._wave = 0;
     this._waveTotal = 0;
     this._waveRemaining = 0;
@@ -1163,28 +1154,13 @@ export class AiSystem {
       object3D: mesh,
       surfaceType: 'metal',
     });
-    this._grenades.push({ body, mesh, fuse: GRENADE_FUSE, agent });
+    this._grenades.push({ body, mesh, fuse: GRENADE_FUSE, source: agent });
     agent.animator.fire(0.35);
     return true;
   }
 
   _updateGrenades(dt: number): void {
-    for (let i = this._grenades.length - 1; i >= 0; i--) {
-      const g = this._grenades[i];
-      g.fuse -= dt;
-      if (g.fuse > 0) continue;
-      const p = g.body.position;
-      this.ctx.events.emit('explosion', {
-        kind: 'grenade',
-        position: new THREE.Vector3(p.x, p.y, p.z),
-        radius: GRENADE_RADIUS,
-        damage: GRENADE_DAMAGE,
-        source: g.agent,
-      });
-      this.phys.removeRigidBody(g.body);
-      this.root.remove(g.mesh);
-      this._grenades.splice(i, 1);
-    }
+    updateGrenades(this._grenades, dt, this.ctx, this._phys);
   }
 
   update(dt: number, ctx: EngineContext): void {
@@ -1831,11 +1807,7 @@ export class AiSystem {
     this.ladderClaims?.clear();
     this._ladderQueue?.clear();
     this.squads.length = 0;
-    for (const g of this._grenades) {
-      this.phys?.removeRigidBody(g.body);
-      this.root.remove(g.mesh);
-    }
-    this._grenades.length = 0;
+    clearGrenades(this._grenades, this._phys);
     this.ground?.dispose();
     this.grid?.dispose();
     this.grid = null;
