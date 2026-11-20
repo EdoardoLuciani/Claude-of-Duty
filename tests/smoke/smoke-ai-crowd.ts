@@ -5,6 +5,7 @@ import type { Vector3 } from 'three';
 import { bakePhysicsNav } from '#worldgen/nav-bake';
 
 import { SurfaceNav } from '../../src/ai/nav.ts';
+import type { PathResult } from '../../src/ai/path-result.ts';
 import { makeAi } from '../lib/agent-fixture.ts';
 import { synthetic, vec } from '../lib/nav240/fixtures.ts';
 import { makeWalker, WalkerAgent } from '../lib/nav240/harness.ts';
@@ -18,12 +19,12 @@ ai.groundAt = (x, z, y): number => f.physics.groundHeight(x, z, y);
 let frame = 0;
 const first: (number | null)[] = Array.from({ length: 4 }, (): null => null);
 const request = ai.requestPath.bind(ai);
-ai.requestPath = (...args): number => {
-  const n = request(...args);
-  const actor = args[3];
+ai.requestPath = (...args): PathResult => {
+  const result = request(...args);
+  const actor = args[4];
   assert(actor);
-  if (n >= 0 && first[actor.id] === null) first[actor.id] = frame;
-  return n;
+  if (result.outcome !== 'deferred' && first[actor.id] === null) first[actor.id] = frame;
+  return result;
 };
 const goals: Vector3[] = [];
 const reached = new Array<boolean>(4).fill(false);

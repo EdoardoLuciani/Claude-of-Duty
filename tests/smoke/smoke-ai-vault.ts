@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { Vector3, Mesh, BoxGeometry, MeshBasicMaterial } from 'three';
 
 import { INFANTRY } from '../../src/ai/capabilities.ts';
-import { CoverMap } from '../../src/ai/nav.ts';
+import { CoverMap, type SurfaceNav } from '../../src/ai/nav.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
 import { makeWalker } from '../lib/nav240/harness.ts';
 import { testNav } from '../lib/test-nav.ts';
@@ -75,7 +75,7 @@ phys.removeStatic(occupied);
 phys.rebuildStatic();
 
 const candidate = {
-  query(start: Vector3, end: Vector3): { points: Vector3[]; outcome: string | null } {
+  query(start: Vector3, end: Vector3): { points: Vector3[]; outcome: SurfaceNav['lastOutcome'] } {
     const points: Vector3[] = [],
       n = nav.findPath(start, end, points);
     return { outcome: nav.lastOutcome, points: points.slice(0, n) };

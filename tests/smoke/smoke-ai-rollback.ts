@@ -12,6 +12,7 @@ import {
 } from 'three';
 
 import { AiSystem } from '../../src/ai/index.ts';
+import type { SurfaceNav } from '../../src/ai/nav.ts';
 import type { EngineSystems } from '../../src/core/context.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
 import { makeAgent } from '../lib/agent-fixture.ts';
@@ -30,7 +31,7 @@ const candidate = {
   query(
     from: Vector3,
     to: Vector3
-  ): { points: Vector3[]; outcome: string | null; reason?: string | null } {
+  ): { points: Vector3[]; outcome: SurfaceNav['lastOutcome']; reason?: string | null } {
     const points: Vector3[] = [];
     grid.findPath(from, to, points);
     return { points, outcome: grid.lastOutcome, reason: grid.lastReason };

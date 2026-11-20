@@ -90,7 +90,10 @@ const direct = {
   query: (
     _from: THREE.Vector3,
     to: THREE.Vector3
-  ): { outcome: string; points: THREE.Vector3[] } => ({ outcome: 'success', points: [to.clone()] }),
+  ): { outcome: 'success'; points: THREE.Vector3[] } => ({
+    outcome: 'success',
+    points: [to.clone()],
+  }),
 };
 for (const scale of [1, INFANTRY.maxScale])
   for (const slopeLimit of [48, INFANTRY.slopeRadians]) {
