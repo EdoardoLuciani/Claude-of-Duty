@@ -279,6 +279,14 @@ that borrow the same geometry, material and maps as the held prop. Weapons warm
 both render passes; restart removes live instances, and teardown releases the
 shared asset after AI and the viewmodel have detached their visuals.
 
+`src/weapons/hand-equipment.ts` owns the mutually exclusive gameplay hand states:
+weapon, bandage, radio, and a grenade from free equip through cooking, commitment,
+and release. Weapon actions keep their own clip gates; the viewmodel plays clips and
+reports the release beat, but only the hand state can authorize a launch. Death drops
+a cooking grenade; death or an immediate weapon swap releases an already committed
+throw once. Restart discards held equipment without launching it. The player owns
+heal timing and effects, and radio owns strike execution.
+
 The held field radio is a standalone authored GLB. `radio-mesh.ts` loads it during
 weapons boot and binds one retained canvas emissive texture to `SCREEN_radio`.
 The viewmodel mounts it at `GRIP_radio`, owns the asset lifetime, and keeps the

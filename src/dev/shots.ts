@@ -173,11 +173,7 @@ export const SHOTS: Record<string, ShotDefinition> = {
     apply: (e): void => {
       e.ctx.peek('weapons')?.debugPose('idle');
       const w = e.ctx.peek('weapons');
-      if (w) {
-        w.radioEquipped = true;
-        w.viewmodel.holdRadio();
-        w.viewmodel.setRadioScreen(1, 0);
-      }
+      if (w?._equipRadio()) w.viewmodel.setRadioScreen(1, 0);
     },
     doc: 'Field radio held — accessory screen, hand pose, charge readout.',
   },
