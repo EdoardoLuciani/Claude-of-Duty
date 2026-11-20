@@ -11,6 +11,7 @@ import type { Agent } from '../../src/ai/agent.ts';
 import { STATE, PATH_OUTCOME, EVIDENCE, SEARCH_DURATION } from '../../src/ai/agent.ts';
 import { AiSystem } from '../../src/ai/index.ts';
 import { SurfaceNav } from '../../src/ai/nav.ts';
+import type { PathResult } from '../../src/ai/path-result.ts';
 import { Squad } from '../../src/ai/squad.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
 import { WorldSystem } from '../../src/world/index.ts';
@@ -69,10 +70,10 @@ function countPaths(
   let maxFrame = 0;
   let frameSolves = 0;
   const orig = AiSystem.prototype.requestPath.bind(ai);
-  ai.requestPath = function (from, dest, out): number {
+  ai.requestPath = (...args): PathResult => {
     total++;
-    const n = orig(from, dest, out);
-    if (n >= 0) frameSolves++;
+    const n = orig(...args);
+    if (n.outcome !== 'deferred') frameSolves++;
     return n;
   };
   fn((dt): void => {
@@ -102,7 +103,7 @@ for (const goal of [new THREE.Vector3(0.8, 0, 0), new THREE.Vector3(0, 0.2, 0)])
     query(
       from: THREE.Vector3,
       to: THREE.Vector3
-    ): { points: THREE.Vector3[]; outcome: string | null; reason: string | null } {
+    ): { points: THREE.Vector3[]; outcome: SurfaceNav['lastOutcome']; reason: string | null } {
       const points: THREE.Vector3[] = [];
       connected.findPath(from, to, points);
       return { points, outcome: connected.lastOutcome, reason: connected.lastReason };
@@ -400,9 +401,9 @@ for (const goal of [new THREE.Vector3(0.8, 0, 0), new THREE.Vector3(0, 0.2, 0)])
     return solve(...args);
   };
   const orig = AiSystem.prototype.requestPath.bind(ai);
-  ai.requestPath = function (from, dest, out): number {
+  ai.requestPath = (...args): PathResult => {
     req++;
-    return orig(from, dest, out);
+    return orig(...args);
   };
   assert.ok(a.patrolPoints);
   const ok = a._goTo(a.patrolPoints[0]);

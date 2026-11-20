@@ -24,6 +24,7 @@ import { LADDER, LadderMotor, ladderMoveBudget } from './ladder.ts';
 import type { LadderDescriptor, LadderCursor } from './ladder.ts';
 import type { BakedCoverPoint } from './nav-format.ts';
 import type { CoverMap, NavCache, SurfaceNav, NavRoute, NavLadderStep } from './nav.ts';
+import { createPathCompletion } from './path-result.ts';
 import { RIG } from './rig.ts';
 import type { Squad } from './squad.ts';
 import { COMBAT, TACTICS, acquireSeconds, applySpread } from './tuning.ts';
@@ -329,6 +330,7 @@ export class Agent {
   lastRollback: { t: number; from: THREE.Vector3Tuple; to: THREE.Vector3Tuple } | null = null;
   /** Destination of a path request deferred by the frame budget. */
   _pendingDest: THREE.Vector3 = new THREE.Vector3();
+  private readonly _pathCompletion = createPathCompletion();
   pathOutcome: string | null = null;
   pathObjective: string | null = null;
   pathReqFloor: number = NaN;
@@ -1974,39 +1976,28 @@ export class Agent {
       this._coverPathMax = Infinity;
     }
     this._pendingDest.copy(dest);
-    const grid = this.ai.grid;
-    if (!grid) {
-      this.pathOutcome = PATH_OUTCOME.INVALID;
-      this.pathReason = 'nav-unavailable';
-      this.pathReqFloor = dy;
-      this.pathResFloor = NaN;
-      this.pathStartSurface = this.pathGoalSurface = 0;
-      this.hasMoveTarget = this.pathPending = false;
-      this.pathLen = 0;
-      this._notePathFail();
-      return false;
-    }
-    // Every objective submits actual feet and the actual goal. The shared
-    // navigator validates attachments; callers must not hide a bad start by snapping it.
-    const n = this.ai.requestPath(this.position, dest, this.path, this);
-    this.pathOutcome = this.ai.lastPathOutcome;
-    if (this.pathOutcome !== PATH_OUTCOME.DEFERRED) {
-      this.pathReqFloor = dy;
-      this.pathResFloor = this.ai.lastPathResFloor;
-      this.pathReason = this.ai.lastPathReason;
-      this.pathStartSurface = this.ai.lastPathStartSurface;
-      this.pathGoalSurface = this.ai.lastPathGoalSurface;
-    }
-    if (n < 0) {
-      // Preserve the request for retry; budget deferral is not an unreachable goal.
+    // Validate actual feet and goal; do not hide a bad start by snapping it.
+    const result = this.ai.requestPath(this.position, dest, this.path, this._pathCompletion, this);
+    this.pathOutcome = result.outcome;
+    if (result.outcome === PATH_OUTCOME.DEFERRED) {
+      // A deferral leaves the active route and the last resolved diagnostics alone.
       this.pathPending = true;
-      if (this.ai.lastPathReason === 'attachment-pending') this._waitingNav = true;
+      if (result.reason === 'attachment-pending') this._waitingNav = true;
       return false;
     }
+    const { count: n, reason } = result;
+    this.pathReqFloor = dy;
+    this.pathResFloor = result.resolvedFloor;
+    this.pathReason = reason;
+    this.pathStartSurface = result.startSurface;
+    this.pathGoalSurface = result.goalSurface;
     this.pathPending = false;
-    this._waitingNav = false;
     const coverPathMax = this._coverPathMax;
-    this._coverPathMax = Infinity;
+    // Unavailable navigation did not attempt the route or consume its cost limit.
+    if (reason !== 'nav-unavailable') {
+      this._waitingNav = false;
+      this._coverPathMax = Infinity;
+    }
     if (n > 0 && Number.isFinite(coverPathMax)) {
       let length = this.position.distanceTo(this.path[0]);
       for (let i = 1; i < n; i++) length += this.path[i - 1].distanceTo(this.path[i]);

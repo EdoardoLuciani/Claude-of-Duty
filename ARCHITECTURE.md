@@ -156,6 +156,11 @@ bounded native budgets and tactical revalidation. Unknown is never provisional
 success or unreachable; failures are terminal, with no main-thread fallback. Async
 admission is not same-tick seeded replay determinism.
 
+`AiSystem.requestPath()` returns a completion in caller-owned storage or an
+explicit budget, worker-pending or superseded deferral. Deferral leaves the
+active route and resolved floor/surface diagnostics intact; only completed
+attempts spend the frame's solve budget.
+
 ## Render
 
 Public render surface:

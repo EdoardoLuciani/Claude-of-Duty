@@ -14,7 +14,7 @@ import type { Rng } from '../core/rng.ts';
 import type { PhysicsSystem } from '../physics/index.ts';
 import type { SkySystem } from '../sky/index.ts';
 import { isAliveTeammate } from './actor.ts';
-import { Agent, STATE, PATH_OUTCOME } from './agent.ts';
+import { Agent, STATE } from './agent.ts';
 import type { AgentOptions } from './agent.ts';
 import { AttachmentQueries } from './attachment-queries.ts';
 import { GroundShadows } from './grounding.ts';
@@ -23,6 +23,7 @@ import { createLadderDescriptors } from './ladder.ts';
 import type { LadderDescriptor } from './ladder.ts';
 import { NAV_VERSION } from './nav-format.ts';
 import { SurfaceNav, CoverMap, NAV_PENDING, NAV_CANCELLED } from './nav.ts';
+import { PATH_DEFERRED, type PathCompletion, type PathResult } from './path-result.ts';
 import { RIG } from './rig.ts';
 import { prepareSoldierSurfaces, resolveVariantName, VARIANTS } from './soldier.ts';
 import { Squad } from './squad.ts';
@@ -220,11 +221,6 @@ export class AiSystem {
   /** Shared solve budget, including endpoint checks. Serve deferred actors
    *  round-robin before fresh requests; entering combat must not burst solves. */
   pathsPerFrame: number = 2;
-  lastPathOutcome: string | null = null;
-  lastPathResFloor: number = NaN;
-  lastPathReason: string | null = null;
-  declare lastPathStartSurface: number;
-  declare lastPathGoalSurface: number;
   _pathCursor: number = 0;
   _frustum: THREE.Frustum = new THREE.Frustum();
   _mvp: THREE.Matrix4 = new THREE.Matrix4();
@@ -261,7 +257,6 @@ export class AiSystem {
     this.ground = new GroundShadows(this.root, 16);
 
     this.stats.pathsDeferred = 0;
-    this.lastPathStartSurface = this.lastPathGoalSurface = 0;
 
     this._wireEvents(ctx);
     console.info(
@@ -1274,32 +1269,27 @@ export class AiSystem {
     g.end();
   }
 
-  /**
-   * Shared surface query, rationed. Returns the waypoint count, or -1 when this
-   * frame's budget is spent — the caller keeps its old path and asks again next
-   * frame, which is invisible at 60 Hz and turns a squad-wide repath (six solves,
-   * ~5 ms, on the frame the player opens fire) into two solves per frame.
-   */
+  /** Ration completed solves; deferrals preserve both caller buffers for retry. */
   requestPath(
     from: THREE.Vector3,
     dest: THREE.Vector3,
     out: THREE.Vector3[],
+    completion: PathCompletion,
     actor: Agent | null = null
-  ): number {
-    if (!this.grid) {
-      this.lastPathOutcome = PATH_OUTCOME.INVALID;
-      this.lastPathReason = 'nav-unavailable';
-      this.lastPathResFloor = NaN;
-      this.lastPathStartSurface = this.lastPathGoalSurface = 0;
-      return 0;
+  ): PathResult {
+    const grid = this.grid;
+    if (!grid) {
+      completion.outcome = 'invalid';
+      completion.reason = 'nav-unavailable';
+      completion.count = 0;
+      completion.resolvedFloor = NaN;
+      completion.startSurface = completion.goalSurface = 0;
+      return completion;
     }
     if (this._pathBudget <= 0) {
       this.stats.pathsDeferred++;
-      this.lastPathOutcome = PATH_OUTCOME.DEFERRED;
-      this.lastPathReason = 'frame-budget';
-      return -1;
+      return PATH_DEFERRED.budget;
     }
-    const grid = this.grid;
     const solve = (): number =>
       actor && out === actor.path
         ? grid.findRoute(from, dest, actor.route, actor)
@@ -1307,17 +1297,16 @@ export class AiSystem {
     const n = grid.worker ? grid.worker.run(actor?.id ?? -1, 'path', solve, from) : solve();
     if (n === NAV_PENDING || n === NAV_CANCELLED) {
       this.stats.pathsDeferred++;
-      this.lastPathOutcome = PATH_OUTCOME.DEFERRED;
-      this.lastPathReason = n === NAV_PENDING ? 'attachment-pending' : 'attachment-superseded';
-      return -1;
+      return n === NAV_PENDING ? PATH_DEFERRED.pending : PATH_DEFERRED.superseded;
     }
     this._pathBudget--;
-    this.lastPathOutcome = this.grid.lastOutcome;
-    this.lastPathReason = this.grid.lastReason;
-    this.lastPathResFloor = this.grid.resolvedFloor;
-    this.lastPathStartSurface = this.grid.startSurface;
-    this.lastPathGoalSurface = this.grid.goalSurface;
-    return n;
+    completion.count = n;
+    completion.outcome = grid.lastOutcome;
+    completion.reason = grid.lastReason;
+    completion.resolvedFloor = grid.resolvedFloor;
+    completion.startSurface = grid.startSurface;
+    completion.goalSurface = grid.goalSurface;
+    return completion;
   }
 
   _servePendingPaths(): void {
