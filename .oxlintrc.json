@@ -2,6 +2,23 @@
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "overrides": [
     {
+      "files": ["src/ui/market-stats.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "(^|/)weapons/(attachments|asset-loader)(\\.ts)?$",
+                "allowTypeImports": true,
+                "message": "Market stats use weapon definitions and attachment-rules.ts, not mounting or loading."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "files": ["tools/worldgen/level/placements/**"],
       "rules": { "oxc/approx-constant": "off" }
     },
