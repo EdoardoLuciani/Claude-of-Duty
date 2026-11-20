@@ -14,10 +14,10 @@ import { MeshBasicNodeMaterial, MeshStandardNodeMaterial } from 'three/webgpu';
 import { disposeMaterials } from '../core/dispose-materials.ts';
 import { isSingleMaterialMesh, isTexture } from '../core/three-guards.ts';
 
-const URL = 'models/props/intel-case.runtime.glb';
+const INTEL_CASE_URL = '/models/props/intel-case.runtime.glb';
 
 export async function loadIntelScene(): Promise<Group> {
-  const model = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(URL);
+  const model = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(INTEL_CASE_URL);
   return model.scene;
 }
 
