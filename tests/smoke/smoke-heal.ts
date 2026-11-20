@@ -449,12 +449,13 @@ for (const motion of [
   wp.viewmodel.play('reloadTac');
   check('cannot start during reload', wp.canBeginHeal() === false);
   wp.viewmodel.stopClip();
-  wp.grenadeEquipped = true;
+  input._pressed.add('KeyG');
+  wp._updateGrenade(0, input, true);
   check('cannot start during grenade', wp.canBeginHeal() === false);
-  wp.grenadeEquipped = false;
-  wp.radioEquipped = true;
+  assert(wp.setWeapon(wp.activeId));
+  assert(wp._equipRadio());
   check('cannot start during radio', wp.canBeginHeal() === false);
-  wp.radioEquipped = false;
+  assert(wp.setWeapon(wp.activeId));
   wp.endHeal();
 }
 

@@ -29,7 +29,7 @@ import {
   fixtureBuffer,
   FixtureAudioBuffer,
 } from '../lib/audio-fixture.ts';
-import { createTestContext } from '../lib/context.ts';
+import { createTestContext, createTestInput } from '../lib/context.ts';
 import { fixture } from '../lib/fixture.ts';
 
 assert.equal(
@@ -229,10 +229,12 @@ assert.equal(weapon._fireTimer, 0.25);
 assert.equal(weapon.tryFire(), false);
 assert.equal(dryCalls.length, 1, 'cooldown prevents duplicate click');
 weapon._fireTimer = 0;
-weapon.grenadeEquipped = true;
+const grenadeInput = createTestInput();
+grenadeInput._pressed.add('KeyG');
+weapon._updateGrenade(0, grenadeInput, true);
 assert.equal(weapon.tryFire(), false);
 assert.equal(dryCalls.length, 1);
-weapon.grenadeEquipped = false;
+weapon._stowGrenade();
 weapon.disabled = true;
 assert.equal(weapon.tryFire(), false);
 assert.equal(dryCalls.length, 1);
