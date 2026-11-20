@@ -319,25 +319,30 @@ export class WeaponSystem {
     });
     const grenade = loadGrenade(renderer).then((asset): void => {
       this._grenadeAsset = asset;
-      this.viewmodel.grenade.add(asset.instantiate());
+      const held = asset.instantiate();
+      held.frustumCulled = false; // like the other first-person meshes
+      this.viewmodel.grenade.add(held);
     });
     const radio = this.viewmodel.loadRadio(renderer);
-    try {
-      const [records] = await Promise.all([
-        Promise.all(spawn.map(load)),
-        attachments,
-        grenade,
-        radio,
-      ]);
-      for (let i = 0; i < spawn.length; i++) {
-        tris += this.viewmodel.addWeapon(
-          records[i],
-          this._requireState(spawn[i]).def,
-          this._requireState(spawn[i]).attachments,
-          this._attachments
-        ).tris;
+    const mounts = Promise.all([Promise.all(spawn.map(load)), attachments]).then(
+      ([records]): void => {
+        for (let i = 0; i < spawn.length; i++) {
+          tris += this.viewmodel.addWeapon(
+            records[i],
+            this._requireState(spawn[i]).def,
+            this._requireState(spawn[i]).attachments,
+            this._attachments
+          ).tris;
+        }
       }
-      this._pickups = await AmmoPickups.load(this, renderer);
+    );
+    // Queue pickup parsing after the spawn weapons, but fetch its bytes alongside theirs.
+    const pickups = AmmoPickups.load(this, renderer).then((pool): void => {
+      this._pickups = pool;
+    });
+    const startup = [mounts, attachments, grenade, radio, pickups];
+    try {
+      await Promise.all(startup);
       this._restTask = (async (): Promise<void> => {
         try {
           await this._mountRest(rest, load);
@@ -346,8 +351,8 @@ export class WeaponSystem {
         }
       })();
     } catch (error) {
-      // Settle required and optional props so disposal owns every completed load.
-      await Promise.allSettled([attachments, grenade, radio]);
+      // Finish mounting/claiming successful loads before teardown.
+      await Promise.allSettled(startup);
       await disposeWeaponLoader(renderer);
       throw error;
     }
@@ -1322,6 +1327,10 @@ export class WeaponSystem {
     this.sim.fixedUpdate(h);
   }
 
+  private canEquipAccessory(): boolean {
+    return !this.cooking && !this._throwing && !this.switching && !this.cycling;
+  }
+
   /**
    * Grenade flow: G equips the grenade (weapon stowed). While it is in hand,
    * LMB cooks and throws LONG, RMB cooks and throws SHORT. The fuse burns only
@@ -1334,9 +1343,8 @@ export class WeaponSystem {
     if (!live) return; // death drops the grenade via its own listener
 
     // G equips the grenade; weapon keys stow it.
-    if (input.actionPressed('grenade')) {
-      if (this.cooking || this._throwing || this.switching) return; // hands are busy
-      if (this.grenadeEquipped) return;
+    if (!this.grenadeEquipped && input.actionPressed('grenade')) {
+      if (!this.canEquipAccessory()) return;
       this._interruptHeal('grenade');
       if (this.grenades > 0) {
         if (this.radioEquipped) this._stowRadio();
@@ -1570,24 +1578,23 @@ export class WeaponSystem {
   /** X equips the radio; weapon keys stow it. Arrows move the LCD cursor, Enter sends. */
   _updateRadio(input: EngineContext['input'], live: boolean): void {
     if (!live) return;
-    const busy = this.cooking || this._throwing || this.switching || this.grenadeEquipped;
-    if (input.actionPressed('radio')) {
-      if (!this.radioEquipped && !busy) {
-        this._interruptHeal('radio');
-        this.radioEquipped = true;
-        this._radioCursor = 0;
-        if (this.reloading) this._viewmodel?.stopClip();
-        this._viewmodel?.holdRadio();
-        this.audio?.playUi('radio_open', 0.9);
-      }
-    } else if (this.radioEquipped) {
+    if (!this.radioEquipped) {
+      if (!input.actionPressed('radio') || this.grenadeEquipped || !this.canEquipAccessory())
+        return;
+      this._interruptHeal('radio');
+      this.radioEquipped = true;
+      this._radioCursor = 0;
+      if (this.reloading) this._viewmodel?.stopClip();
+      this._viewmodel?.holdRadio();
+      this.audio?.playUi('radio_open', 0.9);
+    } else {
       const step =
         Number(input.actionPressed('radioDown')) - Number(input.actionPressed('radioUp'));
       this._radioCursor = clamp(this._radioCursor + step, 0, RADIO_REQUESTS - 1);
       if (input.actionPressed('radioSend')) this._sendRequest();
     }
     // The LCD redraws only when the count or cursor actually changes.
-    if (this.radioEquipped) this._viewmodel?.setRadioScreen(this.carpetBombs, this._radioCursor);
+    this._viewmodel?.setRadioScreen(this.carpetBombs, this._radioCursor);
   }
 
   _sendRequest(): void {
@@ -1601,7 +1608,8 @@ export class WeaponSystem {
         return;
       }
       // Back to the weapon; the accepted radio:strike event owns the UI/audio acknowledgment once.
-      this.setWeapon(this.activeId);
+      this._stowRadio();
+      this._viewmodel?.play('draw');
       return;
     }
     this.audio?.playUi('radio_denied', 0.9);

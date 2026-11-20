@@ -39,18 +39,6 @@ independently to the M590's authored in-game proportions (70 mm / 11.05 mm).
 The pool uses its own shared vertex-finish material and draws the hulls once per
 relevant world pass. The Blender material previews the same vertex finishes.
 
-| Per-hull asset metric | Baseline | Blender hull |
-| --- | ---: | ---: |
-| Indexed triangles submitted (nondegenerate) | 768 (640) | 596 (596) |
-| Exported vertices | 462 | 408 |
-| Geometry attribute + index bytes | 28,632 | 19,896 |
-| Runtime GLB bytes | 30,452 | 21,176 |
-| Primitives / materials | 1 / 1 | 1 / 1 |
-| Texture bytes | 0 | 0 |
-
-Geometry bytes are the loaded typed-array lengths, excluding driver padding and
-the shared instance buffer. At full pool occupancy, each world pass submits
-8,344 hull triangles, down from 10,752 (one instanced draw in both cases). For visual signoff, compare airborne and resting
-hulls, a rapid M590 sequence, and close mouth/primer views in daylight and
-artificial light. Match camera, pose and exposure, and inspect the red against
-the M590 insertion round. Source checks do not replace human in-engine review.
+The [cook](../../../tools/blender/spent_hull/cook.ts) enforces vertex, triangle
+and file-size limits. Review airborne and resting hulls against the M590 insertion
+round in daylight and artificial light.

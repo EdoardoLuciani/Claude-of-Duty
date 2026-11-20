@@ -290,11 +290,18 @@ for (const [primary, first, second] of [
   assert.equal(wp._pendingShots, 1, 'pellets still produce one accepted-shot event');
 }
 {
-  const { wp } = makeHarness();
+  const { wp, tap } = makeHarness();
   assert(wp.applyBuild('sniper', BASE_ATTACHMENTS) && wp.tryFire());
   assert(
     !wp.state.chambered && !wp.tryFire() && !wp.setWeapon('pistol'),
     'bolt cycle blocks fire/switch'
+  );
+  tap('KeyX');
+  tap('KeyG');
+  tap('Digit1');
+  assert(
+    wp.cycling && !wp.radioEquipped && !wp.grenadeEquipped,
+    'accessories preserve the bolt cycle'
   );
   wp.viewmodel.stopClip();
   wp._fireTimer = 0;
@@ -801,7 +808,7 @@ for (const gate of ['frozen', 'disabled']) {
   assert.equal(wp._radioCursor, 2, 'the cursor stops at the last request');
   tap('ArrowUp');
   tap('ArrowUp');
-  tap('Enter');
+  tap('KeyX', 'Enter');
   assert.equal(strikes, 1);
   assert.equal(wp.carpetBombs, 0);
   assert(!wp.radioEquipped);
@@ -872,7 +879,7 @@ for (const [code, other, action, type] of [
 {
   const { wp, tap, frame } = makeHarness();
   tap('KeyG');
-  tap('Mouse0', 'Mouse2');
+  tap('KeyG', 'Mouse0', 'Mouse2');
   assert.equal(wp._cookAction, 'fire', 'fire wins simultaneous cook edges');
   frame();
   assert(wp._throwing, 'same-frame tap commits next update via initiating action no longer held');

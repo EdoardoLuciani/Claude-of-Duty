@@ -5,11 +5,11 @@ import type { AttributeNode, Renderer } from 'three/webgpu';
 
 import { bindingLabel } from '../core/bindings.ts';
 import type { EngineContext } from '../core/context.ts';
+import { disposeMaterials } from '../core/dispose-materials.ts';
 import type { EngineEventMap } from '../core/events.ts';
 import type { Rng } from '../core/rng.ts';
 import { isMesh, isSingleMaterialMesh, isTexture } from '../core/three-guards.ts';
 import { loadWeaponGLTF } from './asset-loader.ts';
-import { disposeWeaponMaterials } from './asset-material.ts';
 import type { WeaponSystem } from './index.ts';
 
 const PICKUP_RADIUS = 2.05;
@@ -108,7 +108,7 @@ export class AmmoPickups {
         for (const value of Object.values(material)) if (isTexture(value)) textures.add(value);
       }
     });
-    disposeWeaponMaterials({ materials, textures });
+    disposeMaterials({ materials, textures });
     throw new Error('[weapons] ammo-pickup.runtime.glb: expected one untransformed PBR Ammo_Case');
   }
 
@@ -372,6 +372,6 @@ export class AmmoPickups {
     const { case: material } = this.materials;
     const textures = new Set<THREE.Texture>();
     for (const value of Object.values(material)) if (isTexture(value)) textures.add(value);
-    disposeWeaponMaterials({ materials: new Set([material]), textures });
+    disposeMaterials({ materials: new Set([material]), textures });
   }
 }

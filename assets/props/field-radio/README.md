@@ -49,33 +49,8 @@ The native and cooked GLBs from two clean same-host builds were byte-identical.
   Stow, pause and restart retain the same model and canvas; viewmodel teardown
   disposes the owned geometry, materials and textures.
 
-## Measured held budgets
+Keep the housing and LCD to one draw each, with no extra lights or transmission
+passes. The [export check](../../../tools/blender/field_radio/check.py) enforces vertex and triangle limits.
 
-| Prop only | Before | FR-12 |
-| --- | ---: | ---: |
-| Draws / materials (native view pass) | 14 / 5 | 2 / 2 |
-| Triangles / vertices | 246 / 397 | 1,206 / 1,648 |
-| Loaded index + attribute bytes | 14,180 | 46,788 |
-| Resident texture payload (including LCD mips, RDNA 4 BC7) | ~171 KiB | ~597 KiB |
-| Dedicated runtime GLB | None | 76,424 B |
-
-The extra geometry gives the housing curved corners, seating/recesses and a
-shaped antenna/encoder. Extra texture memory buys the static labels, grille,
-material variation and visible wear while keeping one housing draw. The prop
-reduces native submissions and reuses the LCD allocation instead of replacing it.
-No extra lights or transmission passes. Texture payload excludes driver allocation
-padding; it is not a whole-renderer memory measurement.
-
-At 1920 × 1080 high quality on AMD RDNA 4 native WebGPU, a frozen gameplay
-fixture alternated held/hidden for 96 measured frames of each. Median whole-graph
-CPU submit was 3.9/3.7 ms before and 4.5/4.4 ms with the FR-12; GPU render-pass
-sum was 5.666/5.658 ms before and 5.637/5.626 ms after. The median within-pair
-held-minus-hidden CPU delta was 0.1 ms before and 0.0 ms after; the GPU delta
-(0.003/0.020 ms) was small relative to variability. These are not isolated prop
-GPU times or evidence of a whole-frame speedup.
-
-Use `bun tools/capture.ts --shot=radio --out=.cache/radio.png` for held context.
-Review a matched close-up by cropping the view camera (without moving either
-camera), daylight and streetlight/night, and both available/empty request rows.
-Check glove seating and controls independently of screen text, and compare the
-finish next to the current M4. In-engine captures do not replace human approval.
+Use `bun tools/capture.ts --shot=radio --out=.cache/radio.png` to review glove
+seating and LCD legibility in daylight and darkness, with charges available and empty.

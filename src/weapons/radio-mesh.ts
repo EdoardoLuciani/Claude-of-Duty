@@ -2,9 +2,10 @@ import * as THREE from 'three';
 import { MeshPhysicalNodeMaterial } from 'three/webgpu';
 
 import { bindingLabel } from '../core/bindings.ts';
+import { disposeMaterials } from '../core/dispose-materials.ts';
 import { isMesh, isSingleMaterialMesh } from '../core/three-guards.ts';
 import { loadWeaponGLTF } from './asset-loader.ts';
-import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
+import { convertWeaponScene, type WeaponSceneMaterials } from './asset-material.ts';
 
 /** Handheld radio. Origin at the grip; +Y up the body, screen on +Z. */
 
@@ -76,14 +77,15 @@ export async function loadRadio(renderer: Parameters<typeof loadWeaponGLTF>[0]):
   scene.traverse((object): void => {
     if (isMesh(object)) geometries.add(object.geometry);
   });
-  const finishes = convertWeaponScene(scene);
+  let finishes: WeaponSceneMaterials = { materials: new Set(), textures: new Set() };
   const dispose = (): void => {
     scene.removeFromParent();
     for (const geometry of geometries) geometry.dispose();
     geometries.clear();
-    disposeWeaponMaterials(finishes);
+    disposeMaterials(finishes);
   };
   try {
+    finishes = convertWeaponScene(scene);
     const grip = scene.getObjectByName('GRIP_radio');
     const housing = scene.getObjectByName('Radio_housing');
     const screen = scene.getObjectByName('SCREEN_radio');

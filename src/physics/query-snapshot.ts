@@ -2,34 +2,25 @@
 // unused BVH capacity. Scratch remains worker-owned.
 import { StaticWorld } from './bvh.ts';
 
+const BUFFER_KEYS = [
+  'pos',
+  'nrm',
+  'surface',
+  'mask',
+  'object',
+  'triIndex',
+  'nodeBounds',
+  'nodeMeta',
+  'triBounds',
+] as const;
+type BufferKey = (typeof BUFFER_KEYS)[number];
+
 /** Query-only copy of a StaticWorld, sent to the AI attachment worker. */
 export type QuerySnapshot = Pick<
   StaticWorld,
-  | 'version'
-  | 'dirty'
-  | 'nodeCount'
-  | 'triCount'
-  | 'pos'
-  | 'nrm'
-  | 'surface'
-  | 'mask'
-  | 'object'
-  | 'triIndex'
-  | 'nodeBounds'
-  | 'nodeMeta'
-  | 'triBounds'
+  BufferKey | 'version' | 'dirty' | 'nodeCount' | 'triCount'
 > & { stackSize: number };
 
-type BufferKey =
-  | 'pos'
-  | 'nrm'
-  | 'surface'
-  | 'mask'
-  | 'object'
-  | 'triIndex'
-  | 'nodeBounds'
-  | 'nodeMeta'
-  | 'triBounds';
 type SnapshotBuffer = QuerySnapshot[BufferKey];
 
 function sameBuffer<T extends SnapshotBuffer>(value: unknown, source: T): value is T {
@@ -82,17 +73,7 @@ export async function querySnapshot(
   function storeBuffer<K extends BufferKey>(name: K, copy: QuerySnapshot[K]): void {
     snapshot[name] = copy;
   }
-  for (const name of [
-    'pos',
-    'nrm',
-    'surface',
-    'mask',
-    'object',
-    'triIndex',
-    'nodeBounds',
-    'nodeMeta',
-    'triBounds',
-  ] as const) {
+  for (const name of BUFFER_KEYS) {
     const length = lengths[name];
     if (!valid()) return null;
     const source = world[name];

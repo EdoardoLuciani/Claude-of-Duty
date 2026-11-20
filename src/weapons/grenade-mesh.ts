@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import type { Renderer } from 'three/webgpu';
 
+import { disposeMaterials } from '../core/dispose-materials.ts';
 import { isMesh } from '../core/three-guards.ts';
 import { loadWeaponGLTF } from './asset-loader.ts';
-import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
+import { convertWeaponScene } from './asset-material.ts';
 
 export interface GrenadeAsset {
   instantiate(): THREE.Mesh;
@@ -12,7 +13,7 @@ export interface GrenadeAsset {
 
 /** The held and world visuals borrow one static exterior mesh and finish. */
 export async function loadGrenade(renderer: Renderer): Promise<GrenadeAsset> {
-  const { scene } = await loadWeaponGLTF(renderer, 'models/weapons/m67.runtime.glb');
+  const { scene } = await loadWeaponGLTF(renderer, '/models/weapons/m67.runtime.glb');
   const finishes = convertWeaponScene(scene);
   const mesh = scene.children.at(0);
   mesh?.updateMatrix();
@@ -26,7 +27,7 @@ export async function loadGrenade(renderer: Renderer): Promise<GrenadeAsset> {
     scene.traverse((node): void => {
       if (isMesh(node)) node.geometry.dispose();
     });
-    disposeWeaponMaterials(finishes);
+    disposeMaterials(finishes);
     throw new Error('[weapons] M67: expected one untransformed MESH_grenade with no children');
   }
   const { geometry, material, name } = mesh;
@@ -39,7 +40,7 @@ export async function loadGrenade(renderer: Renderer): Promise<GrenadeAsset> {
     },
     dispose(): void {
       geometry.dispose();
-      disposeWeaponMaterials(finishes);
+      disposeMaterials(finishes);
     },
   };
 }

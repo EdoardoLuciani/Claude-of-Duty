@@ -518,7 +518,8 @@ assert.equal(wp.radioEquipped, false, 'the switch stows the radio');
 assert(calls.includes('endRadio'));
 wp._switchTo = null; // the harness has no holster clip to complete
 
-// ---- the carpet bomb row spends a charge and calls the strike --------------
+// Capture can present a mounted weapon without buying it; stowing is not a purchase.
+assert(!wp.owns('smg') && wp.setWeaponImmediate('smg'));
 pressX();
 pressAction('radioSend');
 assert.equal(wp.radioEquipped, false, 'calling a strike stows the radio');
