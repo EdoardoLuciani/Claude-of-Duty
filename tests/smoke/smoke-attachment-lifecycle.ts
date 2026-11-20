@@ -171,7 +171,7 @@ for (const key of [
   'triIndex',
   'nodeBounds',
   'nodeMeta',
-  '_taabb',
+  'triBounds',
 ] as const) {
   const array: Float32Array | Int32Array | Uint32Array | Uint16Array | Uint8Array =
     copy.snapshot[key];

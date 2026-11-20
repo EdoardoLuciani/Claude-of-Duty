@@ -861,7 +861,7 @@ let failCompile = false;
 const warmRender = new RenderSystem();
 warmRender.lights = lights;
 warmRender.patchMaterials = (): void => {};
-warmRender._warmGraph = async (): ReturnType<RenderSystem['_warmGraph']> => {
+warmRender.warmGraph = async (): ReturnType<RenderSystem['warmGraph']> => {
   // Native prewarm keeps the same light identities and delegates target /
   // zero-draw restoration to the renderer's real-variant graph warmup.
   assert.equal(lights[0].light.visible, false);

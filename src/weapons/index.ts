@@ -81,7 +81,7 @@ interface AmmoSnapshot {
 }
 
 interface WeaponWarmupReport {
-  graphWarm: Awaited<ReturnType<EngineSystems['render']['_warmGraph']>>;
+  graphWarm: Awaited<ReturnType<EngineSystems['render']['warmGraph']>>;
 }
 
 type WeaponPoseState = Required<ViewState>;
@@ -532,7 +532,7 @@ export class WeaponSystem {
     const render = this.ctx.peek('render');
     // An early caller may try again after initialization. Once work starts, all
     // callers share its result, including failure: boot warmup never retries in gameplay.
-    if (!render?._graph || !this._viewmodel?.grenade.children.length)
+    if (!render?.hasGraph() || !this._viewmodel?.grenade.children.length)
       return Promise.reject(new Error('[weapons] warmup graph or viewmodel not ready'));
     this._warmTask = this._prewarmMaterials(render);
     return this._warmTask;
@@ -603,7 +603,7 @@ export class WeaponSystem {
       const flashlight = this.ctx.peek('player')?.flashlight;
       const graphWarm = flashlight
         ? await render.prewarmLightShadow(flashlight)
-        : await render._warmGraph();
+        : await render.warmGraph();
       return { graphWarm };
     } finally {
       for (const [group, value] of visible) group.visible = value;

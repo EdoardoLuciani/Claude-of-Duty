@@ -1,7 +1,7 @@
 import type { Vector3, Vector3Like } from 'three';
 
-import type { StaticWorld } from '../physics/bvh.ts';
 import type { CharacterController } from '../physics/character.ts';
+import type { QuerySnapshot } from '../physics/query-snapshot.ts';
 import { MASK } from '../physics/surfaces.ts';
 import { LADDER, LADDER_MOTOR_VERSION, ladderMoveBudget } from './ladder.ts';
 import type { LadderDescriptor, LadderDirection, LadderCursor } from './ladder.ts';
@@ -250,22 +250,6 @@ export type QuerySample =
       attempts: number;
       gapFrames: number;
     };
-export type AttachmentSnapshot = Pick<
-  StaticWorld,
-  | 'version'
-  | 'dirty'
-  | 'nodeCount'
-  | 'triCount'
-  | 'pos'
-  | 'nrm'
-  | 'surface'
-  | 'mask'
-  | 'object'
-  | 'triIndex'
-  | 'nodeBounds'
-  | 'nodeMeta'
-  | '_taabb'
-> & { stackSize: number };
 type ControllerSettings = Pick<
   CharacterController,
   | 'radius'
@@ -279,7 +263,7 @@ type ControllerSettings = Pick<
 >;
 export interface InitMessage {
   type: 'init';
-  world: AttachmentSnapshot;
+  world: QuerySnapshot;
   controller: ControllerSettings;
   gravity: number;
   mask: { CHARACTER: number };
@@ -304,7 +288,7 @@ export type WorkerMessage =
       queueMs?: number | undefined;
       costs?: QueryCosts | null;
     };
-function snapshot(value: unknown): value is AttachmentSnapshot {
+function snapshot(value: unknown): value is QuerySnapshot {
   return (
     isRecord(value) &&
     isNumber(value.version) &&
@@ -320,7 +304,7 @@ function snapshot(value: unknown): value is AttachmentSnapshot {
     value.triIndex instanceof Uint32Array &&
     value.nodeBounds instanceof Float32Array &&
     value.nodeMeta instanceof Int32Array &&
-    value._taabb instanceof Float32Array
+    value.triBounds instanceof Float32Array
   );
 }
 function settings(value: unknown): value is ControllerSettings & Record<string, unknown> {
@@ -410,7 +394,7 @@ export function parseWorkerMessage(value: unknown): WorkerMessage {
 }
 export function parseSnapshotCopy(
   value: unknown
-): { snapshot: AttachmentSnapshot; transfer: ArrayBuffer[]; bytes: number } | null {
+): { snapshot: QuerySnapshot; transfer: ArrayBuffer[]; bytes: number } | null {
   if (value === null) return null;
   if (
     !isRecord(value) ||

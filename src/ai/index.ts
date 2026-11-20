@@ -75,7 +75,7 @@ interface AiPrewarm {
   materials: number;
   programs: null;
   ms: number;
-  graphWarm?: Awaited<ReturnType<EngineSystems['render']['_warmGraph']>>;
+  graphWarm?: Awaited<ReturnType<EngineSystems['render']['warmGraph']>>;
   error?: string;
 }
 import {
@@ -326,7 +326,7 @@ export class AiSystem {
       const r = this.ctx.peek('render');
       // init() runs before render's production graph exists. Keep material
       // creation order, but let the later engine hook warm the real variants.
-      if (!r?.renderer || !r._graph) {
+      if (!r?.renderer || !r.hasGraph()) {
         this._prewarmed = null;
         return out;
       }
@@ -347,7 +347,7 @@ export class AiSystem {
         }
         this.ctx.scene.add(scene);
         r.patchMaterials(scene);
-        out.graphWarm = await r._warmGraph(); // zero ranges, restored even on failure
+        out.graphWarm = await r.warmGraph(); // zero ranges, restored even on failure
         out.ok = true;
       } finally {
         scene.removeFromParent();
