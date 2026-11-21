@@ -1564,11 +1564,6 @@ export class WeaponSystem {
     if (this._fireTimer > 0) this._fireTimer -= dt;
     if (this._burstCooldown > 0) this._burstCooldown -= dt;
 
-    // ---- spread recovery -------------------------------------------------
-    const rest = this._restSpread(def, st);
-    this._spread = Math.max(rest, this._spread - def.spreadDecay * dt * (1 + this.adsProgress));
-    if (this._sinceShot > 0.6) this._shotIndex = 0;
-
     // ---- gather state ----------------------------------------------------
     const live =
       !this.disabled &&
@@ -1599,6 +1594,11 @@ export class WeaponSystem {
     st.lowReady = player?.state === 'mantle' || player?.mantling === true;
     st.steadiness = this._steadiness(player, st);
     this._syncAmmoState(s);
+
+    // ---- spread recovery -------------------------------------------------
+    const rest = this._restSpread(def, st);
+    this._spread = Math.max(rest, this._spread - def.spreadDecay * dt * (1 + this.adsProgress));
+    if (this._sinceShot > 0.6) this._shotIndex = 0;
 
     // ---- input -----------------------------------------------------------
     if (live) {
@@ -1823,11 +1823,16 @@ export class WeaponSystem {
     // A fixed, non-zero noise phase: a settled but not artificially symmetric pose.
     vm.noiseT = 12.37;
     vm.debugFrozen = true;
-    this._spread = kind === 'ads' ? 0.24 : 2.05;
+    vm.steadiness = this._state.steadiness;
     this._sinceShot = 10;
     this._debugFrame = 0;
 
     const s = this.state;
+    this._spread = s
+      ? kind === 'ads'
+        ? s.def.spreadAds
+        : (s.def.spreadHip ?? s.def.spreadAds)
+      : 0;
     if (s) {
       s.mag = kind === 'fire' ? 22 : s.def.magSize;
       s.chambered = true;
