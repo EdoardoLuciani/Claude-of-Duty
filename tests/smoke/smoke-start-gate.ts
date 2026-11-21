@@ -74,6 +74,7 @@ globalThis.document = fixture<Document>({
     return pointerLockElement;
   },
   createElement,
+  fullscreenEnabled: false,
   body: fixture<HTMLElement>({ append(): void {} }),
   addEventListener(type: string, fn: EventListenerOrEventListenerObject | null): void {
     if (fn) listeners.set(type, fn);
