@@ -227,8 +227,7 @@ try {
     onShaft = (a: Agent): boolean => a.position.y > foot + 0.2 && a.position.y < top - 0.2;
   const ai = makeAi(nav);
   const climber = (from: Vector3): Agent => {
-    const a = makeAgent({ ai, phys: f.physics, position: from });
-    a.id = ++actor;
+    const a = makeAgent({ ai, phys: f.physics, position: from, id: ++actor });
     a.controller = f.physics.createCharacter({
       position: a.position,
       radius: a.radius,
@@ -250,7 +249,8 @@ try {
         a._move(1 / 60);
       }
       each?.();
-      await new Promise((resolve): NodeJS.Timeout => setTimeout(resolve, 1));
+      if (service.stats.pending)
+        await new Promise((resolve): NodeJS.Timeout => setTimeout(resolve, 1));
     }
   };
   const arrived = (a: Agent, goal: Vector3): boolean =>
