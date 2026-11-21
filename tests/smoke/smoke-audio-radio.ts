@@ -68,7 +68,7 @@ const events = new EventBus(),
 events.on('radio:strike', (): number => calls.push('radio_strike'));
 const w = new WeaponSystem();
 w.carpetBombs = 2;
-w.radioEquipped = true;
+assert(w._equipRadio());
 w.radioSys = new RadioSystem();
 w.radioSys.callStrike = (): boolean => {
   events.emit('radio:strike', { position: new Vector3() });

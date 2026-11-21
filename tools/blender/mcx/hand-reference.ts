@@ -42,7 +42,7 @@ for (const side of ['right', 'left'] as const) {
   };
 }
 writeFileSync(
-  new URL('../../../assets/weapons/mcx-virtus/hand-reference.json', import.meta.url),
+  new URL('../../../src/weapons/authored/mcx-virtus/hand-reference.json', import.meta.url),
   JSON.stringify({ grips, sides, pinch: HAND_POSES.pinch, open: HAND_POSES.open }, null, 2) + '\n'
 );
 console.log('MCX hand calibration written; rebuild Blender actions after editing.');

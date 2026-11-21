@@ -15,18 +15,14 @@ import * as THREE from 'three';
  */
 import { AudioSystem } from '../../src/audio/index.ts';
 import type { EngineEventMap } from '../../src/core/events.ts';
+import { GRENADE_RADIUS, GRENADE_DAMAGE, GRENADE_FUSE } from '../../src/core/grenades.ts';
 import { Input } from '../../src/core/input.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
-import { RigidBody } from '../../src/physics/rigidbody.ts';
+import type { RigidBody } from '../../src/physics/rigidbody.ts';
 import { RadioSystem, CARPET } from '../../src/radio/index.ts';
-import { BASE_ATTACHMENTS } from '../../src/weapons/attachments.ts';
-import {
-  WeaponSystem,
-  GRENADE_RADIUS,
-  GRENADE_DAMAGE,
-  GRENADE_FUSE,
-} from '../../src/weapons/index.ts';
+import { BASE_ATTACHMENTS } from '../../src/weapons/attachment-rules.ts';
+import { WeaponSystem } from '../../src/weapons/index.ts';
 import { WorldSystem } from '../../src/world/index.ts';
 import { createTestContext } from '../lib/context.ts';
 import { fixture } from '../lib/fixture.ts';
@@ -40,7 +36,7 @@ import {
 // ---- fakes ---------------------------------------------------------------
 
 const calls: string[] = []; // viewmodel grenade calls, in order
-const bodies: { velocity: THREE.Vector3; fuse: number }[] = []; // physics addRigidBody captures
+const bodies: RigidBody[] = []; // launch history, including bodies already removed
 type ExplosionEvent = { type: 'explosion'; payload: EngineEventMap['explosion'] };
 const events: ExplosionEvent[] = []; // ctx.events explosion captures
 
@@ -82,19 +78,14 @@ player.rig.eyePosition.set(0, 1.6, 0);
 player.addTrauma = (): void => {};
 player.setAdsProgress = (): void => {};
 const physics = new PhysicsSystem();
+const addRigidBody = physics.addRigidBody.bind(physics);
 physics.addRigidBody = (opts): RigidBody => {
-  assert.ok(opts);
-  assert.ok(opts.velocity);
-  bodies.push({
-    velocity: new THREE.Vector3(opts.velocity.x, opts.velocity.y, opts.velocity.z),
-    fuse: 0,
-  });
-  const body = new RigidBody({ ...opts, position: new THREE.Vector3(0, 1.6, 0) });
+  const body = addRigidBody(opts);
   assert.equal(body.boundRadius, 0.05, 'player grenades use their sphere bounds');
   assert.equal(body.minExtent, 0.05, 'player grenades do not inherit box-sized CCD');
+  bodies.push(body);
   return body;
 };
-physics.removeRigidBody = (): void => {};
 const wp = new WeaponSystem();
 wp.createGrenade = (): THREE.Mesh => new THREE.Mesh();
 wp.ctx = createTestContext({
@@ -125,7 +116,7 @@ const pressDigit = (n: number): void => {
   input._digit = 0;
 };
 const resetLive = (): void => {
-  wp._grenades.length = 0;
+  wp._clearGrenades();
   bodies.length = 0;
   events.length = 0;
 };
@@ -163,7 +154,7 @@ pressG();
 assert.equal(wp.grenadeEquipped, true, 'G equips the grenade');
 assert.equal(wp.grenades, 2, 'equipping spends nothing');
 assert(calls.includes('hold'), 'viewmodel holds the grenade');
-assert(!calls.includes('throw:'), 'G does not throw');
+assert(!calls.some((call): boolean => call.startsWith('throw:')), 'G does not throw');
 
 pressG();
 assert.equal(wp.grenadeEquipped, true, 'G again keeps the grenade out');
@@ -199,25 +190,22 @@ input.down.add('Mouse0');
 input.fire = true;
 for (let i = 0; i < 10; i++) step(); // hold: the fuse burns
 assert.equal(wp.cooking, true, 'still cooking while the button is held');
-assert(wp._cookTime > 0, 'the fuse burns while held');
-assert.equal(wp._throwing, false, 'not thrown while held');
+assert(!calls.some((call): boolean => call.startsWith('throw:')), 'not thrown while held');
 input.down.delete('Mouse0');
 input.fire = false;
 step(); // release commits the throw
 assert.equal(wp.cooking, false, 'release ends the cook');
-assert.equal(wp._throwing, true, 'release commits the throw');
-assert.equal(calls.at(-1), 'throw:long', 'LMB throws LONG');
+assert.equal(calls.at(-1), 'throw:long', 'LMB release commits a long throw');
 
 // The release beat spawns the live grenade with the long-launch velocity.
 wp._onClipEvent('grenade:release', 'grenadeThrow');
 assert.equal(wp._grenades.length, 1, 'one live grenade in the world');
 assert.equal(bodies.length, 1);
-const longVel = bodies[0].velocity;
+const longVel = bodies[0].linearVelocity;
 assert.equal(longVel.y, 2.6, 'long throw has the lofted arc (+2.6 m/s up)');
 assert(Math.hypot(longVel.x, longVel.z) > 25, 'long throw leaves much faster than today (30 m/s)');
 wp._onClipEvent('grenade:done', 'grenadeThrow');
 assert.equal(wp.grenadeEquipped, false, 'the rifle is back after the throw');
-assert.equal(wp._throwing, false);
 resetLive();
 
 // ---- RMB: cook while held, SHORT throw on release --------------------------
@@ -226,7 +214,6 @@ assert.equal(wp.grenadeEquipped, true);
 input._rmbPressed = true;
 step(); // cook starts
 assert.equal(wp.cooking, true, 'RMB starts the cook');
-assert.equal(wp._throwType, 'short', 'RMB cooks a SHORT throw');
 assert.equal(wp.grenades, 0, 'second grenade spent');
 assert(calls.includes('cook:short'), 'viewmodel cocks for the short throw');
 input._rmbPressed = false;
@@ -239,7 +226,7 @@ assert.equal(calls.at(-1), 'throw:short', 'RMB throws SHORT');
 
 wp._onClipEvent('grenade:release', 'grenadeThrow');
 assert.equal(bodies.length, 1);
-const shortVel = bodies[0].velocity;
+const shortVel = bodies[0].linearVelocity;
 assert.equal(shortVel.y, 1.2, 'short throw has the low arc (+1.2 m/s up)');
 const shortSpeed = Math.hypot(shortVel.x, shortVel.z);
 assert(
@@ -263,14 +250,19 @@ wp.audio.playUi = (kind): boolean => {
   return true;
 };
 wp.grenades = 2; // a market pack — the harness skipped init()
-pressG();
-input.firePressed = true;
-step(); // cook starts
-input.firePressed = false;
-input.down.add('Mouse0');
-input.fire = true;
-const fuseFrames = Math.ceil(GRENADE_FUSE / (1 / 60));
-for (let i = 0; i < fuseFrames + 5; i++) step();
+const overcook = (): void => {
+  pressG();
+  input.firePressed = true;
+  step(); // cook starts
+  input.firePressed = false;
+  input.down.add('Mouse0');
+  input.fire = true;
+  const fuseFrames = Math.ceil(GRENADE_FUSE / (1 / 60));
+  for (let i = 0; i < fuseFrames + 5; i++) step();
+  input.down.delete('Mouse0');
+  input.fire = false;
+};
+overcook();
 assert.equal(wp.cooking, false, 'overcook ends the cook');
 assert.equal(wp.grenadeEquipped, false, 'overcook drops the grenade in the hand');
 const booms = events.filter((e): e is ExplosionEvent => e.type === 'explosion');
@@ -285,21 +277,46 @@ assert.equal(booms[0].payload.kind, 'grenade', 'overcook selects grenade audio')
 assert.equal(booms[0].payload.damage, GRENADE_DAMAGE, 'blast carries the tuned damage');
 assert.equal(booms[0].payload.radius, GRENADE_RADIUS, 'blast carries the tuned radius');
 assert.equal(wp.grenades, 1, 'the overcooked grenade stays spent');
-input.down.delete('Mouse0');
-input.fire = false;
 
-// ---- a live grenade detonates on fuse expiry with the same blast ----------
+const firstBlast = booms[0].payload;
+const firstPosition = firstBlast.position.clone();
+const eyeX = player.rig.eyePosition.x;
+player.rig.eyePosition.x += 2;
+overcook();
+player.rig.eyePosition.x = eyeX;
+assert.equal(events.length, 2, 'the second overcook emits one more explosion');
+assert.equal(
+  events[1].payload.position.x - firstPosition.x,
+  2,
+  'the second blast moves with the player'
+);
+assert.deepEqual(firstBlast.position, firstPosition, 'the retained first blast does not move');
+
+// ---- simultaneous fuse expiry emits one stable blast per grenade ----------
 resetLive();
 const releaseOrigin = new THREE.Vector3(0, 1.6, 0);
-wp._spawnGrenade(releaseOrigin, { x: 0, y: 0, z: 0 }, 0.001);
-assert(wp._grenades[0].mesh.position.equals(releaseOrigin), 'draw at release before physics sync');
-step(); // fuse expires: the blast fires
-const dets = events.filter((e): e is ExplosionEvent => e.type === 'explosion');
-assert.equal(dets.length, 1, 'fuse expiry emits exactly one explosion');
-assert.equal(dets[0].payload.kind, 'grenade', 'thrown grenade selects grenade audio');
-assert.equal(dets[0].payload.damage, GRENADE_DAMAGE, 'detonation carries the tuned damage');
-assert.equal(dets[0].payload.radius, GRENADE_RADIUS, 'detonation carries the tuned radius');
-assert.equal(wp._grenades.length, 0, 'the spent grenade is cleared');
+const secondOrigin = new THREE.Vector3(2, 1.6, 0);
+const still = new THREE.Vector3();
+wp._spawnGrenade(releaseOrigin, still, 0.001);
+wp._spawnGrenade(secondOrigin, still, 0.001);
+assert(bodies[0].object3D?.position.equals(releaseOrigin), 'draw at release before physics sync');
+step(0);
+assert.equal(events.length, 0, 'paused time does not expire a live fuse');
+step();
+step(); // expired grenades must not detonate twice
+assert.deepEqual(
+  events.map(({ payload }): THREE.Vector3 => payload.position),
+  [secondOrigin, releaseOrigin],
+  'detonation positions stay distinct and most recent launch is handled first'
+);
+for (const { payload } of events) {
+  assert.equal(payload.kind, 'grenade', 'thrown grenade selects grenade audio');
+  assert.equal(payload.source, player, 'the blast is credited to the player');
+  assert.equal(payload.damage, GRENADE_DAMAGE, 'detonation carries the tuned damage');
+  assert.equal(payload.radius, GRENADE_RADIUS, 'detonation carries the tuned radius');
+}
+assert.equal(physics.bodies.bodies.length, 0, 'spent bodies are removed');
+assert(bodies.every((body): boolean => body.object3D?.parent === null));
 resetLive();
 
 // ---- a follow-through click cannot recook a committed throw ----------------
@@ -316,7 +333,7 @@ for (let i = 0; i < 3; i++) step();
 input.down.delete('Mouse0');
 input.fire = false;
 step(); // release commits the throw
-assert.equal(wp._throwing, true, 'release commits the throw');
+assert.equal(calls.at(-1), 'throw:long', 'release commits the throw');
 assert.equal(wp.grenades, 1, 'one grenade spent');
 const spent = wp.grenades;
 // The throw is in flight (release beat not reached yet): a follow-through
@@ -325,19 +342,18 @@ input.firePressed = true;
 step();
 assert.equal(wp.cooking, false, 'follow-through click does not recook before the release beat');
 assert.equal(wp.grenades, spent, 'follow-through spends nothing');
-assert.equal(wp._throwing, true, 'the throw stays committed');
+assert(!wp.canFire(), 'the throw stays committed');
 input.firePressed = false;
 wp._onClipEvent('grenade:release', 'grenadeThrow');
 input.firePressed = true;
 step(); // same check after the release beat, before grenade:done
 assert.equal(wp.cooking, false, 'follow-through click does not recook after the release beat');
 assert.equal(wp.grenades, spent, 'still no second grenade spent');
-assert.equal(wp._throwing, true, 'still committed until grenade:done');
+assert(!wp.canFire(), 'still committed until grenade:done');
 input.firePressed = false;
 wp._onClipEvent('grenade:done', 'grenadeThrow');
 assert.equal(wp.cooking, false, 'grenade:done leaves cooking unset');
 assert.equal(wp.grenadeEquipped, false, 'grenade:done stows the hand');
-assert.equal(wp._throwing, false);
 assert.equal(wp.canFire(), true, 'the rifle fires again after the throw');
 resetLive();
 
@@ -353,7 +369,6 @@ for (let i = 0; i < 3; i++) step();
 input.down.delete('Mouse0');
 input.fire = false;
 step(); // release commits
-assert.equal(wp._throwing, true);
 assert.equal(
   wp.setWeapon('pistol'),
   false,
@@ -391,13 +406,12 @@ for (let i = 0; i < 3; i++) step();
 input.down.delete('Mouse0');
 input.fire = false;
 step(); // release commits the throw; the release beat has not fired yet
-assert.equal(wp._throwing, true, 'throw committed (windup)');
-assert.equal(wp._throwReleased, false, 'release beat not reached yet');
+assert.equal(calls.at(-1), 'throw:long', 'throw committed (windup)');
+assert.equal(bodies.length, 0, 'release beat not reached yet');
 calls.length = 0;
 assert.equal(wp.setWeaponImmediate('smg'), true, 'market swap applies mid-throw');
 assert.equal(wp._grenades.length, 1, 'exactly one grenade in the world');
 assert.equal(bodies.length, 1, 'one rigid body — no double spawn');
-assert.equal(wp._throwing, false, 'throw state unwound');
 assert.equal(wp.grenadeEquipped, false, 'the grenade hand is cleared');
 assert(calls.includes('end'), 'the viewmodel throw timeline is stopped');
 assert.equal(wp.canFire(), true, 'the bought gun fires right away');
@@ -424,33 +438,32 @@ assert.equal(wp.canFire(), true, 'firing resumes after the next throw');
 assert.equal(wp.grenadeEquipped, false, 'no phantom grenade left behind');
 resetLive();
 
-// ---- death mid-throw releases the spent grenade instead of vanishing it -----
-wp.grenades = 2; // market pack — the harness skipped init()
-pressG();
-input.firePressed = true;
-step(); // cook starts
-input.firePressed = false;
-input.down.add('Mouse0');
-input.fire = true;
-for (let i = 0; i < 3; i++) step();
-input.down.delete('Mouse0');
-input.fire = false;
-step(); // release commits the throw; windup, release beat not reached
-assert.equal(wp._throwing, true, 'throw committed before death');
-assert.equal(wp._throwReleased, false, 'release beat not reached before death');
-wp._onPlayerDeath();
-assert.equal(wp._grenades.length, 1, 'the spent grenade releases on death');
-assert.equal(bodies.length, 1, 'one rigid body');
-assert.equal(wp._throwing, false, 'throw state unwound on death');
-assert.equal(wp.grenadeEquipped, false, 'the grenade hand is cleared on death');
-assert.equal(wp.disabled, true, 'death disables the weapon system');
-// The viewmodel timeline is stopped too: a late release beat must not respawn.
-wp._onClipEvent('grenade:release', 'grenadeThrow');
-assert.equal(wp._grenades.length, 1, 'a late grenade:release after death does not respawn');
-assert.equal(bodies.length, 1);
-// Bring the harness back to life for any remaining checks.
-wp._setDeathDisabled(false);
-resetLive();
+// ---- death drops a cook, releases a commitment, or leaves a launched grenade ----
+for (const phase of ['cooking', 'committed', 'released']) {
+  wp.grenades = 2;
+  pressG();
+  input.firePressed = true;
+  input.down.add('Mouse0');
+  step();
+  input.firePressed = false;
+  if (phase !== 'cooking') {
+    input.down.delete('Mouse0');
+    step();
+    assert.equal(calls.at(-1), 'throw:long');
+  }
+  if (phase === 'released') wp._onClipEvent('grenade:release', 'grenadeThrow');
+  assert.equal(bodies.length, phase === 'released' ? 1 : 0);
+  wp._onPlayerDeath();
+  assert.equal(wp.grenadeEquipped, false, `${phase}: death clears the grenade hand`);
+  assert.equal(wp.disabled, true, 'death disables the weapon system');
+  assert.equal(bodies.length, 1, `${phase}: the spent grenade survives death`);
+  assert.equal(bodies[0].linearVelocity.y, phase === 'cooking' ? 1 : 2.6);
+  wp._onClipEvent('grenade:release', 'grenadeThrow');
+  assert.equal(bodies.length, 1, `${phase}: a late release does not spawn another body`);
+  input.down.delete('Mouse0');
+  wp._setDeathDisabled(false);
+  resetLive();
+}
 
 // ==========================================================================
 //  FIELD RADIO (accessory) — issue #99
@@ -563,30 +576,28 @@ pressAction('radioSend');
 assert.equal(wp.carpetBombs, 2, 'a refused strike keeps the charge');
 assert.equal(wp.radioEquipped, true, 'the radio stays out for a retry');
 assert.equal(strikeCalls, 2, 'no strike was attempted twice');
-pressDigit(1); // stow
 
-// ---- the radio never leaves the weapon slot on a reset ---------------------
-wp.radioEquipped = true;
-wp.viewmodel.endRadio = (): void => {
-  calls.push('endRadio');
-};
+// ---- restart stows either accessory and never launches a pending throw -----
 wp.resetForNewGame();
-assert.equal(wp.radioEquipped, false, 'reset stows the radio');
+assert(!wp.radioEquipped, 'reset stows the radio');
 assert.equal(wp.carpetBombs, 1, 'reset restores the spawn charge');
 
-wp.cooking = true;
-wp._throwing = true;
-wp._throwReleased = true;
-wp.grenadeEquipped = true;
-wp.radioEquipped = true;
+pressG();
+input.firePressed = true;
+step();
+input.firePressed = false;
+step();
+assert.equal(calls.at(-1), 'throw:long');
+wp._spawnGrenade(releaseOrigin, still, 0.05);
 const nBodies = bodies.length;
-wp._resetHandEquipment();
-assert.equal(wp.cooking, false, 'hand reset clears cooking');
-assert.equal(wp._throwing, false, 'hand reset is not a committed throw');
-assert.equal(wp._throwReleased, false);
-assert.equal(wp.grenadeEquipped, false, 'hand reset stows the grenade');
-assert.equal(wp.radioEquipped, false, 'hand reset stows the radio');
-assert.equal(bodies.length, nBodies, 'hand reset does not drop another live grenade');
+wp.resetForNewGame();
+wp._onClipEvent('grenade:release', 'grenadeThrow');
+assert(!wp.grenadeEquipped && wp.canFire(), 'restart restores the weapon hand');
+assert.equal(bodies.length, nBodies, 'restart discards the throw without spawning it');
+assert.equal(physics.bodies.bodies.length, 0, 'restart removes live grenade bodies');
+assert.equal(bodies.at(-1)?.object3D?.parent, null, 'restart detaches the live grenade mesh');
+step(0.05);
+assert.equal(events.length, 0, 'restart does not detonate the removed grenade');
 
 // ==========================================================================
 //  THE STRIKE (RadioSystem) — the bomber carpets the whole map

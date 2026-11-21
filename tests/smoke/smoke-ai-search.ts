@@ -21,6 +21,7 @@ import {
 import { AttachmentQueries, NAV_PENDING, NAV_CANCELLED } from '../../src/ai/attachment-queries.ts';
 import { AiSystem } from '../../src/ai/index.ts';
 import type { SurfaceNav } from '../../src/ai/nav.ts';
+import type { PathResult } from '../../src/ai/path-result.ts';
 import { Squad } from '../../src/ai/squad.ts';
 import { makeAgent, makeAi, makeRng } from '../lib/agent-fixture.ts';
 import { brainPhysics, brainAnimator } from '../lib/ai-brain-fixture.ts';
@@ -258,9 +259,9 @@ const hidden = new THREE.Vector3(10, 0, 1);
   let maxFramePaths = 0;
   const origPath = AiSystem.prototype.requestPath.bind(ai);
   let framePaths = 0;
-  ai.requestPath = function (from, dest, out): number {
+  ai.requestPath = (...args): PathResult => {
     framePaths++;
-    return origPath(from, dest, out);
+    return origPath(...args);
   };
 
   for (let i = 0; i < 1800; i++) {
@@ -318,9 +319,9 @@ const hidden = new THREE.Vector3(10, 0, 1);
   const ai = makeAi(disconnected);
   let paths = 0;
   const origPath = AiSystem.prototype.requestPath.bind(ai);
-  ai.requestPath = function (from, dest, out): number {
+  ai.requestPath = (...args): PathResult => {
     paths++;
-    return origPath(from, dest, out);
+    return origPath(...args);
   };
   const a = makeSearchAgent({
     ai,
@@ -371,9 +372,9 @@ const hidden = new THREE.Vector3(10, 0, 1);
   const ai = makeAi(disconnected);
   let req = 0;
   const origPath = AiSystem.prototype.requestPath.bind(ai);
-  ai.requestPath = function (from, dest, out): number {
+  ai.requestPath = (...args): PathResult => {
     req++;
-    return origPath(from, dest, out);
+    return origPath(...args);
   };
   const a = makeSearchAgent({ ai, position: new THREE.Vector3(0, 0, 0) });
   // Isolate the queued-solve failure contract. The real candidate selector now

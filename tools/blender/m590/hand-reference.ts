@@ -281,7 +281,7 @@ const pump = {
   strokePads: sides.left.pads.map((p): THREE.Vector3Tuple => [p[0], p[1], p[2] + 0.089]),
 };
 writeFileSync(
-  new URL('../../../assets/weapons/m590/hand-reference.json', import.meta.url),
+  new URL('../../../src/weapons/authored/m590/hand-reference.json', import.meta.url),
   JSON.stringify({ ...result, shell, insertion, contactWindows, pump }, null, 2) + '\n'
 );
 console.log(

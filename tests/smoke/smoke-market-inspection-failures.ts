@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three/webgpu';
 
 import { MarketInspection } from '../../src/ui/market-inspection.ts';
-import { BASE_ATTACHMENTS, type AttachmentConfig } from '../../src/weapons/attachments.ts';
+import { BASE_ATTACHMENTS, type AttachmentConfig } from '../../src/weapons/attachment-rules.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
 import { installUiDocument } from '../lib/ui-fixture.ts';
 

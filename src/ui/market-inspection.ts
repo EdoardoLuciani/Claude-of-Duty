@@ -3,7 +3,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import * as THREE from 'three/webgpu';
 
 import { isMesh } from '../core/three-guards.ts';
-import { SLOTS, type AttachmentConfig } from '../weapons/attachments.ts';
+import { SLOTS, type AttachmentConfig } from '../weapons/attachment-rules.ts';
 import { isWeaponId } from '../weapons/defs.ts';
 import type { WeaponSystem } from '../weapons/index.ts';
 import { MARKET_ART, type MarketItemId } from './market-art.ts';

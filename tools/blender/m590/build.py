@@ -468,7 +468,7 @@ def build(output, render=False, quick=False):
     pose('Idle')
     vertices=[C.inverted().to_4x4()@rig.matrix_world.inverted()@o.matrix_world@v.co for o in asset.objects if o.type=='MESH' and o.parent!=shell for v in o.data.vertices]
     bounds=[[min(v[i] for v in vertices) for i in range(3)],[max(v[i] for v in vertices) for i in range(3)]]
-    ref=json.loads((ROOT/'assets/weapons/m590/hand-reference.json').read_text())
+    ref=json.loads((ROOT/'src/weapons/authored/m590/hand-reference.json').read_text())
     manifest={'asset':'Mossberg 590A1 Tactical SKU50774 base / 18.5-inch / 6+1 / AIMPRO-style integrated sight rail / fixed synthetic stock / tri-rail',
         'status':'Provisional runtime review prototype; strict 1:1 and final human visual/gameplay approval pending',
         'units':'metres','blenderForward':'+Y','blenderUp':'+Z','runtimeBasis':'-Z forward / +Y up / +X right; no adapter basis transform',
@@ -495,7 +495,7 @@ def build(output, render=False, quick=False):
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--output',type=Path,default=ROOT/'assets/weapons/m590')
+    parser.add_argument('--output',type=Path,default=ROOT/'.cache/blender/weapons/m590')
     parser.add_argument('--render',action='store_true')
     parser.add_argument('--quick',action='store_true',help='Preview resolution/samples only')
     args=parser.parse_args(sys.argv[sys.argv.index('--')+1:] if '--' in sys.argv else [])

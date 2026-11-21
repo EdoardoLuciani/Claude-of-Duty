@@ -8,7 +8,7 @@ import sys
 import bpy
 
 
-OUT = Path(__file__).resolve().parents[3] / 'assets/fx/spent-hull'
+OUT = Path(__file__).resolve().parents[3] / '.cache/blender/fx/spent-hull'
 SIDES = 24
 # In-game visual proportions from the M590 insertion mesh, not physical specifications.
 RADIUS_SCALE = .00495 / 11.05

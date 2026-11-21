@@ -8,7 +8,7 @@ import { SOLDIER_STEP } from '../../tools/build-assets.ts';
 
 const directory = mkdtempSync(join(tmpdir(), 'cod-asset-output-cache-'));
 try {
-  const output = join(directory, 'assets/soldiers');
+  const output = join(directory, '.cache/blender/soldiers');
   mkdirSync(output, { recursive: true });
   const expected = [
     'manifest.json',

@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 
 import * as THREE from 'three';
 
-import m590Manifest from '../../assets/weapons/m590/manifest.json' with { type: 'json' };
 import { bindingLabel } from '../../src/core/bindings.ts';
+import { GRENADE_FUSE } from '../../src/core/grenades.ts';
 import { Input } from '../../src/core/input.ts';
 import { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
@@ -16,12 +16,14 @@ import { PlayerSystem } from '../../src/player/index.ts';
 import { Movement } from '../../src/player/movement.ts';
 import type { RadioSystem } from '../../src/radio/index.ts';
 import type { UiSystem } from '../../src/ui/index.ts';
-import { BASE_ATTACHMENTS } from '../../src/weapons/attachments.ts';
+import { BASE_ATTACHMENTS } from '../../src/weapons/attachment-rules.ts';
+import m590Manifest from '../../src/weapons/authored/m590/manifest.json' with { type: 'json' };
 import { ProjectileSim } from '../../src/weapons/ballistics.ts';
 import { buildManifestClips, Clip } from '../../src/weapons/clips.ts';
 import { WEAPON_IDS } from '../../src/weapons/defs.ts';
 import type { WeaponId } from '../../src/weapons/defs.ts';
-import { GRENADE_FUSE, MAX_SHOTS_PER_FRAME } from '../../src/weapons/index.ts';
+import { HandEquipment } from '../../src/weapons/hand-equipment.ts';
+import { MAX_SHOTS_PER_FRAME } from '../../src/weapons/index.ts';
 import type { WeaponEntry } from '../../src/weapons/runtime-types.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { ammoPickupFixture } from '../lib/ammo-pickup-fixture.ts';
@@ -142,8 +144,12 @@ function makeHarness(): WeaponHarness {
       return 1;
     },
     holdGrenade(): void {},
-    cookGrenade(): void {},
-    throwGrenade(): void {},
+    cookGrenade(type): void {
+      clips.push(`cook:${type}`);
+    },
+    throwGrenade(type): void {
+      clips.push(`throw:${type}`);
+    },
     endGrenade(): void {},
     holdRadio(): void {},
     endRadio(): void {},
@@ -238,27 +244,27 @@ for (const [primary, first, second] of [
   assert(!wp.state.laserEnabled, 'switching away and back preserves the per-gun switch');
   assert(wp.setAttachments('rifle', { ...config, optic: 'rmr' }));
   assert(!wp.state.laserEnabled, 'optic changes preserve an off switch');
-  for (const gate of [
-    'frozen',
-    'disabled',
-    'dead',
-    'control',
-    'grenade',
-    'radio',
-    'heal',
-  ] as const) {
+  for (const gate of ['frozen', 'disabled', 'dead', 'control']) {
     input.frozen = gate === 'frozen';
     input.enabled = gate !== 'disabled';
     player.health.dead = gate === 'dead';
     player.controlEnabled = gate !== 'control';
-    wp.grenadeEquipped = gate === 'grenade';
-    wp.radioEquipped = gate === 'radio';
-    wp.healing = gate === 'heal';
     tap('KeyL');
     assert(!wp.state.laserEnabled, `${gate} ignores L`);
   }
   player.controlEnabled = input.enabled = true;
-  input.frozen = player.health.dead = wp.grenadeEquipped = wp.radioEquipped = wp.healing = false;
+  input.frozen = player.health.dead = false;
+  for (const equip of ['KeyG', 'KeyX']) {
+    tap(equip);
+    assert(wp.grenadeEquipped || wp.radioEquipped);
+    tap('KeyL');
+    assert(!wp.state.laserEnabled, 'accessories block the laser switch');
+    tap('Digit1');
+  }
+  assert(wp.beginHeal());
+  tap('KeyL');
+  assert(!wp.state.laserEnabled, 'healing blocks the laser switch');
+  wp.endHeal();
   tap('KeyL');
   assert(wp.state.laserEnabled, 'a fresh live press toggles on');
   wp._onPlayerDeath();
@@ -309,6 +315,35 @@ for (const [primary, first, second] of [
   assert.equal(wp.viewmodel.clipName, 'reloadEmpty');
   wp._completeReload(true);
   assert(wp.state.chambered && wp.state.mag === wp.current.magSize - 1);
+}
+
+// A market swap selects the new gun without drawing it over a cooking grenade.
+{
+  const { wp, tap, frame } = makeHarness();
+  const vm = (wp.viewmodel = new Viewmodel(wp.ctx, wp.mats));
+  for (const id of ['rifle', 'smg'] as const)
+    vm.weapons.set(
+      id,
+      fixture<WeaponEntry>({
+        id,
+        group: new THREE.Group(),
+        parts: {},
+        rhandPose: 'wrap',
+        lhandPose: 'wrap',
+        animation: fixture<WeaponEntry['animation']>({ reset(): void {} }),
+      })
+    );
+  vm.setActive('rifle');
+  tap('KeyG');
+  frame({ down: ['Mouse0'] });
+  assert(wp.applyBuild('smg', BASE_ATTACHMENTS));
+  assert.equal(vm.active?.id, 'smg');
+  assert(wp.cooking && vm.grenade.visible && !vm.active.group.visible, 'cook keeps the gun hidden');
+  frame({ dt: GRENADE_FUSE });
+  assert(
+    !wp.cooking && !vm.grenade.visible && vm.active.group.visible,
+    'new gun returns after the cook'
+  );
 }
 
 // A tube reload restarts the same authored Clip from its end callback.
@@ -843,12 +878,31 @@ for (const gate of ['frozen', 'disabled']) {
   assert(wp.grenadeEquipped && !wp.radioEquipped);
 }
 
+// The cook/throw rules do not need a viewmodel or a world.
+{
+  const hands = new HandEquipment();
+  assert(hands.hold('grenade'));
+  assert(!hands.hold('radio'), 'a held grenade cannot share the hand');
+  assert(hands.startCook('fire'));
+  assert(!hands.stow('grenade'), 'a live grenade cannot be stowed');
+  assert.equal(hands.updateCook(0.5, GRENADE_FUSE, false), null);
+  assert.equal(hands.dropCooked(GRENADE_FUSE), GRENADE_FUSE - 0.5);
+  assert(hands.stow('grenade'));
+
+  assert(hands.hold('grenade') && hands.startCook('ads'));
+  assert.equal(hands.updateCook(0.5, GRENADE_FUSE, true), 'committed');
+  assert.equal(hands.releaseThrow(), GRENADE_FUSE - 0.5);
+  assert.equal(hands.releaseThrow(), null, 'release can only be consumed once');
+  assert(!hands.hold('radio'), 'follow-through still owns the hand');
+  assert(hands.finishThrow() && hands.hold('radio'));
+}
+
 // Cooking retains its initiating action. Releasing the other action is inert.
-for (const [code, other, action, type] of [
-  ['Mouse0', 'Mouse2', 'fire', 'long'],
-  ['Mouse2', 'Mouse0', 'ads', 'short'],
+for (const [code, other, type] of [
+  ['Mouse0', 'Mouse2', 'long'],
+  ['Mouse2', 'Mouse0', 'short'],
 ]) {
-  const { wp, frame, tap, bodies, prompts } = makeHarness();
+  const { wp, frame, tap, bodies, prompts, clips } = makeHarness();
   tap('KeyG');
   assert.equal(prompts[prompts.length - 1].key, bindingLabel('fire'));
   assert.equal(
@@ -857,35 +911,32 @@ for (const [code, other, action, type] of [
   );
   frame({ down: [code] });
   assert(wp.cooking);
-  assert.equal(wp._cookAction, action);
-  assert.equal(wp._throwType, type);
+  assert.equal(clips.at(-1), `cook:${type}`);
   frame({ down: [other] });
   frame({ up: [other] });
-  assert(wp.cooking && wp._cookTime > 0, 'non-initiating release does not commit');
+  assert(wp.cooking, 'non-initiating release does not commit');
   frame({ up: [code] });
-  assert(!wp.cooking && wp._throwing);
-  assert.equal(wp._cookAction, null);
-  assert(wp._throwFuse > 0 && wp._throwFuse < GRENADE_FUSE);
+  assert.equal(clips.at(-1), `throw:${type}`);
   tap('Mouse0', 'Mouse2', 'Digit2', 'Tab', 'KeyG', 'KeyX');
-  assert(wp._throwing && !wp.cooking && wp.grenadeEquipped && !wp.radioEquipped);
+  assert(!wp.cooking && wp.grenadeEquipped && !wp.radioEquipped);
   assert.equal(wp._switchTo, null, 'committed throw blocks switching');
   assert.equal(wp.grenades, 1, 'follow-through actions do not spend another grenade');
   wp._onClipEvent('grenade:release', 'grenadeThrow');
   wp._onClipEvent('grenade:release', 'grenadeThrow');
   assert.equal(bodies.length, 1, 'release beat spawns exactly once');
   wp._onClipEvent('grenade:done', 'grenadeThrow');
-  assert(!wp.grenadeEquipped && !wp._throwing && wp.canFire());
+  assert(!wp.grenadeEquipped && wp.canFire());
 }
 {
-  const { wp, tap, frame } = makeHarness();
+  const { tap, frame, clips } = makeHarness();
   tap('KeyG');
   tap('KeyG', 'Mouse0', 'Mouse2');
-  assert.equal(wp._cookAction, 'fire', 'fire wins simultaneous cook edges');
+  assert.equal(clips.at(-1), 'cook:long', 'fire wins simultaneous cook edges');
   frame();
-  assert(wp._throwing, 'same-frame tap commits next update via initiating action no longer held');
+  assert.equal(clips.at(-1), 'throw:long', 'same-frame tap commits on the next update');
 }
 {
-  const { wp, tap, frame } = makeHarness();
+  const { wp, tap, frame, clips } = makeHarness();
   tap('KeyG');
   frame({ down: ['Mouse2'] });
   // Inject an action release while its held union remains true: the approved
@@ -893,7 +944,8 @@ for (const [code, other, action, type] of [
   const released = wp.ctx.input.actionReleased.bind(wp.ctx.input);
   wp.ctx.input.actionReleased = (action): boolean => action === 'ads' || released(action);
   frame();
-  assert(wp.ctx.input.action('ads') && wp._throwing && !wp.cooking);
+  assert(wp.ctx.input.action('ads') && !wp.cooking);
+  assert.equal(clips.at(-1), 'throw:short');
 }
 
 // A release queued before a frozen frame cannot advance the fuse/throw; resume still
@@ -902,14 +954,14 @@ for (const [code, other, action, type] of [
   const { wp, input, tap, frame } = makeHarness();
   tap('KeyG');
   frame({ down: ['Mouse0'] });
-  const cookTime = wp._cookTime;
   input._onMouseUp(fixture<MouseEvent>({ button: 0 }));
   input.frozen = true;
   frame({ dt: 1 });
-  assert(wp.cooking && !wp._throwing && wp._cookTime === cookTime);
+  assert(wp.cooking);
   input.frozen = false;
   frame();
-  assert(wp._throwing && !wp.cooking);
+  wp._onClipEvent('grenade:release', 'grenadeThrow');
+  assert.equal(wp._grenades[0]?.fuse, GRENADE_FUSE - 1 / 60, 'frozen time does not burn the fuse');
 }
 
 // Weapon-side healing interruptions remain synchronous and retain their reasons.

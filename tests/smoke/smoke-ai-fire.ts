@@ -21,6 +21,7 @@ import {
 import { AiSystem } from '../../src/ai/index.ts';
 import type { BakedCoverPoint } from '../../src/ai/nav-format.ts';
 import { CoverMap } from '../../src/ai/nav.ts';
+import { createPathCompletion, PATH_DEFERRED, type PathResult } from '../../src/ai/path-result.ts';
 import { Squad } from '../../src/ai/squad.ts';
 import { COMBAT } from '../../src/ai/tuning.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
@@ -135,17 +136,20 @@ function tickAgent(a: Agent, dt = DT): void {
   a._updateFireBlock();
 }
 
+const budgetProbe = createPathCompletion();
+
 function tickStarved(a: Agent, dt = DT): void {
   const ai = a.ai;
   ai._pathBudget = ai.pathsPerFrame;
-  ai.requestPath(new THREE.Vector3(0, 0, 0), new THREE.Vector3(4, 0, 0), []);
-  ai.requestPath(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 4), []);
+  ai.requestPath(new THREE.Vector3(0, 0, 0), new THREE.Vector3(4, 0, 0), [], budgetProbe);
+  ai.requestPath(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 4), [], budgetProbe);
   tickAgent(a, dt);
 }
 
 function wirePath(a: Agent): void {
   const grid = pathGrid;
   grid.findPath = (_from, dest, out): number => {
+    grid.lastOutcome = 'success';
     if (!out[0]) out[0] = new THREE.Vector3();
     out[0].copy(dest);
     return 1;
@@ -193,9 +197,9 @@ function run(
 {
   const a = stubAgent({ cover: farCover(), repathTimer: 9 });
   wirePath(a);
-  a.ai.requestPath = function (): number {
-    this.lastPathOutcome = PATH_OUTCOME.UNREACHABLE;
-    return 0;
+  a.ai.requestPath = (_from, _to, _out, completion): PathResult => {
+    completion.outcome = PATH_OUTCOME.UNREACHABLE;
+    return completion;
   };
   const shots = attachShots(a);
   a._goTo(a.coverPos);
@@ -536,7 +540,7 @@ for (const reason of [
   let kept = 0;
   for (let i = 0; i < 59; i++) {
     a.ai._pathBudget = 2;
-    a.ai.requestPath(new THREE.Vector3(0, 0, 0), new THREE.Vector3(4, 0, 0), []);
+    a.ai.requestPath(new THREE.Vector3(0, 0, 0), new THREE.Vector3(4, 0, 0), [], budgetProbe);
     tickAgent(a);
     if (a.hasMoveTarget) kept++;
   }
@@ -557,10 +561,7 @@ for (const reason of [
     return 0;
   };
   a.ai.cover = cover;
-  a.ai.requestPath = function (): number {
-    this.lastPathOutcome = PATH_OUTCOME.DEFERRED;
-    return -1;
-  };
+  a.ai.requestPath = (): PathResult => PATH_DEFERRED.budget;
   a._goTo(a.coverPos);
   const shots = attachShots(a);
   let t = 0;

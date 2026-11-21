@@ -3,20 +3,20 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-import mcxManifest from '../../assets/weapons/mcx-virtus/manifest.json' with { type: 'json' };
-import mpxManifest from '../../assets/weapons/sig-mpx/manifest.json' with { type: 'json' };
 import { PhysicsSystem } from '../../src/physics/index.ts';
 import { LAYER } from '../../src/physics/surfaces.ts';
 import { CameraRig } from '../../src/player/camera.ts';
 import type { RenderSystem } from '../../src/render/index-webgpu.ts';
 import {
   BASE_ATTACHMENTS,
+  isAttachmentConfig,
+  type AttachmentConfig,
+} from '../../src/weapons/attachment-rules.ts';
+import {
   configureWeaponAttachments,
   hasAttachmentAssets,
   mountAttachments,
   releaseAttachmentMounts,
-  isAttachmentConfig,
-  type AttachmentConfig,
 } from '../../src/weapons/attachments.ts';
 import {
   authoredModel,
@@ -24,6 +24,8 @@ import {
   rebaseNativeWeapon,
   requiredNode,
 } from '../../src/weapons/authored-model.ts';
+import mcxManifest from '../../src/weapons/authored/mcx-virtus/manifest.json' with { type: 'json' };
+import mpxManifest from '../../src/weapons/authored/sig-mpx/manifest.json' with { type: 'json' };
 import { WEAPON_DEFS, WEAPON_IDS } from '../../src/weapons/defs.ts';
 import { Arm } from '../../src/weapons/hands.ts';
 import { WeaponLaser } from '../../src/weapons/laser.ts';

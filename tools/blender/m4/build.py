@@ -79,7 +79,7 @@ def build(output, render=False, quick=False):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--output', type=Path, default=ROOT / 'assets/weapons/m4a1-block-ii')
+    parser.add_argument('--output', type=Path, default=ROOT / '.cache/blender/weapons/m4a1-block-ii')
     parser.add_argument('--render', action='store_true')
     parser.add_argument('--quick', action='store_true')
     argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []

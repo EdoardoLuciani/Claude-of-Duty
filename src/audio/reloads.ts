@@ -32,7 +32,7 @@ export type ReloadKind = keyof typeof RELOAD_URLS;
 const RELOAD_CUES: Record<string, Partial<Record<ReloadPhase, ReloadKind>>> = {
   rifle: { magout: 'ar-out', magin: 'ar-in', charge: 'ar-charge', boltclose: 'ar-close' },
   mcx: { magout: 'ar-out', magin: 'ar-in', boltclose: 'ar-close' },
-  pistol: { magout: 'pistol-out', magin: 'pistol-in', slide: 'pistol-close' },
+  pistol: { magout: 'pistol-out', magin: 'pistol-in', boltclose: 'pistol-close' },
   smg: { magout: 'smg-out', magin: 'smg-in', boltclose: 'smg-close' },
   sniper: {
     magout: 'sniper-out',

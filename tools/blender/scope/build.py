@@ -9,7 +9,7 @@ import numpy as np
 from mathutils import Matrix, Vector
 
 ROOT=Path(__file__).resolve().parents[3]
-OUT=ROOT/'assets/attachments/schmidt-bender-pm-ii'
+OUT=ROOT/'.cache/blender/attachments/schmidt-bender-pm-ii'
 sys.path.insert(0,str(ROOT/'tools/blender'))
 import picatinny
 

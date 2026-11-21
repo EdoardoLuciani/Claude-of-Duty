@@ -711,16 +711,22 @@ for (const [reason, discovery, setBlock] of [
       },
     ]
   ),
-  ...(
-    ['disabled', 'healing', 'cooking', '_throwing', 'grenadeEquipped', 'radioEquipped'] as const
-  ).map((flag): [string, boolean, () => void] => [
-    flag,
+  [
+    'disabled weapon',
     true,
     (): void => {
       ctx.weapons = new WeaponSystem();
-      ctx.weapons[flag] = true;
+      ctx.weapons.disabled = true;
     },
-  ]),
+  ],
+  [
+    'occupied hand',
+    true,
+    (): void => {
+      ctx.weapons = new WeaponSystem();
+      assert(ctx.weapons._equipRadio());
+    },
+  ],
   [
     'switching',
     true,

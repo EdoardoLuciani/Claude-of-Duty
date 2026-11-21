@@ -7,11 +7,22 @@ Gameplay numbers (timings, distances, rewards) live in code: `src/*/tuning.ts`,
 
 ## Subsystems
 
-Subsystems reach each other through `ctx.get(id)`, not imports; the constant coupling
-`ai` → `weapons` is the one exception. `src/core/`, `src/main.ts`, `src/dev/`,
-`tools/` and `build/` are shared infrastructure used by every subsystem.
+Subsystems reach live instances through `ctx.get(id)`. `src/core/`, `src/main.ts`,
+`src/dev/`, `tools/` and `build/` are shared infrastructure used by every subsystem.
 A leading `_` marks a member internal to its subsystem: files in the same directory,
 `src/dev/`, `tools/` and `tests/` may use it; other subsystems use public members only.
+
+- **Live instances and types:** `src/main.ts` registers subsystem implementations.
+  Market may `import type { WeaponSystem }` but uses `ctx.get('weapons')` for the
+  live instance; it must not import and construct a `WeaponSystem` itself.
+- **Shared data and rules:** `src/ui/market-stats.ts` computes stats using
+  `src/weapons/defs.ts` and `buildDef()` from `src/weapons/attachment-rules.ts`.
+  Lint rejects runtime imports of `src/weapons/attachments.ts` and
+  `src/weapons/asset-loader.ts` from that file.
+- **Worker-owned algorithms:** `src/ai/attachment-worker.ts` restores its own
+  `StaticWorld` through `src/physics/query-snapshot.ts` and constructs its own
+  `CharacterController` from `src/physics/character.ts`. These are worker-owned
+  objects, not access to the live physics subsystem.
 
 | id / directory                                     | responsibility                                              |
 | -------------------------------------------------- | ----------------------------------------------------------- |
@@ -157,6 +168,11 @@ bounded native budgets and tactical revalidation. Unknown is never provisional
 success or unreachable; failures are terminal, with no main-thread fallback. Async
 admission is not same-tick seeded replay determinism.
 
+`AiSystem.requestPath()` returns a completion in caller-owned storage or an
+explicit budget, worker-pending or superseded deferral. Deferral leaves the
+active route and resolved floor/surface diagnostics intact; only completed
+attempts spend the frame's solve budget.
+
 ## Render
 
 Public render surface:
@@ -247,7 +263,7 @@ and runtime consumers. Each weapon's authoring lives in `tools/blender/<weapon>/
 `build/models.ts` owns gltfpack runtime cooking and per-model profiles
 (`bun build/models.ts`); `tools/build-assets.ts` rebuilds stale models during
 dev/build. New profiles need adapter, animation and visual validation. The
-[intel case](assets/props/intel-case/README.md) has a standalone Blender recipe;
+[intel case](tools/blender/intel_case/README.md) has a standalone Blender recipe;
 IntelSystem loads and owns one shared GLB kit, moves its named hinge, pulses the
 beacon and emits sparks at the effect socket during the pooled interaction.
 All seven weapons (M4, MCX, P320, EVOLYS, MPX, AX338, M590) use generated GLBs with
@@ -276,8 +292,20 @@ or teardown. Static map clones are shared only when source, UV, color space and
 sampler match. The Blender-authored grenade is a required boot asset owned by
 weapons. `weapons.createGrenade()` gives AI and player throws independent transforms
 that borrow the same geometry, material and maps as the held prop. Weapons warm
-both render passes; restart removes live instances, and teardown releases the
-shared asset after AI and the viewmodel have detached their visuals.
+both render passes. AI and weapons retain their own launch logic and tick their
+own live lists with `src/core/grenades.ts` on scaled time. It emits a blast with a
+position snapshot and the source captured at spawn, then removes the body and mesh.
+Restart and disposal clear live grenades without detonating them. Teardown releases
+the shared asset after AI and the viewmodel have detached their visuals.
+
+`src/weapons/hand-equipment.ts` owns the mutually exclusive gameplay hand states:
+weapon, bandage, radio, and a grenade from free equip through cooking, commitment,
+and release. Weapon actions keep their own clip gates; the viewmodel plays clips and
+reports the release beat, but only the hand state can authorize a launch. Death drops
+a cooking grenade; death or an immediate weapon swap releases an already committed
+throw once. A swap while cooking leaves the grenade in hand and the new gun hidden.
+Restart discards held equipment without launching it. The player owns
+heal timing and effects, and radio owns strike execution.
 
 The held field radio is a standalone authored GLB. `radio-mesh.ts` loads it during
 weapons boot and binds one retained canvas emissive texture to `SCREEN_radio`.
@@ -287,7 +315,7 @@ camera-space close-up; the LCD is the only radio interface, showing the select,
 send and stow bindings, charges or the empty state, request locks and the request
 cursor. Weapon keys stow the radio. Neither radio nor grenade equip interrupts a bolt cycle.
 Once equipped, the equip key does not consume the accessory's other inputs.
-Request state does not depend on the model. [Radio asset contract](assets/props/field-radio/README.md).
+Request state does not depend on the model. [Radio asset contract](tools/blender/field_radio/README.md).
 
 `weapons.createInspectionModel(id, config)` returns an independent rest-pose clone
 with `dispose()` for the market's demand-rendered WebGPU studio. Inspection owns
@@ -297,20 +325,22 @@ angle on attachment changes and disposes stale async results. Inspection resolve
 omitted configs to the stored build and deduplicates by weapon ID and attachment
 values. DOM controls work while simulation is paused. Model failures affect only
 that selection; renderer failures disable 3D inspection, never purchases. Supply
-artwork is mapped in `src/ui/market-art.ts`; its offline sources live in
-`assets/ui/market/`.
+artwork is mapped in `src/ui/market-art.ts`; its provenance lives in
+[`docs/provenance/market-art.md`](docs/provenance/market-art.md).
 
 `WeaponState.attachments` is the gun's one stored build, an immutable
 `{ optic, muzzle, rail }` snapshot; null slots retain the base weapon, and
 `optic: null` uses irons. Viewmodel entries hold the mounted instances and their
 resolved data, never a copy of the build.
-`src/weapons/attachments.ts` owns the finite catalog (`rmr | acog | scope | exps3`
-optics, TOR Mini `laser`, one `suppressor`), validation, loading and the shared
-gameplay/inspection mount solver. `src/market/attachments.ts` owns prices, not
-compatibility. Market holds one unconfirmed build; selecting, inspecting or editing
-never changes gameplay or credits. Confirmation rechecks credits, shop state and
-asset readiness, then calls `weapons.applyBuild()` before charging. New weapons are
-configured before replacing ownership, so a rejected build never drops the old gun.
+`src/weapons/attachment-rules.ts` owns the finite catalog (`rmr | acog | scope | exps3`
+optics, TOR Mini `laser`, one `suppressor`), compatibility and effective-definition
+resolution without importing weapon loading or mounting. `src/weapons/attachments.ts`
+owns asset loading and the shared gameplay/inspection mount solver.
+`src/market/attachments.ts` owns prices, not compatibility. Market holds one
+unconfirmed build; selecting, inspecting or editing never changes gameplay or credits.
+Confirmation rechecks credits, shop state and asset readiness, then calls
+`weapons.applyBuild()` before charging. New weapons are configured before replacing
+ownership, so a rejected build never drops the old gun.
 
 `WeaponDef.fits` is a per-slot partial record keyed by attachment ID: each entry
 enables a verified fit and holds its data (`fits.optic[id].eyeRelief`, optional
@@ -353,8 +383,8 @@ the `SOCKET_muzzle` name, so the weapon's own socket is held from load as
 `baseMuzzleSocket`, never looked up by name on a mounted rig.
 Prewarm covers every loaded attachment and both iron/muzzle base states.
 
-Per-weapon datums/clearances live in `assets/weapons/*/README.md` and
-`assets/attachments/*/README.md`. Blender fit checks load built attachments through
+Per-weapon and per-attachment datums/clearances live in each recipe's
+`tools/blender/*/README.md`. Blender fit checks load built attachments through
 `attachment_source.py`; cans share `can.py`. `picatinny.py` owns common rail
 geometry, and `check_picatinny.py` checks actual rails/clamps against a slotted gauge.
 

@@ -11,10 +11,12 @@ import { bakePhysicsNav } from '#worldgen/nav-bake';
 
 import type { Agent } from '../../src/ai/agent.ts';
 import { STATE } from '../../src/ai/agent.ts';
+import { AttachmentQueries } from '../../src/ai/attachment-queries.ts';
 import { AiSystem } from '../../src/ai/index.ts';
 import { INTENT, FLUSH_MAX_FAILS } from '../../src/ai/intent.ts';
 import type { BakedCoverPoint } from '../../src/ai/nav-format.ts';
 import { CoverMap, SurfaceNav } from '../../src/ai/nav.ts';
+import { createPathCompletion, type PathResult } from '../../src/ai/path-result.ts';
 import { Squad } from '../../src/ai/squad.ts';
 import { EventBus } from '../../src/core/registry.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
@@ -27,6 +29,7 @@ import {
   brainAnimator,
   coverPoint,
 } from '../lib/ai-brain-fixture.ts';
+import { NativeWorker } from '../lib/attachment-worker-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
 import { synthetic } from '../lib/nav240/fixtures.ts';
 
@@ -332,39 +335,59 @@ for (const s of [
     prev = out[i];
   }
 
-  const ai = fixtureAi();
-  ai.grid = g;
-  ai.pathsPerFrame = 2;
-  ai._pathBudget = 2;
-  ai.stats = {
-    agents: 0,
-    alive: 0,
-    navMs: 0,
-    coverPts: 0,
-    walkable: 0,
-    friendlyHolds: 0,
-    grenadeHolds: 0,
-    pathsDeferred: 0,
-  };
-  assert.ok(ai.requestPath(from, to, []) >= 0);
-  assert.equal(ai.lastPathOutcome, 'success');
-  ai._pathBudget = 2;
-  assert.ok(ai.requestPath(from, to.clone().setY(0.1), []) >= 0);
+  const ai = fixtureAi(g);
+  const first = createPathCompletion(),
+    second = createPathCompletion();
+  const savedRoute: THREE.Vector3[] = [];
+  const success = ai.requestPath(from, to.clone().setY(0.1), savedRoute, first);
+  assert.equal(success.outcome, 'success');
   assert.ok(Math.abs(floor) < 0.1, 'flat fixture resolves to its ground surface');
-  assert.equal(
-    ai.lastPathResFloor,
-    floor,
-    'resolved floor is the surface, not a small request-height error'
-  );
-  assert.ok(ai.requestPath(from, to, []) >= 0);
-  assert.equal(ai.requestPath(from, to, []), -1);
-  assert.equal(ai.lastPathOutcome, 'deferred');
+  assert.equal(first.resolvedFloor, floor, 'resolved floor is the surface, not the request height');
+  assert(first.startSurface && first.goalSurface);
+  const invalid = ai.requestPath(from, to.clone().setY(2), [], second);
+  assert.equal(invalid.outcome, 'invalid');
+  assert.equal(second.count, 0);
+  assert.ok(Number.isNaN(second.resolvedFloor));
+  assert.equal(success.outcome, 'success', 'a second caller cannot overwrite the first result');
+  const saved = { ...first },
+    savedPoints = savedRoute.map((p): THREE.Vector3 => p.clone());
+  assert.deepEqual(ai.requestPath(from, to, savedRoute, first), {
+    outcome: 'deferred',
+    reason: 'frame-budget',
+  });
+  assert.deepEqual(first, saved);
+  assert.deepEqual(savedRoute, savedPoints);
   assert.equal(ai.stats.pathsDeferred, 1);
-  ai._pathBudget = 2; // next frame: a genuinely different floor must be rejected
-  assert.equal(ai.requestPath(from, to.clone().setY(2), []), 0);
-  assert.equal(ai.lastPathOutcome, 'invalid');
-  assert.ok(Number.isNaN(ai.lastPathResFloor));
-  g.dispose();
+
+  const worker = new AttachmentQueries(g, {
+    workerFactory: (): NativeWorker => new NativeWorker(),
+  });
+  g.worker = worker;
+  try {
+    await worker.start();
+    ai._pathBudget = 2;
+    // At the edge of the walkable floor, attachment needs a worker proof.
+    const start = new THREE.Vector3(-8.8, 0, 0);
+    const ask = (): PathResult => ai.requestPath(start, to, savedRoute, first);
+    assert.deepEqual(ask(), { outcome: 'deferred', reason: 'attachment-pending' });
+    start.x += 0.001;
+    assert.deepEqual(ask(), { outcome: 'deferred', reason: 'attachment-superseded' });
+    assert.deepEqual(first, saved);
+    assert.deepEqual(savedRoute, savedPoints);
+    assert.equal(ai._pathBudget, 2, 'neither worker deferral spends a solve slot');
+    const deadline = performance.now() + 5_000;
+    let result = ask();
+    while (result.outcome === 'deferred') {
+      assert.equal(result.reason, 'attachment-pending');
+      assert(performance.now() < deadline, 'replacement route resolves through the worker');
+      await Bun.sleep(1);
+      result = ask();
+    }
+    assert.equal(result.outcome, 'success');
+    assert.equal(ai._pathBudget, 1);
+  } finally {
+    g.dispose();
+  }
 }
 
 /* 6. cover reservations on dispose / reset */

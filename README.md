@@ -57,7 +57,7 @@ Change map content in
 `tools/worldgen/level/`; the [world editing map](tools/worldgen/README.md) identifies
 shape, placement and build locations, and the `bun tools/export-world.ts` options.
 The seven authored weapons use the [shared gltfpack build recipe](build/README.md);
-`bun build/models.ts p320` reruns one cook. The [spent hull](assets/fx/spent-hull/README.md)
+`bun build/models.ts p320` reruns one cook. The [spent hull](tools/blender/spent_hull/README.md)
 keeps its validated native export to preserve the casing pool's vertex attributes.
 Each model has its own geometry, material and animation acceptance gates.
 
@@ -73,10 +73,12 @@ are native DOM. The field radio has no HUD panel: its handheld LCD is the interf
 If the HUD fails to initialize, a Reload error dialog appears.
 [HUD ownership, boundaries and checks](docs/hud.md).
 
-After loading, select **Start** to capture the mouse and begin. Pending or denied
-mouse capture keeps the run frozen; select **Retry Start** to retry (there is no
-unlocked-play fallback). Once playing, click the game canvas to reacquire the
-cursor (also a fire press). The pause menu has Gameplay, Audio and Controls tabs;
+After loading, select **Start** to capture the mouse, enter fullscreen and begin.
+Pending or denied mouse capture keeps the run frozen; select **Retry Start** to retry
+(there is no unlocked-play fallback). Fullscreen is optional; where keyboard lock is
+supported, shortcuts such as Ctrl+W (crouch + forward) stay in the game and a held
+Esc exits fullscreen. Once playing, click the game canvas to reacquire the cursor
+(also a fire press). The pause menu has Gameplay, Audio and Controls tabs;
 Controls is the full keyboard/mouse reference, including contextual behaviors.
 Bindings are fixed defaults in `src/core/bindings.ts`.
 
@@ -152,11 +154,11 @@ it; the first 21:00 triggers a three-minute streetlight outage, not an interior 
 For edit locations, source/generated ownership and regeneration commands, see the
 [asset and world editing map](docs/assets.md).
 
-Asset regeneration/reference notes: [arms](assets/player/arms/README.md),
-[M4](assets/weapons/m4a1-block-ii/README.md), [MCX](assets/weapons/mcx-virtus/README.md),
-[P320](assets/weapons/p320-compact/README.md), [EVOLYS](assets/weapons/fn-evolys-762/README.md),
-[MPX](assets/weapons/sig-mpx/README.md), [AX338](assets/weapons/ax338/README.md),
-[M590](assets/weapons/m590/README.md).
+Asset regeneration/reference notes: [arms](tools/blender/player_arms/README.md),
+[M4](tools/blender/m4/README.md), [MCX](tools/blender/mcx/README.md),
+[P320](tools/blender/p320/README.md), [EVOLYS](tools/blender/evolys/README.md),
+[MPX](tools/blender/mpx/README.md), [AX338](tools/blender/ax338/README.md),
+[M590](tools/blender/m590/README.md).
 Tests are not final human visual acceptance; see each asset's remaining limits.
 
 ## Diagnostics

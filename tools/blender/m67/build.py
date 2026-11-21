@@ -137,7 +137,7 @@ def make_grenade():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--output', type=Path, default=ROOT/'assets/weapons/m67')
+    parser.add_argument('--output', type=Path, default=ROOT/'.cache/blender/weapons/m67')
     args = parser.parse_args(sys.argv[sys.argv.index('--')+1:] if '--' in sys.argv else [])
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)

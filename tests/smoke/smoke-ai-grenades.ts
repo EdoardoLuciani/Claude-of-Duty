@@ -7,8 +7,9 @@ import { AiSystem } from '../../src/ai/index.ts';
 import { GRENADE } from '../../src/ai/tuning.ts';
 /** Issue #356: height-aware lob, cooked 3D arc clearance and live launch parity. */
 import type { EngineEventMap } from '../../src/core/events.ts';
+import { GRENADE_FUSE } from '../../src/core/grenades.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
-import { GRENADE_FUSE, WeaponSystem } from '../../src/weapons/index.ts';
+import { WeaponSystem } from '../../src/weapons/index.ts';
 import { makeAgent } from '../lib/agent-fixture.ts';
 import { brainAnimator } from '../lib/ai-brain-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
@@ -25,7 +26,6 @@ function fixture(): {
   weapons.createGrenade = (): THREE.Mesh => new THREE.Mesh();
   ai.ctx = createTestContext({ providers: { weapons } });
   ai.root = new THREE.Group();
-  ai._grenades = [];
   ai._grenadeArc = { dx: 0, dz: 0, dist: 0, vy: 0, vh: 0, tAir: 0, y: 0, valid: false };
   ai._grenadePoint = new THREE.Vector3();
   ai._grenadeStep = new THREE.Vector3();
@@ -126,27 +126,22 @@ assert.equal(
 const live = fixture();
 assert.equal(live.ai.predictGrenadeLand(from, target, land), 12);
 const arc = { ...live.ai._grenadeArc };
-live.ai.throwGrenade(makeAgent(), from, target);
-assert.equal(live.ai._grenades.length, 1);
-assert(live.ai._grenades[0].mesh.position.equals(from), 'show the launch origin before sync');
-const body = live.ai._grenades[0].body;
+const thrower = makeAgent();
+assert(live.ai.throwGrenade(thrower, from, target));
+const { body, mesh } = live.ai._grenades[0];
+assert(mesh.position.equals(from), 'show the launch origin before sync');
 assert.equal(body.linearDamping, 0, 'no unmodelled drag in the live launch');
 assert(Math.abs(body.linearVelocity.y - arc.vy) < 1e-6);
 assert(Math.abs(body.linearVelocity.x - arc.vh) < 1e-6);
 const { closest } = measureFlight(live.phys, body, land, arc.tAir + 0.1);
 assert(closest < GRENADE.landingTolerance, `live landing agrees with safety arc: ${closest} m`);
-const detonations: Array<{ type: 'explosion'; payload: EngineEventMap['explosion'] }> = [];
-live.ai.ctx.events.on('explosion', (payload): number =>
-  detonations.push({ type: 'explosion', payload })
-);
+const detonations: EngineEventMap['explosion'][] = [];
+live.ai.ctx.events.on('explosion', (payload): number => detonations.push(payload));
 live.ai._updateGrenades(GRENADE_FUSE);
 assert.equal(detonations.length, 1);
-assert.equal(detonations[0].type, 'explosion');
-assert.equal(
-  detonations[0].payload.kind,
-  'grenade',
-  'AI grenade selects the recorded grenade bank'
-);
+assert.equal(detonations[0].kind, 'grenade', 'AI grenade selects the recorded grenade bank');
+assert.equal(detonations[0].source, thrower, 'the blast is credited to the thrower');
+assert(!live.phys.bodies.bodies.includes(body) && mesh.parent === null, 'detonation removes both');
 
 // Grazing sides: a 60 mm gap clears a 50 mm sphere, but a 40 mm gap blocks it.
 // The old live CCD core was 90 mm despite prediction sweeping only 50 mm.

@@ -19,6 +19,7 @@ import {
   type ExpectedNav,
   type BakedCoverPoint,
 } from './nav-format.ts';
+import type { PathSolveOutcome } from './path-result.ts';
 import { TACTICS } from './tuning.ts';
 export { NAV_PENDING, NAV_CANCELLED } from './attachment-queries.ts';
 const EXTENTS = Object.freeze({ x: 1.2, y: INFANTRY.stepHeight, z: 1.2 });
@@ -202,7 +203,7 @@ export class SurfaceNav {
   }
 
   coverPoints: NavCoverPoint[] = [];
-  lastOutcome: string | null = null;
+  lastOutcome: PathSolveOutcome = 'invalid';
   lastReason: string | null = null;
   startSurface: number = 0;
   goalSurface: number = 0;

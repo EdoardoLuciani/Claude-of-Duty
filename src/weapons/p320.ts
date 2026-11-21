@@ -2,8 +2,6 @@ import * as THREE from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Renderer } from 'three/webgpu';
 
-import handReference from '../../assets/weapons/p320-compact/hand-reference.json' with { type: 'json' };
-import manifest from '../../assets/weapons/p320-compact/manifest.json' with { type: 'json' };
 import { disposeMaterials } from '../core/dispose-materials.ts';
 import { isSkinnedMesh } from '../core/three-guards.ts';
 import { loadWeaponGLTF } from './asset-loader.ts';
@@ -11,11 +9,13 @@ import { convertWeaponScene } from './asset-material.ts';
 import { sampleAuthoredFire, MAGAZINE_ALIASES, disposeAuthoredMixer } from './authored-actions.ts';
 import { authoredModel, requiredNode, type AuthoredModelData } from './authored-model.ts';
 import { createAuthoredRig, sampleAuthoredPose } from './authored-rig.ts';
+import handReference from './authored/p320-compact/hand-reference.json' with { type: 'json' };
+import manifest from './authored/p320-compact/manifest.json' with { type: 'json' };
 import { buildMagazineClips, type Clip } from './clips.ts';
 import type { WeaponAnimation } from './runtime-types.ts';
 
 const P320_URL = '/models/weapons/p320-compact.runtime.glb';
-export const P320_EJECT_DELAY = 2 / 60;
+const EJECT_DELAY = 2 / 60;
 const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(MAGAZINE_ALIASES)];
 
 function makeP320Model(gltf: GLTF): P320Model {
@@ -81,6 +81,7 @@ export function createP320Animation(model: P320Model): WeaponAnimation {
   let magazineRoundScaleOverridden = false;
   const animation = {
     ...rig,
+    ejectDelay: EJECT_DELAY,
     clips(): Record<string, Clip> {
       return buildMagazineClips(MAGAZINE_ALIASES, manifest.clips);
     },

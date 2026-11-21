@@ -2,7 +2,7 @@
  * zeroRange is the sight-line crossing; learned sightline recoil is separate from random spread.
  */
 
-import type { CanModel, MuzzleId, OpticId, RailId } from './attachments.ts';
+import type { CanModel, MuzzleId, OpticId, RailId } from './attachment-rules.ts';
 
 export const WEAPON_IDS = ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper', 'mcx'] as const;
 export type WeaponId = (typeof WEAPON_IDS)[number];
@@ -153,7 +153,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     drawTime: 0.62,
     holsterTime: 0.4,
     hipPos: [0.118, -0.192, -0.3],
-    hipRot: [-0.05, 0.081, -0.135],
+    hipRot: [0.004, 0.003, -0.135],
     adsCant: [0, 0, 0],
     eyeRelief: 0.06,
     fits: {
@@ -229,7 +229,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
      * Shared handling offsets for the authored M4; attachment datums and
      * wrist/finger trajectories belong to the Blender asset. */
     hipPos: [0.118, -0.185, -0.3],
-    hipRot: [-0.05, 0.081, -0.135],
+    hipRot: [0.002, 0.001, -0.135],
     adsCant: [0, 0, 0.004],
     // Bring the eye closer to open the rear aperture; its bore and aim datum stay authored.
     eyeRelief: 0.03,
@@ -308,7 +308,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     firingShoulderZ: 0.12, // MPX inspection must not stretch a behind-eye arm.
     adsFiringShoulderZ: 0.28, // ADS shoulder anchor stays behind the wrist.
     hipPos: [0.111, -0.163, -0.288],
-    hipRot: [-0.05, 0.072, -0.131],
+    hipRot: [0.005, 0.002, -0.131],
     adsCant: [0, 0, 0.005],
     // Aim through the deployed rear peep.
     eyeRelief: 0.06,
@@ -380,7 +380,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     supportShoulderZ: -0.07,
     // Bore-aligned pose; the left-side belt box remains visible at hip.
     hipPos: [0.118, -0.185, -0.3],
-    hipRot: [-0.074, 0.081, -0.135],
+    hipRot: [0.002, 0.001, -0.135],
     adsCant: [0, 0, 0.004],
     eyeRelief: 0.03,
     fits: {
@@ -458,7 +458,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
      * past ~0.40 m the two-bone solve hits full extension and they lock. */
     hipPos: [0.115, -0.15, -0.38],
     supportShoulderZ: 0.14,
-    hipRot: [-0.05, 0.066, -0.115],
+    hipRot: [0.005, 0.005, -0.115],
     adsCant: [0, 0, 0.003],
     eyeRelief: 0.34,
     // Fixed iron sights; only the under-barrel laser and compact can are supported.
@@ -526,7 +526,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     // Prototype conventional-stock wrist: body shoulder only, native grip stays fixed.
     firingShoulderZ: 0.45,
     hipPos: [0.118, -0.175, -0.3],
-    hipRot: [-0.05, 0.078, -0.125],
+    hipRot: [0.003, 0.003, -0.125],
     adsCant: [0, 0, 0.003],
     eyeRelief: 0.28,
     // Extended integrated-sight rail seats RMR/ACOG and both PM II pedestals.
@@ -594,7 +594,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     drawTime: 0.88,
     holsterTime: 0.56,
     hipPos: [0.124, -0.2, -0.34],
-    hipRot: [-0.055, 0.078, -0.13],
+    hipRot: [0.002, 0, -0.13],
     adsCant: [0, 0, 0],
     eyeRelief: 0.07,
     fits: {

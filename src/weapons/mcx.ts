@@ -2,8 +2,6 @@ import * as THREE from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Renderer } from 'three/webgpu';
 
-import handReference from '../../assets/weapons/mcx-virtus/hand-reference.json' with { type: 'json' };
-import manifest from '../../assets/weapons/mcx-virtus/manifest.json' with { type: 'json' };
 import { disposeMaterials } from '../core/dispose-materials.ts';
 import { isSkinnedMesh } from '../core/three-guards.ts';
 import { loadWeaponGLTF } from './asset-loader.ts';
@@ -16,6 +14,8 @@ import {
   type AuthoredModelData,
 } from './authored-model.ts';
 import { createAuthoredRig, sampleAuthoredPose } from './authored-rig.ts';
+import handReference from './authored/mcx-virtus/hand-reference.json' with { type: 'json' };
+import manifest from './authored/mcx-virtus/manifest.json' with { type: 'json' };
 import { buildMagazineClips, type Clip } from './clips.ts';
 import type { WeaponDef } from './defs.ts';
 import { configureMCXFinishes } from './mcx-finishes.ts';
@@ -23,7 +23,7 @@ import type { WeaponAnimation } from './runtime-types.ts';
 
 const MCX_URL = '/models/weapons/mcx-virtus.runtime.glb';
 const SHOT_START = 2 / 60;
-export const MCX_EJECT_DELAY = 4 / 60 - SHOT_START;
+const EJECT_DELAY = 4 / 60 - SHOT_START;
 
 export function makeMCXModel(gltf: GLTF): MCXModel {
   // Source +X forward; the game origin is the shooting-hand web, not the chamber.
@@ -88,6 +88,8 @@ export function createMCXAnimation(model: MCXModel, def: WeaponDef): WeaponAnima
   node('spent_case').visible = false;
   const animation = {
     ...rig,
+    // Fire is sampled at `speed`, so the authored ejection beat arrives sooner.
+    ejectDelay: EJECT_DELAY / speed,
     clips(): Record<string, Clip> {
       return buildMagazineClips(MAGAZINE_ALIASES, manifest.clips);
     },

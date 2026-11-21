@@ -10,7 +10,7 @@ from mathutils import Matrix
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import can
 
-root, out = can.begin('SUPPRESSOR', 'assets/attachments/sig-srd762ti')
+root, out = can.begin('SUPPRESSOR', '.cache/blender/attachments/sig-srd762ti')
 asset = bpy.context.collection
 ceramic = can.material('06 | suppressor graphite ceramic', (.045, .046, .049), .76)
 rubber = can.material('05 | bore shadow', (.008, .009, .010), .95)
