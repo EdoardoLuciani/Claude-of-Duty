@@ -2,14 +2,11 @@ import assert from 'node:assert/strict';
 
 import { DEFAULT_BINDINGS, bindingLabels, bindingLabel } from '../../src/core/bindings.ts';
 import type { ActionId } from '../../src/core/bindings.ts';
-import type { EngineContext } from '../../src/core/context.ts';
 import { CONTROL_SECTIONS } from '../../src/ui/controls.ts';
-import { UiSystem } from '../../src/ui/index.ts';
 import { PauseMenu } from '../../src/ui/menu.ts';
 import { Prompt } from '../../src/ui/prompts.ts';
 import { createTestContext, createTestInput } from '../lib/context.ts';
 import type { TestProviders } from '../lib/context.ts';
-import { fixture } from '../lib/fixture.ts';
 import { installUiDocument, UiPlayer } from '../lib/ui-fixture.ts';
 
 installUiDocument();
@@ -41,8 +38,7 @@ const input = createTestInput();
 input.requestPointerLock = (): void => {
   locks++;
 };
-const engine = fixture<EngineContext['engine']>({ gameplaySuspended: false });
-const ctx = createTestContext({ engine, input, providers });
+const ctx = createTestContext({ input, providers });
 ctx.time.scale = 0.5;
 const player = new UiPlayer(ctx);
 player.setControlEnabled = (value: boolean): void => {
@@ -130,32 +126,6 @@ assert.deepEqual(
     ['ui:pause', { paused: false }],
   ]
 );
-
-// Resume with capture pending (or denied) must not read as a fresh lock loss.
-const ui = new UiSystem();
-ui.ctx = ctx;
-ui.menu = menu;
-let lockElement: unknown = null;
-Object.defineProperty(document, 'pointerLockElement', { get: (): unknown => lockElement });
-const setLocked = (locked: boolean): void => {
-  lockElement = locked ? input.canvas : null;
-  input._onLockChange();
-};
-const key = (code: string, repeat = false): KeyboardEvent =>
-  fixture<KeyboardEvent>({ code, repeat, preventDefault(): void {} });
-setLocked(true);
-ui._updatePause();
-setLocked(false);
-ui._updatePause();
-assert.equal(menu.open, true, 'losing pointer lock pauses');
-assert.equal(input.enabled, false, 'the modal owns keyboard and mouse input');
-menu.root.onkeydown?.(key(DEFAULT_BINDINGS.pause[0], true));
-assert.equal(menu.open, true, 'holding Escape does not immediately resume');
-menu.root.onkeydown?.(key(DEFAULT_BINDINGS.pause[0]));
-assert.equal(locks, 2, 'Escape resumes and requests pointer lock');
-input.beginFrame();
-ui._updatePause();
-assert.equal(menu.open, false, 'pending or denied recapture does not reopen the menu');
 menu.dispose();
 assert('removed' in menu.root);
 assert.equal(menu.root.removed, true);

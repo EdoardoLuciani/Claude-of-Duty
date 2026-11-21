@@ -1,5 +1,5 @@
 import type { VolumeKey } from '../audio/settings.ts';
-import { bindingLabel, DEFAULT_BINDINGS } from '../core/bindings.ts';
+import { bindingLabel } from '../core/bindings.ts';
 import type { EngineContext } from '../core/context.ts';
 import { hasOwn } from '../core/guards.ts';
 import { clamp, damp } from '../core/math.ts';
@@ -61,13 +61,9 @@ export class PauseMenu {
     this.ctx = ctx;
     this.root = el('dialog', 'ow-menu ow-dialog', parent);
     this.root.setAttribute('aria-labelledby', 'ow-menu-title');
+    // Esc stays owned by the pause binding, which toggles this menu itself.
     this.root.setAttribute('closedby', 'none');
     this.root.oncancel = (event): void => event.preventDefault();
-    this.root.onkeydown = (event): void => {
-      if (event.code !== DEFAULT_BINDINGS.pause[0]) return;
-      event.preventDefault();
-      if (!event.repeat) this.close();
-    };
     const layout = el('div', 'ow-menu-layout', this.root);
     const rail = el('nav', 'ow-menu-rail', layout);
     rail.setAttribute('aria-label', 'Pause menu');
@@ -299,16 +295,21 @@ export class PauseMenu {
     if (audio) for (const [key, slider] of this.volumes) slider.set(audio.volumes[key]);
   }
 
+  toggle(): void {
+    if (this.open) {
+      this.close();
+    } else {
+      this.show();
+    }
+  }
+
   show(): void {
     if (this.open) return;
     this.open = true;
-    // The modal owns keys and clicks until Resume, even before unlock completes.
-    this.ctx.input.enabled = false;
-    this.ctx.input.clear();
-    document.exitPointerLock();
     this.syncFromConfig();
     setStyle(this.root, 'display', '');
     this.root.showModal();
+    document.exitPointerLock();
     this._prevScale = this.ctx.time.scale;
     this.ctx.time.scale = 0;
     this.ctx.peek('player')?.setControlEnabled(false);
@@ -321,7 +322,6 @@ export class PauseMenu {
     this.root.close(); // Leave the top layer before re-locking; update() still fades it out.
     this.ctx.time.scale = this._prevScale ?? 1;
     this.ctx.peek('player')?.setControlEnabled(true);
-    this.ctx.input.enabled = true;
     this.ctx.input.requestPointerLock();
     this.ctx.events.emit('ui:pause', { paused: false });
   }
@@ -329,10 +329,14 @@ export class PauseMenu {
   /** Driven with unscaled time so the fade still runs while the game is frozen. */
   update(rawDt: number): void {
     this.shown = damp(this.shown, this.open ? 1 : 0, 14, rawDt);
-    const hidden = !this.open && this.shown < 0.004;
-    setStyle(this.root, 'display', hidden ? 'none' : '');
+    if (this.shown < 0.004) {
+      setStyle(this.root, 'display', 'none');
+      setStyle(this.root, 'pointer-events', 'none');
+      return;
+    }
+    setStyle(this.root, 'display', '');
     setStyle(this.root, 'pointer-events', this.open ? 'auto' : 'none');
-    if (!hidden) setStyle(this.root, 'opacity', ease.outQuad(this.shown).toFixed(3));
+    setStyle(this.root, 'opacity', ease.outQuad(this.shown).toFixed(3));
   }
 
   dispose(): void {

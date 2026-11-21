@@ -122,7 +122,6 @@ export class UiSystem {
   hudVisible: number = 1;
   hudTarget!: number;
   _lastRaw!: number;
-  _hadPointerLock!: boolean;
   _marketJustClosed!: boolean;
   _healPrompt: boolean = false;
   _bakeFrame: number = 0;
@@ -161,7 +160,6 @@ export class UiSystem {
 
     this.hudTarget = 1;
     this._lastRaw = ctx.time.raw;
-    this._hadPointerLock = false;
     this._marketJustClosed = false; // one frame after the shop closes
 
     for (let i = 0; i < MAX_BLIPS; i++) this._blips[i] = { x: 0, z: 0, kind: 'enemy', heading: 0 };
@@ -240,7 +238,6 @@ export class UiSystem {
       this.sfx('market_close', 0.7);
       // The shop released the pointer and possibly consumed the Escape that
       // closed it — keep the pause machinery out of this frame entirely.
-      this._hadPointerLock = false;
       this._marketJustClosed = true;
       this.ctx.input.requestPointerLock();
     });
@@ -274,7 +271,6 @@ export class UiSystem {
     // shot; leaving ammo, crosshair and minimap over it defeats the cinematic.
     on('player:death', (): void => {
       this.hudTarget = 0;
-      this._hadPointerLock = false;
       const run = ctx.peek('game')?.getHudState() ?? this.state;
       this.gameOver.show(run, ctx.peek('market')?.credits ?? 0);
     });
@@ -390,8 +386,6 @@ export class UiSystem {
 
   pause(): void {
     if (this.ctx.engine.gameplaySuspended) return;
-    // Resume starts a new capture; a pending or denied request isn't lock loss.
-    this._hadPointerLock = false;
     this.menu.show();
   }
 
@@ -435,27 +429,6 @@ export class UiSystem {
     this._fpsFrames = 0;
   }
 
-  _updatePause(): void {
-    // The shop owns the pointer and Escape, including the frame it closes.
-    if (this._marketJustClosed) {
-      this._marketJustClosed = false;
-      return;
-    }
-    const { input } = this.ctx;
-    if (
-      this.menu.open ||
-      !input.enabled ||
-      input.frozen ||
-      this.ctx.peek('player')?.dead ||
-      this.ctx.peek('market')?.open
-    )
-      return;
-    // Losing pointer lock mid-match is the same intent as pressing Escape.
-    const locked = input.pointerLocked;
-    if (input.actionPressed('pause') || (this._hadPointerLock && !locked)) this.pause();
-    else this._hadPointerLock = locked;
-  }
-
   lateUpdate(dt: number, ctx: UiContext): void {
     // Wall time, not scaled/clamped gameplay time: accurate through pause and hitches.
     this._updateFps();
@@ -467,13 +440,24 @@ export class UiSystem {
     // Resume happens between frames; reveal only after normal active pose hooks.
     if (this.startGate && !this.startGate.afterPose()) {
       this.pixiHud?.setVisible(false);
-      this._hadPointerLock = false;
       return;
     }
     const s = this.state;
     s.time = t.elapsed;
 
-    this._updatePause();
+    // ---- pause -----------------------------------------------------------
+    const playerDead = ctx.peek('player')?.dead === true;
+    const marketOpen = ctx.peek('market')?.open === true;
+    // The shop owns the pointer and the Escape key while it is open; letting
+    // the pause machinery see either would open the menu under the shop or
+    // double-toggle on the same Esc that skipped it.
+    if (this._marketJustClosed) {
+      this._marketJustClosed = false;
+    } else if (ctx.input.enabled && !ctx.input.frozen && !playerDead && !marketOpen) {
+      if (ctx.input.actionPressed('pause')) this.menu.toggle();
+      // Losing pointer lock mid-match is the same intent as pressing Escape.
+      else if (ctx.input.lockLost) this.menu.show();
+    }
     this.menu.update(rawDt);
     this.gameOver.update(rawDt);
     this.shop.update(rawDt);

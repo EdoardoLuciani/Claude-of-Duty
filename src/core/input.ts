@@ -79,6 +79,8 @@ export class Input {
   wheel: number = 0;
   _pendingWheel: number = 0;
   pointerLocked: boolean = false;
+  /** True for the frame after a held pointer lock was lost; a denied request never sets it. */
+  lockLost: boolean = false;
   // Keyboard events can still drive movement when pointer lock is denied or
   // while the pointer-lock transition is in flight. Remember that the canvas
   // was clicked so browser shortcuts are suppressed for that active game
@@ -238,7 +240,9 @@ export class Input {
   }
 
   _onLockChange(): void {
-    this.pointerLocked = document.pointerLockElement === this.canvas;
+    const locked = document.pointerLockElement === this.canvas;
+    if (this.pointerLocked && !locked) this.lockLost = true;
+    this.pointerLocked = locked;
     if (!this.pointerLocked) this._onBlur();
   }
 
@@ -268,6 +272,7 @@ export class Input {
     this._started.clear();
     this.look.x = this.look.y = this._rawLook.x = this._rawLook.y = 0;
     this.wheel = this._pendingWheel = 0;
+    this.lockLost = false;
     this.stick.moveX = this.stick.moveY = this.stick.lookX = this.stick.lookY = 0;
   }
 
@@ -308,7 +313,9 @@ export class Input {
     this._pollGamepad();
   }
 
-  endFrame(): void {}
+  endFrame(): void {
+    this.lockLost = false;
+  }
 
   _pollGamepad(): void {
     if (!this.enabled) {
