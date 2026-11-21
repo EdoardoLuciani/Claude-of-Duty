@@ -303,7 +303,8 @@ weapon, bandage, radio, and a grenade from free equip through cooking, commitmen
 and release. Weapon actions keep their own clip gates; the viewmodel plays clips and
 reports the release beat, but only the hand state can authorize a launch. Death drops
 a cooking grenade; death or an immediate weapon swap releases an already committed
-throw once. Restart discards held equipment without launching it. The player owns
+throw once. A swap while cooking leaves the grenade in hand and the new gun hidden.
+Restart discards held equipment without launching it. The player owns
 heal timing and effects, and radio owns strike execution.
 
 The held field radio is a standalone authored GLB. `radio-mesh.ts` loads it during

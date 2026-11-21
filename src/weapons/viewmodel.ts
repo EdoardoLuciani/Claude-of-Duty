@@ -569,7 +569,7 @@ export class Viewmodel {
     }
     this.active = w;
     w.animation.reset();
-    w.group.visible = true;
+    w.group.visible = !this._grenadeState && !this._radioState && !this._bandageState;
     this.recPos.reset();
     this.recRot.reset();
     this.settle.reset();

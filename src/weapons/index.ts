@@ -1289,7 +1289,7 @@ export class WeaponSystem {
   }
 
   private canEquipAccessory(): boolean {
-    return !this._hands.grenadeLive && !this.switching && !this.cycling;
+    return !this.switching && !this.cycling;
   }
 
   /**
@@ -1451,7 +1451,6 @@ export class WeaponSystem {
   _dropCookedGrenade(): void {
     const fuse = this._hands.dropCooked(GRENADE_FUSE);
     if (fuse === null) return;
-    this._viewmodel?.endGrenade();
     const player = this.player ?? (this.player = this.ctx.peek('player'));
     const at = player?.feetPosition ?? this.ctx.camera.position;
     this._spawnGrenade(
