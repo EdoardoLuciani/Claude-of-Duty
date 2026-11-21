@@ -66,7 +66,6 @@ export class PauseMenu {
     this.root.onkeydown = (event): void => {
       if (event.code !== DEFAULT_BINDINGS.pause[0]) return;
       event.preventDefault();
-      // Resume in the key event, while pointer lock can use its activation.
       if (!event.repeat) this.close();
     };
     const layout = el('div', 'ow-menu-layout', this.root);
@@ -328,14 +327,10 @@ export class PauseMenu {
   /** Driven with unscaled time so the fade still runs while the game is frozen. */
   update(rawDt: number): void {
     this.shown = damp(this.shown, this.open ? 1 : 0, 14, rawDt);
-    if (!this.open && this.shown < 0.004) {
-      setStyle(this.root, 'display', 'none');
-      setStyle(this.root, 'pointer-events', 'none');
-      return;
-    }
-    setStyle(this.root, 'display', '');
+    const hidden = !this.open && this.shown < 0.004;
+    setStyle(this.root, 'display', hidden ? 'none' : '');
     setStyle(this.root, 'pointer-events', this.open ? 'auto' : 'none');
-    setStyle(this.root, 'opacity', ease.outQuad(this.shown).toFixed(3));
+    if (!hidden) setStyle(this.root, 'opacity', ease.outQuad(this.shown).toFixed(3));
   }
 
   dispose(): void {

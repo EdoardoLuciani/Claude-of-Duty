@@ -2,13 +2,12 @@ import assert from 'node:assert/strict';
 
 import { DEFAULT_BINDINGS, bindingLabels, bindingLabel } from '../../src/core/bindings.ts';
 import type { ActionId } from '../../src/core/bindings.ts';
+import { createConfig } from '../../src/core/config.ts';
+import { Engine } from '../../src/core/engine.ts';
 import { CONTROL_SECTIONS } from '../../src/ui/controls.ts';
 import { UiSystem } from '../../src/ui/index.ts';
 import { PauseMenu } from '../../src/ui/menu.ts';
 import { Prompt } from '../../src/ui/prompts.ts';
-import { createTestContext, createTestInput } from '../lib/context.ts';
-import type { TestProviders } from '../lib/context.ts';
-import { createCoreFixture } from '../lib/core-fixture.ts';
 import { fixture } from '../lib/fixture.ts';
 import { installUiDocument, UiPlayer } from '../lib/ui-fixture.ts';
 
@@ -36,19 +35,19 @@ assert.ok(labels.has('Mouse') && labels.has('Mouse wheel'), 'mouse reference ret
 const events: ['ui:pause', { paused: boolean }][] = [];
 const controlChanges: boolean[] = [];
 let locks = 0;
-const providers: TestProviders = {};
-const input = createTestInput({}, document.createElement('canvas'));
-input.canvas.requestPointerLock = async (): Promise<void> => {
+const { canvas, ctx, input, registry } = new Engine({
+  canvas: document.createElement('canvas'),
+  config: createConfig({ deterministic: true }),
+});
+canvas.requestPointerLock = async (): Promise<void> => {
   locks++;
 };
-const { engine } = createCoreFixture();
-const ctx = createTestContext({ engine, input, providers });
 ctx.time.scale = 0.5;
 const player = new UiPlayer(ctx);
 player.setControlEnabled = (value: boolean): void => {
   controlChanges.push(value);
 };
-providers.player = player;
+registry.add('player', player);
 ctx.events.on('ui:pause', (payload): void => {
   events.push(['ui:pause', payload]);
 });
@@ -125,17 +124,22 @@ const key = (code: string, repeat = false): KeyboardEvent =>
       prevented = true;
     },
   });
-let lockElement: HTMLElement | null = input.canvas;
+let lockElement: HTMLCanvasElement | null = null;
 let unlocks = 0;
 Object.defineProperty(document, 'pointerLockElement', {
-  get: (): HTMLElement | null => lockElement,
+  get: (): HTMLCanvasElement | null => lockElement,
 });
 document.exitPointerLock = (): void => {
   unlocks++;
 };
-input._onLockChange();
+const setLocked = (locked: boolean): void => {
+  lockElement = locked ? canvas : null;
+  input._onLockChange();
+};
+const escape = DEFAULT_BINDINGS.pause[0];
+setLocked(true);
 ui._updatePause();
-input._onKeyDown(key(DEFAULT_BINDINGS.pause[0]));
+input._onKeyDown(key(escape));
 input.beginFrame();
 ui._updatePause();
 assert.equal(ctx.time.scale, 0);
@@ -143,24 +147,20 @@ assert.equal(menu.root.open, true, 'pause menu is a native modal');
 assert.equal(menu.resumeBtn.autofocus, true, 'modal opens on Resume');
 menu.show(); // idempotent: do not overwrite the pre-pause scale
 assert.equal(unlocks, 1, 'pause releases the pointer');
-lockElement = null;
-input._onLockChange();
-lockElement = input.canvas; // A pending browser request grants lock during the pause.
-input._onLockChange();
+setLocked(false);
+setLocked(true); // A pending browser request grants lock during the pause.
 assert.equal(unlocks, 2, 'late pointer lock is released again');
 prevented = false;
 input._onKeyDown(key('Tab'));
 input._onKeyDown(key('ArrowDown'));
 assert.equal(prevented, false, 'the menu owns Tab and arrows, even before unlock completes');
-input._onMouseDown(fixture<MouseEvent>({ target: input.canvas, button: 0 }));
+input._onMouseDown(fixture<MouseEvent>({ target: canvas, button: 0 }));
 assert.equal(locks, 0, 'canvas input cannot recapture while the menu is open');
-lockElement = null;
-input._onLockChange();
-const escape = DEFAULT_BINDINGS.pause[0];
+setLocked(false);
 menu.root.onkeydown?.(key(escape, true));
 assert.equal(menu.root.open, true, 'holding Escape does not immediately resume');
 menu.root.onkeydown?.(key(escape));
-assert.equal(locks, 1, 'Escape requests capture within the key event');
+assert.equal(locks, 1, 'Escape requests pointer lock');
 input.beginFrame();
 ui._updatePause();
 assert.equal(menu.root.open, false, 'pending or denied recapture must not reopen the menu');
@@ -173,11 +173,9 @@ assert.deepEqual(
     ['ui:pause', { paused: false }],
   ]
 );
-lockElement = input.canvas;
-input._onLockChange();
+setLocked(true);
 ui._updatePause();
-lockElement = null;
-input._onLockChange();
+setLocked(false);
 ui._updatePause();
 assert.equal(menu.root.open, true, 'losing a newly acquired lock still pauses the run');
 menu.dispose();
