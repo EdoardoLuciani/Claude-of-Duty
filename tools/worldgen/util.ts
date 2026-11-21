@@ -19,6 +19,7 @@ export type MaskPainter = (
   out: number[]
 ) => void;
 export interface AssemblyOptions {
+  visualOnly?: boolean;
   masks?: InstanceMasks;
   paint?: MaskPainter;
 }
@@ -204,6 +205,7 @@ export class Accum {
   declare col: number[] | null;
   declare solid: number[] | null;
   declare idx: number[] | null;
+  readonly visualRanges: [start: number, end: number][] = [];
   constructor(name = 'merged') {
     this.name = name;
     this.pos = [];
@@ -285,6 +287,7 @@ export class Accum {
     }
 
     this.solidCount += solidCount;
+    const start = this.idx!.length;
     if (index) {
       const a = index.array;
       for (let i = 0; i < a.length; i++) this.idx!.push(base + a[i]);
@@ -293,6 +296,8 @@ export class Accum {
       for (let i = 0; i < pa.count; i++) this.idx!.push(base + i);
       this.tris += pa.count / 3;
     }
+    if (opts?.visualOnly && this.idx!.length > start)
+      this.visualRanges.push([start, this.idx!.length]);
     return this;
   }
 

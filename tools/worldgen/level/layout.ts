@@ -58,7 +58,6 @@ export const BUILDINGS: BuildingSpec[] = [
     ],
     // This doorway opens onto the setback terrace rather than a separate slab.
     bayKinds: { 1: { 1: { 2: 'balconyDoor' } } },
-    doorBays: { 0: 2, 1: 1 },
     enterable: true,
     interiorFloors: 1,
     roofProps: 3,
@@ -116,7 +115,6 @@ export const BUILDINGS: BuildingSpec[] = [
       [2, 1, 3, 1.1557, 'concrete'],
     ],
     arches: true,
-    doorBays: { 1: 1, 2: 3 },
     enterable: true,
     interiorFloors: 1,
     roofProps: 4,
@@ -172,12 +170,11 @@ export const BUILDINGS: BuildingSpec[] = [
       [0, 1, 3, 1.3094, 'metal'],
       [1, 1, 0, 1.2584, 'metal'],
     ],
-    doorBays: { 1: 2 },
     // The interior camera stands in the shop and looks out through bay 1 of the
     // street facade, so that bay is an open shopfront by hand, not by dice.
     bayKinds: {
       1: {
-        0: { 1: { kind: 'shop', drop: 0 } },
+        0: { 1: 'shop' },
         // Join the inset apartment slab to its existing terrace doorway.
         1: { 1: { kind: 'balconyDoor', floorBridge: true } },
       },
@@ -214,7 +211,7 @@ export const BUILDINGS: BuildingSpec[] = [
           [0.0, 0.52, 0.55, 0.52, 0.7],
         ],
         furnish: [
-          { kind: 'shop', x0: 0.55, z0: 0.0, x1: 1.0, z1: 1.0 },
+          { kind: 'shop', x0: 0.55, z0: 0.0, x1: 1.0, z1: 1.0, counter: [-8.14, -3.125, 2.1] },
           { kind: 'storage', x0: 0.0, z0: 0.0, x1: 0.55, z1: 0.52 },
           { kind: 'living', x0: 0.0, z0: 0.52, x1: 0.55, z1: 1.0 },
         ],
@@ -254,7 +251,6 @@ export const BUILDINGS: BuildingSpec[] = [
     balconies: [[1, 1, 0, 1.2482, 'metal']],
     ruin: true,
     ruinSide: 1,
-    doorBays: { 1: 0 },
     enterable: true, // walkable ruin; the dark shell had no collision
     wallCuts: [{ side: 2, f: 1, x: -1.625, w: 1.8, h: 2.36 }],
     exteriorStairs: [
@@ -308,7 +304,6 @@ export const BUILDINGS: BuildingSpec[] = [
     damage: 0.3,
     balconies: [[0, 1, 1, 1.2836, 'concrete']],
     arches: true,
-    doorBays: { 0: 3, 1: 3 },
     // This existing shop opening carries the stair route. Raise its shutter
     // and remove the low counter instead of leaving an unexecutable shortcut.
     bayKinds: {
@@ -366,7 +361,6 @@ export const BUILDINGS: BuildingSpec[] = [
       [3, 1, 3, 1.0929, 'concrete'],
       [3, 1, 4, 1.1643, 'concrete'],
     ],
-    doorBays: { 3: 2 },
     enterable: true,
     interiorFloors: 1,
     roofProps: 3,
@@ -426,7 +420,6 @@ export const BUILDINGS: BuildingSpec[] = [
       [3, 1, 2, 1.227, 'metal'],
       [3, 2, 0, 1.1272, 'concrete'],
     ],
-    doorBays: { 3: 2, 0: 1 },
     enterable: true,
     roofAccess: true,
     roofProps: 6,
@@ -469,7 +462,7 @@ export const BUILDINGS: BuildingSpec[] = [
           [0.62, 0.0, 0.62, 0.42, 0.5],
         ],
         furnish: [
-          { kind: 'shop', x0: 0.0, z0: 0.42, x1: 0.62, z1: 1.0 },
+          { kind: 'shop', x0: 0.0, z0: 0.42, x1: 0.62, z1: 1.0, counter: [8.14, 22.4, 2.05] },
           { kind: 'storage', x0: 0.0, z0: 0.0, x1: 0.62, z1: 0.42 },
         ],
       },
@@ -506,7 +499,6 @@ export const BUILDINGS: BuildingSpec[] = [
     bayKinds: {
       2: { 1: { 0: 'balconyDoor', 2: 'balconyDoor', 4: 'balconyDoor' }, 2: { 1: 'balconyDoor' } },
     },
-    doorBays: { 2: 3, 3: 1 },
     enterable: true,
     interiorFloors: 1,
     roofProps: 5,
@@ -516,7 +508,6 @@ export const BUILDINGS: BuildingSpec[] = [
       {
         side: 2,
         doorX: -0.4,
-        clearAwnings: true,
         w: 1.2,
         dir: 1,
         railing: 'right',
@@ -544,7 +535,7 @@ export const BUILDINGS: BuildingSpec[] = [
           [0.0, 0.56, 0.56, 0.56, 0.4],
         ],
         furnish: [
-          { kind: 'shop', x0: 0.0, z0: 0.0, x1: 0.56, z1: 0.56 },
+          { kind: 'shop', x0: 0.0, z0: 0.0, x1: 0.56, z1: 0.56, counter: [8.14, -7.9304, 4.4] },
           { kind: 'ruin', x0: 0.0, z0: 0.56, x1: 0.56, z1: 1.0 },
           { kind: 'storage', x0: 0.56, z0: 0.0, x1: 1.0, z1: 1.0 },
         ],
@@ -569,8 +560,7 @@ export const BUILDINGS: BuildingSpec[] = [
     ],
     ruin: true,
     ruinSide: 3,
-    collapse: true,
-    doorBays: { 3: 1 },
+    collapseDebris: [14.547053, -22.714754],
     enterable: true,
     roofProps: 2,
     wallCuts: [{ side: 1, f: 1, x: 3.2, w: 1.8, h: 2.36 }],
@@ -618,7 +608,6 @@ export const BUILDINGS: BuildingSpec[] = [
     ],
     bayKinds: { 3: { 2: { 4: 'balconyDoor' } } },
     arches: true,
-    doorBays: { 0: 1, 3: 2 },
     enterable: true,
     interiorFloors: 1,
     roofProps: 4,
@@ -959,6 +948,26 @@ export const SET_PIECES = {
     [-1.5, -40.0, 2.0, 26],
     [7.6, -30.5, 2.2, 28],
     [-5.0, 26.0, 1.6, 18],
+  ],
+  /** Solid rubble chunks: [x, z, yaw, width, height, depth].
+   * Keep the kerbside lane open; loose fragments around the chunks are visual. */
+  rubbleCover: [
+    [-4.45, -20.6, 0.2, 0.85, 0.26, 0.52],
+    [5.22, -14.7, -0.38, 1.12, 0.32, 0.72],
+    [-1.55, -40.3, 0.42, 0.72, 0.25, 0.5],
+    [7.95, -30.6, -0.75, 0.86, 0.32, 0.58],
+    [-5.25, 26.3, 0.24, 0.63, 0.22, 0.44],
+  ],
+  /** Loose curbside fragments: [x, z, radius, count] */
+  streetRubble: [
+    [-5.4, 16.5, 1.879, 24],
+    [5.5, 11, 1.539, 24],
+    [-5.6, 2, 1.17, 21],
+    [5.6, -4, 1.505, 20],
+    [-5.5, -13.5, 1.78, 18],
+    [5.4, -19, 1.168, 30],
+    [-5.3, -25.5, 1.227, 28],
+    [5.5, -33, 1.341, 23],
   ],
   /** Tyre stacks: [x, z, n] */
   tyres: [

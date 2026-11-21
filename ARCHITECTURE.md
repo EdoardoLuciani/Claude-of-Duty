@@ -152,11 +152,13 @@ as `unknown-thickness`, overlapping solids as `overlapping-solids`.
 Checked TypeScript in `tools/worldgen/` is the world source. Map layout,
 configuration, intel sites and prop transforms live in `level/`; `level/placements/`
 is data-only and `placement.ts` owns validation, placement and clutter clearance.
-Facade balcony slabs and railings are authored by side, floor and bay, independently
-of procedural dressing. See the [world editing map](tools/worldgen/README.md). `bun tools/export-world.ts` builds meshes
+Playable frontage openings and their obstructions, balconies, and fixed route
+obstacles are authored independently of procedural dressing. See the [world editing map](tools/worldgen/README.md). `bun tools/export-world.ts` builds meshes
 and cooks collision with meshoptimizer from canonical instance buckets. Visual-only
 coalescing may join whole non-distance-LOD buckets within a bounded X/Z span
 independent of the canonical grid. It never changes collision or navigation inputs.
+Pieces marked visual-only at assembly do not enter the collision or navigation bake,
+including when they share a material batch with solid pieces.
 A prototype's optional `visualGeo` is visual only; support, collision and navigation
 use canonical `geo`, topology and RNG/instance inputs. Manifest v2 and content-hashed GLBs are generated into ignored
 `public/models/world/`. Preserve instancing/masks; never author separate collision

@@ -6,7 +6,11 @@ Runtime behavior belongs to `src/world/`.
 
 - `level/layout.ts`: streets, buildings, rooms, gates and set pieces. Balcony slabs
   and railings are authored by facade side, floor and bay; a `balconyDoor` in
-  `bayKinds` alone opens without a slab (e.g. onto a terrace).
+  `bayKinds` alone opens without a slab (e.g. onto a terrace). Shop-room
+  counters and solid street rubble have explicit footprints here.
+- `level/frontages.ts`: playable facade bays, window sizes and obstructions,
+  shop shutters, and awning depths/supports. A playable floor needs one entry
+  per bay on each facade; unlisted backdrop facades may vary procedurally.
 - `level/config.ts`: transform/spawns; `level/intel.ts`: intel drop sites.
 - `level/placements/`: data-only prop transforms, one `PlacementRow` per line, grouped by area.
 - `props.ts`/`dressing.ts`: props; `buildings.ts`/`kit.ts`: construction.
@@ -27,7 +31,9 @@ visual GLB, `pack.ts` collision and `nav-bake.ts` navigation →
 manifest/content-hashed products → runtime model loader.
 The assembler owns geometry lifetime; support/collision/navigation use canonical
 geometry even when visuals have derivatives. Never author separate collision
-meshes or hand-edit products. Navigation shares runtime controller algorithms.
+meshes or hand-edit products. Mark visual-only pieces at assembly so collision
+and navigation never include them, even if they share a palette with solids.
+Navigation shares runtime controller algorithms.
 
 Run from the repository root after `bun ci`:
 

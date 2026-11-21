@@ -1335,13 +1335,17 @@ export function registerProps(A: Assembler): Assembler {
   P('rebar', 'metal_rust', rebarBundle(R('rebar')));
   P('plank_a', 'wood_prop', plank(R('plank_a')), { maxDist: 90, castShadow: false });
   P('plank_b', 'wood_prop_dark', plank(R('plank_b')), { maxDist: 90, castShadow: false });
-  P('litter', 'wood_pale', litterPaper(R('litter')), { maxDist: 45, castShadow: false });
+  P('litter', 'wood_pale', litterPaper(R('litter')), {
+    maxDist: 45,
+    castShadow: false,
+    visualOnly: true,
+  });
   /**
    * Contact fillets. Registered last so `put()` can find it, and never given a
    * skirt of its own. maxDist keeps them off the far half of the map, where
    * the contact line is a pixel wide anyway.
    */
-  P('dust_skirt', 'dust_skirt', dustSkirt(), { maxDist: 42, castShadow: false });
+  P('dust_skirt', 'dust_skirt', dustSkirt(), { maxDist: 42, castShadow: false, visualOnly: true });
   P('bottle', 'glass', bottle(), { maxDist: 55, castShadow: false });
   P('can', 'steel', can(), { maxDist: 45, castShadow: false });
 
@@ -1360,6 +1364,10 @@ export function registerProps(A: Assembler): Assembler {
   // damage
   // 3.2 cm base radius: the callers scale it 0.5-1.5x, so pocks land at 3-10 cm
   // across. At the old 5.5 cm base a single rifle strike was 16 cm wide.
-  P('pock', 'concrete_dark', pockGeometry(R('pock'), 0.032), { maxDist: 65, castShadow: false });
+  P('pock', 'concrete_dark', pockGeometry(R('pock'), 0.032), {
+    maxDist: 65,
+    castShadow: false,
+    visualOnly: true,
+  });
   return A;
 }
