@@ -1,6 +1,9 @@
 # Engine contract
 
 Browser FPS: Three.js r187 (`0.187.0`) + WebGPU only. Assets and WASM are local.
+Static runtime asset URLs are relative to the game page so the same build works at
+an origin root or a project subdirectory. Bundled workers and worklets resolve
+relative to their importing chunk in production.
 Read this before changing a subsystem. Workflow and validation: [AGENTS.md](AGENTS.md).
 Gameplay numbers (timings, distances, rewards) live in code: `src/*/tuning.ts`,
 `src/weapons/defs.ts` and subsystem constants, not in this document.

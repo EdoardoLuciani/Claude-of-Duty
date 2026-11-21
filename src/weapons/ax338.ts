@@ -12,7 +12,7 @@ import manifest from './authored/ax338/manifest.json' with { type: 'json' };
 import { buildManifestClips, type Clip } from './clips.ts';
 import type { WeaponAnimation } from './runtime-types.ts';
 
-const AX338_URL = '/models/weapons/ax338.runtime.glb';
+const AX338_URL = 'models/weapons/ax338.runtime.glb';
 const ALIASES = { ...MAGAZINE_ALIASES, cycle: 'Bolt_Cycle' };
 const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(ALIASES)];
 

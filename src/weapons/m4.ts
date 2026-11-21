@@ -13,7 +13,7 @@ import { buildManifestClips, type Clip } from './clips.ts';
 import { configureM4Finishes } from './m4-finishes.ts';
 import type { WeaponAnimation } from './runtime-types.ts';
 
-const M4_URL = '/models/weapons/m4a1-block-ii.runtime.glb';
+const M4_URL = 'models/weapons/m4a1-block-ii.runtime.glb';
 const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(MAGAZINE_ALIASES)];
 
 function makeM4Model(gltf: GLTF): M4Model {

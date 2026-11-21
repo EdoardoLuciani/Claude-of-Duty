@@ -77,10 +77,10 @@ export async function loadFxAtlases(size: number): Promise<{
   const wrap = THREE.ClampToEdgeWrapping;
   const aniso = 4;
   const results = await Promise.allSettled([
-    loadPngTexture(`/models/proc/fx-particles-${size}.png`, { srgb: true, aniso, wrap }),
-    loadPngTexture(`/models/proc/fx-decals-${size}-albedo.png`, { srgb: true, aniso, wrap }),
-    loadPngTexture(`/models/proc/fx-decals-${size}-normal.png`, { srgb: false, aniso, wrap }),
-    loadPngTexture(`/models/proc/fx-decals-${size}-orm.png`, { srgb: false, aniso, wrap }),
+    loadPngTexture(`models/proc/fx-particles-${size}.png`, { srgb: true, aniso, wrap }),
+    loadPngTexture(`models/proc/fx-decals-${size}-albedo.png`, { srgb: true, aniso, wrap }),
+    loadPngTexture(`models/proc/fx-decals-${size}-normal.png`, { srgb: false, aniso, wrap }),
+    loadPngTexture(`models/proc/fx-decals-${size}-orm.png`, { srgb: false, aniso, wrap }),
   ]);
   const [texture, albedo, normal, orm] = results;
   if (

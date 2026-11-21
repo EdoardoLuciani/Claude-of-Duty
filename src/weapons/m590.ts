@@ -24,7 +24,7 @@ type M590Model = AuthoredModelData<'shotgun'> & {
   };
 };
 
-const M590_URL = '/models/weapons/m590.runtime.glb';
+const M590_URL = 'models/weapons/m590.runtime.glb';
 const ALIASES: Record<string, string> = manifest.aliases;
 
 function makeM590Model(gltf: GLTF): M590Model {

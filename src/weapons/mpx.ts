@@ -17,7 +17,7 @@ import manifest from './authored/sig-mpx/manifest.json' with { type: 'json' };
 import { buildManifestClips, type Clip } from './clips.ts';
 import type { WeaponAnimation } from './runtime-types.ts';
 
-const MPX_URL = '/models/weapons/mpx.runtime.glb';
+const MPX_URL = 'models/weapons/mpx.runtime.glb';
 const EJECT_DELAY = 0.025;
 const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(MAGAZINE_ALIASES)];
 

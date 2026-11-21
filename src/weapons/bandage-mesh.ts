@@ -19,7 +19,7 @@ export async function loadBandage(): Promise<{
   tail: BandageMesh;
   dispose(): void;
 }> {
-  const gltf = await new GLTFLoader().loadAsync('/models/player/bandage.glb');
+  const gltf = await new GLTFLoader().loadAsync('models/player/bandage.glb');
 
   const wrap = gltf.scene.getObjectByName('Bandage_wrap');
   const body = gltf.scene.getObjectByName('Bandage_roll');

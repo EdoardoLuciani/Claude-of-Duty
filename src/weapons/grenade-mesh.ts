@@ -13,7 +13,7 @@ export interface GrenadeAsset {
 
 /** The held and world visuals borrow one static exterior mesh and finish. */
 export async function loadGrenade(renderer: Renderer): Promise<GrenadeAsset> {
-  const { scene } = await loadWeaponGLTF(renderer, '/models/weapons/m67.runtime.glb');
+  const { scene } = await loadWeaponGLTF(renderer, 'models/weapons/m67.runtime.glb');
   const finishes = convertWeaponScene(scene);
   const mesh = scene.children.at(0);
   mesh?.updateMatrix();

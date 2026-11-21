@@ -73,7 +73,6 @@ if (command === 'build') {
     target: 'browser',
     minify: true,
     splitting: true,
-    publicPath: '/',
     naming: { chunk: 'assets/[name]-[hash].[ext]', asset: 'assets/[name]-[hash].[ext]' },
     plugins: [plugin],
   });
