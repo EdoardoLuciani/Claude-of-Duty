@@ -99,9 +99,9 @@ def bake_atlas(output, asset, weapon_meshes):
     # The emission map keeps the small sight dots in the SAME material section.
     samples = scene.cycles.samples
     for name in atlas:
-        # Keep normal-map sampling for bump detail. The colour pass only needs
-        # a few samples for cavity shading; ORM projects scalar material values.
-        scene.cycles.samples = {'base': 4, 'orm': 1}.get(name, samples)
+        # Normal projection needs more samples than colour or scalar finishes
+        # to retain the fine bump detail in grazing light.
+        scene.cycles.samples = {'base': 4, 'orm': 1, 'normal': 8}.get(name, samples)
         bake.margin = atlas[name].size[0] // 256
         for mat in all_mats:
             n, l = mat.node_tree.nodes, mat.node_tree.links
