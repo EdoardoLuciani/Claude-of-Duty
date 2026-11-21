@@ -15,7 +15,7 @@ import { buildMagazineClips, type Clip } from './clips.ts';
 import type { WeaponAnimation } from './runtime-types.ts';
 
 const P320_URL = '/models/weapons/p320-compact.runtime.glb';
-export const P320_EJECT_DELAY = 2 / 60;
+const EJECT_DELAY = 2 / 60;
 const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(MAGAZINE_ALIASES)];
 
 function makeP320Model(gltf: GLTF): P320Model {
@@ -81,6 +81,7 @@ export function createP320Animation(model: P320Model): WeaponAnimation {
   let magazineRoundScaleOverridden = false;
   const animation = {
     ...rig,
+    ejectDelay: EJECT_DELAY,
     clips(): Record<string, Clip> {
       return buildMagazineClips(MAGAZINE_ALIASES, manifest.clips);
     },

@@ -18,7 +18,7 @@ import { buildManifestClips, type Clip } from './clips.ts';
 import type { WeaponAnimation } from './runtime-types.ts';
 
 const MPX_URL = '/models/weapons/mpx.runtime.glb';
-export const MPX_EJECT_DELAY = 0.025;
+const EJECT_DELAY = 0.025;
 const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(MAGAZINE_ALIASES)];
 
 export function makeMPXModel(gltf: GLTF): MPXModel {
@@ -83,6 +83,7 @@ export function createMPXAnimation(model: MPXModel): WeaponAnimation {
   const animation = {
     ...rig,
     magazineBody,
+    ejectDelay: EJECT_DELAY,
     clips(): Record<string, Clip> {
       return buildManifestClips(MAGAZINE_ALIASES, manifest.clips);
     },
@@ -110,7 +111,7 @@ export function createMPXAnimation(model: MPXModel): WeaponAnimation {
     ): void {
       const gesture = sampleAuthoredFire(this, manifest.clips, dt, clipName, clipTime, empty);
       // Lockback survives idle/inspect/draw/switch; empty reload owns release.
-      if (empty && gesture !== 'Reload_Empty' && this.fireTime >= MPX_EJECT_DELAY) {
+      if (empty && gesture !== 'Reload_Empty' && this.fireTime >= EJECT_DELAY) {
         bolt.position.copy(boltRest);
         bolt.position.z += 0.038;
       }

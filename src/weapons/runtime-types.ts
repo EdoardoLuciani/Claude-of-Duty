@@ -81,6 +81,8 @@ export interface WeaponAnimation {
   fire(): void;
   dispose(): void;
   magazineBody?: THREE.Object3D;
+  /** Seconds from a shot until its case leaves the port; else the shot cadence decides. */
+  ejectDelay?: number;
   poseQ: THREE.Quaternion;
   handTarget(side: 'left' | 'right', position: THREE.Vector3, quaternion: THREE.Quaternion): void;
   applyHands(left: Arm, right: Arm): void;
