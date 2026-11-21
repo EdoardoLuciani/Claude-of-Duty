@@ -4,6 +4,9 @@ from .surfaces import active, build_surfaces, stash_sources
 from .color_uv import COLOR_UV, layout_color
 
 ATLAS_RESOLUTIONS = {'base': 1024, 'orm': 1024, 'normal': 1024, 'emission': 1024}
+# Cycles samples per map. Normal projection needs the most to keep fine bump
+# detail in grazing light; ORM is a direct scalar emission bake.
+ATLAS_SAMPLES = {'base': 4, 'orm': 1, 'normal': 8, 'emission': 16}
 
 def build_source_materials(coords):
     def material(name, color, rough=.6, metal=0, grain=0, stipple=False):
@@ -55,8 +58,10 @@ def build_source_materials(coords):
     return nitron, polymer, stipple, steel, barrel_mat, mag_mat, cavity, mark, brass, copper, white
 
 def bake_orm(asset, surfaces):
-    # Scalar finishes can be sampled directly from the packed low-mesh UVs.
-    # Join only temporary copies so runtime ownership and geometry stay intact.
+    # Bake roughness/metalness from the low surfaces' own materials, not by
+    # projection: BAKE_ONLY lettering and SIGLITE finishes stay out of ORM
+    # (they still reach base, normal and emission). Join only temporary copies
+    # so runtime ownership and geometry stay intact.
     copies = []
     for surface, _ in surfaces:
         clone = surface.copy()
@@ -72,7 +77,6 @@ def bake_orm(asset, surfaces):
         clone.select_set(True)
     bpy.ops.object.join()
     bpy.ops.object.bake(type='EMIT', use_selected_to_active=False)
-    meshes.add(merged.data)
     bpy.data.objects.remove(merged, do_unlink=True)
     for mesh in meshes:
         if mesh.users == 0:
@@ -95,13 +99,12 @@ def bake_atlas(output, asset, weapon_meshes):
     bake.use_selected_to_active = True
     bake.max_ray_distance = .0024
     all_mats = {slot.material for obj in weapon_meshes for slot in obj.material_slots if slot.material}
-    # High-to-low projection includes the former lettering/traction geometry.
+    # Base, normal and emission project from the high source, including the
+    # former lettering/traction geometry; ORM is baked directly (bake_orm).
     # The emission map keeps the small sight dots in the SAME material section.
     samples = scene.cycles.samples
     for name in atlas:
-        # Normal projection needs more samples than colour or scalar finishes
-        # to retain the fine bump detail in grazing light.
-        scene.cycles.samples = {'base': 4, 'orm': 1, 'normal': 8}.get(name, samples)
+        scene.cycles.samples = ATLAS_SAMPLES[name]
         bake.margin = atlas[name].size[0] // 256
         for mat in all_mats:
             n, l = mat.node_tree.nodes, mat.node_tree.links

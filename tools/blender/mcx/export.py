@@ -132,6 +132,7 @@ def export_asset(asset, parts, output):
         (obj for obj in asset.objects if obj.type in {'MESH', 'FONT'}),
         key=lambda item: item.name,
     )
+    # Triangulate is a mesh-only modifier, so fonts become meshes first.
     fonts = [obj for obj in surfaces if obj.type == 'FONT']
     if fonts:
         activate(fonts[0])
