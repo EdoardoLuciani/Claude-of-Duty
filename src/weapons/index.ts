@@ -11,7 +11,7 @@ import {
   updateGrenades,
   type LiveGrenade,
 } from '../core/grenades.ts';
-import { DEG, clamp, lerp } from '../core/math.ts';
+import { DEG, clamp, lerp, smootherstep } from '../core/math.ts';
 import { Rng } from '../core/rng.ts';
 import { AmmoPickups } from './ammo-pickups.ts';
 import { disposeWeaponLoader } from './asset-loader.ts';
@@ -50,7 +50,7 @@ import { loadWeapon } from './loaders.ts';
 import { ReticleMaterials } from './materials-tsl.ts';
 import { RADIO_REQUESTS } from './radio-mesh.ts';
 import type { ViewState, WeaponModelRecord, WeaponState } from './runtime-types.ts';
-import { Viewmodel } from './viewmodel.ts';
+import { Viewmodel, viewRayToWorld } from './viewmodel.ts';
 import type { ViewModel } from './viewmodel.ts';
 
 const GRENADES_PER_LIFE = 2;
@@ -186,6 +186,8 @@ export class WeaponSystem {
   _tmp: THREE.Vector3 = new THREE.Vector3();
   _camDir: THREE.Vector3 = new THREE.Vector3();
   _baseDir: THREE.Vector3 = new THREE.Vector3();
+  _boreOrigin: THREE.Vector3 = new THREE.Vector3();
+  _boreDir: THREE.Vector3 = new THREE.Vector3();
   _disc: { x: number; y: number } = { x: 0, y: 0 };
   _firePayload: {
     actor: string;
@@ -962,7 +964,7 @@ export class WeaponSystem {
     const yaw = s.pattern[idx * 2 + 1];
     this._shotIndex++;
 
-    // ---- aim: zeroed bore + a spread cone ----
+    // ---- aim: bore at hip, zeroed sight line at ADS, plus a spread cone ----
     const cam = this.ctx.camera;
     this.viewmodel.syncToCamera(); // gameplay pose; overlay is applied after lateUpdate
     cam.updateMatrixWorld();
@@ -984,6 +986,12 @@ export class WeaponSystem {
       .addScaledVector(this._up, dropAt(def, def.zeroRange))
       .sub(this._muzzle)
       .normalize();
+    // Hip fire leaves along the bore as drawn, which the laser traces, so sway,
+    // bob, lag and the gun's own kick move the shot. Hip poses rest on the zero
+    // above; the weight follows the viewmodel's ADS blend onto the sight line.
+    this.viewmodel.boreDir(this._boreDir);
+    viewRayToWorld(cam, this.ctx.viewCamera, this._boreOrigin.copy(this._muzzle), this._boreDir);
+    this._baseDir.lerp(this._boreDir, 1 - smootherstep(0, 1, this.adsProgress)).normalize();
     const seed = this.rng.u32();
     const pellets = Math.max(1, def.pellets ?? 1);
     const spreadRad = this._spread * DEG;

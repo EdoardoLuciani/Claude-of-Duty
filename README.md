@@ -138,6 +138,9 @@ trade handling, never ballistics: larger optics slow ADS, a can softens recoil b
 ADS, and the laser tightens hip spread. A can also moves the projectile/flash origin to
 its endcap and selects suppressed reports and a smaller flash; the laser draws a beam
 and surface dot along its emitter axis without predicting spread or drop.
+Hip-fire leaves along the barrel, so weapon sway, movement, turning and kick move
+shots with the gun (and its laser) while hip spread still applies; ADS fires on the
+zeroed sight line.
 **L** toggles the mounted laser per gun, independently of the **F** flashlight.
 
 For debug/capture, `attachmentOptic`, `attachmentRail` and `attachmentMuzzle` (`none`

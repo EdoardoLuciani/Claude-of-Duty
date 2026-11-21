@@ -4,6 +4,7 @@ import { MeshBasicNodeMaterial } from 'three/webgpu';
 
 import type { EngineSystems } from '../core/context.ts';
 import { MASK } from '../physics/surfaces.ts';
+import { viewRayToWorld } from './viewmodel.ts';
 
 /** One retained world draw for the beam and surface spot; no lights or decals.
  * Only transforms/attributes change when mounted: the shader is warmed at boot. */
@@ -67,22 +68,9 @@ export class WeaponLaser {
     emitter.updateWorldMatrix(true, false);
     this.origin.setFromMatrixPosition(emitter.matrixWorld);
     this.direction.set(0, 0, -1).transformDirection(emitter.matrixWorld);
-    // Map the whole rigid emitter ray through the separate first-person FOV,
-    // not just its origin. Sampling after the firing overlay keeps the ribbon
-    // on the lens and along its -Z axis during sway, recoil and ADS alike.
-    camera.updateMatrixWorld();
-    viewCamera.updateMatrixWorld();
-    this.origin.applyMatrix4(viewCamera.matrixWorldInverse);
-    this.direction.transformDirection(viewCamera.matrixWorldInverse);
-    const ratio =
-      Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) /
-      Math.tan(THREE.MathUtils.degToRad(viewCamera.fov / 2));
-    this.origin.x *= ratio;
-    this.origin.y *= ratio;
-    this.origin.applyMatrix4(camera.matrixWorld);
-    this.direction.x *= ratio;
-    this.direction.y *= ratio;
-    this.direction.transformDirection(camera.matrixWorld);
+    // Sampling after the firing overlay keeps the ribbon on the lens and along
+    // its -Z axis during sway, recoil and ADS alike.
+    viewRayToWorld(camera, viewCamera, this.origin, this.direction);
     const hit = physics.raycast(this.origin, this.direction, maxRange, MASK.BULLET, owner);
     this.end.copy(hit.point);
     this.normal.copy(hit.normal);
