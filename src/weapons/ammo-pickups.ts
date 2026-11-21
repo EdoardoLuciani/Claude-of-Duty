@@ -79,7 +79,7 @@ export class AmmoPickups {
     owner: AmmoOwner,
     renderer: Pick<Renderer, 'hasFeature'>
   ): Promise<AmmoPickups> {
-    const { scene } = await loadWeaponGLTF(renderer, '/models/props/ammo-pickup.runtime.glb');
+    const { scene } = await loadWeaponGLTF(renderer, 'models/props/ammo-pickup.runtime.glb');
     const mesh = scene.children.at(0);
     mesh?.updateMatrix();
     if (

@@ -61,7 +61,7 @@ assert not any('ROMEO4T' in o.name or 'SRD9' in o.name or 'lens_cap' in o.name f
 assert abs(point('sight').z-.074) < EPS
 assert (point('front_post')-point('sight')).cross(Vector((1,0,0))).length < EPS
 assert abs(point('muzzle').x-point('barrel_crown').x-.006) < EPS
-for name in ('IRON_sights', 'IRON_sights_removed', 'MUZZLE_device', 'MUZZLE_device_removed', 'RAIL_adapter'):
+for name in ('IRON_sights', 'IRON_sights_removed', 'MUZZLE_device', 'MUZZLE_device_removed'):
     assert bpy.data.objects[name].parent.name == 'receiver', (name,'lost rigid assembly ownership')
 for name,loc in [('optic',(.025,0,.044)),('muzzle',(.3162,0,0))]:
     mount = bpy.data.objects['MOUNT_'+name]
@@ -79,24 +79,28 @@ post = bpy.data.objects['Front iron post'].evaluated_get(deps)
 assert abs(max((post.matrix_world@Vector(p)).z for p in post.bound_box)-point('sight').z) < EPS
 assert point('ejection').y < -.02
 # Through-side slots must not be black painted rectangles.
-hg = tree('Hollow five-slot M-LOK handguard')
+hg_obj = bpy.data.objects['Hollow five-slot M-LOK handguard']
+hg = tree(hg_obj.name)
 for x in (.119,.148,.190,.232,.274):
     assert hg.ray_cast(Vector((x,-.06,-.001)),Vector((0,1,0)),.12)[0] is None, (x,'closed M-LOK slot')
 # Solid lands between slots still exist; test at a web with two distinct walls.
 assert hg.ray_cast(Vector((.129,-.06,-.001)),Vector((0,1,0)),.12)[0] is not None
-# Both adapter anchors pass through a real slot, with the backing actually
-# seated on its upper/lower wall lands (not screws/rail floating past the guard).
+# Probe both ends and edges of the angled backing on solid chamfer lands.
 backing = tree('Laser rail adapter web')
-anchors = [o for o in scene.objects if o.name.startswith('Laser rail adapter screw')]
-assert len(anchors) == 2, 'laser adapter requires both anchors'
-for screw in anchors:
-    p = screw.matrix_world.translation
-    assert hg.ray_cast(Vector((p.x,-.06,p.z)),Vector((0,1,0)),.12)[0] is None, ('laser anchor outside slot opening',screw.name)
-    for z in (p.z-.006,p.z+.006):
-        guard_hit = hg.ray_cast(Vector((p.x,-.04,z)),Vector((0,1,0)),.02)[0]
-        plate_hit = backing.ray_cast(Vector((p.x,0,z)),Vector((0,-1,0)),.06)[0]
-        assert guard_hit is not None and plate_hit is not None, ('unsupported laser adapter',screw.name,z)
-        assert -.001 < guard_hit.y-plate_hit.y <= .0001, ('laser backing not seated',screw.name,z,guard_hit.y-plate_hit.y)
+rail_frame = bpy.data.objects['MOUNT_rail'].matrix_world
+inward = rail_frame.to_3x3() @ Vector((0,0,1))
+for x in (.252,.276):
+    for across in (-.004,.004):
+        p = rail_frame @ Vector((across,x-rail_frame.translation.x,0))
+        guard_hit = hg.ray_cast(p,inward,.03)[0]
+        plate_hit = backing.ray_cast(p+.03*inward,-inward,.03)[0]
+        assert guard_hit is not None and plate_hit is not None, ('unsupported laser adapter',x,across)
+        assert -.0001 <= (plate_hit-guard_hit).dot(inward) < .001, ('laser backing not seated',x,across)
+assert backing.overlap(tree('Laser rail adapter groove bed')), 'rail not seated on its backing'
+front = max((hg_obj.matrix_world @ Vector(p)).x for p in hg_obj.bound_box)
+for obj in scene.objects:
+    if obj.type == 'MESH' and obj.name.startswith('Laser rail adapter'):
+        assert max((obj.matrix_world @ Vector(p)).x for p in obj.bound_box) < front, (obj.name,'rail overhangs handguard')
 # Regression: the previous full-ellipse upper left a visible flank seam gap.
 upper = tree('MPX continuous rounded upper')
 lower = tree('Lower receiver shoulder')
@@ -196,8 +200,12 @@ loaded = []
 for id,slot in [('rmr','optic'),('acog','optic'),('scope','optic'),('exps3','optic'),('srd762ti','muzzle'),('laser','rail')]:
     objects,base = attachment_source.load(id)
     mesh = [o for o in objects if o.type == 'MESH']
-    transform = rig.matrix_world.inverted() @ bpy.data.objects['MOUNT_'+slot].matrix_world @ base.matrix_world.inverted()
-    mounted[id] = surface(mesh,transform)
+    seating = bpy.data.objects['MOUNT_'+slot].matrix_world @ base.matrix_world.inverted()
+    mounted[id] = surface(mesh,rig.matrix_world.inverted() @ seating)
+    if slot == 'rail':
+        for obj in mesh:
+            world = seating @ obj.matrix_world
+            assert max((world @ Vector(p)).x for p in obj.bound_box) < front, (obj.name,'laser overhangs handguard')
     if slot == 'optic':
         irons = surface([o for o in bpy.data.objects['IRON_sights'].children if o.type=='MESH'],rig.matrix_world.inverted())
         clash = bool(mounted[id].overlap(irons))
@@ -206,9 +214,12 @@ for id,slot in [('rmr','optic'),('acog','optic'),('scope','optic'),('exps3','opt
         assert not mounted[id].overlap(surface(folded,rig.matrix_world.inverted())), (id,'hits folded removed state')
     loaded.extend(objects)
 
+sight = rig.matrix_world.inverted() @ point('sight')
+assert mounted['laser'].ray_cast(sight,Vector((1,0,0)),1)[0] is None, 'laser blocks iron sight line'
+
 # Check each enabled state against fixed receiver/guard and moving mechanisms.
 # Deliberate rail-foot mating is the only optic contact exemption.
-fixed = [o for o in weapon if o.parent and o.parent.name in ('receiver', 'RAIL_adapter')
+fixed = [o for o in weapon if o.parent and o.parent.name == 'receiver'
          and not o.name.startswith('Picatinny')]
 for id,target in mounted.items():
     for obj in fixed:

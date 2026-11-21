@@ -14,7 +14,7 @@ import manifest from './authored/p320-compact/manifest.json' with { type: 'json'
 import { buildMagazineClips, type Clip } from './clips.ts';
 import type { WeaponAnimation } from './runtime-types.ts';
 
-const P320_URL = '/models/weapons/p320-compact.runtime.glb';
+const P320_URL = 'models/weapons/p320-compact.runtime.glb';
 const EJECT_DELAY = 2 / 60;
 const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(MAGAZINE_ALIASES)];
 

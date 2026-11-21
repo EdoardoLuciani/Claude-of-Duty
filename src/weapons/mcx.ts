@@ -21,7 +21,7 @@ import type { WeaponDef } from './defs.ts';
 import { configureMCXFinishes } from './mcx-finishes.ts';
 import type { WeaponAnimation } from './runtime-types.ts';
 
-const MCX_URL = '/models/weapons/mcx-virtus.runtime.glb';
+const MCX_URL = 'models/weapons/mcx-virtus.runtime.glb';
 const SHOT_START = 2 / 60;
 const EJECT_DELAY = 4 / 60 - SHOT_START;
 

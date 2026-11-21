@@ -14,7 +14,7 @@ import manifest from './authored/fn-evolys-762/manifest.json' with { type: 'json
 import { buildManifestClips, type Clip } from './clips.ts';
 import type { WeaponAnimation } from './runtime-types.ts';
 
-const EVOLYS_URL = '/models/weapons/fn-evolys-762.runtime.glb';
+const EVOLYS_URL = 'models/weapons/fn-evolys-762.runtime.glb';
 const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(MAGAZINE_ALIASES)];
 
 function makeEvolysModel(gltf: GLTF): EvolysModel {

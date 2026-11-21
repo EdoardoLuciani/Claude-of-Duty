@@ -203,18 +203,13 @@ assert.throws(
   railMount.name = 'MOUNT_rail';
   railMount.position.set(0.0285, 0.075, -0.25);
   railMount.rotation.z = Math.PI / 2;
-  const railAdapter = new THREE.Group();
-  railAdapter.name = 'RAIL_adapter';
-  root.add(railMount, railAdapter);
-  configureWeaponAttachments(entry, BASE_ATTACHMENTS, optics);
-  assert(!railAdapter.visible, 'the bare guard has no adapter');
+  root.add(railMount);
   const laserScene = datums('SOCKET_mount', 'SOCKET_laser');
   requiredNode(laserScene, 'SOCKET_laser').position.set(0, -0.0105, -0.02518);
   const laser = rigidAsset('SOCKET_laser', laserScene);
   const laserConfig: AttachmentConfig = { ...BASE_ATTACHMENTS, rail: 'laser' };
   assert(isAttachmentConfig(laserConfig, 'rifle'));
   configureWeaponAttachments(entry, laserConfig, { ...optics, laser });
-  assert(railAdapter.visible, 'the laser has its supporting rail');
   assert.equal(entry.railGroup.parent, railMount);
   assert(entry.laserEmitter);
   const previous = entry.laserEmitter.getWorldPosition(new THREE.Vector3());
@@ -231,7 +226,6 @@ assert.throws(
   configureWeaponAttachments(entry, BASE_ATTACHMENTS, optics);
   assert.equal(entry.laserEmitter, null);
   assert.equal(railMount.children.length, 0);
-  assert(!railAdapter.visible, 'removing the laser restores the bare guard');
   // A posed native skin deforms exactly as before rebasing, moved into game space.
   {
     const skinRoot = new THREE.Group();
@@ -383,11 +377,12 @@ assert.throws(
   }
   const nativeMount = new THREE.Object3D();
   nativeMount.name = 'MOUNT_rail';
-  nativeMount.position.set(0.295, 0, 0.037);
+  nativeMount.position.set(0.28, 0.04, 0.03);
+  const diagonal = Math.SQRT1_2;
   nativeMount.quaternion.setFromRotationMatrix(
     new THREE.Matrix4().makeBasis(
-      new THREE.Vector3(0, 1, 0),
-      new THREE.Vector3(0, 0, -1),
+      new THREE.Vector3(0, diagonal, -diagonal),
+      new THREE.Vector3(0, -diagonal, -diagonal),
       new THREE.Vector3(-1, 0, 0)
     )
   );
@@ -422,6 +417,8 @@ assert.throws(
     })
   );
   const mounted = mountAttachments(mpx, laserConfig, { laser });
+  const outward = 0.0105 * diagonal;
+  const expectedEmitter = new THREE.Vector3(0.03 + outward, 0.04 + outward, -0.30518);
   for (const yaw of [0, 0.3]) {
     nativeRoot.rotation.y = yaw;
     nativeScene.updateMatrixWorld(true);
@@ -436,9 +433,8 @@ assert.throws(
     assert(
       mounted
         .laserEmitter!.getWorldPosition(new THREE.Vector3())
-        .distanceTo(new THREE.Vector3(0.0475, 0, -0.32018).applyQuaternion(nativeRoot.quaternion)) <
-        1e-8,
-      'MPX attachment keeps its authored side seat'
+        .distanceTo(expectedEmitter.clone().applyQuaternion(nativeRoot.quaternion)) < 1e-8,
+      'MPX attachment keeps its canted seat'
     );
   }
   for (const name of ['MOUNT_optic', 'MOUNT_muzzle']) {

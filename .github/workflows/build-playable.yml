@@ -2,6 +2,12 @@ name: Build playable artifact
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.event_name == 'push' && 'github-pages' || github.run_id }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -33,7 +39,13 @@ jobs:
         run: |
           cd "$RUNNER_TEMP"
           blender_archive="blender-${BLENDER_VERSION}-linux-x64.tar.xz"
-          curl -fsSL --retry 3 -o "$blender_archive" "https://download.blender.org/release/Blender${BLENDER_VERSION%.*}/$blender_archive"
+          blender_path="release/Blender${BLENDER_VERSION%.*}/$blender_archive"
+          echo "Downloading Blender from download.blender.org"
+          if ! curl -fsSL --retry 3 -o "$blender_archive" "https://download.blender.org/$blender_path"; then
+            echo "Retrying Blender from the Clarkson University mirror"
+            curl -fsSL --retry 3 -o "$blender_archive" "https://mirror.clarkson.edu/blender/$blender_path"
+          fi
+          echo "Downloading gltfpack from GitHub Releases"
           curl -fsSL --retry 3 -o gltfpack-ubuntu.zip "https://github.com/zeux/meshoptimizer/releases/download/v${GLTFPACK_VERSION}/gltfpack-ubuntu.zip"
           printf '%s  %s\n' \
             84098912789dc450e95697c4184fb8a90acbe5111c2ba4aede3fecb57806a168 "$blender_archive" \
@@ -69,9 +81,30 @@ jobs:
           test -s dist/basis/basis_transcoder.wasm
           du -sh dist
       - name: Upload playable artifact
+        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v7
         with:
           name: claude-of-duty-playable
           path: dist/
           if-no-files-found: error
           retention-days: 7
+      - name: Upload Pages artifact
+        if: github.event_name == 'push'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist/
+
+  deploy:
+    if: github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.publish.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: publish
+        uses: actions/deploy-pages@v5

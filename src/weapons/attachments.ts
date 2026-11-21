@@ -105,7 +105,7 @@ export async function loadAttachments(
     make: (gltf: GLTF) => Required<AttachmentAssets>[K]
   ): Promise<void> => {
     try {
-      assets[id] = make(await loadWeaponGLTF(renderer, `/models/attachments/${id}.runtime.glb`));
+      assets[id] = make(await loadWeaponGLTF(renderer, `models/attachments/${id}.runtime.glb`));
     } catch (err: unknown) {
       console.error(`[weapons] ${id} attachment load failed`, err);
     }
@@ -169,17 +169,14 @@ const REPLACED = {
   muzzle: ['removableMuzzleDevice', 'MUZZLE_device'],
 } as const;
 
-type SlotVisuals = { bare: THREE.Object3D | undefined; fitted: THREE.Object3D | undefined };
+type SlotVisuals = { bare: THREE.Object3D; fitted: THREE.Object3D | undefined };
 
 /** Authored hardware whose visibility follows the slot, excluding permanent parts. */
 export function slotVisuals(
   model: WeaponModelRecord,
   slot: (typeof SLOTS)[number]
 ): SlotVisuals | undefined {
-  if (slot === 'rail') {
-    const fitted = model.root.getObjectByName('RAIL_adapter');
-    return fitted ? { bare: undefined, fitted } : undefined;
-  }
+  if (slot === 'rail') return;
   const [flag, name] = REPLACED[slot];
   if (!WEAPON_DEFS[model.id][flag]) return;
   return {
@@ -255,9 +252,10 @@ export function mountAttachments(
   muzzle.parent?.add(muzzle.group);
   for (const [i, slot] of SLOTS.entries()) {
     const nodes = visuals[i];
+    if (!nodes) continue;
     const fitted = config[slot] !== null;
-    if (nodes?.bare) nodes.bare.visible = !fitted;
-    if (nodes?.fitted) nodes.fitted.visible = fitted;
+    nodes.bare.visible = !fitted;
+    if (nodes.fitted) nodes.fitted.visible = fitted;
   }
   return {
     opticGroup: opticSlot.group,

@@ -63,11 +63,8 @@ interface HudState {
   >;
 }
 
-/** Grace period after a wave clear before the shop opens: time to collect
- *  ammo and breathe. The AI wave delay (20 s) is longer than this window, so
- *  the shop always opens before the next wave — and freezing time on open
- *  holds whatever countdown remains. */
-export const MARKET_DELAY = 10;
+/** Looting time after a wave clear, before the shop pauses the wave countdown. */
+export const MARKET_DELAY = 15;
 
 /** Catalog order is the shop layout. Kits/strikes BUY (MAX at cap);
  *  guns are bought as builds (`beginBuild`/`confirmBuild`), EQUIPPED when owned. */

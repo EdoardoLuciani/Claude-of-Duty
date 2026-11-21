@@ -15,6 +15,7 @@ import { mountableWeapon, opticAsset, rigidAsset } from '../lib/weapon-attachmen
  *
  *   bun test ./tests/smoke/smoke-market.ts
  */
+import { AiSystem } from '../../src/ai/index.ts';
 import { MarketSystem, MARKET_DELAY } from '../../src/market/index.ts';
 import { Health } from '../../src/player/health.ts';
 import { WEAPON_DEFS, WEAPON_IDS, PRIMARY_IDS } from '../../src/weapons/defs.ts';
@@ -74,7 +75,6 @@ const weaponState = (id: WeaponId): ReturnType<WeaponSystem['_makeState']> => {
   assert(state);
   return state;
 };
-check('delay constant is 10s', MARKET_DELAY === 10);
 check(
   'catalog is resupply / secondary / primary / ordnance',
   market
@@ -110,14 +110,17 @@ check('credits mirror positive score deltas', market.credits === 250);
 
 // ---- wave clear arms the grace period, then opens the shop ---------------
 earn(250);
-context.events.emit('wave:complete', { wave: 1, nextWave: 2, delay: 20 });
+const ai = new AiSystem();
+ai.ctx = context;
+ai._wave = 1;
+ai._updateWaves(context);
 check('wave bonus +250 (via score:change)', market.credits === 500);
 check('shop NOT open yet (grace period)', market.open === false);
 check('time still running during grace', context.time.scale === 1);
-check('countdown shows 10s', market.getHudState().marketIn === 10);
-context.time.elapsed += 9;
+check('shop countdown shows 15s', market.getHudState().marketIn === 15);
+context.time.elapsed += 14;
 market.update();
-check('still closed at 9s', market.open === false);
+check('still closed at 14s', market.open === false);
 context.time.elapsed += 1;
 market.update();
 check('shop opens when the window elapses', market.open === true);
@@ -126,6 +129,7 @@ check(
   context.time.scale === 0 && player.controlEnabled === false
 );
 check('countdown cleared once open', market.getHudState().marketIn === 0);
+check('next wave countdown is paused at 15s', ai.getWaveState().nextIn === 15);
 
 // ---- purchasing ----------------------------------------------------------
 check(
@@ -169,7 +173,7 @@ check(
 );
 
 // ---- dead player blocks the auto-open ------------------------------------
-context.events.emit('wave:complete', { wave: 2, nextWave: 3, delay: 20 }); // arm the timer
+context.events.emit('wave:complete', { wave: 2, nextWave: 3, delay: ai.waveDelay }); // arm the timer
 player.dead = true;
 context.time.elapsed += MARKET_DELAY;
 market.update();
