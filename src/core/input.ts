@@ -36,6 +36,17 @@ const GAME_KEYS: ReadonlySet<string> = new Set(
     .filter((binding): boolean => !binding.startsWith('Mouse'))
 );
 
+declare global {
+  // Fullscreen keyboard lock (WHATWG Fullscreen) and Chromium's Keyboard Lock
+  // API are not in the bundled DOM typings yet.
+  interface FullscreenOptions {
+    keyboardLock?: 'none' | 'browser';
+  }
+  interface Navigator {
+    readonly keyboard?: { lock(codes: string[]): Promise<void> };
+  }
+}
+
 type InputConfig = { sensitivity: number; invertY: boolean };
 type Point2 = { x: number; y: number };
 type InputHandlers = {
@@ -140,6 +151,21 @@ export class Input {
     } catch {
       /* not eligible — keep running unlocked */
     }
+  }
+
+  /**
+   * Enter fullscreen with keyboard lock so reserved browser shortcuts that
+   * collide with game keys (Ctrl+W while crouch-walking) reach
+   * preventDefault(); a held Escape exits. Request pointer lock first: this
+   * consumes the click's user activation.
+   */
+  requestFullscreen(): void {
+    if (!document.fullscreenEnabled || document.fullscreenElement) return;
+    document.documentElement
+      .requestFullscreen({ keyboardLock: 'browser' })
+      // Chromium ignores the option and locks keys through navigator.keyboard.
+      .then((): Promise<void> | undefined => navigator.keyboard?.lock([...GAME_KEYS]))
+      .catch((): void => {}); // Windowed play remains supported.
   }
 
   /** True while keyboard input belongs to the active game rather than the menu. */

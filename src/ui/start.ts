@@ -102,6 +102,7 @@ export class StartGate {
     } catch {
       this.lockDenied();
     }
+    this.engine.input.requestFullscreen();
   }
 
   private lockDenied = (): void => {
