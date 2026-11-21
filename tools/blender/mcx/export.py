@@ -128,15 +128,27 @@ def export_asset(asset, parts, output):
     Parts must be in their rest pose, with all NLA tracks muted. Actions mode
     reads the authored curves, not a blended/evaluated NLA scene snapshot.
     """
-    for obj in sorted(asset.objects, key=lambda item: item.name):
-        if obj.type not in {'MESH', 'FONT'}:
-            continue
-        activate(obj)
+    surfaces = sorted(
+        (obj for obj in asset.objects if obj.type in {'MESH', 'FONT'}),
+        key=lambda item: item.name,
+    )
+    fonts = [obj for obj in surfaces if obj.type == 'FONT']
+    if fonts:
+        activate(fonts[0])
+        for obj in fonts:
+            obj.select_set(True)
         bpy.ops.object.convert(target='MESH')
+
+    # Evaluate the final modifier stacks in one operation, then project UVs
+    # onto exactly the triangles that will be exported.
+    activate(surfaces[0])
+    for obj in surfaces:
+        obj.select_set(True)
         triangulate = obj.modifiers.new('Runtime triangles', 'TRIANGULATE')
         triangulate.quad_method = 'FIXED'
         triangulate.ngon_method = 'CLIP'
-        bpy.ops.object.modifier_apply(modifier=triangulate.name)
+    bpy.ops.object.convert(target='MESH')
+    for obj in surfaces:
         surface_uvs(obj)
 
     consolidate_finishes(asset, output)
