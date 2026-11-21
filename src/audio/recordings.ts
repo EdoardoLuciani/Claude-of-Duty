@@ -6,5 +6,5 @@ export function recordingUrls(stem: string, count: number): readonly string[] {
 }
 
 export function recordingUrl(name: string): string {
-  return `/audio/samples/${name}.opus`;
+  return `audio/samples/${name}.opus`;
 }

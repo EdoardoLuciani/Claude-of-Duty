@@ -72,7 +72,7 @@ export async function loadRadio(renderer: Parameters<typeof loadWeaponGLTF>[0]):
   setScreen(count: number, cursor: number): void;
   dispose(): void;
 }> {
-  const { scene } = await loadWeaponGLTF(renderer, '/models/player/field-radio.runtime.glb');
+  const { scene } = await loadWeaponGLTF(renderer, 'models/player/field-radio.runtime.glb');
   const geometries = new Set<THREE.BufferGeometry>();
   scene.traverse((object): void => {
     if (isMesh(object)) geometries.add(object.geometry);

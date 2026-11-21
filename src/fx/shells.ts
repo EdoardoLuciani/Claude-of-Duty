@@ -52,7 +52,7 @@ export interface ShellOptions {
 }
 
 export async function loadSpentHullGeometry(): Promise<THREE.BufferGeometry> {
-  const gltf = await new GLTFLoader().loadAsync('/models/fx/spent12g.glb');
+  const gltf = await new GLTFLoader().loadAsync('models/fx/spent12g.glb');
   const mesh = gltf.scene.getObjectByName('spent12g');
   if (
     !isMesh(mesh) ||

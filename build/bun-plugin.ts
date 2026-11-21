@@ -3,7 +3,8 @@
  * energy worklet) into one hashed ES module each, for the dev server (bunfig.toml) and
  * `build/bun.ts build`. Also injects a fixed Git revision for telemetry in both modes.
  * Sources stay raw ES modules that Bun smoke tests import unchanged.
- * URLs resolve against the page because dev HMR sees a file:// import.meta.url.
+ * Build URLs resolve against the importing chunk; dev HMR uses the page instead
+ * because its import.meta.url may be a file URL.
  * Dev bundles each target once per load: restart `bun run dev` after editing one.
  */
 import { execFileSync, type ExecFileSyncOptionsWithStringEncoding } from 'node:child_process';
@@ -53,6 +54,7 @@ const plugin: BunPlugin = {
   name: 'claude-of-duty',
   setup(build): void {
     const minify = !!build.config.minify;
+    const urlBase = build.config.outdir ? 'import.meta.url' : 'location.href';
     // `ow-bundle:<entry>.js` names the emitted asset; it loads from <entry>.ts.
     build.onResolve({ filter: /^ow-bundle:/ }, ({ path }): OnResolveResult => ({
       path: path.slice('ow-bundle:'.length),
@@ -76,7 +78,7 @@ const plugin: BunPlugin = {
         imports.push(`import ${name} from ${JSON.stringify(asset)};`);
         // Keep the match's line breaks so later lines (and sourcemaps) stay aligned.
         const breaks = '\n'.repeat(match.split('\n').length - 1);
-        return `new URL(${name}, location.href${breaks})`;
+        return `new URL(${name}, ${urlBase}${breaks})`;
       });
       // Prepended on the first source line, again keeping line numbers.
       return imports.length || contents !== source

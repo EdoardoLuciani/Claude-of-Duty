@@ -105,7 +105,7 @@ export async function loadAttachments(
     make: (gltf: GLTF) => Required<AttachmentAssets>[K]
   ): Promise<void> => {
     try {
-      assets[id] = make(await loadWeaponGLTF(renderer, `/models/attachments/${id}.runtime.glb`));
+      assets[id] = make(await loadWeaponGLTF(renderer, `models/attachments/${id}.runtime.glb`));
     } catch (err: unknown) {
       console.error(`[weapons] ${id} attachment load failed`, err);
     }

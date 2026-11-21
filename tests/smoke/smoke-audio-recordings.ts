@@ -12,12 +12,14 @@ import {
   fixtureEntries,
 } from '../lib/audio-fixture.ts';
 
-// Served from public/audio/samples/ at this fixed path.
-const PREFIX = '/audio/samples/';
+// Resolve like the browser when the site is hosted under a subdirectory.
+const page = new URL('https://example.test/game/');
 const root = new URL('../../public/audio/samples/', import.meta.url);
 const relative = (url: string): string => {
-  assert(url.startsWith(PREFIX), `${url}: served from ${PREFIX}`);
-  return url.slice(PREFIX.length);
+  const prefix = new URL('audio/samples/', page).href;
+  const resolved = new URL(url, page).href;
+  assert(resolved.startsWith(prefix), `${url}: served from ${prefix}`);
+  return resolved.slice(prefix.length);
 };
 const fetched: string[] = [];
 const pending: Array<() => void> = [];
