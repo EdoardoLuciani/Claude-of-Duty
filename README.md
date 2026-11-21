@@ -13,6 +13,23 @@ bun run verify  # CI gate: format:check, knip, build:ci, test
 
 The full command list is in [AGENTS.md](AGENTS.md#commands-and-invariants).
 
+### Playable build artifact
+
+In GitHub Actions, run **Build playable artifact** on the branch you want to test.
+The workflow must be on the default branch before GitHub allows manual runs. It
+builds the full game, caches generated assets, and uploads `dist/` as
+`claude-of-duty-playable`. It does not deploy the site. To test the downloaded
+artifact, unzip it and serve the extracted `index.html` at the server root:
+
+```sh
+python3 -m http.server 4173 --bind 127.0.0.1 --directory /path/to/extracted/artifact
+```
+
+Open `http://127.0.0.1:4173/` in a WebGPU-capable browser instead of opening the
+HTML file directly.
+
+### Toolchain
+
 Bun (version pinned by `packageManager` in `package.json`) is the only toolchain:
 it installs, type-checks (`bun check`), formats, lints, bundles, serves, runs the
 tests and drives the asset tools. Node.js is not required.
