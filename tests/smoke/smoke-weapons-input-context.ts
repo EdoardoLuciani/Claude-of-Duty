@@ -160,6 +160,9 @@ function makeHarness(): WeaponHarness {
     muzzleWorld(out): THREE.Vector3 {
       return out.set(0, 0, 0);
     },
+    boreDir(out): THREE.Vector3 {
+      return out.set(0, 0, -1);
+    },
   });
   for (const id of WEAPON_IDS) wp.states.set(id, wp._makeState(id));
   const frame = ({ down = [], up = [], wheel = 0, dt = 1 / 60 }: FrameOptions = {}): void => {
