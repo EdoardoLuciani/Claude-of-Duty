@@ -302,10 +302,12 @@ export class PauseMenu {
   show(): void {
     if (this.open) return;
     this.open = true;
-    this.ctx.input.setGameplayCaptureEnabled(false);
+    // The modal owns keys and clicks until Resume, even before unlock completes.
+    this.ctx.input.enabled = false;
+    this.ctx.input.clear();
+    document.exitPointerLock();
     this.syncFromConfig();
     setStyle(this.root, 'display', '');
-    setStyle(this.root, 'pointer-events', 'auto');
     this.root.showModal();
     this._prevScale = this.ctx.time.scale;
     this.ctx.time.scale = 0;
@@ -319,7 +321,7 @@ export class PauseMenu {
     this.root.close(); // Leave the top layer before re-locking; update() still fades it out.
     this.ctx.time.scale = this._prevScale ?? 1;
     this.ctx.peek('player')?.setControlEnabled(true);
-    this.ctx.input.setGameplayCaptureEnabled(true);
+    this.ctx.input.enabled = true;
     this.ctx.input.requestPointerLock();
     this.ctx.events.emit('ui:pause', { paused: false });
   }

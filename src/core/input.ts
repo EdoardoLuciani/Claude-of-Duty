@@ -84,7 +84,6 @@ export class Input {
   // was clicked so browser shortcuts are suppressed for that active game
   // session too.
   _gameplayFocus: boolean = false;
-  private gameplayCaptureEnabled = true;
   enabled: boolean = true;
   /** Set true by capture mode so scripted shots aren't fought by real input. */
   frozen: boolean = false;
@@ -141,19 +140,7 @@ export class Input {
     this.canvas.removeEventListener('contextmenu', this._bound.contextmenu);
   }
 
-  /** Hand browser input to/from a modal without changing fullscreen. */
-  setGameplayCaptureEnabled(enabled: boolean): void {
-    this.gameplayCaptureEnabled = enabled;
-    this._gameplayFocus = false;
-    this.clear();
-    if (!enabled) {
-      this.pointerLocked = false;
-      document.exitPointerLock();
-    }
-  }
-
   requestPointerLock(): void {
-    if (!this.gameplayCaptureEnabled) return;
     // Chrome returns a promise that rejects if the document is not eligible
     // (headless capture, an iframe, a lock request too soon after an exit).
     // An unhandled rejection there shows up as a page error in the harness, so
@@ -180,7 +167,6 @@ export class Input {
 
   /** True while keyboard input belongs to the active game rather than the menu. */
   _gameplayInputActive(): boolean {
-    if (!this.gameplayCaptureEnabled) return false;
     // Check the DOM as well as the cached flag. pointerlockchange is delivered
     // asynchronously, so the cache can briefly lag the browser's state.
     const locked =
@@ -197,7 +183,7 @@ export class Input {
   }
 
   _onKeyDown(e: KeyboardEvent): void {
-    if (!this.enabled || !this.gameplayCaptureEnabled) return;
+    if (!this.enabled) return;
     this._preventBrowserShortcut(e);
     if (this.frozen) return;
     if (e.code === DEFAULT_BINDINGS.pause[0]) {
@@ -210,7 +196,7 @@ export class Input {
   }
 
   _onKeyUp(e: KeyboardEvent): void {
-    if (!this.enabled || !this.gameplayCaptureEnabled) return;
+    if (!this.enabled) return;
     // Some browser actions are committed on keyup. Repeat the cancellation for
     // the matching release while the game is active, rather than relying only
     // on keydown.
@@ -220,7 +206,7 @@ export class Input {
   }
 
   _onMouseDown(e: MouseEvent): void {
-    if (!this.enabled || !this.gameplayCaptureEnabled || this.frozen) return;
+    if (!this.enabled || this.frozen) return;
     if (e.target !== this.canvas) {
       if (!this.pointerLocked) this._onBlur();
       return;
@@ -233,7 +219,7 @@ export class Input {
   }
 
   _onMouseUp(e: MouseEvent): void {
-    if (!this.enabled || !this.gameplayCaptureEnabled || this.frozen) return;
+    if (!this.enabled || this.frozen) return;
     this._queueTransition(`Mouse${e.button}`, false);
   }
 
@@ -252,10 +238,7 @@ export class Input {
   }
 
   _onLockChange(): void {
-    const locked = document.pointerLockElement === this.canvas;
-    this.pointerLocked = locked && this.gameplayCaptureEnabled;
-    // A request already in flight can succeed after the menu takes input.
-    if (locked && !this.gameplayCaptureEnabled) document.exitPointerLock();
+    this.pointerLocked = document.pointerLockElement === this.canvas;
     if (!this.pointerLocked) this._onBlur();
   }
 
