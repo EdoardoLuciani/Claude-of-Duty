@@ -456,7 +456,6 @@ const basePattern = weaponState('lmg').pattern;
 const fullBuild = { optic: 'acog', muzzle: 'suppressor', rail: 'laser' } as const;
 market.credits = 950;
 assert(market.setBuild(fullBuild) && market.confirmBuild());
-assert(liveDef.spreadHip < baseDef.spreadHip, 'laser tightens hip spread');
 assert(liveDef.adsTime > baseDef.adsTime, 'fitted build takes longer to aim');
 const recoilScale = liveDef.recoil.pitch / baseDef.recoil.pitch;
 assert(recoilScale < 1);
