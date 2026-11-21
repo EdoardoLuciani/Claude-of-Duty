@@ -390,6 +390,8 @@ export class UiSystem {
 
   pause(): void {
     if (this.ctx.engine.gameplaySuspended) return;
+    // Resume starts a new capture; a pending or denied request isn't lock loss.
+    this._hadPointerLock = false;
     this.menu.show();
   }
 
@@ -433,6 +435,27 @@ export class UiSystem {
     this._fpsFrames = 0;
   }
 
+  _updatePause(): void {
+    // The shop owns the pointer and Escape, including the frame it closes.
+    if (this._marketJustClosed) {
+      this._marketJustClosed = false;
+      return;
+    }
+    const { input } = this.ctx;
+    if (
+      this.menu.open ||
+      !input.enabled ||
+      input.frozen ||
+      this.ctx.peek('player')?.dead ||
+      this.ctx.peek('market')?.open
+    )
+      return;
+    // Losing pointer lock mid-match is the same intent as pressing Escape.
+    const locked = input.pointerLocked;
+    if (input.actionPressed('pause') || (this._hadPointerLock && !locked)) this.pause();
+    else this._hadPointerLock = locked;
+  }
+
   lateUpdate(dt: number, ctx: UiContext): void {
     // Wall time, not scaled/clamped gameplay time: accurate through pause and hitches.
     this._updateFps();
@@ -450,23 +473,7 @@ export class UiSystem {
     const s = this.state;
     s.time = t.elapsed;
 
-    // ---- pause -----------------------------------------------------------
-    const playerDead = ctx.peek('player')?.dead === true;
-    const marketOpen = ctx.peek('market')?.open === true;
-    // The shop owns the pointer and the Escape key while it is open; letting
-    // the pause machinery see either would open the menu under the shop or
-    // double-toggle on the same Esc that skipped it.
-    if (this._marketJustClosed) {
-      this._marketJustClosed = false;
-    } else if (ctx.input.enabled && !ctx.input.frozen && !playerDead && !marketOpen) {
-      if (ctx.input.actionPressed('pause')) this.menu.toggle();
-      // Losing pointer lock mid-match is the same intent as pressing Escape.
-      if (ctx.input.pointerLocked) this._hadPointerLock = true;
-      else if (this._hadPointerLock && !this.menu.open) {
-        this._hadPointerLock = false;
-        this.menu.show();
-      }
-    }
+    this._updatePause();
     this.menu.update(rawDt);
     this.gameOver.update(rawDt);
     this.shop.update(rawDt);
