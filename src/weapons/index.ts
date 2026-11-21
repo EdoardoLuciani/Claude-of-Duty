@@ -48,9 +48,6 @@ import { createWeaponInspection } from './inspection.ts';
 import { WeaponLaser } from './laser.ts';
 import { loadWeapon } from './loaders.ts';
 import { ReticleMaterials } from './materials-tsl.ts';
-import { MCX_EJECT_DELAY } from './mcx.ts';
-import { MPX_EJECT_DELAY } from './mpx.ts';
-import { P320_EJECT_DELAY } from './p320.ts';
 import { RADIO_REQUESTS } from './radio-mesh.ts';
 import type { ViewState, WeaponModelRecord, WeaponState } from './runtime-types.ts';
 import { Viewmodel } from './viewmodel.ts';
@@ -203,10 +200,9 @@ export class WeaponSystem {
     dir: new THREE.Vector3(),
     seed: 0,
   };
-  _reloadPayload: { weapon: WeaponDef; phase: ReloadPhase; retained: boolean } = {
+  _reloadPayload: { weapon: WeaponDef; phase: ReloadPhase } = {
     weapon: WEAPON_DEFS.rifle,
     phase: 'start',
-    retained: false,
   };
   // `weapon:shell` carries the canonical { position, velocity } plus the real
   // case dimensions and a spin, so fx can size and tumble the brass instead of
@@ -1054,13 +1050,7 @@ export class WeaponSystem {
       this.viewmodel.play('pump');
     } else {
       this._queueShell(
-        def.id === 'mcx'
-          ? MCX_EJECT_DELAY / requiredTuning(def.fireAnimationSpeed, 'fireAnimationSpeed')
-          : def.id === 'pistol'
-            ? P320_EJECT_DELAY
-            : def.id === 'smg'
-              ? MPX_EJECT_DELAY
-              : Math.min(0.05, this._fireTimer * 0.45)
+        this.viewmodel.active?.animation.ejectDelay ?? Math.min(0.05, this._fireTimer * 0.45)
       );
     }
     return true;
@@ -1109,7 +1099,7 @@ export class WeaponSystem {
         if (isReload) this._emitReload('charge');
         break;
       case 'boltrelease':
-        this._emitReload(s?.def.id === 'pistol' ? 'slide' : 'boltclose');
+        this._emitReload('boltclose');
         break;
       case 'bolt:close':
         this._emitReload('boltclose');
@@ -1206,8 +1196,6 @@ export class WeaponSystem {
     if (!current) return;
     this._reloadPayload.weapon = current;
     this._reloadPayload.phase = phase;
-    this._reloadPayload.retained =
-      (current.id === 'pistol' || current.id === 'smg') && this.viewmodel.clipName === 'reloadTac';
     this.ctx.events.emit('weapon:reload', this._reloadPayload);
   }
 

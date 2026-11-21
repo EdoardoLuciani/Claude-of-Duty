@@ -23,7 +23,7 @@ import type { WeaponAnimation } from './runtime-types.ts';
 
 const MCX_URL = '/models/weapons/mcx-virtus.runtime.glb';
 const SHOT_START = 2 / 60;
-export const MCX_EJECT_DELAY = 4 / 60 - SHOT_START;
+const EJECT_DELAY = 4 / 60 - SHOT_START;
 
 export function makeMCXModel(gltf: GLTF): MCXModel {
   // Source +X forward; the game origin is the shooting-hand web, not the chamber.
@@ -88,6 +88,8 @@ export function createMCXAnimation(model: MCXModel, def: WeaponDef): WeaponAnima
   node('spent_case').visible = false;
   const animation = {
     ...rig,
+    // Fire is sampled at `speed`, so the authored ejection beat arrives sooner.
+    ejectDelay: EJECT_DELAY / speed,
     clips(): Record<string, Clip> {
       return buildMagazineClips(MAGAZINE_ALIASES, manifest.clips);
     },

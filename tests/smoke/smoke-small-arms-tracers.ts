@@ -31,6 +31,7 @@ for (const id of WEAPON_IDS) {
 
 let clipName: string | null = null;
 const vm = fixture<Viewmodel>({
+  active: null,
   get clipName(): string | null {
     return clipName;
   },

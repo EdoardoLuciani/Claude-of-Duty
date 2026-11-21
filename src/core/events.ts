@@ -19,7 +19,6 @@ export type ReloadPhase =
   | 'start'
   | 'magout'
   | 'magin'
-  | 'slide'
   | 'end'
   | 'shellin'
   | 'pump'
@@ -92,7 +91,6 @@ export interface EngineEventMap {
   'weapon:reload': {
     weapon: EventWeapon;
     phase: ReloadPhase;
-    retained?: boolean;
     actor?: unknown;
     position?: Vector3;
   };
