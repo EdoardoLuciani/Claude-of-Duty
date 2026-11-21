@@ -23,7 +23,7 @@ import {
   BANDAGE_ELBOW_R,
 } from './bandage-path.ts';
 import type { Clip } from './clips.ts';
-import type { WeaponDef } from './defs.ts';
+import { HIP_SWAY, type WeaponDef } from './defs.ts';
 import { HAND_POSES } from './hand-poses.ts';
 import { Arm } from './hands.ts';
 import type { ReticleMaterials } from './materials-tsl.ts';
@@ -1106,7 +1106,9 @@ export class Viewmodel {
       this._baseQuat.slerp(this._adsQuat, ads);
     }
 
-    const swayScale = def.swayScale * lerp(1, 0.22, ads) * lerp(1, 1.5, this.sprintT);
+    // Hip shots follow the bore, so hip sway is the hip aim error; sprint keeps its own.
+    const hipSway = lerp(HIP_SWAY * (s.steadiness ?? 1), 1, this.sprintT);
+    const swayScale = def.swayScale * lerp(hipSway, 0.22, ads) * lerp(1, 1.5, this.sprintT);
     this.noiseT += dt;
     const n = this.noise;
     const nr = this.noiseRates;

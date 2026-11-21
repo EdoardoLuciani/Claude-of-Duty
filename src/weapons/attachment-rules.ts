@@ -106,7 +106,7 @@ export function fittedCan(id: WeaponId, muzzle: MuzzleId | null): CanModel | nul
  * presentation live with their own data, not here. */
 const HANDLING: Record<
   NonNullable<AttachmentConfig[keyof AttachmentConfig]>,
-  { adsTime?: number; recoil?: number; spreadHip?: number }
+  { adsTime?: number; recoil?: number }
 > = {
   rmr: {},
   exps3: { adsTime: 1.04 },
@@ -114,7 +114,8 @@ const HANDLING: Record<
   scope: { adsTime: 1.18 },
   // Can mass at the muzzle slows aiming; its gas trap softens every shot.
   suppressor: { adsTime: 1.08, recoil: 0.88 },
-  laser: { spreadHip: 0.85 },
+  // The laser's value is showing where hip shots go.
+  laser: {},
 };
 /** Kick magnitudes a recoil effect scales; spring, bracing and pattern shape stay authored. */
 const RECOIL_MAGNITUDES = ['pitch', 'yaw', 'kickBack', 'kickUp', 'roll', 'punch'] as const;
@@ -131,14 +132,12 @@ export function buildDef(id: WeaponId, config: AttachmentConfig): BuiltWeaponDef
   const base = WEAPON_DEFS[id];
   const optic = config.optic === null ? undefined : OPTICS[config.optic];
   let adsTime = base.adsTime;
-  let spreadHip = base.spreadHip;
   let recoilScale = 1;
   for (const slot of SLOTS) {
     const attachment = config[slot];
     if (attachment === null) continue;
     const effect = HANDLING[attachment];
     adsTime *= effect.adsTime ?? 1;
-    spreadHip *= effect.spreadHip ?? 1;
     recoilScale *= effect.recoil ?? 1;
   }
   const recoil = { ...base.recoil };
@@ -149,7 +148,6 @@ export function buildDef(id: WeaponId, config: AttachmentConfig): BuiltWeaponDef
     adsFovScale: optic?.adsFovScale,
     adsSensScale: optic?.adsSensScale,
     adsTime,
-    spreadHip,
     recoil,
   };
 }
