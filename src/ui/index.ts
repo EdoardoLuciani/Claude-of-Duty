@@ -51,6 +51,7 @@ const HUD_DEFAULTS = {
   ads: false,
   airborne: false,
   baseSpread: 5.5,
+  hidden: false,
   score: 0,
   wave: 0,
   enemiesRemaining: 0,
@@ -474,6 +475,7 @@ export class UiSystem {
       s.reloadProgress = ws.reloadProgress;
       s.ads = ws.ads;
       s.baseSpread = 4 + ws.spread * 40;
+      s.hidden = !ws.crosshair;
       s.lethalCount = ws.lethalCount;
       s.cooking = ws.cooking;
       s.grenadeEquipped = ws.grenadeEquipped;

@@ -97,6 +97,8 @@ export interface ViewState {
   empty: boolean;
   magazineLoaded?: boolean;
   remainingRounds?: number;
+  /** Stance/movement factor on hip sway. */
+  steadiness: number;
 }
 export interface ViewPoseKey {
   t?: number;

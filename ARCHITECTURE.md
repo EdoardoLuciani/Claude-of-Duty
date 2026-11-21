@@ -367,7 +367,7 @@ pose; ADS uses the rest-pose optic datum in the weapon frame, while the reticle
 follows the live mount. The mount commit resolves the sight datum, eye relief,
 `OpticData`, laser emitter and muzzle socket on the viewmodel entry. Separately,
 `buildDef(id, config)` resolves suppression, optic ADS FOV/sensitivity (undefined
-defers to player config), ADS time, hip spread and recoil from the authored `WeaponDef`.
+defers to player config), ADS time and recoil from the authored `WeaponDef`.
 Attachment multipliers multiply across slots from the authored definition, never onto a
 previous build, and never change ballistics.
 `WeaponSystem` updates the gun's private definition in place (the viewmodel shares it)
@@ -397,6 +397,9 @@ FOV mapping (`viewRayToWorld`) and are sampled after firing vibration, without
 camera-crosshair convergence. Hip shots leave the muzzle along the same mapped bore
 (sampled before firing vibration), so sway, bob, lag and kick move them; they blend onto
 the zeroed sight line with the viewmodel's ADS weight. Hip poses rest on that zero.
+Hip aim error is therefore sway: `HIP_SWAY` times the stance/movement `steadiness`
+(`SPREAD_MODS`, also applied to the cone) that `ViewState` carries to the viewmodel.
+The HUD hides the screen-centre crosshair while a gun is out.
 L toggles per-weapon state across swaps and pause/shop; new mounts start on,
 removal/drop/restart/death switch off. Busy hands hide the beam and block L.
 The laser changes no AI perception; the flashlight keeps separate light ownership.

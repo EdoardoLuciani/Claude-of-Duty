@@ -98,6 +98,8 @@ interface WeaponHudState {
   lethalCount: number;
   cooking: boolean;
   grenadeEquipped: boolean;
+  /** Whether the screen-centre crosshair applies: hip shots follow the bore, a throw does not. */
+  crosshair: boolean;
 }
 interface WeaponStats {
   tris: number;
@@ -250,6 +252,7 @@ export class WeaponSystem {
     empty: false,
     magazineLoaded: true,
     remainingRounds: 0,
+    steadiness: 1,
   };
   // Preallocated HUD snapshot handed to `ui` (see getHudState).
   _hudState: WeaponHudState = {
@@ -266,6 +269,7 @@ export class WeaponSystem {
     lethalCount: GRENADES_PER_LIFE,
     cooking: false,
     grenadeEquipped: false,
+    crosshair: false,
   };
 
   constructor() {
@@ -746,6 +750,7 @@ export class WeaponSystem {
     h.lethalCount = this.grenades;
     h.cooking = this.cooking;
     h.grenadeEquipped = this.grenadeEquipped;
+    h.crosshair = this.grenadeEquipped;
     return h;
   }
 
@@ -1559,11 +1564,6 @@ export class WeaponSystem {
     if (this._fireTimer > 0) this._fireTimer -= dt;
     if (this._burstCooldown > 0) this._burstCooldown -= dt;
 
-    // ---- spread recovery -------------------------------------------------
-    const rest = this._restSpread(def, player, st);
-    this._spread = Math.max(rest, this._spread - def.spreadDecay * dt * (1 + this.adsProgress));
-    if (this._sinceShot > 0.6) this._shotIndex = 0;
-
     // ---- gather state ----------------------------------------------------
     const live =
       !this.disabled &&
@@ -1592,7 +1592,13 @@ export class WeaponSystem {
     st.crouch = player?.stance === 'crouch';
     st.airborne = player?.airborne === true;
     st.lowReady = player?.state === 'mantle' || player?.mantling === true;
+    st.steadiness = this._steadiness(player, st);
     this._syncAmmoState(s);
+
+    // ---- spread recovery -------------------------------------------------
+    const rest = this._restSpread(def, st);
+    this._spread = Math.max(rest, this._spread - def.spreadDecay * dt * (1 + this.adsProgress));
+    if (this._sinceShot > 0.6) this._shotIndex = 0;
 
     // ---- input -----------------------------------------------------------
     if (live) {
@@ -1686,19 +1692,21 @@ export class WeaponSystem {
     }
   }
 
-  _restSpread(
-    def: WeaponState['def'],
-    player: EngineSystems['player'] | null,
-    st: WeaponPoseState
-  ): number {
-    let base = lerp(def.spreadHip, def.spreadAds, this.adsProgress);
-    if (st.crouch) base *= SPREAD_MODS.crouch;
-    if (player?.stance === 'prone') base *= SPREAD_MODS.prone;
-    if (st.speed < 0.4) base *= SPREAD_MODS.still;
-    else if (st.speed > 3.2) base *= SPREAD_MODS.walking;
-    if (st.sprint) base *= SPREAD_MODS.sprinting;
-    if (st.airborne) base *= SPREAD_MODS.airborne;
-    return base;
+  /** Stance/movement factor on the cone and on the hip sway that hip shots follow. */
+  _steadiness(player: EngineSystems['player'] | null, st: WeaponPoseState): number {
+    let k = 1;
+    if (st.crouch) k *= SPREAD_MODS.crouch;
+    if (player?.stance === 'prone') k *= SPREAD_MODS.prone;
+    if (st.speed < 0.4) k *= SPREAD_MODS.still;
+    else if (st.speed > 3.2) k *= SPREAD_MODS.walking;
+    if (st.airborne) k *= SPREAD_MODS.airborne;
+    return k;
+  }
+
+  _restSpread(def: WeaponState['def'], st: WeaponPoseState): number {
+    const base =
+      lerp(def.spreadHip ?? def.spreadAds, def.spreadAds, this.adsProgress) * st.steadiness;
+    return st.sprint ? base * SPREAD_MODS.sprinting : base;
   }
 
   lateUpdate(dt: number, ctx: EngineContext): void {
@@ -1815,11 +1823,16 @@ export class WeaponSystem {
     // A fixed, non-zero noise phase: a settled but not artificially symmetric pose.
     vm.noiseT = 12.37;
     vm.debugFrozen = true;
-    this._spread = kind === 'ads' ? 0.24 : 2.05;
+    vm.steadiness = this._state.steadiness;
     this._sinceShot = 10;
     this._debugFrame = 0;
 
     const s = this.state;
+    this._spread = s
+      ? kind === 'ads'
+        ? s.def.spreadAds
+        : (s.def.spreadHip ?? s.def.spreadAds)
+      : 0;
     if (s) {
       s.mag = kind === 'fire' ? 22 : s.def.magSize;
       s.chambered = true;

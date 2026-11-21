@@ -23,7 +23,7 @@ import {
   BANDAGE_ELBOW_R,
 } from './bandage-path.ts';
 import type { Clip } from './clips.ts';
-import type { WeaponDef } from './defs.ts';
+import { HIP_SWAY, type WeaponDef } from './defs.ts';
 import { HAND_POSES } from './hand-poses.ts';
 import { Arm } from './hands.ts';
 import type { ReticleMaterials } from './materials-tsl.ts';
@@ -371,6 +371,8 @@ export class Viewmodel {
   recRot: Spring3 = new Spring3();
   settle: Spring3 = new Spring3(2.05, 0.77);
   sprintT: number = 0;
+  /** Smoothed `ViewState.steadiness`: stance/movement steps would otherwise snap the sway. */
+  steadiness: number = 1;
 
   constructor(ctx: ViewmodelContext, mats: ReticleMaterials) {
     this.ctx = ctx;
@@ -1068,6 +1070,7 @@ export class Viewmodel {
     const sprintTarget = s.sprint && !this.clip ? 1 : 0;
     this.sprintT = damp(this.sprintT, sprintTarget, 9, dt);
     this.lowReadyT = damp(this.lowReadyT, s.lowReady ? 1 : 0, 8, dt);
+    this.steadiness = damp(this.steadiness, s.steadiness, 6, dt);
 
     const hipP = def.hipPos;
     const hipR = def.hipRot;
@@ -1106,7 +1109,9 @@ export class Viewmodel {
       this._baseQuat.slerp(this._adsQuat, ads);
     }
 
-    const swayScale = def.swayScale * lerp(1, 0.22, ads) * lerp(1, 1.5, this.sprintT);
+    // Sprint keeps its own sway.
+    const hipSway = lerp(HIP_SWAY * this.steadiness, 1, this.sprintT);
+    const swayScale = def.swayScale * lerp(hipSway, 0.22, ads) * lerp(1, 1.5, this.sprintT);
     this.noiseT += dt;
     const n = this.noise;
     const nr = this.noiseRates;

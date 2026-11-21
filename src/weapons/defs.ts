@@ -39,7 +39,8 @@ export interface WeaponDef {
   maxRange: number;
   dragK: number;
   zeroRange: number;
-  spreadHip: number;
+  /** Hip cone (degrees) when it differs from `spreadAds`: a pellet gun's pattern. */
+  spreadHip?: number;
   spreadAds: number;
   spreadPerShot: number;
   spreadMax: number;
@@ -126,7 +127,6 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     maxRange: 260,
     dragK: 0.36,
     zeroRange: 50, // subsonic: 20 cm low at 100 m, 74 cm at 150 m
-    spreadHip: 2.0,
     spreadAds: 0.2,
     spreadPerShot: 0.25,
     spreadMax: 3.2,
@@ -193,7 +193,6 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     dragK: 0.28,
     zeroRange: 200, // flat to ~250 m; 18 cm low at 300 m
     /* --- accuracy (degrees) --- */
-    spreadHip: 2.05,
     spreadAds: 0.24,
     spreadPerShot: 0.3,
     spreadMax: 3.4,
@@ -276,7 +275,6 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     maxRange: 240,
     dragK: 0.42,
     zeroRange: 50, // 11 cm low at 100 m, 42 cm at 150 m
-    spreadHip: 2.5,
     spreadAds: 0.4,
     spreadPerShot: 0.26,
     spreadMax: 3.9,
@@ -348,7 +346,6 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     maxRange: 520,
     dragK: 0.22,
     zeroRange: 200, // flat to 250 m; 24 cm low at 300 m
-    spreadHip: 2.6,
     spreadAds: 0.34,
     spreadPerShot: 0.32,
     spreadMax: 3.8,
@@ -422,7 +419,6 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     maxRange: 180,
     dragK: 0.46,
     zeroRange: 25, // the 5-50 m band: 2 cm low at 50 m
-    spreadHip: 3.1,
     spreadAds: 0.5,
     spreadPerShot: 0.42,
     spreadMax: 4.6,
@@ -567,7 +563,6 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     maxRange: 900,
     dragK: 0.14,
     zeroRange: 300, // 12 cm high at 150 m, 25 cm low at 400 m
-    spreadHip: 3.8,
     spreadAds: 0.06,
     spreadPerShot: 0.7,
     spreadMax: 4.6,
@@ -663,6 +658,9 @@ export function buildRecoilPattern(
 export function shotInterval(def: Pick<WeaponDef, 'boltAction' | 'boltTime' | 'rpm'>): number {
   return def.boltAction ? (def.boltTime ?? 1.1) : 60 / def.rpm;
 }
+
+/** Hip sway gain over each weapon's `swayScale`, scaled by stance/movement steadiness. */
+export const HIP_SWAY = 3;
 
 export const SPREAD_MODS = {
   crouch: 0.78,
