@@ -24,10 +24,9 @@ import {
 } from './attachment-rules.ts';
 import {
   configureWeaponAttachments,
-  REPLACED_SLOTS,
-  replacedNodes,
   hasAttachmentAssets,
   loadAttachments,
+  slotVisuals,
   type AttachmentAssets,
 } from './attachments.ts';
 import { ProjectileSim, dropAt } from './ballistics.ts';
@@ -544,11 +543,12 @@ export class WeaponSystem {
         visible.push([this._laser.mesh, this._laser.mesh.visible]);
         this._laser.mesh.visible = true;
       }
-      // Both removable iron/muzzle states must be warm before runtime swaps.
+      // Warm both bare and fitted states of the authored slot hardware.
       for (const w of this.viewmodel.weapons.values()) {
-        for (const slot of REPLACED_SLOTS) {
-          const nodes = replacedNodes(w.model, slot);
-          for (const node of nodes ? [nodes.installed, nodes.removed] : []) {
+        for (const slot of SLOTS) {
+          const nodes = slotVisuals(w.model, slot);
+          if (!nodes) continue;
+          for (const node of [nodes.bare, nodes.fitted]) {
             if (!node) continue;
             visible.push([node, node.visible]);
             node.visible = true;

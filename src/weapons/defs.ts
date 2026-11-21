@@ -308,8 +308,8 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     hipPos: [0.111, -0.163, -0.288],
     hipRot: [0.005, 0.002, -0.131],
     adsCant: [0, 0, 0.005],
-    // Aim through the deployed rear peep.
-    eyeRelief: 0.06,
+    // Keep the deployed peep centred without letting its housing dominate ADS.
+    eyeRelief: 0.095,
     fits: {
       optic: OPTIC_FITS,
       muzzle: { suppressor: { model: 'srd762ti' } },

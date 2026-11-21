@@ -49,8 +49,8 @@ preserves canonical shared-attachment locals at all three mount boundaries. RMR 
 ACOG clear the deployed irons; the PM II needs them folded. The can swaps
 `MUZZLE_device` (thread protector) for `MUZZLE_device_removed` (an adapter sleeve
 bridging the crown to the shared rear mount); see the
-[shared calibre decision](../suppressor/README.md). The right-side
-laser adapter is anchored through the last M-LOK slot.
+[shared calibre decision](../suppressor/README.md). The right-side `RAIL_adapter`
+is anchored through the last M-LOK slot and appears only with the laser fitted.
 
 `check.py` verifies catalog seating, iron clashes, both iron states, concurrent
 slots, fixed surfaces, every clip's mechanisms and deformed hands at 120 Hz, plus
@@ -61,6 +61,18 @@ animations).
 bun tools/capture.ts --weapon=smg --shot=ads --out=/tmp/mpx-irons.png
 bun tools/capture.ts --weapon=smg --rail=laser --muzzle=suppressor --shot=weapon --out=/tmp/mpx-attachments.png
 ```
+
+## Exterior reference
+
+The receiver, handguard, telescoping stock, grip and magazine are registered to
+one scale from the [2019 SIG SAUER defense catalog][catalog], printed page 23
+(PDF page 25), labeled **SIG MPX 8″ SBR**. Compare the right side orthographically.
+The photo shows an optional optic, folded irons and a compensator; the game's
+unfitted build shows deployed irons, a thread protector and bare M-LOK slots.
+Those differences are intentional. First-person iron ADS uses a separate
+camera setback and does not rescale the model.
+
+[catalog]: https://www.sigsauer.com/pub/media/sigsauer/resources/2019_DEFENSE_CATLOG_web.pdf#page=25
 
 ## Source map
 
