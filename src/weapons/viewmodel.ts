@@ -52,24 +52,26 @@ const _q2 = new THREE.Quaternion();
 const _e = new THREE.Euler(0, 0, 0, 'XYZ');
 const _m = new THREE.Matrix4();
 
-/** Map a rigid first-person ray (both origin and direction) through the separate
+/** Map a rigid first-person ray (direction, and origin if given) through the separate
  * view FOV into world framing in place, so it lands where the player sees it. */
 export function viewRayToWorld(
   camera: THREE.PerspectiveCamera,
   viewCamera: THREE.PerspectiveCamera,
-  origin: THREE.Vector3,
-  direction: THREE.Vector3
+  direction: THREE.Vector3,
+  origin?: THREE.Vector3
 ): void {
   camera.updateMatrixWorld();
   viewCamera.updateMatrixWorld();
-  origin.applyMatrix4(viewCamera.matrixWorldInverse);
-  direction.transformDirection(viewCamera.matrixWorldInverse);
   const ratio =
     Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) /
     Math.tan(THREE.MathUtils.degToRad(viewCamera.fov / 2));
-  origin.x *= ratio;
-  origin.y *= ratio;
-  origin.applyMatrix4(camera.matrixWorld);
+  if (origin) {
+    origin.applyMatrix4(viewCamera.matrixWorldInverse);
+    origin.x *= ratio;
+    origin.y *= ratio;
+    origin.applyMatrix4(camera.matrixWorld);
+  }
+  direction.transformDirection(viewCamera.matrixWorldInverse);
   direction.x *= ratio;
   direction.y *= ratio;
   direction.transformDirection(camera.matrixWorld);
@@ -1147,8 +1149,7 @@ export class Viewmodel {
       clamp(av.pitch * 0.014, -0.04, 0.04) * lagScale,
       clamp(-Math.abs(av.yaw) * 0.006, -0.03, 0.03) * lagScale
     );
-    // Hip shots follow the bore, so pitch/yaw lag is aim error: keep it to a
-    // believable trail. Roll spins about the bore and carries the turn's feel.
+    // Pitch/yaw lag is hip aim error; roll spins about the bore and keeps the turn's feel.
     this.lagRot.step(
       dt,
       clamp(-av.pitch * 0.022, -0.07, 0.07) * lagScale,

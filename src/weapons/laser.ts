@@ -70,7 +70,7 @@ export class WeaponLaser {
     this.direction.set(0, 0, -1).transformDirection(emitter.matrixWorld);
     // Sampling after the firing overlay keeps the ribbon on the lens and along
     // its -Z axis during sway, recoil and ADS alike.
-    viewRayToWorld(camera, viewCamera, this.origin, this.direction);
+    viewRayToWorld(camera, viewCamera, this.direction, this.origin);
     const hit = physics.raycast(this.origin, this.direction, maxRange, MASK.BULLET, owner);
     this.end.copy(hit.point);
     this.normal.copy(hit.normal);

@@ -186,7 +186,6 @@ export class WeaponSystem {
   _tmp: THREE.Vector3 = new THREE.Vector3();
   _camDir: THREE.Vector3 = new THREE.Vector3();
   _baseDir: THREE.Vector3 = new THREE.Vector3();
-  _boreOrigin: THREE.Vector3 = new THREE.Vector3();
   _boreDir: THREE.Vector3 = new THREE.Vector3();
   _disc: { x: number; y: number } = { x: 0, y: 0 };
   _firePayload: {
@@ -990,7 +989,7 @@ export class WeaponSystem {
     // bob, lag and the gun's own kick move the shot. Hip poses rest on the zero
     // above; the weight follows the viewmodel's ADS blend onto the sight line.
     this.viewmodel.boreDir(this._boreDir);
-    viewRayToWorld(cam, this.ctx.viewCamera, this._boreOrigin.copy(this._muzzle), this._boreDir);
+    viewRayToWorld(cam, this.ctx.viewCamera, this._boreDir);
     this._baseDir.lerp(this._boreDir, 1 - smootherstep(0, 1, this.adsProgress)).normalize();
     const seed = this.rng.u32();
     const pellets = Math.max(1, def.pellets ?? 1);
