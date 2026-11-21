@@ -2,9 +2,17 @@
 
 **[Play Claude of Duty in your browser](https://edoardoluciani.github.io/Claude-of-Duty/)**
 
-A first-person survival game. Explore the map before the first wave, then earn credits by
-surviving increasingly tough squads. Between waves, use the market to restock, inspect weapons
-in 3D, or customize your loadout.
+**The streets are quiet. They won't stay that way.**
+
+Claude of Duty is a first-person survival shooter. Scout the market district before the first
+wave, then hold out against increasingly tough squads. Spend the credits you earn between waves
+on supplies, new weapons, and attachments. No download. Just open the game and hit **Start**.
+
+![First-person view of the player firing a rifle down a sunlit market street](docs/screenshots/market-firefight.webp)
+
+| The streets after dark                                                                                    | Build your loadout                                                                                              |
+| --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| ![The market district at night, with warm streetlights and dark alleys](docs/screenshots/after-dark.webp) | ![A rifle with an optic, suppressor, and laser shown in the market's 3D preview](docs/screenshots/loadout.webp) |
 
 ## How to play
 
