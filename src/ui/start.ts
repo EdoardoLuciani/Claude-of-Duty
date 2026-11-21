@@ -92,15 +92,15 @@ export class StartGate {
     this.button.textContent = 'RETRY START';
     if (document.pointerLockElement === this.engine.canvas) {
       this.queueActivation(); // New Game can begin with the lock already held.
-      return;
-    }
-    try {
-      const request = this.engine.canvas.requestPointerLock();
-      request.catch((): void => {
-        if (generation === this.generation) this.lockDenied();
-      });
-    } catch {
-      this.lockDenied();
+    } else {
+      try {
+        const request = this.engine.canvas.requestPointerLock();
+        request.catch((): void => {
+          if (generation === this.generation) this.lockDenied();
+        });
+      } catch {
+        this.lockDenied();
+      }
     }
     this.engine.input.requestFullscreen();
   }

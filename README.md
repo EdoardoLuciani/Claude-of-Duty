@@ -75,10 +75,10 @@ If the HUD fails to initialize, a Reload error dialog appears.
 
 After loading, select **Start** to capture the mouse, enter fullscreen and begin.
 Pending or denied mouse capture keeps the run frozen; select **Retry Start** to retry
-(there is no unlocked-play fallback). Fullscreen is optional; where the browser
-supports keyboard lock it keeps shortcuts such as Ctrl+W (crouch + forward) inside
-the game, and exiting fullscreen takes a held Esc. Once playing, click the game canvas to reacquire the
-cursor (also a fire press). The pause menu has Gameplay, Audio and Controls tabs;
+(there is no unlocked-play fallback). Fullscreen is optional; where keyboard lock is
+supported, shortcuts such as Ctrl+W (crouch + forward) stay in the game and a held
+Esc exits fullscreen. Once playing, click the game canvas to reacquire the cursor
+(also a fire press). The pause menu has Gameplay, Audio and Controls tabs;
 Controls is the full keyboard/mouse reference, including contextual behaviors.
 Bindings are fixed defaults in `src/core/bindings.ts`.
 
