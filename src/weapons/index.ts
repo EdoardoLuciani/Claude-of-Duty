@@ -1099,8 +1099,6 @@ export class WeaponSystem {
         if (isReload) this._emitReload('charge');
         break;
       case 'boltrelease':
-        this._emitReload('boltclose');
-        break;
       case 'bolt:close':
         this._emitReload('boltclose');
         break;
