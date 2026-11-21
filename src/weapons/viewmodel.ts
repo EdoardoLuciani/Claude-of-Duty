@@ -1147,10 +1147,12 @@ export class Viewmodel {
       clamp(av.pitch * 0.014, -0.04, 0.04) * lagScale,
       clamp(-Math.abs(av.yaw) * 0.006, -0.03, 0.03) * lagScale
     );
+    // Hip shots follow the bore, so pitch/yaw lag is aim error: keep it to a
+    // believable trail. Roll spins about the bore and carries the turn's feel.
     this.lagRot.step(
       dt,
-      clamp(-av.pitch * 0.075, -0.24, 0.24) * lagScale,
-      clamp(av.yaw * 0.085, -0.3, 0.3) * lagScale,
+      clamp(-av.pitch * 0.022, -0.07, 0.07) * lagScale,
+      clamp(av.yaw * 0.025, -0.09, 0.09) * lagScale,
       clamp(-av.yaw * 0.055, -0.2, 0.2) * lagScale
     );
     px += this.lag.x;
