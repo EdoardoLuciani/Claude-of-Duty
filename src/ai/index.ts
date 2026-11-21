@@ -144,10 +144,7 @@ export class AiSystem {
   grid: SurfaceNav | null = null;
   cover: CoverMap | null = null;
   inspect: boolean = false;
-  /** dev: force the garrison to spawn even in deterministic capture runs */
-  forcePopulate: boolean = false;
-  /** Wave director: wave 1 starts after a grace period; later waves arrive
-   *  after the field goes quiet. Unlimited by design. */
+
   _wave: number = 0;
   _waveTotal: number = 0;
   _waveRemaining: number = 0;
@@ -296,7 +293,6 @@ export class AiSystem {
     // there is deliberately no first-frame bake or legacy-grid fallback.
     await this._buildNav();
     if (!ctx.config.deterministic) this._queueOpeningWave();
-    else if (this.forcePopulate) this.startWave(1);
     await this.prewarmMaterials();
   }
 
