@@ -264,9 +264,8 @@ export class AiSystem {
         `(${this.materials.bakeMs.toFixed(0)}ms texture bake)`
     );
 
-    // Load exported soldiers without consuming gameplay RNG. Validate bone order
-    // and material groups before caching: agents bind their own skeletons by index,
-    // so incompatible or stale assets must fail boot rather than break later spawns.
+    // Load and bind shared geometry once, without consuming gameplay RNG.
+    // Incompatible assets fail boot rather than breaking later spawns.
     this._loadedVariants = new Map();
     const models = ctx.get('models');
     const variantNames = Object.keys(VARIANTS);
@@ -276,7 +275,7 @@ export class AiSystem {
     for (let i = 0; i < variantNames.length; i++) {
       const name = variantNames[i];
       const rec = loaded[i];
-      this._validateSoldierRecord(name, rec);
+      this._bindSoldierRecord(name, rec);
       this._loadedVariants.set(name, rec);
       console.info(`[ai] model "${name}" ${rec.stats.triangles | 0} tris loaded from GLB`);
     }
@@ -510,10 +509,8 @@ export class AiSystem {
     return Math.hypot(px - dx * t, py - dy * t, pz - dz * t);
   }
 
-  /** Validate skin indices against RIG order and GLB groups against finish-slot order.
-   * Reject mismatches at boot with expected/actual details, before spawning actors.
-   */
-  _validateSoldierRecord(name: string, rec: SoldierRecord): void {
+  /** Resolve GLB skin indices into RIG order before sharing the geometry with actors. */
+  _bindSoldierRecord(name: string, rec: SoldierRecord): void {
     const problems = [];
     // rec.name is the JSON METADATA's claimed variant (see models.js), so a
     // file that belongs to another variant is caught here. Missing values are
@@ -540,19 +537,33 @@ export class AiSystem {
         `material slots (${rec.slots.length}) != geometry groups (${geo.groups.length})`
       );
     }
-    if (rec.boneNames.length !== RIG.names.length) {
-      problems.push(`skeleton has ${rec.boneNames.length} bones, RIG has ${RIG.names.length}`);
+    const remap = rec.joints.map((joint): number => RIG.names.indexOf(joint.name));
+    const jointsInRigOrder = [...rec.joints];
+    if (remap.length !== RIG.count || remap.includes(-1) || new Set(remap).size !== RIG.count) {
+      problems.push(
+        `skin must name each RIG joint exactly once; got ${rec.joints.map((joint): string => joint.name).join(', ')}`
+      );
     } else {
-      for (let i = 0; i < RIG.names.length; i++) {
-        if (rec.boneNames[i] !== RIG.names[i]) {
-          problems.push(
-            `skeleton bone order differs at index ${i}: "${rec.boneNames[i]}" vs RIG "${RIG.names[i]}"\n` +
-              `  GLB: ${rec.boneNames.join(', ')}\n` +
-              `  RIG: ${RIG.names.join(', ')}`
-          );
+      const expected = new THREE.Matrix4();
+      const unitScale = new THREE.Vector3(1, 1, 1);
+      for (const [i, joint] of rec.joints.entries()) {
+        const target = remap[i];
+        jointsInRigOrder[target] = joint;
+        expected.compose(RIG.bindPos[target], RIG.bindQuat[target], unitScale).invert();
+        // glTF stores inverse bind matrices as float32; allow round-off, not a different pose.
+        if (
+          !joint.inverseBind.elements.every(
+            (value, j): boolean => Math.abs(value - expected.elements[j]) <= 1e-5
+          )
+        ) {
+          problems.push(`joint "${joint.name}" has an incompatible inverse bind matrix`);
           break;
         }
       }
+    }
+    const indices = geo.getAttribute('skinIndex');
+    if (geo.hasAttribute('skinIndex') && (indices.itemSize !== 4 || indices.normalized)) {
+      problems.push('skinIndex must have four unnormalized joint indices per vertex');
     }
     if (problems.length) {
       throw new Error(
@@ -561,6 +572,19 @@ export class AiSystem {
           '\nRegenerate the assets with: bun tools/export-models.ts'
       );
     }
+    for (let vertex = 0; vertex < indices.count; vertex++) {
+      for (let component = 0; component < 4; component++) {
+        const source = indices.getComponent(vertex, component);
+        if (!Number.isInteger(source) || source < 0 || source >= remap.length) {
+          throw new Error(
+            `[ai] soldier model "${name}" has an invalid skin joint index: ${source}`
+          );
+        }
+        const target = remap[source];
+        if (target !== source) indices.setComponent(vertex, component, target);
+      }
+    }
+    rec.joints = jointsInRigOrder;
   }
 
   variant(name: string): AiVariant {

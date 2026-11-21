@@ -4,9 +4,15 @@ import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, rmSync, existsSync
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
+import * as THREE from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
+import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
+import { AiSystem } from '../../src/ai/index.ts';
+import { RIG } from '../../src/ai/rig.ts';
 import { VARIANTS, MATERIAL_SLOTS } from '../../src/ai/soldier.ts';
+import { ModelSystem } from '../../src/core/models.ts';
+import { isSkinnedMesh } from '../../src/core/three-guards.ts';
 import { BUN } from '../../tools/lib/browser-harness.ts';
 
 const fileReader = globalThis.FileReader;
@@ -34,6 +40,9 @@ try {
       })
     ),
   };
+  mesh.skinIndex[0] = RIG.index('HandR');
+  mesh.skinWeight[0] = 0.75;
+  mesh.skinWeight[1] = 0.25;
   const payload = {
     version: 1,
     name: 'vanguard',
@@ -64,6 +73,64 @@ try {
   const encoded = await cook.cookSoldier(payload);
   assert.equal(encoded.glb.readUInt32LE(0), 0x46546c67);
   assert.deepEqual(encoded.meta.weapon, payload.weapon);
+
+  // A different skin joint table must produce the same deformation with the runtime rig.
+  const gltf = await new GLTFLoader().parseAsync(Uint8Array.from(encoded.glb).buffer, '');
+  const models = new ModelSystem();
+  models._loadGLB = async (): Promise<GLTF> => gltf;
+  models._loadJSON = async (): Promise<unknown> => encoded.meta;
+  const ai = new AiSystem();
+  const canonical = await models._loadSoldier('vanguard');
+  ai._bindSoldierRecord('vanguard', canonical);
+  const meshes: THREE.SkinnedMesh[] = [];
+  gltf.scene.traverse((node): void => {
+    if (isSkinnedMesh(node)) meshes.push(node);
+  });
+  const skin = meshes[0].skeleton;
+  skin.bones.reverse();
+  skin.boneInverses.reverse();
+  for (const attr of new Set(
+    meshes.map((m): ReturnType<THREE.BufferGeometry['getAttribute']> =>
+      m.geometry.getAttribute('skinIndex')
+    )
+  )) {
+    for (let i = 0; i < attr.count; i++) {
+      for (let j = 0; j < 4; j++)
+        attr.setComponent(i, j, skin.bones.length - 1 - attr.getComponent(i, j));
+    }
+  }
+  const shuffled = await models._loadSoldier('vanguard');
+  const joint = shuffled.joints[0];
+  shuffled.joints[0] = shuffled.joints[1];
+  assert.throws(
+    (): void => ai._bindSoldierRecord('vanguard', shuffled),
+    /each RIG joint exactly once/
+  );
+  shuffled.joints[0] = { ...joint, inverseBind: new THREE.Matrix4() };
+  assert.throws(
+    (): void => ai._bindSoldierRecord('vanguard', shuffled),
+    /incompatible inverse bind matrix/
+  );
+  shuffled.joints[0] = joint;
+  ai._bindSoldierRecord('vanguard', shuffled);
+  const { bones, skeleton, root } = RIG.createSkeleton();
+  const forearm = bones[RIG.index('ForearmR')];
+  const posed = (geometry: THREE.BufferGeometry): THREE.Vector3 => {
+    const mesh = new THREE.SkinnedMesh(geometry);
+    mesh.bind(skeleton, new THREE.Matrix4());
+    return mesh.getVertexPosition(0, new THREE.Vector3());
+  };
+  const rest = posed(canonical.geometry);
+  forearm.rotateX(0.6);
+  forearm.updateMatrix();
+  root.updateMatrixWorld(true);
+  const expected = posed(canonical.geometry);
+  assert(expected.distanceTo(rest) > 0.01, 'the chosen vertex deforms');
+  assert(
+    posed(shuffled.geometry).distanceTo(expected) < 1e-6,
+    'joint order does not affect the pose'
+  );
+
   const parse = Object.getOwnPropertyDescriptor(GLTFExporter.prototype, 'parseAsync');
   assert(parse);
   const failure = new Error('encoder failure');

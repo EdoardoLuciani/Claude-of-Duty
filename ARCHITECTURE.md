@@ -401,9 +401,11 @@ preserves the runtime joint/attribute format. `tools/export-models.ts` validates
 stages them; missing/stale/corrupt products fail rather than triggering Blender or a
 fallback. `tools/blender/spent_hull/` authors and validates one native spent hull GLB
 for the FX casing pool. `models.getSoldier(name)` returns
-`{ name, geometry, slots, boneNames, weapon, stats, variant }` as one skinned geometry
-with slot groups. Bone order must match `RIG.createSkeleton()`; mismatches fail boot.
-AI owns the soldier texture arrays and finish lookup textures.
+`{ name, geometry, slots, joints, weapon, stats, variant }` as one skinned geometry
+with slot groups. At boot AI maps GLB joint names into its own rig order once per model
+and rejects missing or duplicate joints and incompatible bind poses. Actors share the
+remapped geometry and animate their own skeletons. AI owns the soldier texture arrays
+and finish lookup textures.
 
 FX atlases (`tools/lib/fx-atlas.ts`) and recorded audio are required: missing
 atlases reject FX init, and recording failures disable the audio graph. Gameplay

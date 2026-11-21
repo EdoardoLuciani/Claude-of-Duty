@@ -119,8 +119,15 @@ export class ModelSystem {
     const first = meshes.at(0);
     if (!first) throw new Error(`[models] ${name}.glb: no skinned mesh`);
 
+    const { skeleton } = first;
+    if (meshes.some((mesh): boolean => mesh.skeleton !== skeleton)) {
+      throw new Error(`[models] ${name}.glb: primitives must share one skin`);
+    }
     const geometry = meshes.length === 1 ? first.geometry : mergePrimitives(meshes);
-    const boneNames = first.skeleton.bones.map((bone): string => bone.name);
+    const joints = skeleton.bones.map((bone, i): SoldierRecord['joints'][number] => ({
+      name: bone.name,
+      inverseBind: skeleton.boneInverses[i],
+    }));
 
     const record = {
       // `name` is what the JSON METADATA claims the variant is (validated by
@@ -130,7 +137,7 @@ export class ModelSystem {
       name: meta.name,
       geometry,
       slots: meta.slots,
-      boneNames,
+      joints,
       weapon: meta.weapon,
       stats: meta.stats,
       variant: meta.variant,

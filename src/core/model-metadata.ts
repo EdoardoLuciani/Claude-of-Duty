@@ -1,4 +1,4 @@
-import type { BufferGeometry } from 'three';
+import type { BufferGeometry, Matrix4 } from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 import { isRecord } from './guards.ts';
@@ -44,7 +44,8 @@ export interface SoldierMetadata {
 export interface SoldierRecord extends SoldierMetadata {
   requestedName: string;
   geometry: BufferGeometry;
-  boneNames: string[];
+  /** The joint table addressed by geometry's skinIndex attribute. */
+  joints: { name: string; inverseBind: Matrix4 }[];
 }
 interface WorldBuilding {
   spec: {
