@@ -1,8 +1,56 @@
-# Native soldier authoring
+# Procedural soldiers
+
+Authoritative geometry: [`tools/blender/soldiers/build.py`](build.py).
+The recipe builds factory-empty with Blender **5.2.2** and supports all uint32
+seeds. Native primitives, sewn cloth sections and modifiers replace the old
+TypeScript builder; visual differences are intentional, not a pixel-perfect port.
+
+- **Vanguard:** covered helmet, down goggles, fabric wrap, full carrier and carbine.
+- **Irregular:** tied headwrap, shooting shades, chest rig and long wood-tone AK.
+- **Breacher:** bare helmet, parked goggles, hard half-mask and full carrier.
+
+`src/ai/rig.ts` and `soldier.ts` remain the rig, variant and surface authorities.
+`reference.ts` serializes that calibration explicitly. Geometry generation reads
+no old GLB, blend or cached mesh. Editable blends are review products, not fallback
+inputs; put lasting edits into the recipe. Runtime IK, animation, textures,
+materials, hitboxes and AI logic retain their existing owners.
+
+## Regenerate and review
+
+```sh
+# First author into an empty absolute scratch directory:
+bun tools/blender/soldiers/export.ts --output /tmp/soldier-review
+# Optional --seed 0x5eed1234 --blender /absolute/path/to/blender
+# After structural, in-engine material and pose review, regenerate canonical files:
+bun tools/blender/soldiers/export.ts --output "$(pwd)/.cache/blender/soldiers"
+bun tools/export-models.ts
+bun run test
+bun run build
+```
+
+The explicit author command stages the complete family before publishing
+`<name>.blend`, `<name>.glb`, `<name>.json` and the final `manifest.json`.
+Three.js GLTFExporter encodes newly generated mesh data, preserving canonical
+joint order, FLOAT colors and four weights without Blender exporter hooks or GLB
+repair. The five weapon sockets derive from the authored rifle frame.
+
+The manifest binds declared source content, Three revision and product hashes.
+Source text and JSON hashes normalize LF/CRLF; binary hashes remain exact.
+Changing a declared recipe/calibration input requires regeneration. Missing,
+stale or corrupt products fail visibly rather than silently rebuilding/falling
+back. Products are ignored, not committed: `bun run dev` / `bun run build`
+regenerate them when inputs change, then stage GLB/JSON to ignored public URLs.
+
+Same-host repeated generation is checked; blend bytes need not match and there
+is no cross-platform bitwise or old-pixel guarantee. Rig/skin/surface/socket
+contracts, runtime material acceptance and real animation/ladder clearance checks
+remain required. Commit the recipe; never hand-edit the manifest or runtime files.
+
+## Native authoring
 
 `vanguard`, `irregular` and `breacher` are supported; unknown names and rifle
 styles fail explicitly. Python owns geometry; dev/build generate the ignored
-products in `assets/soldiers/` (via `tools/build-assets.ts`). `bun tools/export-models.ts`
+products in `.cache/blender/soldiers/` (via `tools/build-assets.ts`). `bun tools/export-models.ts`
 validates and stages GLB/JSON into the ignored `public/models/soldiers/` directory. No mesh
 product is an authoring input.
 
@@ -43,7 +91,7 @@ blend hashes, but contain no timestamps or absolute authoring/output paths.
 
 - `loadCommittedSoldiers(directory = ASSET_ROOT)` returns
   `[{ name, glb: Buffer, json: Buffer, meta }]` for the entire registry.
-- `ASSET_ROOT` is the canonical `assets/soldiers/` directory.
+- `ASSET_ROOT` is the canonical `.cache/blender/soldiers/` directory.
 - `soldierInputHash(root?)` hashes the declared LF-normalized source text and
   `Three.REVISION`, not computed reference floats, mtimes or machine paths.
 - `SOURCE_INPUTS` lists relative sources; `soldierInputPaths(root?)` returns

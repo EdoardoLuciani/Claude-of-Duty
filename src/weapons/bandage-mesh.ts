@@ -10,7 +10,7 @@ import { BANDAGE_SEGMENTS } from './bandage-path.ts';
 
 type BandageMesh = THREE.Mesh<THREE.BufferGeometry, Material>;
 
-/** Authored with the player arms in assets/player/arms/player-arms.blend. */
+/** Authored with the player arms in .cache/blender/player/arms/player-arms.blend. */
 export async function loadBandage(): Promise<{
   wrap: BandageMesh;
   roll: THREE.Group;
@@ -33,7 +33,7 @@ export async function loadBandage(): Promise<{
     Array.isArray(cap.material) ||
     wrap.geometry.index?.count !== BANDAGE_SEGMENTS * 24
   ) {
-    throw new Error('Bandage: stale Blender export (run tools/blender/player_bandage.py)');
+    throw new Error('Bandage: stale Blender export (run tools/blender/player_arms/bandage.py)');
   }
   const replacements = new Map<Material, MeshPhysicalNodeMaterial>();
   for (const mesh of [wrap, body, cap]) {

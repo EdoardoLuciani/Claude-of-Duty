@@ -19,7 +19,7 @@ bun build/models.ts p320 /tmp/p320-review
 The encoder writes to a temporary directory before replacing the destination.
 Runtime outputs use `.runtime.glb`; their container is still GLB, regardless of
 embedded texture formats. Weapon/attachment textures use UASTC quality 8 at their
-authored resolutions. The [intel case](../assets/props/intel-case/README.md) uses
+authored resolutions. The [intel case](../tools/blender/intel_case/README.md) uses
 meshopt and embedded WebP atlases, with a half-resolution roughness/metalness map.
 Each cook gets one quarter of the available CPUs (at least one thread), sharing
 the CPU budget with the asset pipeline's bounded model pool.
@@ -43,5 +43,5 @@ its source checker narrowly bounds one approved shared-glove contact below 30 µ
 EXPS3 uses a tighter error limit to preserve its optical
 opening; it loads through the shared optic catalog on all seven weapons. TOR Mini preserves
 its native geometry without simplification and uses their shared laser slot; see its
-[asset review/commands](../assets/attachments/steiner-tor-mini/README.md). Other models
+[asset review/commands](../tools/blender/tor_mini/README.md). Other models
 are not converted by these profiles.

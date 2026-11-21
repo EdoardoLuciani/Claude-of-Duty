@@ -8,7 +8,7 @@ import bpy
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from finish import SIZE, TILES, finish
 
-OUT = Path(__file__).resolve().parents[3] / 'assets/props/ammo-pickup'
+OUT = Path(__file__).resolve().parents[3] / '.cache/blender/props/ammo-pickup'
 
 
 def octagon(hx, hy, c):

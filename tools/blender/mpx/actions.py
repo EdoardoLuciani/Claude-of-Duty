@@ -19,7 +19,7 @@ def eq(e): return Quaternion((1, 0, 0), e[0]) @ Quaternion((0, 1, 0), e[1]) @ Qu
 
 def author_actions(root, asset, rig, parts, mag, spare, bolt, trigger, release, mag_catch, rounds):
     scene = bpy.context.scene
-    ref = json.loads((root / 'assets/weapons/sig-mpx/hand-reference.json').read_text())
+    ref = json.loads((root / 'src/weapons/authored/sig-mpx/hand-reference.json').read_text())
     indexed = ref['sides']['right']['indexed']
     controls = []; hands = {}; clips = {}
     def control(name):

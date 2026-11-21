@@ -88,7 +88,7 @@ def build(output, render=False, quick=False):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--output', type=Path, default=ROOT / 'assets/weapons/p320-compact')
+    parser.add_argument('--output', type=Path, default=ROOT / '.cache/blender/weapons/p320-compact')
     parser.add_argument('--render', action='store_true')
     parser.add_argument('--quick', action='store_true', help='Only reduce preview resolution/samples')
     args = parser.parse_args(sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else [])

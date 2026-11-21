@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 
 import * as THREE from 'three';
 
-import m590Manifest from '../../assets/weapons/m590/manifest.json' with { type: 'json' };
 import { bindingLabel } from '../../src/core/bindings.ts';
 import { GRENADE_FUSE } from '../../src/core/grenades.ts';
 import { Input } from '../../src/core/input.ts';
@@ -18,6 +17,7 @@ import { Movement } from '../../src/player/movement.ts';
 import type { RadioSystem } from '../../src/radio/index.ts';
 import type { UiSystem } from '../../src/ui/index.ts';
 import { BASE_ATTACHMENTS } from '../../src/weapons/attachment-rules.ts';
+import m590Manifest from '../../src/weapons/authored/m590/manifest.json' with { type: 'json' };
 import { ProjectileSim } from '../../src/weapons/ballistics.ts';
 import { buildManifestClips, Clip } from '../../src/weapons/clips.ts';
 import { WEAPON_IDS } from '../../src/weapons/defs.ts';

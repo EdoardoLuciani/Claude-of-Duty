@@ -1,5 +1,5 @@
 """Saved editable M590 source checks. Not a runtime/gameplay acceptance claim.
-blender -b assets/weapons/m590/m590.blend --python-exit-code 1 --python tools/blender/m590/check.py
+blender -b .cache/blender/weapons/m590/m590.blend --python-exit-code 1 --python tools/blender/m590/check.py
 """
 import json
 import math
@@ -11,8 +11,8 @@ from mathutils import Matrix, Vector
 from mathutils.bvhtree import BVHTree
 ROOT=Path(__file__).resolve().parents[3]
 sys.path.insert(0,str(ROOT/'tools/blender'))
-ref=json.loads((ROOT/'assets/weapons/m590/hand-reference.json').read_text())
-manifest=json.loads((ROOT/'assets/weapons/m590/manifest.json').read_text())
+ref=json.loads((ROOT/'src/weapons/authored/m590/hand-reference.json').read_text())
+manifest=json.loads((ROOT/'.cache/blender/weapons/m590/manifest.json').read_text())
 scene=bpy.context.scene;rig=bpy.data.objects['M590_RIG'];CI=Matrix(((1,0,0),(0,0,1),(0,-1,0))).to_4x4()
 assert scene.unit_settings.system=='METRIC' and scene.unit_settings.scale_length==1 and scene.render.fps==120
 assert json.loads(scene['clips'])==manifest['clips']

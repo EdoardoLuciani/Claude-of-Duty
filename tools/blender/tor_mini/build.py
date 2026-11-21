@@ -18,7 +18,7 @@ import bpy
 from mathutils import Matrix, Vector
 
 ROOT = Path(__file__).resolve().parents[3]
-OUT = ROOT / 'assets/attachments/steiner-tor-mini'
+OUT = ROOT / '.cache/blender/attachments/steiner-tor-mini'
 MM = .001
 HIGH = False
 sys.path.insert(0,str(ROOT/'tools/blender'))

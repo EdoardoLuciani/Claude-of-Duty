@@ -1,5 +1,5 @@
 """Independent saved-source geometry/animation/export checks, no regeneration.
-blender -b assets/weapons/fn-evolys-762/fn-evolys-762.blend --python-exit-code 1 --python tools/blender/evolys/check.py
+blender -b .cache/blender/weapons/fn-evolys-762/fn-evolys-762.blend --python-exit-code 1 --python tools/blender/evolys/check.py
 """
 import json
 import math
@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 import bpy
 from mathutils import Matrix, Vector, Quaternion
-ROOT=Path(__file__).resolve().parents[3];OUT=ROOT/'assets/weapons/fn-evolys-762'
+ROOT=Path(__file__).resolve().parents[3];OUT=ROOT/'.cache/blender/weapons/fn-evolys-762'
 sys.path.insert(0,str(ROOT/'tools/blender'))
 manifest=json.loads((OUT/'manifest.json').read_text());scene=bpy.context.scene
 C=Matrix(((1,0,0),(0,0,-1),(0,1,0)));CI=C.inverted()
@@ -158,7 +158,7 @@ reference,contact_curve=charging_contact_reference(action,duration)
 sample('Reload_Empty',.82*duration)
 fingers=[o for o in asset.objects if o.name.startswith(('L_finger','L_thumb'))]
 held={o:(o.location.copy(),o.rotation_quaternion.copy(),o.scale.copy()) for o in fingers}
-calibration=json.loads((OUT/'hand-reference.json').read_text())['charging']
+calibration=json.loads((ROOT/'src/weapons/authored/fn-evolys-762/hand-reference.json').read_text())['charging']
 q=calibration['quaternion'];expected_q=(C@Quaternion((q[3],*q[:3])).to_matrix()@CI).to_quaternion()
 for time in [.82*duration,*[f/120 for f in range(math.ceil(.82*duration*120),math.floor(.88*duration*120)+1)],.88*duration]:
     sample('Reload_Empty',time)

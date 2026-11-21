@@ -14,7 +14,7 @@ def eq(e):return Quaternion((1,0,0),e[0])@Quaternion((0,1,0),e[1])@Quaternion((0
 
 def author_actions(root,asset,rig,parts,forend,bolt,trigger,shell):
     scene=bpy.context.scene
-    ref=json.loads((root/'assets/weapons/m590/hand-reference.json').read_text())
+    ref=json.loads((root/'src/weapons/authored/m590/hand-reference.json').read_text())
     stroke=ref['pump']['stroke'][2]
     controls=[];hand_controls={}
     def control(name):
@@ -171,7 +171,7 @@ def author_actions(root,asset,rig,parts,forend,bolt,trigger,shell):
     # Blender. Exported controls drive those same named joints in the game.
     hand_collection=bpy.data.collections.new('M590 | authored hands (shared appearance)')
     scene.collection.children.link(hand_collection)
-    source=root/'assets/player/arms/player-arms.blend'
+    source=root/'.cache/blender/player/arms/player-arms.blend'
     with bpy.data.libraries.load(str(source),link=False) as (available,loaded):
         loaded.objects=list(available.objects)
     loaded_objects=[o for o in loaded.objects if o]

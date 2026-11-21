@@ -9,7 +9,7 @@ from mathutils import Vector
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import can
 
-root, out = can.begin('SUPPRESSOR_12G', 'assets/attachments/12g-suppressor')
+root, out = can.begin('SUPPRESSOR_12G', '.cache/blender/attachments/12g-suppressor')
 ceramic = can.material('12g | graphite ceramic', (.035, .039, .043), .72)
 steel = can.material('12g | machined end rings', (.085, .093, .10), .48, 1)
 mark = can.material('12g | engraved identification', (.36, .34, .29), .8)

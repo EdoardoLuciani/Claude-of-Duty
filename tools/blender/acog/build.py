@@ -8,7 +8,7 @@ from mathutils import Matrix, Vector
 
 ROOT = Path(__file__).resolve().parents[3]
 ID = 'acog'
-OUT = ROOT / 'assets/attachments/trijicon-acog'
+OUT = ROOT / '.cache/blender/attachments/trijicon-acog'
 OUT.mkdir(parents=True, exist_ok=True)
 (OUT / 'textures').mkdir(exist_ok=True)
 sys.path.insert(0, str(ROOT / 'tools/blender'))
