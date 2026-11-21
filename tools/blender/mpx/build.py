@@ -388,7 +388,9 @@ def build(output, render=False, quick=False):
     hg_start, hg_end = .096, .300
     section = [(-.016,.036),(.016,.036),(.024,.024),(.025,-.015),(.017,-.026),
                (-.017,-.026),(-.025,-.015),(-.024,.024)]
-    verts = [(x,y,z) for x in (hg_start,hg_end) for y,z in section]
+    # The front lip slopes back at the bottom instead of ending in a square skirt.
+    verts = [(x-(.006 if x==hg_end and z==-.026 else 0),y,z)
+             for x in (hg_start,hg_end) for y,z in section]
     faces = [(i,(i+1) % 8,(i+1) % 8+8,i+8) for i in range(8)]
     hg = mesh('Hollow five-slot M-LOK handguard', verts, faces, bevel=0)
     active(hg)
@@ -397,7 +399,7 @@ def build(output, render=False, quick=False):
     for x,length in [(.119,.011),(.148,.035),(.190,.035),(.232,.035),(.274,.035)]:
         opening(hg, (x,0,-.001), (length,.080,.009), .0033)
     for x in np.linspace(.123,.282,8):
-        cut(hg, profile('CUT', [(x-.006,.027),(x-.002,.034),(x+.006,.034),(x+.002,.027)], .08, None, None, bevel=.0005))
+        cut(hg, profile('CUT', [(x-.006,.033),(x-.002,.026),(x+.006,.026),(x+.002,.033)], .08, None, None, bevel=.0005))
         cut(hg, profile('CUT', [(x-.007,-.020),(x-.001,-.012),(x+.007,-.012),(x+.001,-.020)], .08, None, None, bevel=.0005))
     mod = hg.modifiers.new('Slot rim radii', 'BEVEL'); mod.width=.00055; mod.segments=2; mod.harden_normals=True
     mod = hg.modifiers.new('Weighted shell normals', 'WEIGHTED_NORMAL'); mod.keep_sharp=True
@@ -501,23 +503,25 @@ def build(output, render=False, quick=False):
     cyl('Folding hinge pin',(-.122,.015,.004),.004,.050,steel,'Z',stock)
     box('Folding hinge leaf',(-.127,0,.004),(.015,.028,.045),alloy,stock,.0015)
     box('Telescoping stock shaft',(-.180,0,.010),(.111,.016,.019),alloy,stock,.0012)
-    stock_outline=trace([(324,201),(494,201),(497,211),(491,230),(457,237),
-        (412,284),(386,334),(367,350),(324,346),(315,329),(315,216)])
+    # Registration follows the cheek housing, stepped toe and narrow opening
+    # of the telescoping stock in the 8-inch catalog side view.
+    stock_outline=trace([(328,202),(505,202),(508,210),(506,239),(482,241),
+        (457,268),(422,274),(373,319),(396,341),(381,357),(338,357),(326,345),(317,221)])
     butt=profile('Factory telescoping stock moulding',stock_outline,.035,polymer,stock,bevel=.003,smooth=True)
-    cut(butt,traced('CUT',[(357,319),(370,324),(411,275),(429,253),(416,252),(402,263)],.06,None,None,bevel=.002))
+    cut(butt,traced('CUT',[(366,311),(373,315),(413,278),(405,273)],.06,None,None,bevel=.002))
     for side in (-1,1):
-        traced('Inset diagonal stock web',[(326,248),(348,248),(390,278),(365,322),(351,330),(326,319)],
-               .0015,rubber,stock,y=side*.0173,bevel=.0006)
-        traced('Cheek traction inset',[(337,215),(479,215),(477,228),(335,230)],
+        traced('Inset diagonal stock web',[(329,237),(479,238),(451,267),(411,271),
+            (369,309),(351,306),(345,279)],.0015,rubber,stock,y=side*.0173,bevel=.0006)
+        traced('Cheek traction inset',[(337,211),(499,211),(497,226),(334,228)],
                .0009,polymer,stock,y=side*.0178,bevel=.001)
         qd=cyl('Stock QD socket lip',(-.289,side*.0185,-.019),.007,.002,steel,'Y',stock)
         cut(qd,cyl('CUT',(-.289,side*.0185,-.019),.0048,.020,None,'Y',None,32,0))
         for x in (-.28,-.205):
             box('Cheek moulding relief',(x,side*.018,.010),(.017,.001,.006),rubber,stock,.001)
         text('SIG SAUER',(-.293 if side == -1 else -.270,side*.0178,-.084),.004,side,stock,mat=polymer,surface=butt)
-    traced('Buttpad',[(315,207),(324,209),(324,344),(317,340),(312,323)],.037,rubber,stock,bevel=.002)
-    for i in range(13):
-        box('Buttpad traction',(-.318,0,-.010-i*.006),(.0014,.034,.0012),rubber,stock,.0003)
+    traced('Buttpad',[(328,202),(333,204),(327,222),(342,344),(386,344),
+        (386,354),(377,359),(335,358),(329,348),(315,224),(317,210)],
+        .037,rubber,stock,bevel=.002)
 
     # Rear ambidextrous non-reciprocating charging handle, correct MPX control location.
     box('Charging handle shaft',(-.029,0,.030),(.167,.010,.006),steel,handle,.0008)
@@ -560,17 +564,17 @@ def build(output, render=False, quick=False):
                      'magazine':(.069,0,-.065)}.items():
         empty('SOCKET_'+name,loc,rig)
 
-    # Right M-LOK/Picatinny adapter, forward of the support-hand grip.
+    # Keep the right-side laser hardware forward of the support hand, but
+    # separate it from the base receiver so the bare M-LOK guard stays bare.
     rail = empty('MOUNT_rail', (.295, -.037, 0), body)
     rail.rotation_euler = Matrix(((0,1,0),(0,0,1),(1,0,0))).to_euler()
-    # The TOR's clamp starts at x=.2855: the former rear tooth/flange added no
-    # clamp support and crossed the departing glove. Keep four supported teeth.
-    box('Laser rail adapter web',(.30075,-.0289,0),(.0435,.0098,.014),alloy)
+    rail_adapter = empty('RAIL_adapter', parent=body)
     bpy.context.view_layer.update()
-    picatinny.build_rail('Laser rail adapter',rail.matrix_world@Matrix.Rotation(math.pi,4,'Y'),-.0126,.0226,steel,body,asset)
+    box('Laser rail adapter web',(.30075,-.0289,0),(.0435,.0098,.014),alloy,rail_adapter)
+    picatinny.build_rail('Laser rail adapter',rail.matrix_world@Matrix.Rotation(math.pi,4,'Y'),-.0126,.0226,steel,rail_adapter,asset)
     # Both anchors stay inside the last real M-LOK slot, not past the guard end.
     for x in (.282,.289):
-        cyl('Laser rail adapter screw',(x,-.0348,0),.002,.004,steel,'Y')
+        cyl('Laser rail adapter screw',(x,-.0348,0),.002,.004,steel,'Y',rail_adapter)
 
     # Stage 3: surface-fitted markings and original component atlas UVs.
     # Project original text mesh vertices onto their declared physical surface, not
@@ -673,6 +677,7 @@ def build(output, render=False, quick=False):
         # Preserve the approved fixed geometry/photo views without review-only arms.
         hands_collection=bpy.data.collections['MPX | authored hands (shared appearance)']
         hands_collection.hide_render=True
+        for o in rail_adapter.children: o.hide_render=True
         for name,cam in cams.items():
             scene.camera=cam; scene.render.filepath=str(REVIEW/(name+'.png'))
             bpy.ops.render.render(write_still=True)
@@ -774,7 +779,7 @@ def build(output, render=False, quick=False):
     stats={'triangleInstances':triangles,'primitives':sum(len(m['primitives']) for m in j['meshes']),
            'materials':len(j.get('materials',[])),'images':len(j.get('images',[])),'bytes':len(raw)}
     assert triangles<80000,stats
-    assert stats['primitives']==16 and stats['materials']==1 and stats['images']==3 and len(raw)<=10*1024*1024,stats
+    assert stats['primitives']==17 and stats['materials']==1 and stats['images']==3 and len(raw)<=10*1024*1024,stats
     # Stage 7: separate manifest metadata (the GLB remains read-only).
     manifest={'status':'Base conversion candidate — human visual/animation/gameplay review pending',
         'asset':'SIG MPX 8 inch / open 9mm crown and thread protector / 30-round magazine / removable deployed irons',

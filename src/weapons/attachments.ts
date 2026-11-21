@@ -231,6 +231,7 @@ export function mountAttachments(
   const slots = opticId ? (WEAPON_DEFS[model.id].fits?.optic?.[opticId]?.railSlots ?? 0) : 0;
   opticSlot.group.position.z = -slots * PICATINNY_PITCH;
   const rail = stageMount(model, 'rail', config.rail, config.rail && assets[config.rail]);
+  const railAdapter = model.root.getObjectByName('RAIL_adapter');
   // isAttachmentConfig guarantees a fitted can for any installed muzzle.
   const can = fittedCan(model.id, config.muzzle) ?? null;
   const muzzle = stageMount(model, 'muzzle', can, can && assets[can]);
@@ -253,6 +254,7 @@ export function mountAttachments(
   opticSlot.parent?.add(opticSlot.group);
   rail.parent?.add(rail.group);
   muzzle.parent?.add(muzzle.group);
+  if (railAdapter) railAdapter.visible = config.rail !== null;
   // Fixed irons and permanent muzzle hardware stay under a mounted attachment.
   for (const slot of REPLACED_SLOTS) {
     const nodes = replaced[slot];

@@ -539,8 +539,13 @@ export class WeaponSystem {
         visible.push([this._laser.mesh, this._laser.mesh.visible]);
         this._laser.mesh.visible = true;
       }
-      // Both removable iron/muzzle states must be warm before runtime swaps.
+      // Both removable iron/muzzle states and optional rail hardware need warming.
       for (const w of this.viewmodel.weapons.values()) {
+        const railAdapter = w.model.root.getObjectByName('RAIL_adapter');
+        if (railAdapter) {
+          visible.push([railAdapter, railAdapter.visible]);
+          railAdapter.visible = true;
+        }
         for (const slot of REPLACED_SLOTS) {
           const nodes = replacedNodes(w.model, slot);
           for (const node of nodes ? [nodes.installed, nodes.removed] : []) {
