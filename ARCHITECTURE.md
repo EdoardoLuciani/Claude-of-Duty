@@ -49,7 +49,9 @@ A leading `_` marks a member internal to its subsystem: files in the same direct
 Each system declares `static id`, `static deps`, and implements needed hooks:
 `async init(ctx)`, `fixedUpdate(h, ctx)` (120 Hz), `update(dt, ctx)`,
 `lateUpdate(dt, ctx)`, `resize(w, h, ctx)`, `async dispose()`.
-Teardown is reverse-order and failure-isolated.
+Init runs in dependency order; `engine.onSystemInit(id)` fires before each system's
+`init` (boot maps it to loading-screen stages). Teardown is reverse-order and
+failure-isolated.
 
 `ctx`: `scene/camera` (world), `viewScene/viewCamera` (separate first person),
 `canvas`, `config`, `events`, `input`, `time`, `rng`, `get/peek/has(id)`.

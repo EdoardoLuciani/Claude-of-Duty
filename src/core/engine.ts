@@ -36,6 +36,8 @@ export class Engine {
   private _gameplaySuspended = false;
   /** One-shot rendered-frame boundary; graph warmup never calls step(). */
   onFirstRender: (() => void) | null = null;
+  /** Called before each system's `init`, in dependency order. */
+  onSystemInit: ((id: string) => void) | null = null;
   _onResize: () => void;
   _loop = (now: number): void => {
     if (!this._running) return;
@@ -106,6 +108,7 @@ export class Engine {
     const order = this.registry.resolve();
     for (const sys of order) {
       const t0 = performance.now();
+      this.onSystemInit?.(describeSystem(sys).id);
       await sys.init?.(this.ctx);
       if (this.error) throw new Error(this.error.message);
       const ms = performance.now() - t0;
