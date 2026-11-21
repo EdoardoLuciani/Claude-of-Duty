@@ -166,10 +166,27 @@ assert(
   'repeat is not a new edge'
 );
 assert(input.actionPressed('cycleWeapon') && input.wheel === -1, 'Tab and wheel stay independent');
+// Lock loss is a one-frame edge on a held lock; a denied recapture never reports it.
+let lockElement: Element | null = input.canvas;
+globalThis.document = fixture<Document>({
+  get pointerLockElement(): Element | null {
+    return lockElement;
+  },
+});
+input._onLockChange();
+lockElement = null;
+input._onLockChange();
+input.beginFrame();
+assert(input.lockLost, 'losing a held lock is visible to the next frame');
+input.endFrame();
+input._onLockChange();
+assert(!input.lockLost, 'lock loss lasts one frame; a denied recapture is not a loss');
 input.enabled = false;
 input.frozen = true;
 input.clear();
 assert.equal(input.enabled, false);
 assert.equal(input.frozen, true);
 assert.equal(input.fire, false);
-console.log('ok  input clear discards held, edge, pending, look, wheel and stick state');
+console.log(
+  'ok  input clear discards held, edge, pending, look, wheel and stick state; lock loss is an edge'
+);
