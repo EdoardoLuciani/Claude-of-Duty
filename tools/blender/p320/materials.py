@@ -72,7 +72,11 @@ def bake_atlas(output, asset, weapon_meshes):
     all_mats = {slot.material for obj in weapon_meshes for slot in obj.material_slots if slot.material}
     # High-to-low projection includes the former lettering/traction geometry.
     # The emission map keeps the small sight dots in the SAME material section.
+    samples = scene.cycles.samples
     for name in atlas:
+        # Keep normal-map sampling for bump detail. The colour pass only needs
+        # a few samples for cavity shading; ORM projects scalar material values.
+        scene.cycles.samples = {'base': 4, 'orm': 1}.get(name, samples)
         bake.margin = atlas[name].size[0] // 256
         for mat in all_mats:
             n, l = mat.node_tree.nodes, mat.node_tree.links
@@ -107,8 +111,12 @@ def bake_atlas(output, asset, weapon_meshes):
                     emit.inputs[0].default_value = tuple(v * strength for v in socket.default_value[:3]) + (1,)
             l.new(emit.outputs[0], out.inputs['Surface'])
         for surface, sources in surfaces:
+            # Only the slide carries emissive SIGLITE insets; other islands stay black.
+            is_slide = surface.parent.name == 'slide'
+            if name == 'emission' and not is_slide:
+                continue
             # Cast from outside the rear rings above the slide's sloped sight face.
-            bake.cage_extrusion = .0015 if surface.parent.name == 'slide' else .0012
+            bake.cage_extrusion = .0015 if is_slide else .0012
             mesh = surface.data
             mesh.uv_layers.active_index = mesh.uv_layers.find(COLOR_UV) if name == 'base' else 0
             mesh.uv_layers.active.active_render = True
@@ -122,6 +130,7 @@ def bake_atlas(output, asset, weapon_meshes):
         im.save()
         im.pack()
         im.filepath = '//textures/p320-' + name + '.png'
+    scene.cycles.samples = samples
     bake.use_selected_to_active = False
     for mat in all_mats:
         n = mat.node_tree.nodes
