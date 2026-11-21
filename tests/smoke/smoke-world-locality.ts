@@ -5,6 +5,7 @@ import * as THREE from 'three';
 
 import { buildWorld } from '#worldgen/build';
 import { Assembler } from '#worldgen/builder';
+import type { BuildingInfo } from '#worldgen/buildings';
 import { BUILDINGS } from '#worldgen/level/layout';
 
 const box = new THREE.Box3();
@@ -18,7 +19,7 @@ const seatProbes = [
 
 /** Every merged piece and surviving instance as `key min max` -> { n, x, z }. */
 type Piece = { n: number; x: number; z: number };
-function emitted(): Map<string, Piece> {
+function emitted(): { pieces: Map<string, Piece>; w2Openings: BuildingInfo['facadeOpenings'] } {
   const out = new Map<string, Piece>();
   const record = (key: string, geo: THREE.BufferGeometry, matrix?: THREE.Matrix4 | null): void => {
     if (!geo.boundingBox) geo.computeBoundingBox();
@@ -58,7 +59,8 @@ function emitted(): Map<string, Piece> {
     }
     return A;
   };
-  buildWorld(A);
+  const w2 = buildWorld(A).find((info): boolean => info.spec.id === 'W2');
+  assert(w2);
   seat.material.dispose();
   assert.equal(unsupported.size, 0, 'baked balcony props keep a physical seat');
   // Instances after clutter clearance, so culling differences count too.
@@ -66,17 +68,18 @@ function emitted(): Map<string, Piece> {
     assert(proto.geo, 'unfinalized prototypes retain their geometry');
     for (const m of proto.matrices) record(id, proto.geo, m);
   }
-  return out;
+  return { pieces: out, w2Openings: w2.facadeOpenings.filter((opening): boolean => opening.f < 2) };
 }
 
 // W2 has facades, an interior stair, furnished rooms, a ladder and roof dressing.
 const spec = BUILDINGS.find((building): boolean => building.id === 'W2');
 assert(spec);
-const before = emitted();
+const { pieces: before, w2Openings: beforeOpenings } = emitted();
 const damage = spec.damage;
 spec.damage = (damage ?? 0.2) + 0.25; // changes the draw count of every W2 facade
-const after = emitted();
+const { pieces: after, w2Openings: afterOpenings } = emitted();
 spec.damage = damage;
+assert.deepEqual(afterOpenings, beforeOpenings, 'weathering cannot change playable bays');
 
 const near = ({ x, z }: Piece): boolean =>
   Math.abs(x - spec.x) < spec.w / 2 + 3 && Math.abs(z - spec.z) < spec.d / 2 + 3;

@@ -12,6 +12,7 @@ export interface RoomSpec extends RectXZ {
   y: number;
   h: number;
   street?: number | undefined;
+  counter?: [x: number, z: number, length: number] | undefined;
   doors: { x: number; z: number }[];
   envelope: RectXZ;
   facadeOpenings: BuildingInfo['facadeOpenings'];
@@ -165,7 +166,7 @@ export function furnishRoom(A: Assembler, rng: Rng, r: RoomSpec): void {
     if (!inDoorway(r, px, pz)) A.put(prototype, px, y + 0.04, pz, ry, scale, [1, 1.4, 1]);
   }
 
-  if (kind === 'shop') furnishShop(A, rng, r, cx, cz, w, d);
+  if (kind === 'shop') furnishShop(A, rng, r, cx, cz);
   else if (kind === 'living') furnishLiving(A, rng, r, cx, cz);
   else if (kind === 'workshop') furnishWorkshop(A, rng, r, cx, cz, w, d);
   else if (kind === 'ruin') furnishRuin(A, rng, r, cx, cz);
@@ -288,22 +289,19 @@ function dressWalls(A: Assembler, rng: Rng, r: RoomSpec): void {
       const sLen = Math.min(rng.range(0.9, 1.8), s.len - 0.6);
       const st = rng.range(-half + sLen / 2, half - sLen / 2);
       const [sx, sz] = at(s, st, 0.15);
-      if (!inDoorway(r, sx, sz) && backedByWall(st, sLen / 2 + 0.03, sy - 0.2, sy + 0.22)) {
-        if (!inVoid(r, sx, sz)) {
-          A.add('wood_prop_dark', BOX(A), LL(IDENT, sx, sy, sz, s.yaw, sLen, 0.035, 0.28), {
-            masks: [0.85, 0.5, 0.15],
+      if (
+        !inDoorway(r, sx, sz) &&
+        !inVoid(r, sx, sz) &&
+        backedByWall(st, sLen / 2 + 0.03, sy - 0.2, sy + 0.22)
+      ) {
+        A.add('wood_prop_dark', BOX(A), LL(IDENT, sx, sy, sz, s.yaw, sLen, 0.035, 0.28), {
+          masks: [0.85, 0.5, 0.15],
+        });
+        for (const bt of [-1, 1]) {
+          const [bx, bz] = at(s, st + bt * (sLen / 2 - 0.12), 0.1);
+          A.add('metal_dark', BOX_FINE(A), LL(IDENT, bx, sy - 0.09, bz, s.yaw, 0.03, 0.16, 0.18), {
+            masks: [0.6, 0.6, 0.3],
           });
-          for (const bt of [-1, 1]) {
-            const [bx, bz] = at(s, st + bt * (sLen / 2 - 0.12), 0.1);
-            A.add(
-              'metal_dark',
-              BOX_FINE(A),
-              LL(IDENT, bx, sy - 0.09, bz, s.yaw, 0.03, 0.16, 0.18),
-              {
-                masks: [0.6, 0.6, 0.3],
-              }
-            );
-          }
         }
         for (let i = 0; i < rng.int(2, 5); i++) {
           const [gx, gz] = at(
@@ -514,93 +512,45 @@ function furnishWorkshop(
 }
 
 // ------------------------------------------------------------------- shop --
-function furnishShop(
-  A: Assembler,
-  rng: Rng,
-  r: RoomSpec,
-  cx: number,
-  cz: number,
-  w: number,
-  d: number
-): void {
-  const { x0, x1, y } = r;
-  const frontZ = r.street === 0 ? -1 : r.street === 2 ? 1 : 0;
-  // rug on the floor
+function furnishShop(A: Assembler, rng: Rng, r: RoomSpec, cx: number, cz: number): void {
+  const { y } = r;
   addRug(A, rng, cx + rng.range(-0.5, 0.5), y, cz + rng.range(-0.5, 0.5), rng.range(1.6, 2.4));
+  if (!r.counter) return;
 
-  /**
-   * The counter runs PARALLEL to the shop's frontage, a metre inside it, the way
-   * a real market shop is arranged: it fills the lower third of the view out of
-   * the shop with goods instead of walling the opening off.
-   */
+  const [ccx, ccz, clen] = r.counter;
   const alongZ = r.street === 1 || r.street === 3;
-  let ccx = alongZ ? (r.street === 1 ? x1 - 1.3 : x0 + 1.3) : cx;
-  let ccz = alongZ ? cz : frontZ ? cz - frontZ * (d * 0.5 - 1.3) : cz + d * 0.18;
-  let clen = Math.min((alongZ ? d : w) - 1.4, 4.4);
-  // Face a shop in this room, the authored one (a sightline depends on it) first.
-  const [lo, hi] = alongZ ? [r.z0, r.z1] : [x0, x1];
-  const shops = r.facadeOpenings.filter((opening): boolean => {
-    const at = alongZ ? opening.z : opening.x;
-    return (
-      opening.kind === 'shop' &&
-      opening.side === r.street &&
-      at >= Math.min(lo, hi) &&
-      at <= Math.max(lo, hi)
-    );
-  });
-  const shop = shops.find((opening): boolean => opening.authored) ?? shops[0];
-  if (shop) {
-    clen = Math.min(clen, Math.max(1.2, shop.w - 0.4));
-    if (alongZ) ccz = shop.z;
-    else ccx = shop.x;
-  }
   const cSX = alongZ ? 0.74 : clen;
   const cSZ = alongZ ? clen : 0.74;
-  // The counter stands 1.3 m inside the frontage, beyond inDoorway's reach:
-  // keep it off the straight approach to any other doorway in that wall (the
-  // shop it faces is sized to walk around).
-  const front = alongZ ? (r.street === 1 ? x1 : x0) : frontZ < 0 ? r.z1 : r.z0;
-  const along = (p: { x: number; z: number }): number => (alongZ ? p.z : p.x);
-  const across = (p: { x: number; z: number }): number => (alongZ ? p.x : p.z);
-  let clear =
-    (!alongZ && !frontZ) ||
-    !r.doors.some(
-      (door): boolean =>
-        Math.abs(across(door) - front) < 0.6 &&
-        Math.abs(along(door) - (alongZ ? ccz : ccx)) < clen / 2 + 0.6 &&
-        !(shop && Math.abs(along(door) - along(shop)) < 0.05)
-    );
-  for (let i = 0; clear && i <= 6; i++) {
+  for (let i = 0; i <= 6; i++) {
     const t = -clen / 2 + (i / 6) * clen;
     const px = ccx + (alongZ ? 0 : t);
     const pz = ccz + (alongZ ? t : 0);
-    if (inDoorway(r, px, pz)) clear = false;
+    if (inDoorway(r, px, pz))
+      throw new Error(`[world] authored shop counter at ${ccx}/${ccz} blocks a doorway`);
   }
-  if (clear) {
-    A.add('wood_prop_dark', BOX(A), LL(IDENT, ccx, y + 0.9, ccz, 0, cSX, 0.06, cSZ), {
-      masks: [0.9, 0.4, 0.1],
-    });
-    A.add(
-      'wood_prop_dark',
-      BOX(A),
-      LL(
-        IDENT,
-        ccx + (alongZ ? -0.32 : 0),
-        y + 0.45,
-        ccz + (alongZ ? 0 : 0.32),
-        0,
-        alongZ ? 0.09 : cSX,
-        0.9,
-        alongZ ? cSZ : 0.09
-      ),
-      {
-        masks: [0.5, 0.6, 0.4],
-      }
-    );
-    A.add('wood_prop_dark', BOX(A), LL(IDENT, ccx, y + 0.28, ccz, 0, cSX - 0.2, 0.04, cSZ - 0.2), {
-      masks: [0.4, 0.7, 0.5],
-    });
-  }
+  A.add('wood_prop_dark', BOX(A), LL(IDENT, ccx, y + 0.9, ccz, 0, cSX, 0.06, cSZ), {
+    masks: [0.9, 0.4, 0.1],
+  });
+  A.add(
+    'wood_prop_dark',
+    BOX(A),
+    LL(
+      IDENT,
+      ccx + (alongZ ? -0.32 : 0),
+      y + 0.45,
+      ccz + (alongZ ? 0 : 0.32),
+      0,
+      alongZ ? 0.09 : cSX,
+      0.9,
+      alongZ ? cSZ : 0.09
+    ),
+    {
+      masks: [0.5, 0.6, 0.4],
+    }
+  );
+  A.add('wood_prop_dark', BOX(A), LL(IDENT, ccx, y + 0.28, ccz, 0, cSX - 0.2, 0.04, cSZ - 0.2), {
+    masks: [0.4, 0.7, 0.5],
+  });
   const occupied: [number, number][] = [];
   for (let i = 0; i < 6; i++) {
     const t = rng.range(-clen / 2 + 0.3, clen / 2 - 0.3);
@@ -610,7 +560,7 @@ function furnishShop(
     if (rng.float() < 0.45) {
       const trayYaw = rng.range(-0.4, 0.4) + (alongZ ? Math.PI / 2 : 0);
       const produceYaw = rng.float() * 6.28;
-      if (clear && hasRoom) {
+      if (hasRoom) {
         A.put('tray', px, y + 0.94, pz, trayYaw, 1, [1, 1.1, 1]);
         A.put('produce', px, y + 0.96, pz, produceYaw, 1, [1, 1, 1]);
         occupied.push([px, pz]);
@@ -626,7 +576,7 @@ function furnishShop(
       ]);
       const yaw = rng.float() * 6.28;
       const scale = rng.range(0.6, 0.9);
-      if (clear && hasRoom) {
+      if (hasRoom) {
         A.put(prototype, px, y + 0.94, pz, yaw, scale, [1, 1.15, 1]);
         occupied.push([px, pz]);
       }
@@ -695,7 +645,8 @@ function furnishRuin(A: Assembler, rng: Rng, r: RoomSpec, cx: number, cz: number
   const mx = cx + rng.range(-1, 1);
   const mz = cz + rng.range(-1, 1);
   const mr = rng.range(1.4, 2.2);
-  if (!inDoorway(r, mx, mz, mr + 0.45)) rubbleMound(A, rng, mx, y, mz, mr, 22);
+  if (inDoorway(r, mx, mz, mr + 0.45)) return;
+  rubbleMound(A, rng, mx, y, mz, mr, 22);
   const sYaw = rng.float() * 6.28;
   const sheet = clothGeometry(1.4, 1.1, {
     segX: 7,
@@ -706,8 +657,9 @@ function furnishRuin(A: Assembler, rng: Rng, r: RoomSpec, cx: number, cz: number
     fray: 0.02,
     rng,
   });
-  A.addOnce('fabric_cream', sheet, LL(IDENT, mx, y + 0.25, mz, sYaw, 1, 1, 1, -Math.PI / 2), {
+  A.addOnce('fabric_cream', sheet, LL(IDENT, mx, y + 0.035, mz, sYaw, 1, 1, 1, -Math.PI / 2), {
     masks: [0.4, 0.7, 0.3],
+    visualOnly: true,
   });
 }
 

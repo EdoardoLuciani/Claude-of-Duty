@@ -11,6 +11,7 @@ export type { AssemblyOptions, InstanceMasks } from './util.ts';
 export interface PrototypeSpec {
   geo: THREE.BufferGeometry;
   visualGeo?: THREE.BufferGeometry;
+  visualOnly?: boolean;
   key: string;
   ballisticSurface?: SurfaceName;
   sheetThickness?: number;
@@ -25,6 +26,7 @@ export interface Prototype {
   id: string;
   geo: THREE.BufferGeometry | null;
   visualGeo: THREE.BufferGeometry | null;
+  visualOnly: boolean;
   key: string;
   ballisticSurface: SurfaceName;
   sheetThickness: number;
@@ -86,6 +88,7 @@ export class Assembler {
   declare _static: Map<string, Accum>;
   declare _protos: Map<string, Prototype>;
   declare _geoCache: Map<string, THREE.BufferGeometry>;
+  private readonly collisionGeometries: THREE.BufferGeometry[] = [];
   declare meshes: THREE.Mesh[];
   declare interiorLights: THREE.Vector3Like[];
   declare lampAnchors: THREE.Vector3Like[];
@@ -236,6 +239,7 @@ export class Assembler {
       id,
       geo: spec.geo,
       visualGeo: spec.visualGeo ?? null,
+      visualOnly: spec.visualOnly ?? false,
       key: spec.key,
       ballisticSurface:
         spec.ballisticSurface ?? PALETTE[spec.key]?.ballisticSurface ?? this.surfaceOf(spec.key),
@@ -329,7 +333,6 @@ export class Assembler {
       if (acc.empty) continue;
       const source = acc.build();
       const geo = mergeVertices(source);
-      source.dispose();
       const mesh = new THREE.Mesh(geo, this.mat(key));
       mesh.name = `world_${key}`;
       mesh.castShadow = true;
@@ -342,7 +345,27 @@ export class Assembler {
       mesh.userData.collision = false; // cooked into a separate derived asset
       mesh.updateMatrix();
       root.add(mesh);
-      collisionSource?.add(mesh.clone());
+      if (collisionSource) {
+        if (acc.visualRanges.length === 0) collisionSource.add(mesh.clone());
+        else {
+          const indices = source.index!.array;
+          const physical: number[] = [];
+          let cursor = 0;
+          for (const [start, end] of acc.visualRanges) {
+            while (cursor < start) physical.push(indices[cursor++]);
+            cursor = end;
+          }
+          while (cursor < indices.length) physical.push(indices[cursor++]);
+          if (physical.length) {
+            source.setIndex(physical);
+            const collider = mesh.clone();
+            collider.geometry = mergeVertices(source);
+            this.collisionGeometries.push(collider.geometry);
+            collisionSource.add(collider);
+          }
+        }
+      }
+      source.dispose();
       this.meshes.push(mesh);
       this.stats.staticTris += geo.index!.count / 3;
       this.stats.drawCalls++;
@@ -412,7 +435,7 @@ export class Assembler {
 
       const mat = this.mat(p.key);
       for (const [target, lists] of [
-        [collisionSource, buckets.values()],
+        [p.visualOnly ? null : collisionSource, buckets.values()],
         [root, chunks],
       ] satisfies [THREE.Object3D | null, Iterable<number[]>][]) {
         if (!target) continue;
@@ -474,6 +497,8 @@ export class Assembler {
       m.parent?.remove(m);
     }
     this.meshes.length = 0;
+    for (const geo of this.collisionGeometries) geo.dispose();
+    this.collisionGeometries.length = 0;
     for (const p of this._protos.values()) {
       p.geo?.dispose();
       if (p.visualGeo !== p.geo) p.visualGeo?.dispose();

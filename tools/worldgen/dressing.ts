@@ -567,6 +567,16 @@ function facadeHangings(A: Assembler): void {
 
 // --- rubble -----------------------------------------------------------------
 function rubbleDust(A: Assembler): void {
+  for (const [x, z, yaw, w, h, d] of SET_PIECES.rubbleCover) {
+    A.add(
+      'concrete_prop',
+      BOX_SOFT(A),
+      LL(IDENT, x, groundY(x, z) + h / 2 - 0.04, z, yaw, w, h, d),
+      {
+        masks: [0.3, 0.75, 0.45],
+      }
+    );
+  }
   for (const [x, z, radius, count] of SET_PIECES.rubble) {
     const rng = keyedRng('rubble', x, z);
     const y = groundY(x, z);
@@ -575,18 +585,9 @@ function rubbleDust(A: Assembler): void {
 }
 
 function streetRubble(A: Assembler): void {
-  for (const [x, z] of [
-    [-5.4, 16.5],
-    [5.5, 11.0],
-    [-5.6, 2.0],
-    [5.6, -4.0],
-    [-5.5, -13.5],
-    [5.4, -19.0],
-    [-5.3, -25.5],
-    [5.5, -33.0],
-  ]) {
+  for (const [x, z, radius, count] of SET_PIECES.streetRubble) {
     const rng = keyedRng('street-rubble', x, z);
-    rubbleMound(A, rng, x, groundY(x, z), z, rng.range(1.1, 1.9), rng.int(18, 30), {
+    rubbleMound(A, rng, x, groundY(x, z), z, radius, count, {
       key: 'concrete_prop',
     });
   }
@@ -677,7 +678,7 @@ function dressBuilding(A: Assembler, rng: Rng, info: BuildingInfo): void {
         rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream']),
         cloth,
         LL(IDENT, wp[0], wp[1], wp[2], ryOf(pm) + Math.PI),
-        { masks: [0.4, 0.55, 0.2] }
+        { masks: [0.4, 0.55, 0.2], visualOnly: true }
       );
     }
   }

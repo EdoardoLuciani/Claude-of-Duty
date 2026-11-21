@@ -226,9 +226,9 @@ try {
 
   const failures = [...errors];
   // Keep an exact budget so unrelated placement/batching changes still fail.
-  if (result.stats.drawCalls !== 139 || result.stats.instances !== 7838)
+  if (result.stats.drawCalls !== 139 || result.stats.instances !== 7853)
     failures.push('world draw/instance budget changed');
-  if (result.physicsTris < 300000 || result.physicsTris > 340000) {
+  if (result.physicsTris < 265000 || result.physicsTris > 290000) {
     failures.push(`physics triangle budget changed: ${result.physicsTris}`);
   }
   if (result.buildings !== 20 || result.bulbs !== 15 || result.lamps !== 5)

@@ -1,6 +1,6 @@
 import type { Assembler } from './builder.ts';
 import type { BuildingInfo } from './buildings.ts';
-import { buildBuilding, collapseRoof, exteriorStairBoxes } from './buildings.ts';
+import { buildBuilding, dressCollapse, exteriorStairBoxes } from './buildings.ts';
 import {
   registerDressingProps,
   dressStreet,
@@ -13,7 +13,6 @@ import { BUILDINGS } from './level/layout.ts';
 import type { ClearanceBox } from './placement.ts';
 import { clearDoorwayClutter, clearVolumeClutter, placeBaked } from './placement.ts';
 import { registerProps } from './props.ts';
-import { keyedRng } from './util.ts';
 
 /**
  * Populate an Assembler with the complete authored level. Each element draws
@@ -28,13 +27,7 @@ export function buildWorld(A: Assembler): BuildingInfo[] {
   for (const spec of BUILDINGS) {
     const info = buildBuilding(A, spec);
     buildings.push(info);
-    if (spec.collapse) {
-      const rng = keyedRng('collapse', spec.id);
-      collapseRoof(A, rng, spec, info, {
-        x: spec.x + rng.range(-2, 2),
-        z: spec.z + rng.range(-2, 2),
-      });
-    }
+    if (spec.collapseDebris) dressCollapse(A, info, ...spec.collapseDebris);
   }
 
   buildGate(A);
