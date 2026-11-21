@@ -3,12 +3,14 @@ import assert from 'node:assert/strict';
 import type { Vector3Like } from 'three';
 import { Vector3 } from 'three';
 
+import type { Agent } from '../../src/ai/agent.ts';
 import { AttachmentQueries } from '../../src/ai/attachment-queries.ts';
 import { createLadderDescriptors, ladderMoveBudget } from '../../src/ai/ladder.ts';
 import type { NavMetadata, ExpectedNav } from '../../src/ai/nav-format.ts';
 import { unpackNav, packNav, NAV_LINK_RADIUS } from '../../src/ai/nav-format.ts';
 import type { NavRoute, NavCache } from '../../src/ai/nav.ts';
 import { SurfaceNav, NAV_PENDING, NAV_CANCELLED } from '../../src/ai/nav.ts';
+import { makeAgent, makeAi } from '../lib/agent-fixture.ts';
 import { mutableLadder, type MutableLadderDescriptor } from '../lib/ai-movement-fixture.ts';
 import { NativeWorker } from '../lib/attachment-worker-fixture.ts';
 import { ladderProfiles } from '../lib/ladder-fixture.ts';
@@ -212,6 +214,128 @@ try {
   assert.equal(result, 0);
   assert.equal(nav.lastReason, 'disconnected');
   assert.deepEqual(out, { points: [], ladderSteps: [] });
+  // Real agents traverse real routes: claim, shaft, landing and release.
+  // Landing records a safe position with the existing main-thread attachment check.
+  nav._checkAttachment = originalOracle;
+  const d = descriptors[4],
+    n = v(d.normal),
+    side = new Vector3(n.z, 0, -n.x),
+    at = (p: Vector3Like, out: number, across = 0): Vector3 =>
+      v(p).addScaledVector(n, out).addScaledVector(side, across);
+  const foot = d.points[0].y,
+    top = d.points[3].y,
+    onShaft = (a: Agent): boolean => a.position.y > foot + 0.2 && a.position.y < top - 0.2;
+  const ai = makeAi(nav);
+  const climber = (from: Vector3): Agent => {
+    const a = makeAgent({ ai, phys: f.physics, position: from, id: ++actor });
+    a.controller = f.physics.createCharacter({
+      position: a.position,
+      radius: a.radius,
+      height: a.height,
+    });
+    ai.agents.push(a);
+    return a;
+  };
+  let frame = 0;
+  const drive = async (until: () => boolean, each?: () => void): Promise<void> => {
+    for (const end = frame + 2000; !until(); frame++) {
+      assert.ok(frame < end, 'bounded traversal');
+      service.update(frame, new Set(ai.agents.map((a): number => a.id)));
+      ai._pathBudget = 2;
+      for (const a of ai.agents) {
+        if (!a.alive) continue;
+        if (a.pathPending) a._goTo(a._pendingDest);
+        a.desiredSpeed = 2;
+        a._move(1 / 60);
+      }
+      each?.();
+      if (service.stats.pending)
+        await new Promise((resolve): NodeJS.Timeout => setTimeout(resolve, 1));
+    }
+  };
+  const arrived = (a: Agent, goal: Vector3): boolean =>
+    !a.ladder && !a.pathPending && !a.hasMoveTarget && a.position.distanceTo(goal) < 0.5;
+
+  // One climb holds the shaft for its whole length, lands and releases.
+  const goal = at(d.points[3], 3),
+    first = climber(at(d.points[0], 2));
+  first._goTo(goal);
+  let climbed = false;
+  await drive(
+    (): boolean => arrived(first, goal),
+    (): void => {
+      if (!onShaft(first)) return;
+      climbed = true;
+      assert.equal(ai.ladderClaims.get(d.id), first, 'the shaft is never climbed unclaimed');
+      assert.ok(first.animator.climbing, 'climb pose while on the shaft');
+    }
+  );
+  assert.ok(climbed);
+  assert.ok(first.position.y > top - 0.1, 'landed on the upper floor');
+  assert.equal(ai.ladderClaims.size, 0, 'landing releases the claim');
+  assert.equal(first.animator.climbing, false);
+
+  // A route change while climbing waits for the landing, then replaces the goal.
+  const descend = climber(at(d.points[3], 2, -1.5)),
+    below = at(d.points[0], 2, -1);
+  descend._goTo(below);
+  await drive((): boolean => onShaft(descend));
+  const solved = nav.stats.queries,
+    retarget = at(d.points[0], 3, 1);
+  assert.equal(descend._goTo(retarget), false, 'no route request from the shaft');
+  assert.equal(descend.pathPending, false);
+  assert.equal(nav.stats.queries, solved);
+  await drive((): boolean => arrived(descend, retarget));
+  assert.equal(ai.ladderClaims.size, 0);
+
+  // A replaced navigator freezes the climb; the original one resumes it from the shaft.
+  const resumed = climber(at(d.points[0], 2, -1));
+  resumed._goTo(goal);
+  await drive((): boolean => onShaft(resumed));
+  const frozen = resumed.position.clone(),
+    travel = resumed.animator.climbTravel;
+  ai.grid = null;
+  for (let i = 0; i < 30; i++) resumed._move(1 / 60);
+  assert.ok(resumed.position.equals(frozen), 'no shaft motion without its navigator');
+  assert.equal(resumed.animator.climbTravel, travel);
+  assert.equal(ai.ladderClaims.get(d.id), resumed, 'a frozen climber keeps the shaft');
+  ai.grid = nav;
+  await drive((): boolean => arrived(resumed, goal));
+  assert.equal(ai.ladderClaims.size, 0);
+
+  // A queued arrival holds clear of an owned shaft and climbs once the owner has landed.
+  const ownerGoal = at(d.points[3], 2),
+    queuedGoal = at(d.points[3], 3, -1),
+    owner = climber(at(d.points[0], 2));
+  owner._goTo(ownerGoal);
+  await drive((): boolean => onShaft(owner));
+  const queued = climber(at(d.points[0], 2, 1.5));
+  queued._goTo(queuedGoal);
+  let handedOver = false;
+  await drive(
+    (): boolean => arrived(owner, ownerGoal) && arrived(queued, queuedGoal),
+    (): void => {
+      const claim = ai.ladderClaims.get(d.id);
+      if (claim === queued && !handedOver) {
+        handedOver = true;
+        assert.ok(owner.position.y > top - 0.1, 'the owner landed before the handover');
+      }
+      if (!handedOver) assert.equal(onShaft(queued), false, 'a queued actor never climbs');
+      if (onShaft(queued)) assert.equal(claim, queued);
+    }
+  );
+  assert.ok(handedOver);
+  assert.equal(ai.ladderClaims.size, 0);
+
+  // Death mid-climb frees the shaft.
+  const fallen = climber(at(d.points[3], 2, -1.5));
+  fallen._goTo(below);
+  await drive((): boolean => onShaft(fallen));
+  fallen.die(fallen.position.clone(), null);
+  assert.equal(fallen.ladder, null);
+  assert.equal(ai.ladderClaims.size, 0, 'death releases the shaft');
+  assert.equal(fallen.animator.climbing, false);
+  for (const a of ai.agents) a.dispose();
 } finally {
   nav._probe.move = originalFoot;
   nav._checkAttachment = originalOracle;
@@ -348,5 +472,5 @@ for (let l = ground.poly.firstLink(); l !== 0xffffffff; l = ground.tile.links(l)
 }
 broken.dispose();
 console.log(
-  `ok  ladder nav: ${proofCount} complete real-worker routes, exact descriptors, walking-only compatibility, strict offmesh corruption`
+  `ok  ladder nav: ${proofCount} complete real-worker routes, agent claim/handover/landing/interruption, exact descriptors, walking-only compatibility, strict offmesh corruption`
 );
