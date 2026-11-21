@@ -73,7 +73,7 @@ function fixture(dead: boolean, stance: PlayerStance): RespawnFixture {
   const ai = new AiSystem();
   ai.ctx = ctx;
   // Native navigation is never queried when perSquad is zero; only readiness is used.
-  ai.grid = partialFixture<SurfaceNav>({});
+  ai.grid = partialFixture<SurfaceNav>({ worker: null });
   ai._v3 = new THREE.Vector3();
   const placementOrigins: THREE.Vector3[] = [];
   ai.playerPosition = function (out, sample): THREE.Vector3 {
@@ -134,6 +134,28 @@ for (const dead of [true, false]) {
     }
   }
 }
+// A restart after elapsed gameplay must give a fresh countdown without a wave clear.
+{
+  const { ai, events } = fixture(false, 'stand');
+  const { ctx } = ai;
+  ctx.config.deterministic = false;
+  const waves: number[] = [];
+  ai.populate = (): number => 6;
+  events.on('wave:start', ({ wave }): void => {
+    waves.push(wave);
+  });
+  events.on('wave:complete', (): never => assert.fail('no clear before the first wave'));
+  ai.resetForNewGame();
+  assert.equal(ai.getWaveState().nextIn, 15);
+  ctx.time.elapsed += 14.9;
+  ai._updateWaves(ctx);
+  assert.deepEqual(waves, []);
+  ctx.time.elapsed += 0.2;
+  ai._updateWaves(ctx);
+  assert.deepEqual(waves, [1]);
+  assert.equal(ai.getWaveState().incoming, false);
+}
+
 console.log(
   'ALL PASS: dead/living respawn synchronizes capsule before nested observers and AI placement'
 );
