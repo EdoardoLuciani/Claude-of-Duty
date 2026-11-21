@@ -6,10 +6,10 @@
   "blenderUp": "+Z",
   "stats": {
     "triangleInstances": 64225,
-    "primitives": 17,
+    "primitives": 16,
     "materials": 1,
     "images": 3,
-    "bytes": 6907196
+    "bytes": 6906724
   },
   "clips": {
     "Idle": {

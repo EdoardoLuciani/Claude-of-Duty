@@ -564,17 +564,15 @@ def build(output, render=False, quick=False):
                      'magazine':(.069,0,-.065)}.items():
         empty('SOCKET_'+name,loc,rig)
 
-    # Keep the right-side laser hardware forward of the support hand, but
-    # separate it from the base receiver so the bare M-LOK guard stays bare.
+    # The fixed right-side rail stays forward of the support hand.
     rail = empty('MOUNT_rail', (.295, -.037, 0), body)
     rail.rotation_euler = Matrix(((0,1,0),(0,0,1),(1,0,0))).to_euler()
-    rail_adapter = empty('RAIL_adapter', parent=body)
     bpy.context.view_layer.update()
-    box('Laser rail adapter web',(.30075,-.0289,0),(.0435,.0098,.014),alloy,rail_adapter)
-    picatinny.build_rail('Laser rail adapter',rail.matrix_world@Matrix.Rotation(math.pi,4,'Y'),-.0126,.0226,steel,rail_adapter,asset)
+    box('Laser rail adapter web',(.30075,-.0289,0),(.0435,.0098,.014),alloy)
+    picatinny.build_rail('Laser rail adapter',rail.matrix_world@Matrix.Rotation(math.pi,4,'Y'),-.0126,.0226,steel,body,asset)
     # Both anchors stay inside the last real M-LOK slot, not past the guard end.
     for x in (.282,.289):
-        cyl('Laser rail adapter screw',(x,-.0348,0),.002,.004,steel,'Y',rail_adapter)
+        cyl('Laser rail adapter screw',(x,-.0348,0),.002,.004,steel,'Y')
 
     # Stage 3: surface-fitted markings and original component atlas UVs.
     # Project original text mesh vertices onto their declared physical surface, not
@@ -677,7 +675,6 @@ def build(output, render=False, quick=False):
         # Preserve the approved fixed geometry/photo views without review-only arms.
         hands_collection=bpy.data.collections['MPX | authored hands (shared appearance)']
         hands_collection.hide_render=True
-        for o in rail_adapter.children: o.hide_render=True
         for name,cam in cams.items():
             scene.camera=cam; scene.render.filepath=str(REVIEW/(name+'.png'))
             bpy.ops.render.render(write_still=True)
@@ -780,7 +777,7 @@ def build(output, render=False, quick=False):
     stats={'triangleInstances':triangles,'primitives':sum(len(m['primitives']) for m in j['meshes']),
            'materials':len(j.get('materials',[])),'images':len(j.get('images',[])),'bytes':len(raw)}
     assert triangles<80000,stats
-    assert stats['primitives']==17 and stats['materials']==1 and stats['images']==3 and len(raw)<=10*1024*1024,stats
+    assert stats['primitives']==16 and stats['materials']==1 and stats['images']==3 and len(raw)<=10*1024*1024,stats
     # Stage 7: separate manifest metadata (the GLB remains read-only).
     manifest={'status':'Base conversion candidate — human visual/animation/gameplay review pending',
         'asset':'SIG MPX 8 inch / open 9mm crown and thread protector / 30-round magazine / removable deployed irons',

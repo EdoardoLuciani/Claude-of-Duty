@@ -366,9 +366,9 @@ mounts and inspection clones own transforms only. `weapons.setAttachments(id, co
 changes an owned, loaded weapon synchronously outside the frame loop.
 `mountAttachments()` validates all assets/datums before attaching groups under
 `MOUNT_optic`/`MOUNT_rail`/`MOUNT_muzzle` and switching authored hardware via
-`slotVisuals()`. Optional authored `RAIL_adapter` hardware appears only with a
-rail attachment. Instances follow authored parents/animation, never a baked live
-pose; ADS uses the rest-pose optic datum in the weapon frame, while the reticle
+`slotVisuals()`. Fixed side rails remain part of the base weapon when the laser is
+removed. Instances follow authored parents/animation, never a baked live pose;
+ADS uses the rest-pose optic datum in the weapon frame, while the reticle
 follows the live mount. The mount commit resolves the sight datum, eye relief,
 `OpticData`, laser emitter and muzzle socket on the viewmodel entry. Separately,
 `buildDef(id, config)` resolves suppression, optic ADS FOV/sensitivity (undefined
@@ -388,8 +388,7 @@ exit (a can's endcap, else the weapon's `SOCKET_muzzle`) once; `viewmodel.muzzle
 reads it for ballistics/FX; ejection stays at `SOCKET_ejection`. A can's endcap shares
 the `SOCKET_muzzle` name, so the weapon's own socket is held from load as
 `baseMuzzleSocket`, never looked up by name on a mounted rig.
-Prewarm covers every loaded attachment, both iron/muzzle base states and optional
-rail hardware.
+Prewarm covers every loaded attachment and both iron/muzzle hardware states.
 
 Per-weapon and per-attachment datums/clearances live in each recipe's
 `tools/blender/*/README.md`. Blender fit checks load built attachments through

@@ -61,7 +61,7 @@ assert not any('ROMEO4T' in o.name or 'SRD9' in o.name or 'lens_cap' in o.name f
 assert abs(point('sight').z-.074) < EPS
 assert (point('front_post')-point('sight')).cross(Vector((1,0,0))).length < EPS
 assert abs(point('muzzle').x-point('barrel_crown').x-.006) < EPS
-for name in ('IRON_sights', 'IRON_sights_removed', 'MUZZLE_device', 'MUZZLE_device_removed', 'RAIL_adapter'):
+for name in ('IRON_sights', 'IRON_sights_removed', 'MUZZLE_device', 'MUZZLE_device_removed'):
     assert bpy.data.objects[name].parent.name == 'receiver', (name,'lost rigid assembly ownership')
 for name,loc in [('optic',(.025,0,.044)),('muzzle',(.3162,0,0))]:
     mount = bpy.data.objects['MOUNT_'+name]
@@ -208,7 +208,7 @@ for id,slot in [('rmr','optic'),('acog','optic'),('scope','optic'),('exps3','opt
 
 # Check each enabled state against fixed receiver/guard and moving mechanisms.
 # Deliberate rail-foot mating is the only optic contact exemption.
-fixed = [o for o in weapon if o.parent and o.parent.name in ('receiver', 'RAIL_adapter')
+fixed = [o for o in weapon if o.parent and o.parent.name == 'receiver'
          and not o.name.startswith('Picatinny')]
 for id,target in mounted.items():
     for obj in fixed:

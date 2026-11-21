@@ -203,18 +203,13 @@ assert.throws(
   railMount.name = 'MOUNT_rail';
   railMount.position.set(0.0285, 0.075, -0.25);
   railMount.rotation.z = Math.PI / 2;
-  const railAdapter = new THREE.Group();
-  railAdapter.name = 'RAIL_adapter';
-  root.add(railMount, railAdapter);
-  configureWeaponAttachments(entry, BASE_ATTACHMENTS, optics);
-  assert(!railAdapter.visible, 'the bare guard has no adapter');
+  root.add(railMount);
   const laserScene = datums('SOCKET_mount', 'SOCKET_laser');
   requiredNode(laserScene, 'SOCKET_laser').position.set(0, -0.0105, -0.02518);
   const laser = rigidAsset('SOCKET_laser', laserScene);
   const laserConfig: AttachmentConfig = { ...BASE_ATTACHMENTS, rail: 'laser' };
   assert(isAttachmentConfig(laserConfig, 'rifle'));
   configureWeaponAttachments(entry, laserConfig, { ...optics, laser });
-  assert(railAdapter.visible, 'the laser has its supporting rail');
   assert.equal(entry.railGroup.parent, railMount);
   assert(entry.laserEmitter);
   const previous = entry.laserEmitter.getWorldPosition(new THREE.Vector3());
@@ -231,7 +226,6 @@ assert.throws(
   configureWeaponAttachments(entry, BASE_ATTACHMENTS, optics);
   assert.equal(entry.laserEmitter, null);
   assert.equal(railMount.children.length, 0);
-  assert(!railAdapter.visible, 'removing the laser restores the bare guard');
   // A posed native skin deforms exactly as before rebasing, moved into game space.
   {
     const skinRoot = new THREE.Group();
