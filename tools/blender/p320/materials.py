@@ -54,6 +54,31 @@ def build_source_materials(coords):
 
     return nitron, polymer, stipple, steel, barrel_mat, mag_mat, cavity, mark, brass, copper, white
 
+def bake_orm(asset, surfaces):
+    # Scalar finishes can be sampled directly from the packed low-mesh UVs.
+    # Join only temporary copies so runtime ownership and geometry stay intact.
+    copies = []
+    for surface, _ in surfaces:
+        clone = surface.copy()
+        clone.data = surface.data.copy()
+        clone.data.uv_layers.active_index = 0
+        clone.data.uv_layers[0].active_render = True
+        asset.objects.link(clone)
+        copies.append(clone)
+    meshes = {clone.data for clone in copies}
+    merged = copies[0]
+    active(merged)
+    for clone in copies:
+        clone.select_set(True)
+    bpy.ops.object.join()
+    bpy.ops.object.bake(type='EMIT', use_selected_to_active=False)
+    meshes.add(merged.data)
+    bpy.data.objects.remove(merged, do_unlink=True)
+    for mesh in meshes:
+        if mesh.users == 0:
+            bpy.data.meshes.remove(mesh)
+
+
 def bake_atlas(output, asset, weapon_meshes):
     scene = bpy.context.scene
     surfaces = build_surfaces(asset, weapon_meshes)
@@ -110,20 +135,23 @@ def bake_atlas(output, asset, weapon_meshes):
                     strength = p.inputs['Emission Strength'].default_value if name == 'emission' else 1
                     emit.inputs[0].default_value = tuple(v * strength for v in socket.default_value[:3]) + (1,)
             l.new(emit.outputs[0], out.inputs['Surface'])
-        for surface, sources in surfaces:
-            # Only the slide carries emissive SIGLITE insets; other islands stay black.
-            is_slide = surface.parent.name == 'slide'
-            if name == 'emission' and not is_slide:
-                continue
-            # Cast from outside the rear rings above the slide's sloped sight face.
-            bake.cage_extrusion = .0015 if is_slide else .0012
-            mesh = surface.data
-            mesh.uv_layers.active_index = mesh.uv_layers.find(COLOR_UV) if name == 'base' else 0
-            mesh.uv_layers.active.active_render = True
-            active(surface)
-            for source in sources:
-                source.select_set(True)
-            bpy.ops.object.bake(type='NORMAL' if name == 'normal' else 'EMIT')
+        if name == 'orm':
+            bake_orm(asset, surfaces)
+        else:
+            for surface, sources in surfaces:
+                # Only the slide carries emissive SIGLITE insets; other islands stay black.
+                is_slide = surface.parent.name == 'slide'
+                if name == 'emission' and not is_slide:
+                    continue
+                # Cast from outside the rear rings above the slide's sloped sight face.
+                bake.cage_extrusion = .0015 if is_slide else .0012
+                mesh = surface.data
+                mesh.uv_layers.active_index = mesh.uv_layers.find(COLOR_UV) if name == 'base' else 0
+                mesh.uv_layers.active.active_render = True
+                active(surface)
+                for source in sources:
+                    source.select_set(True)
+                bpy.ops.object.bake(type='NORMAL' if name == 'normal' else 'EMIT')
         im = atlas[name]
         im.filepath_raw = str(output / 'textures' / f'p320-{name}.png')
         im.file_format = 'PNG'
