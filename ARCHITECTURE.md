@@ -393,7 +393,10 @@ geometry, and `check_picatinny.py` checks actual rails/clamps against a slotted 
 The laser owns one retained beam/dot mesh, no light/decal or per-frame allocation;
 boot warms it even without a module. One pooled bullet-mask query clips the rigid
 -Z emitter ray without damage/effects. Origin and direction share the first-person/world
-FOV mapping and are sampled after firing vibration, without camera-crosshair convergence.
+FOV mapping (`viewRayToWorld`) and are sampled after firing vibration, without
+camera-crosshair convergence. Hip shots leave the muzzle along the same mapped bore
+(sampled before firing vibration), so sway, bob, lag and kick move them; they blend onto
+the zeroed sight line with the viewmodel's ADS weight. Hip poses rest on that zero.
 L toggles per-weapon state across swaps and pause/shop; new mounts start on,
 removal/drop/restart/death switch off. Busy hands hide the beam and block L.
 The laser changes no AI perception; the flashlight keeps separate light ownership.

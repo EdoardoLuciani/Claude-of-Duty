@@ -52,6 +52,31 @@ const _q2 = new THREE.Quaternion();
 const _e = new THREE.Euler(0, 0, 0, 'XYZ');
 const _m = new THREE.Matrix4();
 
+/** Map a rigid first-person ray (direction, and origin if given) through the separate
+ * view FOV into world framing in place, so it lands where the player sees it. */
+export function viewRayToWorld(
+  camera: THREE.PerspectiveCamera,
+  viewCamera: THREE.PerspectiveCamera,
+  direction: THREE.Vector3,
+  origin?: THREE.Vector3
+): void {
+  camera.updateMatrixWorld();
+  viewCamera.updateMatrixWorld();
+  const ratio =
+    Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) /
+    Math.tan(THREE.MathUtils.degToRad(viewCamera.fov / 2));
+  if (origin) {
+    origin.applyMatrix4(viewCamera.matrixWorldInverse);
+    origin.x *= ratio;
+    origin.y *= ratio;
+    origin.applyMatrix4(camera.matrixWorld);
+  }
+  direction.transformDirection(viewCamera.matrixWorldInverse);
+  direction.x *= ratio;
+  direction.y *= ratio;
+  direction.transformDirection(camera.matrixWorld);
+}
+
 /** Duration of the arm throw, and the beat where the grenade leaves. The
  *  long throw is the big overhead heave; the short throw is a faster, more
  *  compact toss with a much earlier release. */
@@ -1124,10 +1149,11 @@ export class Viewmodel {
       clamp(av.pitch * 0.014, -0.04, 0.04) * lagScale,
       clamp(-Math.abs(av.yaw) * 0.006, -0.03, 0.03) * lagScale
     );
+    // Pitch/yaw lag is hip aim error; roll spins about the bore and keeps the turn's feel.
     this.lagRot.step(
       dt,
-      clamp(-av.pitch * 0.075, -0.24, 0.24) * lagScale,
-      clamp(av.yaw * 0.085, -0.3, 0.3) * lagScale,
+      clamp(-av.pitch * 0.022, -0.07, 0.07) * lagScale,
+      clamp(av.yaw * 0.025, -0.09, 0.09) * lagScale,
       clamp(-av.yaw * 0.055, -0.2, 0.2) * lagScale
     );
     px += this.lag.x;
