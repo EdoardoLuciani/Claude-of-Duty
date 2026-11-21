@@ -564,10 +564,10 @@ def build(output, render=False, quick=False):
                      'magazine':(.069,0,-.065)}.items():
         empty('SOCKET_'+name,loc,rig)
 
-    # Seat the fixed rail on the upper-right handguard chamfer, ahead of the support hand.
+    # Seat the fixed rail on the chamfer, set back from the front lip.
     (top_y, top_z, _), (side_y, side_z, _) = section[0], section[-1]
     roll = Matrix.Rotation(-math.atan2(top_y-side_y,top_z-side_z), 3, 'X')
-    seat = Vector((.285,(top_y+side_y)/2,(top_z+side_z)/2))
+    seat = Vector((.270,(top_y+side_y)/2,(top_z+side_z)/2))
     rail = empty('MOUNT_rail', seat + roll @ Vector((0,-.014,0)), body)
     rail.rotation_euler = (roll @ Matrix(((0,1,0),(0,0,1),(1,0,0)))).to_euler()
     web = box('Laser rail adapter web',seat + roll @ Vector((-.005,-.005,0)),(.035,.011,.014),alloy)

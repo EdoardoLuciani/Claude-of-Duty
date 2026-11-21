@@ -50,8 +50,9 @@ ACOG clear the deployed irons; the PM II needs them folded. The can swaps
 `MUZZLE_device` (thread protector) for `MUZZLE_device_removed` (an adapter sleeve
 bridging the crown to the shared rear mount); see the
 [shared calibre decision](../suppressor/README.md). The short Picatinny rail
-on the upper-right handguard chamfer stays visible with or without the laser.
-The TOR Mini shares the rail's cant and still points along the bore.
+sits back from the front lip on the upper-right handguard chamfer and stays
+visible with or without the laser. The TOR Mini shares the rail's cant and
+still points along the bore.
 
 `check.py` verifies catalog seating, iron clashes, both iron states, concurrent
 slots, fixed surfaces, every clip's mechanisms and deformed hands at 120 Hz, plus

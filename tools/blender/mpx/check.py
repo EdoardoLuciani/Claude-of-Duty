@@ -79,7 +79,8 @@ post = bpy.data.objects['Front iron post'].evaluated_get(deps)
 assert abs(max((post.matrix_world@Vector(p)).z for p in post.bound_box)-point('sight').z) < EPS
 assert point('ejection').y < -.02
 # Through-side slots must not be black painted rectangles.
-hg = tree('Hollow five-slot M-LOK handguard')
+hg_obj = bpy.data.objects['Hollow five-slot M-LOK handguard']
+hg = tree(hg_obj.name)
 for x in (.119,.148,.190,.232,.274):
     assert hg.ray_cast(Vector((x,-.06,-.001)),Vector((0,1,0)),.12)[0] is None, (x,'closed M-LOK slot')
 # Solid lands between slots still exist; test at a web with two distinct walls.
@@ -88,7 +89,7 @@ assert hg.ray_cast(Vector((.129,-.06,-.001)),Vector((0,1,0)),.12)[0] is not None
 backing = tree('Laser rail adapter web')
 rail_frame = bpy.data.objects['MOUNT_rail'].matrix_world
 inward = rail_frame.to_3x3() @ Vector((0,0,1))
-for x in (.268,.295):
+for x in (.252,.276):
     for across in (-.004,.004):
         p = rail_frame @ Vector((across,x-rail_frame.translation.x,0))
         guard_hit = hg.ray_cast(p,inward,.03)[0]
@@ -96,6 +97,10 @@ for x in (.268,.295):
         assert guard_hit is not None and plate_hit is not None, ('unsupported laser adapter',x,across)
         assert -.0001 <= (plate_hit-guard_hit).dot(inward) < .001, ('laser backing not seated',x,across)
 assert backing.overlap(tree('Laser rail adapter groove bed')), 'rail not seated on its backing'
+front = max((hg_obj.matrix_world @ Vector(p)).x for p in hg_obj.bound_box)
+for obj in scene.objects:
+    if obj.type == 'MESH' and obj.name.startswith('Laser rail adapter'):
+        assert max((obj.matrix_world @ Vector(p)).x for p in obj.bound_box) < front, (obj.name,'rail overhangs handguard')
 # Regression: the previous full-ellipse upper left a visible flank seam gap.
 upper = tree('MPX continuous rounded upper')
 lower = tree('Lower receiver shoulder')
@@ -195,8 +200,12 @@ loaded = []
 for id,slot in [('rmr','optic'),('acog','optic'),('scope','optic'),('exps3','optic'),('srd762ti','muzzle'),('laser','rail')]:
     objects,base = attachment_source.load(id)
     mesh = [o for o in objects if o.type == 'MESH']
-    transform = rig.matrix_world.inverted() @ bpy.data.objects['MOUNT_'+slot].matrix_world @ base.matrix_world.inverted()
-    mounted[id] = surface(mesh,transform)
+    seating = bpy.data.objects['MOUNT_'+slot].matrix_world @ base.matrix_world.inverted()
+    mounted[id] = surface(mesh,rig.matrix_world.inverted() @ seating)
+    if slot == 'rail':
+        for obj in mesh:
+            world = seating @ obj.matrix_world
+            assert max((world @ Vector(p)).x for p in obj.bound_box) < front, (obj.name,'laser overhangs handguard')
     if slot == 'optic':
         irons = surface([o for o in bpy.data.objects['IRON_sights'].children if o.type=='MESH'],rig.matrix_world.inverted())
         clash = bool(mounted[id].overlap(irons))
