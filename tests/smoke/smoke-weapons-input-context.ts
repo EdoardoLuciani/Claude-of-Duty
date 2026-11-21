@@ -317,6 +317,35 @@ for (const [primary, first, second] of [
   assert(wp.state.chambered && wp.state.mag === wp.current.magSize - 1);
 }
 
+// A market swap selects the new gun without drawing it over a cooking grenade.
+{
+  const { wp, tap, frame } = makeHarness();
+  const vm = (wp.viewmodel = new Viewmodel(wp.ctx, wp.mats));
+  for (const id of ['rifle', 'smg'] as const)
+    vm.weapons.set(
+      id,
+      fixture<WeaponEntry>({
+        id,
+        group: new THREE.Group(),
+        parts: {},
+        rhandPose: 'wrap',
+        lhandPose: 'wrap',
+        animation: fixture<WeaponEntry['animation']>({ reset(): void {} }),
+      })
+    );
+  vm.setActive('rifle');
+  tap('KeyG');
+  frame({ down: ['Mouse0'] });
+  assert(wp.applyBuild('smg', BASE_ATTACHMENTS));
+  assert.equal(vm.active?.id, 'smg');
+  assert(wp.cooking && vm.grenade.visible && !vm.active.group.visible, 'cook keeps the gun hidden');
+  frame({ dt: GRENADE_FUSE });
+  assert(
+    !wp.cooking && !vm.grenade.visible && vm.active.group.visible,
+    'new gun returns after the cook'
+  );
+}
+
 // A tube reload restarts the same authored Clip from its end callback.
 {
   const { wp } = makeHarness();
