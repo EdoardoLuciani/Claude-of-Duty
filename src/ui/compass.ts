@@ -58,12 +58,15 @@ export class ScoreBar {
   status = '6 HOSTILES';
   update(s: ScoreState): void {
     this.score = String(Math.max(0, Math.round(s.score ?? 0))).padStart(6, '0');
-    this.wave = String(Math.max(0, Math.round(s.wave ?? 0)));
+    const wave = Math.max(0, Math.round(s.wave ?? 0));
+    const opening = wave === 0 && s.waveIncoming;
+    this.wave = opening ? '1' : String(wave);
     this.credits = String(Math.max(0, Math.round(s.credits ?? 0))).padStart(6, '0');
     if ((s.marketIn ?? 0) > 0) this.status = `SUPPLIES IN ${s.marketIn}s`;
-    else if (s.waveIncoming)
-      this.status = `NEXT WAVE ${Math.max(0, Math.ceil(s.nextWaveIn ?? 0))}s`;
-    else {
+    else if (s.waveIncoming) {
+      const label = opening ? 'WAVE 1 IN' : 'NEXT WAVE';
+      this.status = `${label} ${Math.max(0, Math.ceil(s.nextWaveIn ?? 0))}s`;
+    } else {
       const n = Math.max(0, Math.round(s.enemiesRemaining ?? 0));
       this.status = `${n} ${n === 1 ? 'HOSTILE' : 'HOSTILES'}`;
     }

@@ -74,6 +74,7 @@ If the HUD fails to initialize, a Reload error dialog appears.
 [HUD ownership, boundaries and checks](docs/hud.md).
 
 After loading, select **Start** to capture the mouse, enter fullscreen and begin.
+Use the time before the first wave to explore; the HUD shows when enemies will arrive.
 Pending or denied mouse capture keeps the run frozen; select **Retry Start** to retry
 (there is no unlocked-play fallback). Fullscreen is optional; where keyboard lock is
 supported, shortcuts such as Ctrl+W (crouch + forward) stay in the game and a held

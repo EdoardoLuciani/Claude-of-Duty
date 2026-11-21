@@ -1,5 +1,5 @@
 /** Soldiers, navigation, perception, squads and wave progression.
- * Build navigation and the garrison during init; frame queries use bounded budgets.
+ * Build navigation during init; frame queries use bounded budgets.
  * Prewarm borrows real materials/geometry without actors, simulation, IDs or RNG consumption.
  * API/event and worker ownership contracts live in ARCHITECTURE.md.
  */
@@ -28,7 +28,7 @@ import { RIG } from './rig.ts';
 import { prepareSoldierSurfaces, resolveVariantName, VARIANTS } from './soldier.ts';
 import { Squad } from './squad.ts';
 import { SoldierMaterialsNode } from './textures-tsl.ts';
-import { COMBAT, GRENADE } from './tuning.ts';
+import { COMBAT, GRENADE, OPENING_WAVE_DELAY } from './tuning.ts';
 import { isVector3Like } from './validation.ts';
 
 export type AiVariant = Pick<SoldierRecord, 'geometry' | 'weapon' | 'stats' | 'variant'> & {
@@ -144,10 +144,7 @@ export class AiSystem {
   grid: SurfaceNav | null = null;
   cover: CoverMap | null = null;
   inspect: boolean = false;
-  /** dev: force the garrison to spawn even in deterministic capture runs */
-  forcePopulate: boolean = false;
-  /** Wave director: the boot garrison is wave 1; every time the field goes
-   *  quiet the next wave arrives after a short beat. Unlimited by design. */
+
   _wave: number = 0;
   _waveTotal: number = 0;
   _waveRemaining: number = 0;
@@ -295,7 +292,7 @@ export class AiSystem {
     // handed to the player. Missing or incompatible cooked data fails boot;
     // there is deliberately no first-frame bake or legacy-grid fallback.
     await this._buildNav();
-    if (!ctx.config.deterministic || this.forcePopulate) this.startWave(1);
+    if (!ctx.config.deterministic) this._queueOpeningWave();
     await this.prewarmMaterials();
   }
 
@@ -948,7 +945,7 @@ export class AiSystem {
     return s;
   }
 
-  /** Remove the previous run and immediately stage a fresh wave. */
+  /** Remove the previous run and rearm the opening countdown. */
   resetForNewGame(): void {
     this.grid?.worker?.clear();
     for (const a of this.agents) a.dispose();
@@ -966,7 +963,13 @@ export class AiSystem {
     this.stats.agents = 0;
     this.stats.alive = 0;
     this.cover?.releaseAll();
-    if (!this.ctx.config.deterministic && this.grid) this.startWave(1);
+    if (!this.ctx.config.deterministic && this.grid) this._queueOpeningWave();
+  }
+
+  private _queueOpeningWave(): void {
+    this._wavePending = true;
+    // Scaled time is frozen until Start hands over control, and during pause.
+    this._nextWaveAt = this.ctx.time.elapsed + OPENING_WAVE_DELAY;
   }
 
   /** 0 at night, 1 in full daylight. Drives both flash gains below. */
@@ -1222,9 +1225,8 @@ export class AiSystem {
   }
 
   /**
-   * Wave director. `startWave(1)` opens the run; the moment no real
-   * (non-staged) enemy is alive, `_wavePending` arms a respawn beat and
-   * the next wave spawns at the far spawn points. Waves grow slowly and cap at
+   * Wave director. The opening countdown uses the same pending state as later
+   * waves, without reporting a wave clear. Waves grow slowly and cap at
    * 3 squads x 4 (12 concurrent enemies) to stay inside the frame budget.
    */
   _updateWaves(ctx: EngineContext): void {

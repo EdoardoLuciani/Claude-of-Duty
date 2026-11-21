@@ -62,6 +62,9 @@ export const COMBAT = {
   suppressMax: 1.6,
 } as const;
 
+/** Seconds of active play before the first wave spawns. */
+export const OPENING_WAVE_DELAY = 15;
+
 /** Enemy grenade launch/clearance, metres and seconds. */
 export const GRENADE = Object.freeze({
   maxSpeed: 24,

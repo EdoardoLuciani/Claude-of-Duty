@@ -84,6 +84,8 @@ correlated name/payload tuple. Semantics the types don't capture:
   the remainder first. `armourAbsorbed` records absorption; `plateBreak` records a
   consumed plate. Healing applies only on `complete`, never on cancellation. One
   player-owned heartbeat clock drives low-health audio/HUD.
+- Each new run starts with a scaled-time countdown to wave 1. Waiting at Start
+  and pausing freeze it. The opening countdown does not emit `wave:complete`.
 - A wave clear starts an ammo-looting grace period, then one player-dismissed shop
   session that freezes scaled time and the AI wave countdown.
 - `ai:footstep` is one boot per animated stride plant; cull by distance.
