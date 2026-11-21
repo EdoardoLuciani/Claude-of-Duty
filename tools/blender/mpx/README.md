@@ -49,8 +49,10 @@ preserves canonical shared-attachment locals at all three mount boundaries. RMR 
 ACOG clear the deployed irons; the PM II needs them folded. The can swaps
 `MUZZLE_device` (thread protector) for `MUZZLE_device_removed` (an adapter sleeve
 bridging the crown to the shared rear mount); see the
-[shared calibre decision](../suppressor/README.md). The right-side `RAIL_adapter`
-is anchored through the last M-LOK slot and appears only with the laser fitted.
+[shared calibre decision](../suppressor/README.md). The short Picatinny rail
+sits back from the front lip on the upper-right handguard chamfer and stays
+visible with or without the laser. The TOR Mini shares the rail's cant and
+still points along the bore.
 
 `check.py` verifies catalog seating, iron clashes, both iron states, concurrent
 slots, fixed surfaces, every clip's mechanisms and deformed hands at 120 Hz, plus
@@ -68,7 +70,7 @@ The receiver, handguard, telescoping stock, grip and magazine are registered to
 one scale from the [2019 SIG SAUER defense catalog][catalog], printed page 23
 (PDF page 25), labeled **SIG MPX 8″ SBR**. Compare the right side orthographically.
 The photo shows an optional optic, folded irons and a compensator; the game's
-unfitted build shows deployed irons, a thread protector and bare M-LOK slots.
+base build shows deployed irons, a thread protector and a canted side rail.
 Those differences are intentional. First-person iron ADS uses a separate
 camera setback and does not rescale the model.
 

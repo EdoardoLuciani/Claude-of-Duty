@@ -564,17 +564,16 @@ def build(output, render=False, quick=False):
                      'magazine':(.069,0,-.065)}.items():
         empty('SOCKET_'+name,loc,rig)
 
-    # Keep the right-side laser hardware forward of the support hand, but
-    # separate it from the base receiver so the bare M-LOK guard stays bare.
-    rail = empty('MOUNT_rail', (.295, -.037, 0), body)
-    rail.rotation_euler = Matrix(((0,1,0),(0,0,1),(1,0,0))).to_euler()
-    rail_adapter = empty('RAIL_adapter', parent=body)
+    # Seat the fixed rail on the chamfer, set back from the front lip.
+    (top_y, top_z, _), (side_y, side_z, _) = section[0], section[-1]
+    roll = Matrix.Rotation(-math.atan2(top_y-side_y,top_z-side_z), 3, 'X')
+    seat = Vector((.270,(top_y+side_y)/2,(top_z+side_z)/2))
+    rail = empty('MOUNT_rail', seat + roll @ Vector((0,-.014,0)), body)
+    rail.rotation_euler = (roll @ Matrix(((0,1,0),(0,0,1),(1,0,0)))).to_euler()
+    web = box('Laser rail adapter web',seat + roll @ Vector((-.005,-.005,0)),(.035,.011,.014),alloy)
+    web.rotation_euler = roll.to_euler()
     bpy.context.view_layer.update()
-    box('Laser rail adapter web',(.30075,-.0289,0),(.0435,.0098,.014),alloy,rail_adapter)
-    picatinny.build_rail('Laser rail adapter',rail.matrix_world@Matrix.Rotation(math.pi,4,'Y'),-.0126,.0226,steel,rail_adapter,asset)
-    # Both anchors stay inside the last real M-LOK slot, not past the guard end.
-    for x in (.282,.289):
-        cyl('Laser rail adapter screw',(x,-.0348,0),.002,.004,steel,'Y',rail_adapter)
+    picatinny.build_rail('Laser rail adapter',rail.matrix_world@Matrix.Rotation(math.pi,4,'Y'),-.0126,.0226,steel,body,asset)
 
     # Stage 3: surface-fitted markings and original component atlas UVs.
     # Project original text mesh vertices onto their declared physical surface, not
@@ -677,7 +676,6 @@ def build(output, render=False, quick=False):
         # Preserve the approved fixed geometry/photo views without review-only arms.
         hands_collection=bpy.data.collections['MPX | authored hands (shared appearance)']
         hands_collection.hide_render=True
-        for o in rail_adapter.children: o.hide_render=True
         for name,cam in cams.items():
             scene.camera=cam; scene.render.filepath=str(REVIEW/(name+'.png'))
             bpy.ops.render.render(write_still=True)
@@ -780,7 +778,7 @@ def build(output, render=False, quick=False):
     stats={'triangleInstances':triangles,'primitives':sum(len(m['primitives']) for m in j['meshes']),
            'materials':len(j.get('materials',[])),'images':len(j.get('images',[])),'bytes':len(raw)}
     assert triangles<80000,stats
-    assert stats['primitives']==17 and stats['materials']==1 and stats['images']==3 and len(raw)<=10*1024*1024,stats
+    assert stats['primitives']==16 and stats['materials']==1 and stats['images']==3 and len(raw)<=10*1024*1024,stats
     # Stage 7: separate manifest metadata (the GLB remains read-only).
     manifest={'status':'Base conversion candidate — human visual/animation/gameplay review pending',
         'asset':'SIG MPX 8 inch / open 9mm crown and thread protector / 30-round magazine / removable deployed irons',
