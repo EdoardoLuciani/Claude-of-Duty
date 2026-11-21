@@ -11,6 +11,7 @@ import { isSkinnedMesh } from './three-guards.ts';
 export type { SoldierRecord, WorldPrefetch } from './model-metadata.ts';
 
 const BASE = 'models';
+type DownloadProgress = (loaded: number, total: number) => void;
 
 /** Observe a prefetch so a rejection is not unhandled before the consumer awaits it. */
 function watch<T>(promise: Promise<T>): Promise<T> {
@@ -27,6 +28,8 @@ export class ModelSystem {
 
   static readonly id = 'models';
   static readonly deps: SystemId[] = [];
+
+  constructor(private readonly worldProgress?: DownloadProgress) {}
 
   async init(ctx: EngineContext): Promise<void> {
     this.ctx = ctx;
@@ -45,34 +48,64 @@ export class ModelSystem {
     }
     const metadata: unknown = await manifestResponse.json();
     const assets = parseWorldAssets(metadata);
+    const report = this.worldProgress;
+    const downloads = Array.from({ length: 3 }, (): { loaded: number; total: number } => ({
+      loaded: 0,
+      total: 0,
+    }));
+    const track = (index: number): DownloadProgress | undefined =>
+      report &&
+      ((loaded, total): void => {
+        downloads[index].loaded = loaded;
+        downloads[index].total = total;
+        if (!downloads.every((file): boolean => file.total > 0)) return;
+        report(
+          downloads.reduce((sum, file): number => sum + file.loaded, 0),
+          downloads.reduce((sum, file): number => sum + file.total, 0)
+        );
+      });
     const [visual, collision, nav] = await Promise.all([
-      this._loadWorldGLB(`${base}/${assets.visual}`),
-      this._loadWorldGLB(`${base}/${assets.collision}`),
-      this._loadWorldBytes(`${base}/${assets.nav}`),
+      this._loadWorldGLB(`${base}/${assets.visual}`, track(0)),
+      this._loadWorldGLB(`${base}/${assets.collision}`, track(1)),
+      this._loadWorldBytes(`${base}/${assets.nav}`, track(2)),
     ]);
     const meta = parseWorldManifest(metadata);
     this.worldNav = nav;
     return { meta, visual, collision };
   }
 
-  async _loadWorldBytes(url: string): Promise<ArrayBuffer> {
+  async _loadWorldBytes(url: string, report?: DownloadProgress): Promise<ArrayBuffer> {
     const response = await fetch(url);
     if (!response.ok || !response.body) {
       throw new Error(`[models] failed to load ${url}: HTTP ${response.status}`);
     }
-    const alreadyDecoded = response.headers.get('content-encoding')?.includes('gzip');
+    const encoding = response.headers.get('content-encoding');
+    const alreadyDecoded = encoding?.includes('gzip');
     if (!alreadyDecoded && typeof DecompressionStream === 'undefined') {
       throw new Error('[models] this browser cannot decompress world assets');
     }
-    return alreadyDecoded
-      ? await response.arrayBuffer()
-      : await new Response(
-          response.body.pipeThrough(new DecompressionStream('gzip'))
-        ).arrayBuffer();
+    let body = response.body;
+    const total = Number(response.headers.get('content-length'));
+    // With HTTP encoding, fetch hands us decoded bytes but Content-Length is encoded.
+    if (report && (!encoding || encoding === 'identity') && total > 0) {
+      let loaded = 0;
+      report(0, total);
+      body = body.pipeThrough(
+        new TransformStream<Uint8Array<ArrayBuffer>, Uint8Array<ArrayBuffer>>({
+          transform(chunk, controller): void {
+            loaded += chunk.byteLength;
+            report(loaded, total);
+            controller.enqueue(chunk);
+          },
+        })
+      );
+    }
+    if (!alreadyDecoded) body = body.pipeThrough(new DecompressionStream('gzip'));
+    return await new Response(body).arrayBuffer();
   }
 
-  async _loadWorldGLB(url: string): Promise<GLTF> {
-    const buffer = await this._loadWorldBytes(url);
+  async _loadWorldGLB(url: string, report?: DownloadProgress): Promise<GLTF> {
+    const buffer = await this._loadWorldBytes(url, report);
     return this.loader.parseAsync(buffer, url.slice(0, url.lastIndexOf('/') + 1));
   }
 

@@ -2,6 +2,7 @@ declare global {
   interface Window {
     __STARTUP__: {
       stage(text: 'Loading world and assets…' | 'Preparing graphics…'): void;
+      worldProgress(this: void, loaded: number, total: number): void;
       complete(): void;
       terminal(): void;
       fail(error: unknown): void;

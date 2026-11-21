@@ -15,6 +15,9 @@
       .startup-title { font-size: clamp(1.4rem, 6vw, 3.2rem); font-weight: 600; letter-spacing: .22em; padding-left: .22em; }
       .startup-subtitle { margin-top: .6rem; color: #8c9ca3; font-size: .7rem; letter-spacing: .32em; }
       #startup-status { margin-top: 3rem; font-size: .95rem; line-height: 1.6; }
+      #startup-download { margin-top: 1rem; color: #b6c3c9; font-size: .8rem; }
+      #startup-download progress { display: block; width: 15rem; max-width: 100%; height: .55rem; margin: .45rem auto 0; accent-color: #65b9ab; }
+      #startup-download:not([hidden]) + .startup-dots { display: none; }
       .startup-dots { display: flex; justify-content: center; gap: .6rem; margin-top: 1rem; color: #65b9ab; }
       .startup-dots span { animation: startup-pulse 1.8s ease-in-out infinite; }
       .startup-dots span:nth-child(2) { animation-delay: .2s; }
@@ -36,6 +39,10 @@
         <h1 id="startup-title" class="startup-title">Claude of Duty</h1>
         <p class="startup-subtitle">TACTICAL SHOOTER</p>
         <p id="startup-status" role="status" aria-live="polite" aria-atomic="true">Initializing…</p>
+        <div id="startup-download" hidden>
+          <label for="startup-progress">World download</label>
+          <progress id="startup-progress" max="100" value="0"></progress>
+        </div>
         <div class="startup-dots" aria-hidden="true"
           ><span>•</span><span>•</span><span>•</span></div
         >
@@ -48,6 +55,8 @@
       (() => {
         const panel = document.getElementById('startup');
         const status = document.getElementById('startup-status');
+        const download = document.getElementById('startup-download');
+        const progress = document.getElementById('startup-progress');
         const detail = document.getElementById('startup-detail');
         const reload = document.getElementById('startup-reload');
         const game = document.getElementById('game');
@@ -73,6 +82,7 @@
           if (!active || failed) return;
           if (document.getElementById('engine-failure')) { dismiss(); return; }
           failed = true;
+          download.hidden = true;
           panel.setAttribute('data-failed', '');
           status.textContent = 'Startup failed';
           detail.textContent = error instanceof Error ? error.message : String(error);
@@ -89,7 +99,17 @@
         panel.addEventListener('keyup', event => event.stopPropagation());
         reload.onclick = () => location.reload();
         window.__STARTUP__ = {
-          stage: text => { if (active && !failed) status.textContent = text; },
+          stage: text => {
+            if (!active || failed) return;
+            download.hidden = true;
+            status.textContent = text;
+          },
+          worldProgress: (loaded, total) => {
+            if (!active || failed) return;
+            const percent = Math.floor(100 * loaded / total);
+            if (progress.value !== percent) progress.value = percent;
+            download.hidden = loaded >= total;
+          },
           complete: () => { if (!failed) dismiss(); },
           terminal: dismiss,
           fail,

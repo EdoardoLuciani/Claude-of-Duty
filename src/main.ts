@@ -58,7 +58,7 @@ engine.onFirstRender = (): void => {
 
 // Registration order is irrelevant — Registry topo-sorts on static deps.
 engine
-  .add(ModelSystem)
+  .add(ModelSystem, window.__STARTUP__.worldProgress)
   .add(RenderSystem)
   .add(MaterialSystem)
   .add(SkySystem)
