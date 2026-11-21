@@ -271,13 +271,14 @@ export class WeaponSystem {
     crosshair: false,
   };
 
-  constructor() {
+  constructor(private readonly onEquipmentLoad?: () => void) {
     for (let i = 0; i < 8; i++) {
       this._shellQueue.push({ t: -1, weapon: null });
     }
   }
 
   async init(ctx: EngineContext): Promise<void> {
+    this.onEquipmentLoad?.();
     this.ctx = ctx;
     this.rng = ctx.rng.fork();
     this._sim = new ProjectileSim(ctx);
