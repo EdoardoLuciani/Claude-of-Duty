@@ -86,8 +86,9 @@ correlated name/payload tuple. Semantics the types don't capture:
   player-owned heartbeat clock drives low-health audio/HUD.
 - Each new run starts with a scaled-time countdown to wave 1. Waiting at Start
   and pausing freeze it. The opening countdown does not emit `wave:complete`.
-- A wave clear starts an ammo-looting grace period, then one player-dismissed shop
-  session that freezes scaled time and the AI wave countdown.
+- A wave clear starts an ammo-looting grace period. The shop opens halfway through
+  the wave countdown and freezes scaled time until dismissed; the remaining countdown
+  gives players time to prepare for the next wave.
 - `ai:footstep` is one boot per animated stride plant; cull by distance.
   `ai:bark` requests contact on visual acquisition, reload on reload start, or a
   grenade announcement after a successful launch. `voice` is the actor's immutable

@@ -163,10 +163,9 @@ export class AiSystem {
     incoming: false,
     nextIn: 0,
   };
-  /** Seconds of silence before the next wave lands. Longer than the market
-   *  grace period (10 s, see MARKET_DELAY in market/index.ts): the shop
-   *  opens mid-countdown and freezing time on open holds what remains. */
-  waveDelay: number = 20;
+  /** Total gameplay seconds between waves. The countdown pauses at the shop,
+   *  halfway through (see MARKET_DELAY in market/index.ts). */
+  waveDelay: number = 30;
   _hudList: AiActor[] = [];
   _lastHeardPing: number = -Infinity;
   /** Seconds a corpse stays before it despawns (shrinks and is removed). */

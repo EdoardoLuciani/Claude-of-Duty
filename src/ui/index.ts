@@ -220,8 +220,7 @@ export class UiSystem {
 
     on('wave:complete', (e): void => {
       const points = Math.max(1, e.wave) * 250;
-      // The shop opens after a 10 s grace period (see MARKET_DELAY), so the
-      // banner has the moment to itself before the countdown takes over.
+      // The banner has a moment to itself before the shop countdown takes over.
       this.banner.show(`Wave ${e.wave} Cleared`, `+${points} · WAVE BONUS`, 2.4);
       this.sfx('objective', 0.7);
     });
