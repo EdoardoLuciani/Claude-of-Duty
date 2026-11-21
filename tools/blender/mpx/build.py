@@ -564,15 +564,16 @@ def build(output, render=False, quick=False):
                      'magazine':(.069,0,-.065)}.items():
         empty('SOCKET_'+name,loc,rig)
 
-    # The fixed right-side rail stays forward of the support hand.
-    rail = empty('MOUNT_rail', (.295, -.037, 0), body)
-    rail.rotation_euler = Matrix(((0,1,0),(0,0,1),(1,0,0))).to_euler()
+    # Seat the fixed rail on the upper-right handguard chamfer, ahead of the support hand.
+    (top_y, top_z, _), (side_y, side_z, _) = section[0], section[-1]
+    roll = Matrix.Rotation(-math.atan2(top_y-side_y,top_z-side_z), 3, 'X')
+    seat = Vector((.285,(top_y+side_y)/2,(top_z+side_z)/2))
+    rail = empty('MOUNT_rail', seat + roll @ Vector((0,-.014,0)), body)
+    rail.rotation_euler = (roll @ Matrix(((0,1,0),(0,0,1),(1,0,0)))).to_euler()
+    web = box('Laser rail adapter web',seat + roll @ Vector((-.005,-.005,0)),(.035,.011,.014),alloy)
+    web.rotation_euler = roll.to_euler()
     bpy.context.view_layer.update()
-    box('Laser rail adapter web',(.30075,-.0289,0),(.0435,.0098,.014),alloy)
     picatinny.build_rail('Laser rail adapter',rail.matrix_world@Matrix.Rotation(math.pi,4,'Y'),-.0126,.0226,steel,body,asset)
-    # Both anchors stay inside the last real M-LOK slot, not past the guard end.
-    for x in (.282,.289):
-        cyl('Laser rail adapter screw',(x,-.0348,0),.002,.004,steel,'Y')
 
     # Stage 3: surface-fitted markings and original component atlas UVs.
     # Project original text mesh vertices onto their declared physical surface, not

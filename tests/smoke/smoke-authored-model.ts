@@ -377,11 +377,12 @@ assert.throws(
   }
   const nativeMount = new THREE.Object3D();
   nativeMount.name = 'MOUNT_rail';
-  nativeMount.position.set(0.295, 0, 0.037);
+  nativeMount.position.set(0.28, 0.04, 0.03);
+  const diagonal = Math.SQRT1_2;
   nativeMount.quaternion.setFromRotationMatrix(
     new THREE.Matrix4().makeBasis(
-      new THREE.Vector3(0, 1, 0),
-      new THREE.Vector3(0, 0, -1),
+      new THREE.Vector3(0, diagonal, -diagonal),
+      new THREE.Vector3(0, -diagonal, -diagonal),
       new THREE.Vector3(-1, 0, 0)
     )
   );
@@ -416,6 +417,8 @@ assert.throws(
     })
   );
   const mounted = mountAttachments(mpx, laserConfig, { laser });
+  const outward = 0.0105 * diagonal;
+  const expectedEmitter = new THREE.Vector3(0.03 + outward, 0.04 + outward, -0.30518);
   for (const yaw of [0, 0.3]) {
     nativeRoot.rotation.y = yaw;
     nativeScene.updateMatrixWorld(true);
@@ -430,9 +433,8 @@ assert.throws(
     assert(
       mounted
         .laserEmitter!.getWorldPosition(new THREE.Vector3())
-        .distanceTo(new THREE.Vector3(0.0475, 0, -0.32018).applyQuaternion(nativeRoot.quaternion)) <
-        1e-8,
-      'MPX attachment keeps its authored side seat'
+        .distanceTo(expectedEmitter.clone().applyQuaternion(nativeRoot.quaternion)) < 1e-8,
+      'MPX attachment keeps its canted seat'
     );
   }
   for (const name of ['MOUNT_optic', 'MOUNT_muzzle']) {
