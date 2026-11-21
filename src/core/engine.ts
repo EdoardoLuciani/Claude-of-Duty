@@ -107,12 +107,13 @@ export class Engine {
   async init(): Promise<this> {
     const order = this.registry.resolve();
     for (const sys of order) {
+      const { id } = describeSystem(sys);
       const t0 = performance.now();
-      this.onSystemInit?.(describeSystem(sys).id);
+      this.onSystemInit?.(id);
       await sys.init?.(this.ctx);
       if (this.error) throw new Error(this.error.message);
       const ms = performance.now() - t0;
-      if (ms > 50) console.info(`[engine] ${describeSystem(sys).id} init ${ms.toFixed(0)}ms`);
+      if (ms > 50) console.info(`[engine] ${id} init ${ms.toFixed(0)}ms`);
     }
     this.input.attach();
     addEventListener('resize', this._onResize);
