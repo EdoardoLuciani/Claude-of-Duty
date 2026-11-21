@@ -709,11 +709,12 @@ def build(output, render=False, quick=False):
     for source,clone in copy_by_source.items():
         if source.parent:
             world=clone.matrix_world.copy(); clone.parent=copy_by_source[source.parent]; clone.matrix_world=world
-    for source,clone in copy_by_source.items():
-        if clone.type != 'MESH': continue
-        active(clone)
-        for mod in list(clone.modifiers):
-            bpy.ops.object.modifier_apply(modifier=mod.name)
+    # Evaluate the selected export copies together instead of updating the scene per modifier.
+    meshes = [clone for clone in copy_by_source.values() if clone.type == 'MESH']
+    active(meshes[0])
+    for clone in meshes:
+        clone.select_set(True)
+    bpy.ops.object.convert(target='MESH')
     consolidate_finishes(list(export.objects), OUT, orm_map, normal_map)
     # Join mesh copies under the same rigid parent (not all components indiscriminately).
     parents={o.parent for o in export.objects if o.type=='MESH'}
