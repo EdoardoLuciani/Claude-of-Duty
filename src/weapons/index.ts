@@ -251,6 +251,7 @@ export class WeaponSystem {
     empty: false,
     magazineLoaded: true,
     remainingRounds: 0,
+    steadiness: 1,
   };
   // Preallocated HUD snapshot handed to `ui` (see getHudState).
   _hudState: WeaponHudState = {
@@ -1561,7 +1562,7 @@ export class WeaponSystem {
     if (this._burstCooldown > 0) this._burstCooldown -= dt;
 
     // ---- spread recovery -------------------------------------------------
-    const rest = this._restSpread(def, player, st);
+    const rest = this._restSpread(def, st);
     this._spread = Math.max(rest, this._spread - def.spreadDecay * dt * (1 + this.adsProgress));
     if (this._sinceShot > 0.6) this._shotIndex = 0;
 
@@ -1593,6 +1594,7 @@ export class WeaponSystem {
     st.crouch = player?.stance === 'crouch';
     st.airborne = player?.airborne === true;
     st.lowReady = player?.state === 'mantle' || player?.mantling === true;
+    st.steadiness = this._steadiness(player, st);
     this._syncAmmoState(s);
 
     // ---- input -----------------------------------------------------------
@@ -1687,19 +1689,20 @@ export class WeaponSystem {
     }
   }
 
-  _restSpread(
-    def: WeaponState['def'],
-    player: EngineSystems['player'] | null,
-    st: WeaponPoseState
-  ): number {
-    let base = lerp(def.spreadHip, def.spreadAds, this.adsProgress);
-    if (st.crouch) base *= SPREAD_MODS.crouch;
-    if (player?.stance === 'prone') base *= SPREAD_MODS.prone;
-    if (st.speed < 0.4) base *= SPREAD_MODS.still;
-    else if (st.speed > 3.2) base *= SPREAD_MODS.walking;
-    if (st.sprint) base *= SPREAD_MODS.sprinting;
-    if (st.airborne) base *= SPREAD_MODS.airborne;
-    return base;
+  /** Stance/movement factor on the cone and on the hip sway that hip shots follow. */
+  _steadiness(player: EngineSystems['player'] | null, st: WeaponPoseState): number {
+    let k = 1;
+    if (st.crouch) k *= SPREAD_MODS.crouch;
+    if (player?.stance === 'prone') k *= SPREAD_MODS.prone;
+    if (st.speed < 0.4) k *= SPREAD_MODS.still;
+    else if (st.speed > 3.2) k *= SPREAD_MODS.walking;
+    if (st.airborne) k *= SPREAD_MODS.airborne;
+    return k;
+  }
+
+  _restSpread(def: WeaponState['def'], st: WeaponPoseState): number {
+    const base = lerp(def.spreadHip, def.spreadAds, this.adsProgress) * st.steadiness;
+    return st.sprint ? base * SPREAD_MODS.sprinting : base;
   }
 
   lateUpdate(dt: number, ctx: EngineContext): void {
