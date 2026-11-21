@@ -32,6 +32,7 @@ for (const id of WEAPON_IDS) {
 let clipName: string | null = null;
 const vm = fixture<Viewmodel>({
   active: null,
+  adsT: 0,
   get clipName(): string | null {
     return clipName;
   },
@@ -45,6 +46,9 @@ const vm = fixture<Viewmodel>({
   syncToCamera(): void {},
   muzzleWorld(out): THREE.Vector3 {
     return out;
+  },
+  boreDir(out): THREE.Vector3 {
+    return out.set(0, 0, -1);
   },
   addRecoil(): void {},
 });
