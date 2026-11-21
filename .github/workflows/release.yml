@@ -23,7 +23,7 @@ jobs:
       cancel-in-progress: false
     steps:
       - name: Publish version tag and release
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const assert = require('node:assert/strict');
