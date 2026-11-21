@@ -14,7 +14,7 @@ import numpy as np
 from mathutils import Matrix, Vector
 
 ROOT=Path(__file__).resolve().parents[3]
-INPUT=ROOT/'assets/weapons/ax338'
+OUT_DEFAULT=ROOT/'.cache/blender/weapons/ax338'
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import picatinny
 from ax338.actions import author_actions
@@ -178,8 +178,8 @@ def build(output,render=False,quick=False):
     cut(guard,profile('CUT trigger guard',rounded_guard(-.0091,.0469,-.0091,.0218,.008),.070,None,None,bevel=.0003))
     # Trace the two longitudinal boundaries independently in the unchanged brochure
     # registration. Elliptical cross-sections alone do NOT make a curved grip.
-    rows=json.loads((INPUT/'grip-profile.json').read_text())['rows']
-    registration=json.loads((INPUT/'photo-review.json').read_text())[0]
+    rows=json.loads((Path(__file__).with_name('grip-profile.json')).read_text())['rows']
+    registration=json.loads((Path(__file__).with_name('photo-review.json')).read_text())[0]
     ppm=registration['pixels_per_metre'];cx=registration['image_size'][0]/2;cy=registration['image_size'][1]/2
     # Shape-preserving cubic Hermite interpolation: smooth the traced curves without
     # overshooting their neck/heel extrema or bowing the near-vertical lower front.
@@ -417,7 +417,7 @@ def build(output,render=False,quick=False):
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--output',type=Path,default=INPUT)
+    parser.add_argument('--output',type=Path,default=OUT_DEFAULT)
     parser.add_argument('--render',action='store_true')
     parser.add_argument('--quick',action='store_true',help='Only reduce preview resolution/samples')
     args=parser.parse_args(sys.argv[sys.argv.index('--')+1:] if '--' in sys.argv else [])

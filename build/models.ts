@@ -2,7 +2,7 @@
 /** Shared gltfpack cook for generated runtime models. */
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, statSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, statSync } from 'node:fs';
 import { availableParallelism, tmpdir } from 'node:os';
 import { basename, dirname, extname, join, resolve } from 'node:path';
 
@@ -37,33 +37,33 @@ const GEOMETRY_FLAGS = [
 export const GLTFPACK_FLAGS = [...GEOMETRY_FLAGS, '-tu', '-tq', '8'];
 // Opt assets in here after validating their adapters and visual/animation fidelity.
 // Simplification is model-specific, never a blanket default for all models.
-// `output` is repo-relative; runtime-mounted weapons/attachments are served from public/.
+// `directory` holds native Blender products; `output` is repo-relative under public/.
 const attachment = (
   directory: string,
   source: string,
   runtime: string,
   flags: string[] = []
 ): { directory: string; source: string; output: string; flags: string[] } => ({
-  directory: `assets/attachments/${directory}`,
+  directory: `.cache/blender/attachments/${directory}`,
   source,
   output: `public/models/attachments/${runtime}.runtime.glb`,
   flags,
 });
 export const MODEL_COOKS = {
   intel_case: {
-    directory: 'assets/props/intel-case',
+    directory: '.cache/blender/props/intel-case',
     source: 'intel-case.glb',
     output: 'public/models/props/intel-case.runtime.glb',
     flags: [],
   },
   ammo_pickup: {
-    directory: 'assets/props/ammo-pickup',
+    directory: '.cache/blender/props/ammo-pickup',
     source: 'ammo-pickup.glb',
     output: 'public/models/props/ammo-pickup.runtime.glb',
     flags: [],
   },
   field_radio: {
-    directory: 'assets/props/field-radio',
+    directory: '.cache/blender/props/field-radio',
     source: 'field-radio.glb',
     output: 'public/models/player/field-radio.runtime.glb',
     // Keep the LCD's UVs even though its image is only bound at runtime.
@@ -77,43 +77,43 @@ export const MODEL_COOKS = {
   scope: attachment('schmidt-bender-pm-ii', 'scope.glb', 'scope'),
   rmr: attachment('trijicon-rmr', 'rmr.glb', 'rmr'),
   m67: {
-    directory: 'assets/weapons/m67',
+    directory: '.cache/blender/weapons/m67',
     source: 'm67.glb',
     output: 'public/models/weapons/m67.runtime.glb',
     flags: [],
   },
   m590: {
-    directory: 'assets/weapons/m590',
+    directory: '.cache/blender/weapons/m590',
     source: 'm590.glb',
     output: 'public/models/weapons/m590.runtime.glb',
     flags: ['-si', '0.50', '-se', '0.0002', '-sp', '-vc', '16'],
   },
   m4: {
-    directory: 'assets/weapons/m4a1-block-ii',
+    directory: '.cache/blender/weapons/m4a1-block-ii',
     source: 'm4a1-block-ii.glb',
     output: 'public/models/weapons/m4a1-block-ii.runtime.glb',
     flags: ['-noq', '-vc', '16', '-kv'],
   },
   mcx: {
-    directory: 'assets/weapons/mcx-virtus',
+    directory: '.cache/blender/weapons/mcx-virtus',
     source: 'mcx-virtus.glb',
     output: 'public/models/weapons/mcx-virtus.runtime.glb',
     flags: ['-si', '0.65', '-se', '0.0002', '-sp', '-vc', '16'],
   },
   evolys: {
-    directory: 'assets/weapons/fn-evolys-762',
+    directory: '.cache/blender/weapons/fn-evolys-762',
     source: 'fn-evolys-762.glb',
     output: 'public/models/weapons/fn-evolys-762.runtime.glb',
     flags: [],
   },
   ax338: {
-    directory: 'assets/weapons/ax338',
+    directory: '.cache/blender/weapons/ax338',
     source: 'ax338.glb',
     output: 'public/models/weapons/ax338.runtime.glb',
     flags: ['-vc', '16', '-vp', '16'],
   },
   mpx: {
-    directory: 'assets/weapons/sig-mpx',
+    directory: '.cache/blender/weapons/sig-mpx',
     source: 'mpx.glb',
     output: 'public/models/weapons/mpx.runtime.glb',
     flags: ['-km', '-vc', '16', '-si', '0.7', '-se', '0.0002', '-sp'],
@@ -129,7 +129,7 @@ export const MODEL_COOKS = {
     '-sp',
   ]),
   p320: {
-    directory: 'assets/weapons/p320-compact',
+    directory: '.cache/blender/weapons/p320-compact',
     source: 'p320-compact.glb',
     output: 'public/models/weapons/p320-compact.runtime.glb',
     flags: ['-si', '0.50', '-se', '0.001', '-sp'],
@@ -201,5 +201,9 @@ if (import.meta.main) {
       join(dir, model.source),
       directory ? join(dir, basename(model.output)) : join(ROOT, model.output)
     );
+    // Weapon code imports the native manifest; publish canonical builds beside calibration.
+    const authored = join(ROOT, 'src/weapons/authored', basename(model.directory));
+    if (!directory && existsSync(authored))
+      copyFileSync(join(dir, 'manifest.json'), join(authored, 'manifest.json'));
   }
 }

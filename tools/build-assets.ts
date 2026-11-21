@@ -27,7 +27,7 @@ import {
   writeSync,
 } from 'node:fs';
 import { availableParallelism } from 'node:os';
-import { dirname, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { REVISION } from 'three';
@@ -76,25 +76,24 @@ const blender = (script: string): [string, ...string[]] => [
   script,
 ];
 const bun = (...args: string[]): [string, ...string[]] => [process.execPath, ...args];
-/** Hand-authored JSON beside the generated products; manifest.json is a product. */
-const authoredJson = (dir: string): string[] =>
-  readdirSync(join(ROOT, dir))
-    .filter((file): boolean => file.endsWith('.json') && file !== 'manifest.json')
-    .map((file): string => `${dir}/${file}`);
+/** Committed weapon calibration; its sibling manifest.json is a cook product. */
+const calibration = (directory: string): string[] => {
+  const file = `src/weapons/authored/${basename(directory)}/hand-reference.json`;
+  return existsSync(join(ROOT, file)) ? [file] : [];
+};
 
 const ARMS: AssetStep = {
   id: 'arms',
-  inputs: [
-    'tools/blender/player_arms.py',
-    'tools/blender/player_bandage.py',
-    'assets/player/arms/pose-reference.json',
-  ],
+  inputs: ['tools/blender/player_arms'],
   outputs: [
-    'assets/player/arms/player-arms.blend',
+    '.cache/blender/player/arms/player-arms.blend',
     'public/models/player/arms.glb',
     'public/models/player/bandage.glb',
   ],
-  commands: [blender('tools/blender/player_arms.py'), blender('tools/blender/player_bandage.py')],
+  commands: [
+    blender('tools/blender/player_arms/build.py'),
+    blender('tools/blender/player_arms/bandage.py'),
+  ],
 };
 
 export const SOLDIER_STEP: AssetStep = {
@@ -110,8 +109,8 @@ const SPENT_HULL_STEP: AssetStep = {
   inputs: ['tools/blender/spent_hull', 'src/core/three-guards.ts'],
   salt: [REVISION],
   outputs: [
-    'assets/fx/spent-hull/spent12g.blend',
-    'assets/fx/spent-hull/spent12g.glb',
+    '.cache/blender/fx/spent-hull/spent12g.blend',
+    '.cache/blender/fx/spent-hull/spent12g.glb',
     'public/models/fx/spent12g.glb',
   ],
   commands: [blender('tools/blender/spent_hull/build.py'), bun('tools/blender/spent_hull/cook.ts')],
@@ -144,7 +143,7 @@ const STANDALONE_TOOLS: Partial<Record<ModelId, string[]>> = {
   ],
   scope: ['tools/blender/scope'],
   rmr: ['tools/blender/rmr'],
-  exps3: ['tools/blender/exps3.py', 'tools/blender/exps3_bake.py'],
+  exps3: ['tools/blender/exps3'],
   tor_mini: ['tools/blender/tor_mini'],
   field_radio: ['tools/blender/field_radio/build.py'],
 };
@@ -163,7 +162,7 @@ function cookStep(id: ModelId, salt: string[]): AssetStep {
             ...(id === 'm67' || id === 'ammo_pickup' || id === 'intel_case'
               ? []
               : ['tools/blender/picatinny.py']),
-            ...authoredJson(directory),
+            ...calibration(directory),
           ],
     // Only this model's cook settings, so one profile edit rebuilds one model.
     salt: [...salt, JSON.stringify(MODEL_COOKS[id]), ...modelCookBaseFlags(id), GLTFPACK_VERSION],

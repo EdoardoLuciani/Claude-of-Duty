@@ -10,7 +10,7 @@ from mathutils import Vector
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import atlas
 
-OUT = Path(__file__).resolve().parents[3] / 'assets/props/intel-case'
+OUT = Path(__file__).resolve().parents[3] / '.cache/blender/props/intel-case'
 HINGE = (0, .23, .38)
 TRAY_LIFT = .043
 SPARK = (.13, -.06, .245 + TRAY_LIFT)

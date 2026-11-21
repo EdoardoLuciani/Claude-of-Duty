@@ -330,7 +330,10 @@ function foreendGap(p: THREE.Vector3): number {
 // Generated from the actual curved mesh samples. Export geometry before this
 // offline solve after changing grip-profile.json; runtime never evaluates it.
 const manifest: unknown = JSON.parse(
-  readFileSync(new URL('../../../assets/weapons/ax338/manifest.json', import.meta.url), 'utf8')
+  readFileSync(
+    new URL('../../../src/weapons/authored/ax338/manifest.json', import.meta.url),
+    'utf8'
+  )
 );
 assert(isRecord(manifest) && isRecord(manifest.contactGeometry), 'AX338 contact geometry');
 function parseSections(value: unknown): number[][] {
@@ -506,7 +509,7 @@ function fitHoldingHand(result: HoldingReference): void {
   assert(finalUnwrap);
   result.rightOpen = structuredClone(finalUnwrap.pose);
 }
-const out = new URL('../../../assets/weapons/ax338/', import.meta.url);
+const out = new URL('../../../src/weapons/authored/ax338/', import.meta.url);
 function writeReference(result: HoldingReference): void {
   // release_right() keys only the index. Other controls are unused payload;
   // rightIndexed/rightOpen retain the complete poses needed by full pose keys.

@@ -2,8 +2,6 @@ import * as THREE from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Renderer } from 'three/webgpu';
 
-import handReference from '../../assets/weapons/sig-mpx/hand-reference.json' with { type: 'json' };
-import manifest from '../../assets/weapons/sig-mpx/manifest.json' with { type: 'json' };
 import { loadWeaponGLTF } from './asset-loader.ts';
 import { convertWeaponScene } from './asset-material.ts';
 import { sampleAuthoredFire, MAGAZINE_ALIASES } from './authored-actions.ts';
@@ -14,6 +12,8 @@ import {
   type AuthoredModelData,
 } from './authored-model.ts';
 import { createAuthoredRig, sampleAuthoredPose } from './authored-rig.ts';
+import handReference from './authored/sig-mpx/hand-reference.json' with { type: 'json' };
+import manifest from './authored/sig-mpx/manifest.json' with { type: 'json' };
 import { buildManifestClips, type Clip } from './clips.ts';
 import type { WeaponAnimation } from './runtime-types.ts';
 

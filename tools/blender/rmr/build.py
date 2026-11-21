@@ -9,7 +9,7 @@ from rmr.geometry import build_rmr
 import picatinny
 
 ROOT=Path(__file__).resolve().parents[3]
-OUT=ROOT/'assets/attachments/trijicon-rmr'
+OUT=ROOT/'.cache/blender/attachments/trijicon-rmr'
 OUT.mkdir(parents=True,exist_ok=True)
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.context.scene.unit_settings.system='METRIC'

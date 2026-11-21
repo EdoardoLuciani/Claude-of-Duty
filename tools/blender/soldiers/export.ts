@@ -17,7 +17,7 @@ import { cookSoldier, validateMetadata } from './cook.ts';
 import { soldierReference } from './reference.ts';
 
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
-export const ASSET_ROOT = path.join(ROOT, 'assets/soldiers');
+export const ASSET_ROOT = path.join(ROOT, '.cache/blender/soldiers');
 const DEFAULT_SEED = 0x5eed1234;
 export const SOURCE_INPUTS = Object.freeze([
   'tools/blender/soldiers/build.py',

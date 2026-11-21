@@ -2,8 +2,6 @@ import * as THREE from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Renderer } from 'three/webgpu';
 
-import handReference from '../../assets/weapons/mcx-virtus/hand-reference.json' with { type: 'json' };
-import manifest from '../../assets/weapons/mcx-virtus/manifest.json' with { type: 'json' };
 import { disposeMaterials } from '../core/dispose-materials.ts';
 import { isSkinnedMesh } from '../core/three-guards.ts';
 import { loadWeaponGLTF } from './asset-loader.ts';
@@ -16,6 +14,8 @@ import {
   type AuthoredModelData,
 } from './authored-model.ts';
 import { createAuthoredRig, sampleAuthoredPose } from './authored-rig.ts';
+import handReference from './authored/mcx-virtus/hand-reference.json' with { type: 'json' };
+import manifest from './authored/mcx-virtus/manifest.json' with { type: 'json' };
 import { buildMagazineClips, type Clip } from './clips.ts';
 import type { WeaponDef } from './defs.ts';
 import { configureMCXFinishes } from './mcx-finishes.ts';

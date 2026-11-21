@@ -5,7 +5,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import can
 
-root, out = can.begin('SUPPRESSOR_338', 'assets/attachments/suppressor-338')
+root, out = can.begin('SUPPRESSOR_338', '.cache/blender/attachments/suppressor-338')
 ceramic = can.material('338 | graphite ceramic', (.035, .039, .043), .65)
 steel = can.material('338 | exposed mount steel', (.12, .13, .14), .38, 1)
 mark = can.material('338 | engraving', (.40, .39, .35), .8)

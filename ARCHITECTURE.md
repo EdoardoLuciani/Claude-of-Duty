@@ -263,7 +263,7 @@ and runtime consumers. Each weapon's authoring lives in `tools/blender/<weapon>/
 `build/models.ts` owns gltfpack runtime cooking and per-model profiles
 (`bun build/models.ts`); `tools/build-assets.ts` rebuilds stale models during
 dev/build. New profiles need adapter, animation and visual validation. The
-[intel case](assets/props/intel-case/README.md) has a standalone Blender recipe;
+[intel case](tools/blender/intel_case/README.md) has a standalone Blender recipe;
 IntelSystem loads and owns one shared GLB kit, moves its named hinge, pulses the
 beacon and emits sparks at the effect socket during the pooled interaction.
 All seven weapons (M4, MCX, P320, EVOLYS, MPX, AX338, M590) use generated GLBs with
@@ -315,7 +315,7 @@ camera-space close-up; the LCD is the only radio interface, showing the select,
 send and stow bindings, charges or the empty state, request locks and the request
 cursor. Weapon keys stow the radio. Neither radio nor grenade equip interrupts a bolt cycle.
 Once equipped, the equip key does not consume the accessory's other inputs.
-Request state does not depend on the model. [Radio asset contract](assets/props/field-radio/README.md).
+Request state does not depend on the model. [Radio asset contract](tools/blender/field_radio/README.md).
 
 `weapons.createInspectionModel(id, config)` returns an independent rest-pose clone
 with `dispose()` for the market's demand-rendered WebGPU studio. Inspection owns
@@ -325,8 +325,8 @@ angle on attachment changes and disposes stale async results. Inspection resolve
 omitted configs to the stored build and deduplicates by weapon ID and attachment
 values. DOM controls work while simulation is paused. Model failures affect only
 that selection; renderer failures disable 3D inspection, never purchases. Supply
-artwork is mapped in `src/ui/market-art.ts`; its offline sources live in
-`assets/ui/market/`.
+artwork is mapped in `src/ui/market-art.ts`; its provenance lives in
+[`docs/provenance/market-art.md`](docs/provenance/market-art.md).
 
 `WeaponState.attachments` is the gun's one stored build, an immutable
 `{ optic, muzzle, rail }` snapshot; null slots retain the base weapon, and
@@ -383,8 +383,8 @@ the `SOCKET_muzzle` name, so the weapon's own socket is held from load as
 `baseMuzzleSocket`, never looked up by name on a mounted rig.
 Prewarm covers every loaded attachment and both iron/muzzle base states.
 
-Per-weapon datums/clearances live in `assets/weapons/*/README.md` and
-`assets/attachments/*/README.md`. Blender fit checks load built attachments through
+Per-weapon and per-attachment datums/clearances live in each recipe's
+`tools/blender/*/README.md`. Blender fit checks load built attachments through
 `attachment_source.py`; cans share `can.py`. `picatinny.py` owns common rail
 geometry, and `check_picatinny.py` checks actual rails/clamps against a slotted gauge.
 

@@ -1,5 +1,5 @@
 """Render the saved P320 source, never reconstruct it.
-blender -b assets/weapons/p320-compact/p320-compact.blend --python tools/blender/p320/review.py -- --reel
+blender -b .cache/blender/weapons/p320-compact/p320-compact.blend --python tools/blender/p320/review.py -- --reel
 """
 import argparse
 import json
@@ -16,7 +16,7 @@ p.add_argument('--camera',default='hero')
 p.add_argument('--hands',action='store_true')
 p.add_argument('--reel',action='store_true')
 p.add_argument('--quick',action='store_true')
-p.add_argument('--out',default=str(root/'assets/weapons/p320-compact/renders'))
+p.add_argument('--out',default=str(root/'.cache/blender/weapons/p320-compact/renders'))
 a=p.parse_args(sys.argv[sys.argv.index('--')+1:] if '--' in sys.argv else [])
 s=bpy.context.scene;clips=json.loads(s['clips']);out=Path(a.out);out.mkdir(parents=True,exist_ok=True)
 

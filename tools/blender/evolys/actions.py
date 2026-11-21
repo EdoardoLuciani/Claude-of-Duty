@@ -31,7 +31,7 @@ def charging_contact_reference(action,duration):
 
 def author_actions(root,asset,rig,parts,belt,belt_pos):
     scene=bpy.context.scene
-    ref=json.loads((root/'assets/weapons/fn-evolys-762/hand-reference.json').read_text())
+    ref=json.loads((root/'src/weapons/authored/fn-evolys-762/hand-reference.json').read_text())
     controls=[];hand_controls={};clips={}
     def control(name):
         o=bpy.data.objects.new(name,None);asset.objects.link(o);o.parent=rig;o.rotation_mode='QUATERNION';o.empty_display_size=.004;controls.append(o);return o

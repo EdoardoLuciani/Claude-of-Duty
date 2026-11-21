@@ -10,7 +10,7 @@ import zlib
 
 import bpy
 
-OUT = Path(__file__).resolve().parents[3] / 'assets/props/field-radio'
+OUT = Path(__file__).resolve().parents[3] / '.cache/blender/props/field-radio'
 SIZE = 512
 
 # Ink on the moulding, not on the dynamic LCD. Each glyph is a 5x7 bitmap,

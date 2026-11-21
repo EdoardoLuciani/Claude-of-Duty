@@ -88,7 +88,7 @@ const magazine = {
   pose: handPose(support, 'magazine'),
 };
 writeFileSync(
-  new URL('../../../assets/weapons/p320-compact/hand-reference.json', import.meta.url),
+  new URL('../../../src/weapons/authored/p320-compact/hand-reference.json', import.meta.url),
   JSON.stringify({ grips, sides, magazine }, null, 2) + '\n'
 );
 console.log('P320 contact seed written; rebuild Blender actions after changing this file.');
