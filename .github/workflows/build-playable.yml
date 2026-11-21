@@ -33,7 +33,13 @@ jobs:
         run: |
           cd "$RUNNER_TEMP"
           blender_archive="blender-${BLENDER_VERSION}-linux-x64.tar.xz"
-          curl -fsSL --retry 3 -o "$blender_archive" "https://download.blender.org/release/Blender${BLENDER_VERSION%.*}/$blender_archive"
+          blender_path="release/Blender${BLENDER_VERSION%.*}/$blender_archive"
+          echo "Downloading Blender from download.blender.org"
+          if ! curl -fsSL --retry 3 -o "$blender_archive" "https://download.blender.org/$blender_path"; then
+            echo "Retrying Blender from the Clarkson University mirror"
+            curl -fsSL --retry 3 -o "$blender_archive" "https://mirror.clarkson.edu/blender/$blender_path"
+          fi
+          echo "Downloading gltfpack from GitHub Releases"
           curl -fsSL --retry 3 -o gltfpack-ubuntu.zip "https://github.com/zeux/meshoptimizer/releases/download/v${GLTFPACK_VERSION}/gltfpack-ubuntu.zip"
           printf '%s  %s\n' \
             84098912789dc450e95697c4184fb8a90acbe5111c2ba4aede3fecb57806a168 "$blender_archive" \
