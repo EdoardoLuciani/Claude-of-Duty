@@ -108,7 +108,10 @@ engine.events.on('engine:error', ({ system, method, message }): void => {
 
 // Model prefetch begins here, overlapping renderer/system initialization; later
 // hooks await those resources. Do not imply downloads are a separate phase.
-window.__STARTUP__.stage('Loading world and assets…');
+window.__STARTUP__.stage('Loading world…');
+engine.onSystemInit = (id): void => {
+  if (id === 'weapons') window.__STARTUP__.stage('Loading weapons and equipment…');
+};
 try {
   await engine.init();
 } catch (err) {
