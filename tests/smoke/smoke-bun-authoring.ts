@@ -81,7 +81,7 @@ try {
   models._loadJSON = async (): Promise<unknown> => encoded.meta;
   const ai = new AiSystem();
   const canonical = await models._loadSoldier('vanguard');
-  ai._bindSoldierRecord('vanguard', canonical);
+  ai._bindSoldierRecord(canonical);
   const meshes: THREE.SkinnedMesh[] = [];
   gltf.scene.traverse((node): void => {
     if (isSkinnedMesh(node)) meshes.push(node);
@@ -102,17 +102,11 @@ try {
   const shuffled = await models._loadSoldier('vanguard');
   const joint = shuffled.joints[0];
   shuffled.joints[0] = shuffled.joints[1];
-  assert.throws(
-    (): void => ai._bindSoldierRecord('vanguard', shuffled),
-    /each RIG joint exactly once/
-  );
+  assert.throws((): void => ai._bindSoldierRecord(shuffled), /duplicate skin joint/);
   shuffled.joints[0] = { ...joint, inverseBind: new THREE.Matrix4() };
-  assert.throws(
-    (): void => ai._bindSoldierRecord('vanguard', shuffled),
-    /incompatible inverse bind matrix/
-  );
+  assert.throws((): void => ai._bindSoldierRecord(shuffled), /incompatible inverse bind matrix/);
   shuffled.joints[0] = joint;
-  ai._bindSoldierRecord('vanguard', shuffled);
+  ai._bindSoldierRecord(shuffled);
   const { bones, skeleton, root } = RIG.createSkeleton();
   const forearm = bones[RIG.index('ForearmR')];
   const posed = (geometry: THREE.BufferGeometry): THREE.Vector3 => {

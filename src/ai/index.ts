@@ -275,7 +275,7 @@ export class AiSystem {
     for (let i = 0; i < variantNames.length; i++) {
       const name = variantNames[i];
       const rec = loaded[i];
-      this._bindSoldierRecord(name, rec);
+      this._bindSoldierRecord(rec);
       this._loadedVariants.set(name, rec);
       console.info(`[ai] model "${name}" ${rec.stats.triangles | 0} tris loaded from GLB`);
     }
@@ -510,15 +510,12 @@ export class AiSystem {
   }
 
   /** Resolve GLB skin indices into RIG order before sharing the geometry with actors. */
-  _bindSoldierRecord(name: string, rec: SoldierRecord): void {
+  _bindSoldierRecord(rec: SoldierRecord): void {
+    const { requestedName: name, geometry: geo } = rec;
     const problems = [];
-    // rec.name is the JSON METADATA's claimed variant (see models.js), so a
-    // file that belongs to another variant is caught here. Missing values are
-    // reported explicitly rather than as a generic comparison failure.
     if (rec.name !== name) {
       problems.push(`metadata variant name is "${rec.name}", expected "${name}"`);
     }
-    const geo = rec.geometry;
     // three types getAttribute() as present; loaded metadata may still omit it.
     if (!geo.hasAttribute('position')) {
       problems.push('geometry has no position attribute');
@@ -532,18 +529,23 @@ export class AiSystem {
         }
       }
     }
-    if (!Array.isArray(rec.slots) || rec.slots.length !== geo.groups.length) {
+    if (rec.slots.length !== geo.groups.length) {
       problems.push(
         `material slots (${rec.slots.length}) != geometry groups (${geo.groups.length})`
       );
     }
-    const remap = rec.joints.map((joint): number => RIG.names.indexOf(joint.name));
+    const seen = new Set<number>();
+    const remap = rec.joints.map((joint): number => {
+      const target = RIG.names.indexOf(joint.name);
+      if (target < 0) problems.push(`unknown skin joint "${joint.name}"`);
+      else if (seen.has(target)) problems.push(`duplicate skin joint "${joint.name}"`);
+      else seen.add(target);
+      return target;
+    });
+    const missing = RIG.names.filter((_, i): boolean => !seen.has(i));
+    if (missing.length) problems.push(`missing skin joints: ${missing.join(', ')}`);
     const jointsInRigOrder = [...rec.joints];
-    if (remap.length !== RIG.count || remap.includes(-1) || new Set(remap).size !== RIG.count) {
-      problems.push(
-        `skin must name each RIG joint exactly once; got ${rec.joints.map((joint): string => joint.name).join(', ')}`
-      );
-    } else {
+    if (missing.length === 0 && remap.length === RIG.count) {
       const expected = new THREE.Matrix4();
       const unitScale = new THREE.Vector3(1, 1, 1);
       for (const [i, joint] of rec.joints.entries()) {
@@ -569,7 +571,7 @@ export class AiSystem {
       throw new Error(
         `[ai] soldier model "${name}" is incompatible with this build:\n - ` +
           problems.join('\n - ') +
-          '\nRegenerate the assets with: bun tools/export-models.ts'
+          '\nSee tools/blender/soldiers/README.md for rebuild steps.'
       );
     }
     for (let vertex = 0; vertex < indices.count; vertex++) {
@@ -594,7 +596,7 @@ export class AiSystem {
       const rec = this._loadedVariants.get(name);
       if (!rec) {
         throw new Error(
-          `[ai] required soldier model "${name}" was not loaded; regenerate assets with: bun tools/export-models.ts`
+          `[ai] required soldier model "${name}" was not loaded. See tools/blender/soldiers/README.md for rebuild steps.`
         );
       }
       // One native material ignores the GLB's authoring groups when drawing.

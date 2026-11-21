@@ -92,11 +92,6 @@ export class ModelSystem {
     return r.json();
   }
 
-  /**
-   * @param {string} name  variant name ('vanguard' | 'irregular' | 'breacher')
-   * @returns {Promise<object>} soldier record:
-   *   { geometry, slots, boneNames, weapon, stats, variant }
-   */
   getSoldier(name: string): Promise<SoldierRecord> {
     const cached = this._soldiers.get(name);
     if (cached) return cached;
@@ -130,9 +125,6 @@ export class ModelSystem {
     }));
 
     const record = {
-      // `name` is what the JSON METADATA claims the variant is (validated by
-      // the ai subsystem against the requested name); `requestedName` is what
-      // the caller asked for, so the mismatch is never masked.
       requestedName: name,
       name: meta.name,
       geometry,
