@@ -37,7 +37,7 @@ def basis(finger,back):
 def author_hands(root,asset,parts,clips):
     scene = bpy.context.scene
     rig,mag,spare,_,handle,*_ = parts
-    ref = json.loads((root/'assets/weapons/mcx-virtus/hand-reference.json').read_text())
+    ref = json.loads((root/'src/weapons/authored/mcx-virtus/hand-reference.json').read_text())
     controls = []; hands = {}
     def control(name):
         obj = bpy.data.objects.new(name,None); asset.objects.link(obj); obj.parent = rig

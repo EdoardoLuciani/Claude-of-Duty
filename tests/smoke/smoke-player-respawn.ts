@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { AiSystem } from '../../src/ai/index.ts';
 /** Respawn must publish the reset damage capsule before nested restart consumers run. */
 import type { SurfaceNav } from '../../src/ai/nav.ts';
+import { OPENING_WAVE_DELAY } from '../../src/ai/tuning.ts';
 import { EventBus } from '../../src/core/registry.ts';
 import { StaticWorld } from '../../src/physics/bvh.ts';
 import { CharacterController } from '../../src/physics/character.ts';
@@ -134,6 +135,30 @@ for (const dead of [true, false]) {
     }
   }
 }
-console.log(
-  'ALL PASS: dead/living respawn synchronizes capsule before nested observers and AI placement'
-);
+{
+  const ai = new AiSystem();
+  const ctx = createTestContext();
+  ai.ctx = ctx;
+  ai.grid = partialFixture<SurfaceNav>({ worker: null });
+  ai.populate = (): number => 6;
+  ctx.config.deterministic = false;
+  ctx.time.elapsed = 60;
+  ai.startWave(2);
+
+  const starts: number[] = [];
+  ctx.events.on('wave:start', ({ wave }): void => {
+    starts.push(wave);
+  });
+  ctx.events.on('wave:complete', (): never => assert.fail('no clear before the first wave'));
+  ai.resetForNewGame();
+  assert.equal(ai.getWaveState().nextIn, OPENING_WAVE_DELAY);
+  ctx.time.elapsed += OPENING_WAVE_DELAY - 0.5;
+  ai._updateWaves(ctx);
+  assert.deepEqual(starts, []);
+  ctx.time.elapsed += 0.5;
+  ai._updateWaves(ctx);
+  assert.deepEqual(starts, [1]);
+  assert.equal(ai.getWaveState().incoming, false);
+}
+
+console.log('Respawn synchronizes the capsule and restart rearms the opening wave');

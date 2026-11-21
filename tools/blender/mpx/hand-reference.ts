@@ -202,7 +202,7 @@ const restLeft = {
   pose: rest,
 };
 writeFileSync(
-  new URL('../../../assets/weapons/sig-mpx/hand-reference.json', import.meta.url),
+  new URL('../../../src/weapons/authored/sig-mpx/hand-reference.json', import.meta.url),
   JSON.stringify(
     { ...result, magazine: magazineContact, magazineRelease, boltRelease, restLeft },
     null,

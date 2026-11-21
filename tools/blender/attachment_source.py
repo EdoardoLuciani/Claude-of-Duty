@@ -55,7 +55,7 @@ def named(objects, name):
 def load(id, names=None):
     """Append a built attachment's objects (only `names`, if given) to the scene.
     Returns (objects, datum), where the datum is its weapon-mount base."""
-    path = ROOT/'assets/attachments'/SOURCES[id]
+    path = ROOT/'.cache/blender/attachments'/SOURCES[id]
     assert path.exists(), f'Build {id} before weapon fit checks: {path}'
     with bpy.data.libraries.load(str(path), link=False) as (source, loaded):
         loaded.objects = [n for n in source.objects if names is None or n in names]

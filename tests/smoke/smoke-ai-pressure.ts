@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import type { Agent, AiState } from '../../src/ai/agent.ts';
 import type { BakedCoverPoint } from '../../src/ai/nav-format.ts';
 import { SurfaceNav, CoverMap } from '../../src/ai/nav.ts';
+import { PATH_DEFERRED, type PathResult } from '../../src/ai/path-result.ts';
 import { Squad } from '../../src/ai/squad.ts';
 import { TACTICS } from '../../src/ai/tuning.ts';
 import type { EngineEventMap } from '../../src/core/events.ts';
@@ -455,10 +456,10 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
     },
   });
   let routes = 0;
-  a.ai.requestPath = (from): number => {
+  a.ai.requestPath = (from, _dest, _out, completion): PathResult => {
     routes++;
     assert.equal(from, a.position);
-    return 0;
+    return completion;
   };
   a._finishRepositionPlan();
   assert.ok(walks.length > 0 && walks.every((p): boolean => p.equals(center)));
@@ -484,9 +485,7 @@ for (const admitted of [true, false]) {
     a._searchCount = 1;
     a._searchCand[0].copy(destination);
   };
-  a.ai.lastPathOutcome = 'deferred';
-  a.ai.lastPathReason = 'attachment-pending';
-  a.ai.requestPath = (): number => -1;
+  a.ai.requestPath = (): PathResult => PATH_DEFERRED.pending;
   a._finishRepositionPlan();
   assert(a._repositioning && a.pathPending);
   a._combatClock += TACTICS.firingStepTime * 2;
@@ -497,10 +496,14 @@ for (const admitted of [true, false]) {
     !a._failedCovers.some((p): boolean => p.until > a._combatClock),
     'waiting is not a physical failure'
   );
-  a.ai.requestPath = (): 0 | 2 => {
-    a.path[0] = a.position.clone();
-    a.path[1] = destination.clone();
-    return admitted ? 2 : 0;
+  a.ai.requestPath = (_from, _dest, out, completion): PathResult => {
+    if (admitted) {
+      (out[0] ??= new THREE.Vector3()).copy(a.position);
+      (out[1] ??= new THREE.Vector3()).copy(destination);
+    }
+    completion.outcome = admitted ? 'success' : 'invalid';
+    completion.count = admitted ? 2 : 0;
+    return completion;
   };
   a._goTo(a._pendingDest);
   assert.equal(a._updateReposition(), admitted);

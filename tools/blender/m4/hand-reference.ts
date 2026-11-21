@@ -100,7 +100,7 @@ const chargingContact = {
   pose: handPose(arm, 'charging'),
 };
 writeFileSync(
-  new URL('../../../assets/weapons/m4a1-block-ii/hand-reference.json', import.meta.url),
+  new URL('../../../src/weapons/authored/m4a1-block-ii/hand-reference.json', import.meta.url),
   JSON.stringify({ grips, sides, magazine, charging: chargingContact }, null, 2) + '\n'
 );
 console.log('M4 hand control seed written; rebuild Blender actions after editing.');

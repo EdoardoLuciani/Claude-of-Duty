@@ -1,7 +1,7 @@
 import type * as THREE from 'three';
 
 import type { EngineContext, EngineSystems } from '../core/context.ts';
-import type { AttachmentConfig, BuiltWeaponDef } from './attachments.ts';
+import type { AttachmentConfig, BuiltWeaponDef, OpticData } from './attachment-rules.ts';
 import type { loadAX338 } from './ax338.ts';
 import type { Clip } from './clips.ts';
 import type { WeaponDef, WeaponId, WeaponMode } from './defs.ts';
@@ -36,15 +36,6 @@ export type AuthoredModels = {
   shotgun: Awaited<ReturnType<typeof loadM590>>;
 };
 export type AuthoredWeaponModel = AuthoredModels[WeaponId];
-export interface OpticData {
-  kind?: 'scope';
-  reticle?: 'chevron' | 'p4fl';
-  apertureR?: number;
-  dotMoa?: number;
-  ringMoa?: number;
-  minDotPixels?: number;
-  dotOpacity?: number;
-}
 export type WeaponModelRecord = AuthoredWeaponModel;
 export interface WeaponEntry {
   id: WeaponId;
@@ -90,6 +81,8 @@ export interface WeaponAnimation {
   fire(): void;
   dispose(): void;
   magazineBody?: THREE.Object3D;
+  /** Seconds from a shot until its case leaves the port; else the shot cadence decides. */
+  ejectDelay?: number;
   poseQ: THREE.Quaternion;
   handTarget(side: 'left' | 'right', position: THREE.Vector3, quaternion: THREE.Quaternion): void;
   applyHands(left: Arm, right: Arm): void;
@@ -104,6 +97,8 @@ export interface ViewState {
   empty: boolean;
   magazineLoaded?: boolean;
   remainingRounds?: number;
+  /** Stance/movement factor on hip sway. */
+  steadiness: number;
 }
 export interface ViewPoseKey {
   t?: number;

@@ -4,6 +4,11 @@ import { Agent, STATE } from '../../../src/ai/agent.ts';
 import { INFANTRY } from '../../../src/ai/capabilities.ts';
 import { NAV_PROFILE } from '../../../src/ai/nav-format.ts';
 import type { SurfaceNav } from '../../../src/ai/nav.ts';
+import {
+  PATH_DEFERRED,
+  type PathResult,
+  type PathSolveOutcome,
+} from '../../../src/ai/path-result.ts';
 import { applyDefinedPatch } from '../../../src/core/patch.ts';
 import type { CharacterController } from '../../../src/physics/character.ts';
 import type { PhysicsSystem } from '../../../src/physics/index.ts';
@@ -19,7 +24,7 @@ export interface PathCandidate {
   query(
     from: THREE.Vector3,
     to: THREE.Vector3
-  ): { points: THREE.Vector3[]; outcome: string | null; reason?: string | null };
+  ): { points: THREE.Vector3[]; outcome: PathSolveOutcome; reason?: string | null };
 }
 export interface WalkerOptions {
   scale?: number;
@@ -102,21 +107,21 @@ export function makeWalker(
     height = INFANTRY.height * scale;
   const ai = makeAi(fixture.grid);
   ai.groundAt = (x: number, z: number, y: number): number => physics.groundHeight(x, z, y);
-  ai.requestPath = (start, to, out): number => {
+  ai.requestPath = (start, to, out, completion): PathResult => {
     if (ai._pathBudget <= 0) {
-      ai.lastPathOutcome = 'deferred';
       ai.deferred++;
-      return -1;
+      return PATH_DEFERRED.budget;
     }
     ai._pathBudget--;
     if (!candidate) throw new Error('walker path request requires a candidate');
     const result = candidate.query(start, to);
-    ai.lastPathOutcome = result.outcome;
-    ai.lastPathReason = result.reason ?? null;
-    ai.lastPathResFloor = result.points.at(-1)?.y ?? NaN;
-    for (let i = 0; i < result.points.length; i++)
+    completion.outcome = result.outcome;
+    completion.reason = result.reason ?? null;
+    completion.resolvedFloor = result.points.at(-1)?.y ?? NaN;
+    completion.count = result.points.length;
+    for (let i = 0; i < completion.count; i++)
       (out[i] ??= new THREE.Vector3()).copy(result.points[i]);
-    return result.points.length;
+    return completion;
   };
   // Real Agent movement/navigation methods; omit only rendering, senses and gun.
   const a = new WalkerAgent(ai, { position: from });

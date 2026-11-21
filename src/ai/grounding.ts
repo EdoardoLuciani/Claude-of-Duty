@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 /** Grounding uses a body ellipse and two foot lobes to supplement shadow-map contact detail.
- * Near-black alpha-over approximates multiplication across exposure, with a small sky-blue term.
+ * Black alpha-over attenuates the ground color without adding light, even in deep shade.
  * Contact strength changes sprite size as feet lift; body/foot instances remain two draws.
  */
 
@@ -40,12 +40,9 @@ interface GroundedAgent {
   animator?: { bonePos(name: string, out: THREE.Vector3): void };
 }
 
-// Not pure black: a contact shadow is lit by the sky it is occluding less
-// of, so it keeps a trace of the sky's blue. 0.05 linear, i.e. deep but not
-// a hole.
 const contactShadowMaterial = (tex: THREE.DataTexture, opacity: number): THREE.MeshBasicMaterial =>
   new THREE.MeshBasicMaterial({
-    color: new THREE.Color(0.045, 0.05, 0.062),
+    color: 0x000000,
     map: tex,
     transparent: true,
     opacity,

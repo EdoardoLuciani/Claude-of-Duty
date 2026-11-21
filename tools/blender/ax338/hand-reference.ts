@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 // Offline fitting inputs. Blender owns the resulting wrist/finger curves.
 import assert from 'node:assert/strict';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 
 import * as THREE from 'three';
 import { GLTFLoader, type GLTFLoaderPlugin } from 'three/addons/loaders/GLTFLoader.js';
@@ -330,7 +330,10 @@ function foreendGap(p: THREE.Vector3): number {
 // Generated from the actual curved mesh samples. Export geometry before this
 // offline solve after changing grip-profile.json; runtime never evaluates it.
 const manifest: unknown = JSON.parse(
-  readFileSync(new URL('../../../assets/weapons/ax338/manifest.json', import.meta.url), 'utf8')
+  readFileSync(
+    new URL('../../../.cache/blender/weapons/ax338/manifest.json', import.meta.url),
+    'utf8'
+  )
 );
 assert(isRecord(manifest) && isRecord(manifest.contactGeometry), 'AX338 contact geometry');
 function parseSections(value: unknown): number[][] {
@@ -506,7 +509,7 @@ function fitHoldingHand(result: HoldingReference): void {
   assert(finalUnwrap);
   result.rightOpen = structuredClone(finalUnwrap.pose);
 }
-const out = new URL('../../../assets/weapons/ax338/', import.meta.url);
+const out = new URL('../../../src/weapons/authored/ax338/', import.meta.url);
 function writeReference(result: HoldingReference): void {
   // release_right() keys only the index. Other controls are unused payload;
   // rightIndexed/rightOpen retain the complete poses needed by full pose keys.
@@ -811,6 +814,5 @@ result.bolt = contact(
 );
 validateHoldingReference(result);
 fitHoldingHand(result);
-mkdirSync(out, { recursive: true });
 writeReference(result);
 console.log('AX338 hand reference written; regenerate Blender actions after changes.');

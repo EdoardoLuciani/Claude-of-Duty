@@ -8,7 +8,7 @@ from mathutils import Matrix, Vector
 from mathutils.bvhtree import BVHTree
 ROOT=Path(__file__).resolve().parents[3];CI=Matrix(((1,0,0),(0,0,-1),(0,1,0))).inverted()
 scene=bpy.context.scene;rig=bpy.data.objects['AX338_RIG']
-manifest=json.loads((ROOT/'assets/weapons/ax338/manifest.json').read_text())
+manifest=json.loads((ROOT/'.cache/blender/weapons/ax338/manifest.json').read_text())
 def select(clip,time=0):
     for o in bpy.data.objects:
         if o.animation_data:

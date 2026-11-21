@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 // Offline input for Blender controls. Runtime uses these exact fitted poses.
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 
 import { Arm } from '../../../src/weapons/hands.ts';
 import {
@@ -93,9 +93,8 @@ for (const [name, g, pose, target] of [
     pose: handPose(arm, name),
   };
 }
-mkdirSync(new URL('../../../assets/weapons/fn-evolys-762/', import.meta.url), { recursive: true });
 writeFileSync(
-  new URL('../../../assets/weapons/fn-evolys-762/hand-reference.json', import.meta.url),
+  new URL('../../../src/weapons/authored/fn-evolys-762/hand-reference.json', import.meta.url),
   JSON.stringify({ ...result, ...contacts }, null, 2) + '\n'
 );
 console.log('EVOLYS hand reference written; rebuild Blender actions after edits.');

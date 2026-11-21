@@ -13,6 +13,23 @@ bun run verify  # CI gate: format:check, knip, build:ci, test
 
 The full command list is in [AGENTS.md](AGENTS.md#commands-and-invariants).
 
+### Playable build artifact
+
+In GitHub Actions, run **Build playable artifact** on the branch you want to test.
+The workflow must be on the default branch before GitHub allows manual runs. It
+builds the full game, caches generated assets, and uploads `dist/` as
+`claude-of-duty-playable`. It does not deploy the site. To test the downloaded
+artifact, unzip it and serve the extracted `index.html` at the server root:
+
+```sh
+python3 -m http.server 4173 --bind 127.0.0.1 --directory /path/to/extracted/artifact
+```
+
+Open `http://127.0.0.1:4173/` in a WebGPU-capable browser instead of opening the
+HTML file directly.
+
+### Toolchain
+
 Bun (version pinned by `packageManager` in `package.json`) is the only toolchain:
 it installs, type-checks (`bun check`), formats, lints, bundles, serves, runs the
 tests and drives the asset tools. Node.js is not required.
@@ -57,7 +74,7 @@ Change map content in
 `tools/worldgen/level/`; the [world editing map](tools/worldgen/README.md) identifies
 shape, placement and build locations, and the `bun tools/export-world.ts` options.
 The seven authored weapons use the [shared gltfpack build recipe](build/README.md);
-`bun build/models.ts p320` reruns one cook. The [spent hull](assets/fx/spent-hull/README.md)
+`bun build/models.ts p320` reruns one cook. The [spent hull](tools/blender/spent_hull/README.md)
 keeps its validated native export to preserve the casing pool's vertex attributes.
 Each model has its own geometry, material and animation acceptance gates.
 
@@ -73,10 +90,13 @@ are native DOM. The field radio has no HUD panel: its handheld LCD is the interf
 If the HUD fails to initialize, a Reload error dialog appears.
 [HUD ownership, boundaries and checks](docs/hud.md).
 
-After loading, select **Start** to capture the mouse and begin. Pending or denied
-mouse capture keeps the run frozen; select **Retry Start** to retry (there is no
-unlocked-play fallback). Once playing, click the game canvas to reacquire the
-cursor (also a fire press). The pause menu has Gameplay, Audio and Controls tabs;
+After loading, select **Start** to capture the mouse, enter fullscreen and begin.
+Use the time before the first wave to explore; the HUD shows when enemies will arrive.
+Pending or denied mouse capture keeps the run frozen; select **Retry Start** to retry
+(there is no unlocked-play fallback). Fullscreen is optional; where keyboard lock is
+supported, shortcuts such as Ctrl+W (crouch + forward) stay in the game and a held
+Esc exits fullscreen. Once playing, click the game canvas to reacquire the cursor
+(also a fire press). The pause menu has Gameplay, Audio and Controls tabs;
 Controls is the full keyboard/mouse reference, including contextual behaviors.
 Bindings are fixed defaults in `src/core/bindings.ts`.
 
@@ -119,7 +139,7 @@ Toolbar buttons also provide zoom and reset. Inspection never spends credits.
 Weapon cards open a customization draft: choose an optic, suppressor and laser from
 verified fits, then **Buy Build / Apply Changes** or **Cancel**. The preview changes
 immediately, along with a stats table comparing the base weapon, the owned build and
-the draft (damage, fire rate, magazine, velocity, spread, recoil and ADS time, each
+the draft (damage, fire rate, magazine, velocity, hip sway, ADS spread, recoil and ADS time, each
 change labelled better or worse); gameplay and credits change only on confirmation.
 Owned weapons charge only for new attachments, while a new weapon also costs its base
 price. Removing or replacing an attachment discards it without a refund. Closing the
@@ -132,9 +152,14 @@ scope; mounting one swaps removable irons for their stowed state (M590 keeps fix
 irons). Every weapon accepts the TOR Mini laser and a suppressor: the M4, MCX, MPX and
 EVOLYS share the SRD762Ti; P320, AX338 and M590 mount dedicated cans. Attachments
 trade handling, never ballistics: larger optics slow ADS, a can softens recoil but slows
-ADS, and the laser tightens hip spread. A can also moves the projectile/flash origin to
+ADS. A can also moves the projectile/flash origin to
 its endcap and selects suppressed reports and a smaller flash; the laser draws a beam
 and surface dot along its emitter axis without predicting spread or drop.
+Hip-fire leaves along the barrel, so weapon sway, movement, turning and kick move
+shots with the gun; only the laser shows where it points, and no crosshair is drawn
+while a gun is out (a grenade keeps one). Stance and movement scale hip sway, and the
+hip cone is only dispersion (a shotgun's is its pellet pattern). ADS fires on the
+zeroed sight line.
 **L** toggles the mounted laser per gun, independently of the **F** flashlight.
 
 For debug/capture, `attachmentOptic`, `attachmentRail` and `attachmentMuzzle` (`none`
@@ -152,11 +177,11 @@ it; the first 21:00 triggers a three-minute streetlight outage, not an interior 
 For edit locations, source/generated ownership and regeneration commands, see the
 [asset and world editing map](docs/assets.md).
 
-Asset regeneration/reference notes: [arms](assets/player/arms/README.md),
-[M4](assets/weapons/m4a1-block-ii/README.md), [MCX](assets/weapons/mcx-virtus/README.md),
-[P320](assets/weapons/p320-compact/README.md), [EVOLYS](assets/weapons/fn-evolys-762/README.md),
-[MPX](assets/weapons/sig-mpx/README.md), [AX338](assets/weapons/ax338/README.md),
-[M590](assets/weapons/m590/README.md).
+Asset regeneration/reference notes: [arms](tools/blender/player_arms/README.md),
+[M4](tools/blender/m4/README.md), [MCX](tools/blender/mcx/README.md),
+[P320](tools/blender/p320/README.md), [EVOLYS](tools/blender/evolys/README.md),
+[MPX](tools/blender/mpx/README.md), [AX338](tools/blender/ax338/README.md),
+[M590](tools/blender/m590/README.md).
 Tests are not final human visual acceptance; see each asset's remaining limits.
 
 ## Diagnostics

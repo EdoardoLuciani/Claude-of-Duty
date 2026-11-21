@@ -4,7 +4,7 @@ export const LEVEL_TZ = 1.34;
 
 /** Spawn points in level space: [x, z, yaw, tag]. */
 export const SPAWNS: [x: number, z: number, yaw: number, tag: string][] = [
-  [0.4, 22.5, Math.PI, 'north street'],
+  [0.4, 22.5, 0, 'north street'],
   [-2.4, 30.0, Math.PI, 'north plaza'],
   [3.6, 5.0, Math.PI, 'market'],
   [-3.4, -12.0, 0, 'mid street'],

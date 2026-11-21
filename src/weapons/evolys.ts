@@ -2,8 +2,6 @@ import * as THREE from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Renderer } from 'three/webgpu';
 
-import handReference from '../../assets/weapons/fn-evolys-762/hand-reference.json' with { type: 'json' };
-import manifest from '../../assets/weapons/fn-evolys-762/manifest.json' with { type: 'json' };
 import { disposeMaterials } from '../core/dispose-materials.ts';
 import { hasOwn } from '../core/guards.ts';
 import { loadWeaponGLTF } from './asset-loader.ts';
@@ -11,6 +9,8 @@ import { convertWeaponScene } from './asset-material.ts';
 import { sampleAuthoredFire, MAGAZINE_ALIASES, disposeAuthoredMixer } from './authored-actions.ts';
 import { authoredModel, requiredNode, type AuthoredModelData } from './authored-model.ts';
 import { createAuthoredRig, sampleAuthoredPose } from './authored-rig.ts';
+import handReference from './authored/fn-evolys-762/hand-reference.json' with { type: 'json' };
+import manifest from './authored/fn-evolys-762/manifest.json' with { type: 'json' };
 import { buildManifestClips, type Clip } from './clips.ts';
 import type { WeaponAnimation } from './runtime-types.ts';
 

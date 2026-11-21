@@ -16,7 +16,7 @@ const candidate = {
   query(
     from: Vector3,
     to: Vector3
-  ): { points: Vector3[]; outcome: string | null; reason?: string | null } {
+  ): { points: Vector3[]; outcome: SurfaceNav['lastOutcome']; reason?: string | null } {
     const points: Vector3[] = [],
       n = f.grid.findPath(from, to, points);
     return { points: points.slice(0, n), outcome: f.grid.lastOutcome, reason: f.grid.lastReason };

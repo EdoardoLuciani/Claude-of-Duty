@@ -12,7 +12,7 @@ def author_review_hands(root,rig,hand_controls,all_parts,clips,*,basis,label,fra
     orientation=C@source_basis.inverted()
     scene=bpy.context.scene
     collection=bpy.data.collections.new(label+' | authored hands (shared appearance)');scene.collection.children.link(collection)
-    with bpy.data.libraries.load(str(root/'assets/player/arms/player-arms.blend'),link=False) as (available,loaded):loaded.objects=list(available.objects)
+    with bpy.data.libraries.load(str(root/'.cache/blender/player/arms/player-arms.blend'),link=False) as (available,loaded):loaded.objects=list(available.objects)
     objects=[o for o in loaded.objects if o];source=next(o for o in objects if o.type=='ARMATURE')
     meshes=[o for o in objects if o.type=='MESH' and any(m.type=='ARMATURE' for m in o.modifiers)]
     arms={}

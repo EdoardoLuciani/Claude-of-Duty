@@ -14,7 +14,7 @@ assert(argv.length === 0 || argv.length === 2, 'usage: bun cook.ts [input.glb ou
 const [input, output] = argv.length
   ? argv.map((file): string => resolve(file))
   : [
-      resolve(root, 'assets/fx/spent-hull/spent12g.glb'),
+      resolve(root, '.cache/blender/fx/spent-hull/spent12g.glb'),
       resolve(root, 'public/models/fx/spent12g.glb'),
     ];
 assert.notEqual(input, output, 'do not overwrite the native export');

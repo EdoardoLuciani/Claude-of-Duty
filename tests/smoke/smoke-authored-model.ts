@@ -3,20 +3,20 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-import mcxManifest from '../../assets/weapons/mcx-virtus/manifest.json' with { type: 'json' };
-import mpxManifest from '../../assets/weapons/sig-mpx/manifest.json' with { type: 'json' };
 import { PhysicsSystem } from '../../src/physics/index.ts';
 import { LAYER } from '../../src/physics/surfaces.ts';
 import { CameraRig } from '../../src/player/camera.ts';
 import type { RenderSystem } from '../../src/render/index-webgpu.ts';
 import {
   BASE_ATTACHMENTS,
+  isAttachmentConfig,
+  type AttachmentConfig,
+} from '../../src/weapons/attachment-rules.ts';
+import {
   configureWeaponAttachments,
   hasAttachmentAssets,
   mountAttachments,
   releaseAttachmentMounts,
-  isAttachmentConfig,
-  type AttachmentConfig,
 } from '../../src/weapons/attachments.ts';
 import {
   authoredModel,
@@ -24,6 +24,8 @@ import {
   rebaseNativeWeapon,
   requiredNode,
 } from '../../src/weapons/authored-model.ts';
+import mcxManifest from '../../src/weapons/authored/mcx-virtus/manifest.json' with { type: 'json' };
+import mpxManifest from '../../src/weapons/authored/sig-mpx/manifest.json' with { type: 'json' };
 import { WEAPON_DEFS, WEAPON_IDS } from '../../src/weapons/defs.ts';
 import { Arm } from '../../src/weapons/hands.ts';
 import { WeaponLaser } from '../../src/weapons/laser.ts';
@@ -201,13 +203,18 @@ assert.throws(
   railMount.name = 'MOUNT_rail';
   railMount.position.set(0.0285, 0.075, -0.25);
   railMount.rotation.z = Math.PI / 2;
-  root.add(railMount);
+  const railAdapter = new THREE.Group();
+  railAdapter.name = 'RAIL_adapter';
+  root.add(railMount, railAdapter);
+  configureWeaponAttachments(entry, BASE_ATTACHMENTS, optics);
+  assert(!railAdapter.visible, 'the bare guard has no adapter');
   const laserScene = datums('SOCKET_mount', 'SOCKET_laser');
   requiredNode(laserScene, 'SOCKET_laser').position.set(0, -0.0105, -0.02518);
   const laser = rigidAsset('SOCKET_laser', laserScene);
   const laserConfig: AttachmentConfig = { ...BASE_ATTACHMENTS, rail: 'laser' };
   assert(isAttachmentConfig(laserConfig, 'rifle'));
   configureWeaponAttachments(entry, laserConfig, { ...optics, laser });
+  assert(railAdapter.visible, 'the laser has its supporting rail');
   assert.equal(entry.railGroup.parent, railMount);
   assert(entry.laserEmitter);
   const previous = entry.laserEmitter.getWorldPosition(new THREE.Vector3());
@@ -224,6 +231,7 @@ assert.throws(
   configureWeaponAttachments(entry, BASE_ATTACHMENTS, optics);
   assert.equal(entry.laserEmitter, null);
   assert.equal(railMount.children.length, 0);
+  assert(!railAdapter.visible, 'removing the laser restores the bare guard');
   // A posed native skin deforms exactly as before rebasing, moved into game space.
   {
     const skinRoot = new THREE.Group();

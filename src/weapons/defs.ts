@@ -2,7 +2,7 @@
  * zeroRange is the sight-line crossing; learned sightline recoil is separate from random spread.
  */
 
-import type { CanModel, MuzzleId, OpticId, RailId } from './attachments.ts';
+import type { CanModel, MuzzleId, OpticId, RailId } from './attachment-rules.ts';
 
 export const WEAPON_IDS = ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper', 'mcx'] as const;
 export type WeaponId = (typeof WEAPON_IDS)[number];
@@ -39,7 +39,8 @@ export interface WeaponDef {
   maxRange: number;
   dragK: number;
   zeroRange: number;
-  spreadHip: number;
+  /** Hip cone (degrees) when it differs from `spreadAds`: a pellet gun's pattern. */
+  spreadHip?: number;
   spreadAds: number;
   spreadPerShot: number;
   spreadMax: number;
@@ -126,7 +127,6 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     maxRange: 260,
     dragK: 0.36,
     zeroRange: 50, // subsonic: 20 cm low at 100 m, 74 cm at 150 m
-    spreadHip: 2.0,
     spreadAds: 0.2,
     spreadPerShot: 0.25,
     spreadMax: 3.2,
@@ -153,7 +153,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     drawTime: 0.62,
     holsterTime: 0.4,
     hipPos: [0.118, -0.192, -0.3],
-    hipRot: [-0.05, 0.081, -0.135],
+    hipRot: [0.004, 0.003, -0.135],
     adsCant: [0, 0, 0],
     eyeRelief: 0.06,
     fits: {
@@ -193,7 +193,6 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     dragK: 0.28,
     zeroRange: 200, // flat to ~250 m; 18 cm low at 300 m
     /* --- accuracy (degrees) --- */
-    spreadHip: 2.05,
     spreadAds: 0.24,
     spreadPerShot: 0.3,
     spreadMax: 3.4,
@@ -229,7 +228,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
      * Shared handling offsets for the authored M4; attachment datums and
      * wrist/finger trajectories belong to the Blender asset. */
     hipPos: [0.118, -0.185, -0.3],
-    hipRot: [-0.05, 0.081, -0.135],
+    hipRot: [0.002, 0.001, -0.135],
     adsCant: [0, 0, 0.004],
     // Bring the eye closer to open the rear aperture; its bore and aim datum stay authored.
     eyeRelief: 0.03,
@@ -276,7 +275,6 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     maxRange: 240,
     dragK: 0.42,
     zeroRange: 50, // 11 cm low at 100 m, 42 cm at 150 m
-    spreadHip: 2.5,
     spreadAds: 0.4,
     spreadPerShot: 0.26,
     spreadMax: 3.9,
@@ -308,10 +306,10 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     firingShoulderZ: 0.12, // MPX inspection must not stretch a behind-eye arm.
     adsFiringShoulderZ: 0.28, // ADS shoulder anchor stays behind the wrist.
     hipPos: [0.111, -0.163, -0.288],
-    hipRot: [-0.05, 0.072, -0.131],
+    hipRot: [0.005, 0.002, -0.131],
     adsCant: [0, 0, 0.005],
-    // Aim through the deployed rear peep.
-    eyeRelief: 0.06,
+    // Keep the deployed peep centred without letting its housing dominate ADS.
+    eyeRelief: 0.095,
     fits: {
       optic: OPTIC_FITS,
       muzzle: { suppressor: { model: 'srd762ti' } },
@@ -348,7 +346,6 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     maxRange: 520,
     dragK: 0.22,
     zeroRange: 200, // flat to 250 m; 24 cm low at 300 m
-    spreadHip: 2.6,
     spreadAds: 0.34,
     spreadPerShot: 0.32,
     spreadMax: 3.8,
@@ -380,7 +377,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     supportShoulderZ: -0.07,
     // Bore-aligned pose; the left-side belt box remains visible at hip.
     hipPos: [0.118, -0.185, -0.3],
-    hipRot: [-0.074, 0.081, -0.135],
+    hipRot: [0.002, 0.001, -0.135],
     adsCant: [0, 0, 0.004],
     eyeRelief: 0.03,
     fits: {
@@ -422,7 +419,6 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     maxRange: 180,
     dragK: 0.46,
     zeroRange: 25, // the 5-50 m band: 2 cm low at 50 m
-    spreadHip: 3.1,
     spreadAds: 0.5,
     spreadPerShot: 0.42,
     spreadMax: 4.6,
@@ -458,7 +454,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
      * past ~0.40 m the two-bone solve hits full extension and they lock. */
     hipPos: [0.115, -0.15, -0.38],
     supportShoulderZ: 0.14,
-    hipRot: [-0.05, 0.066, -0.115],
+    hipRot: [0.005, 0.005, -0.115],
     adsCant: [0, 0, 0.003],
     eyeRelief: 0.34,
     // Fixed iron sights; only the under-barrel laser and compact can are supported.
@@ -526,7 +522,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     // Prototype conventional-stock wrist: body shoulder only, native grip stays fixed.
     firingShoulderZ: 0.45,
     hipPos: [0.118, -0.175, -0.3],
-    hipRot: [-0.05, 0.078, -0.125],
+    hipRot: [0.003, 0.003, -0.125],
     adsCant: [0, 0, 0.003],
     eyeRelief: 0.28,
     // Extended integrated-sight rail seats RMR/ACOG and both PM II pedestals.
@@ -567,7 +563,6 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     maxRange: 900,
     dragK: 0.14,
     zeroRange: 300, // 12 cm high at 150 m, 25 cm low at 400 m
-    spreadHip: 3.8,
     spreadAds: 0.06,
     spreadPerShot: 0.7,
     spreadMax: 4.6,
@@ -594,7 +589,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     drawTime: 0.88,
     holsterTime: 0.56,
     hipPos: [0.124, -0.2, -0.34],
-    hipRot: [-0.055, 0.078, -0.13],
+    hipRot: [0.002, 0, -0.13],
     adsCant: [0, 0, 0],
     eyeRelief: 0.07,
     fits: {
@@ -663,6 +658,9 @@ export function buildRecoilPattern(
 export function shotInterval(def: Pick<WeaponDef, 'boltAction' | 'boltTime' | 'rpm'>): number {
   return def.boltAction ? (def.boltTime ?? 1.1) : 60 / def.rpm;
 }
+
+/** Hip sway gain over each weapon's `swayScale`, scaled by stance/movement steadiness. */
+export const HIP_SWAY = 3;
 
 export const SPREAD_MODS = {
   crouch: 0.78,

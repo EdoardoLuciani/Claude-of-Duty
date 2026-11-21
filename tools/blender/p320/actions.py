@@ -20,7 +20,7 @@ def eq(e):
 
 def author_actions(root,asset,rig,parts,mag,spare,slide,barrel,trigger,catch,round_live):
     scene=bpy.context.scene
-    ref=json.loads((root/'assets/weapons/p320-compact/hand-reference.json').read_text())
+    ref=json.loads((root/'src/weapons/authored/p320-compact/hand-reference.json').read_text())
     controls=[];hand_controls={}
     def control(name):
         o=bpy.data.objects.new(name,None);asset.objects.link(o);o.parent=rig
@@ -194,7 +194,7 @@ def author_actions(root,asset,rig,parts,mag,spare,slide,barrel,trigger,catch,rou
     # Blender. Exported controls drive those same named joints in the game.
     hand_collection=bpy.data.collections.new('P320 | authored hands (shared appearance)')
     scene.collection.children.link(hand_collection)
-    source=root/'assets/player/arms/player-arms.blend'
+    source=root/'.cache/blender/player/arms/player-arms.blend'
     with bpy.data.libraries.load(str(source),link=False) as (available,loaded):
         loaded.objects=list(available.objects)
     loaded_objects=[o for o in loaded.objects if o]

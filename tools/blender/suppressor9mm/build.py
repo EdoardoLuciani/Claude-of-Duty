@@ -5,7 +5,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import can
 
-root, out = can.begin('SUPPRESSOR9MM', 'assets/attachments/compact-9mm')
+root, out = can.begin('SUPPRESSOR9MM', '.cache/blender/attachments/compact-9mm')
 
 
 def material(name, color, metal, rough):

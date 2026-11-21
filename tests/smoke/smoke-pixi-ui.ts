@@ -387,8 +387,11 @@ score.update({
 assert.equal(score.score, '000123');
 assert.equal(score.credits, '000045');
 assert.equal(score.status, 'SUPPLIES IN 3s');
-score.update({ waveIncoming: true, nextWaveIn: 4.2 });
+score.update({ wave: 2, waveIncoming: true, nextWaveIn: 4.2 });
 assert.equal(score.status, 'NEXT WAVE 5s');
+score.update({ wave: 0, waveIncoming: true, nextWaveIn: 15 });
+assert.equal(score.wave, '1');
+assert.equal(score.status, 'WAVE 1 IN 15s');
 score.update({ enemiesRemaining: 1 });
 assert.equal(score.status, '1 HOSTILE');
 count.update(0.1, 5);

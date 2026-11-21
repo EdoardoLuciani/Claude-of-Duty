@@ -83,7 +83,7 @@ WEAPONS=[
     ('ax338/ax338',('Continuous top rail','Rail tooth'),('Laser rail adapter tooth','Laser rail adapter groove bed')),
 ]
 for file,optic_names,rail_names in WEAPONS:
-    bpy.ops.wm.open_mainfile(filepath=str(ROOT/'assets/weapons'/(file+'.blend')))
+    bpy.ops.wm.open_mainfile(filepath=str(ROOT/'.cache/blender/weapons'/(file+'.blend')))
     for obj in bpy.context.scene.objects:
         if obj.animation_data:
             obj.animation_data.action=None

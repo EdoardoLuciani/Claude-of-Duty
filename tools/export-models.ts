@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Stage Blender-authored soldiers. This script never runs Blender:
- * tools/build-assets.ts regenerates assets/soldiers/ first.
+ * tools/build-assets.ts regenerates .cache/blender/soldiers/ first.
  *
  * Content hashing covers shared inputs and canonical products. Missing outputs
  * force a full restage; --force bypasses the cache. Keep the pid lock and atomic

@@ -51,6 +51,7 @@ const HUD_DEFAULTS = {
   ads: false,
   airborne: false,
   baseSpread: 5.5,
+  hidden: false,
   score: 0,
   wave: 0,
   enemiesRemaining: 0,
@@ -122,7 +123,6 @@ export class UiSystem {
   hudVisible: number = 1;
   hudTarget!: number;
   _lastRaw!: number;
-  _hadPointerLock!: boolean;
   _marketJustClosed!: boolean;
   _healPrompt: boolean = false;
   _bakeFrame: number = 0;
@@ -161,7 +161,6 @@ export class UiSystem {
 
     this.hudTarget = 1;
     this._lastRaw = ctx.time.raw;
-    this._hadPointerLock = false;
     this._marketJustClosed = false; // one frame after the shop closes
 
     for (let i = 0; i < MAX_BLIPS; i++) this._blips[i] = { x: 0, z: 0, kind: 'enemy', heading: 0 };
@@ -240,7 +239,6 @@ export class UiSystem {
       this.sfx('market_close', 0.7);
       // The shop released the pointer and possibly consumed the Escape that
       // closed it — keep the pause machinery out of this frame entirely.
-      this._hadPointerLock = false;
       this._marketJustClosed = true;
       this.ctx.input.requestPointerLock();
     });
@@ -274,7 +272,6 @@ export class UiSystem {
     // shot; leaving ammo, crosshair and minimap over it defeats the cinematic.
     on('player:death', (): void => {
       this.hudTarget = 0;
-      this._hadPointerLock = false;
       const run = ctx.peek('game')?.getHudState() ?? this.state;
       this.gameOver.show(run, ctx.peek('market')?.credits ?? 0);
     });
@@ -444,7 +441,6 @@ export class UiSystem {
     // Resume happens between frames; reveal only after normal active pose hooks.
     if (this.startGate && !this.startGate.afterPose()) {
       this.pixiHud?.setVisible(false);
-      this._hadPointerLock = false;
       return;
     }
     const s = this.state;
@@ -461,11 +457,7 @@ export class UiSystem {
     } else if (ctx.input.enabled && !ctx.input.frozen && !playerDead && !marketOpen) {
       if (ctx.input.actionPressed('pause')) this.menu.toggle();
       // Losing pointer lock mid-match is the same intent as pressing Escape.
-      if (ctx.input.pointerLocked) this._hadPointerLock = true;
-      else if (this._hadPointerLock && !this.menu.open) {
-        this._hadPointerLock = false;
-        this.menu.show();
-      }
+      else if (ctx.input.lockLost) this.menu.show();
     }
     this.menu.update(rawDt);
     this.gameOver.update(rawDt);
@@ -483,6 +475,7 @@ export class UiSystem {
       s.reloadProgress = ws.reloadProgress;
       s.ads = ws.ads;
       s.baseSpread = 4 + ws.spread * 40;
+      s.hidden = !ws.crosshair;
       s.lethalCount = ws.lethalCount;
       s.cooking = ws.cooking;
       s.grenadeEquipped = ws.grenadeEquipped;

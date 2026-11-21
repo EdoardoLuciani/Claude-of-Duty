@@ -5,10 +5,10 @@ import type { Node, UniformNode } from 'three/webgpu';
 
 import { Spring, TAU, clamp, clamp01, damp, lerp, smootherstep } from '../core/math.ts';
 import { loadArmAsset } from './arm-asset.ts';
+import type { AttachmentConfig } from './attachment-rules.ts';
 import {
   configureWeaponAttachments,
   releaseAttachmentMounts,
-  type AttachmentConfig,
   type AttachmentAssets,
 } from './attachments.ts';
 import { createWeaponAnimation } from './authored-animation.ts';
@@ -23,7 +23,7 @@ import {
   BANDAGE_ELBOW_R,
 } from './bandage-path.ts';
 import type { Clip } from './clips.ts';
-import type { WeaponDef } from './defs.ts';
+import { HIP_SWAY, type WeaponDef } from './defs.ts';
 import { HAND_POSES } from './hand-poses.ts';
 import { Arm } from './hands.ts';
 import type { ReticleMaterials } from './materials-tsl.ts';
@@ -51,6 +51,31 @@ const _q = new THREE.Quaternion();
 const _q2 = new THREE.Quaternion();
 const _e = new THREE.Euler(0, 0, 0, 'XYZ');
 const _m = new THREE.Matrix4();
+
+/** Map a rigid first-person ray (direction, and origin if given) through the separate
+ * view FOV into world framing in place, so it lands where the player sees it. */
+export function viewRayToWorld(
+  camera: THREE.PerspectiveCamera,
+  viewCamera: THREE.PerspectiveCamera,
+  direction: THREE.Vector3,
+  origin?: THREE.Vector3
+): void {
+  camera.updateMatrixWorld();
+  viewCamera.updateMatrixWorld();
+  const ratio =
+    Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) /
+    Math.tan(THREE.MathUtils.degToRad(viewCamera.fov / 2));
+  if (origin) {
+    origin.applyMatrix4(viewCamera.matrixWorldInverse);
+    origin.x *= ratio;
+    origin.y *= ratio;
+    origin.applyMatrix4(camera.matrixWorld);
+  }
+  direction.transformDirection(viewCamera.matrixWorldInverse);
+  direction.x *= ratio;
+  direction.y *= ratio;
+  direction.transformDirection(camera.matrixWorld);
+}
 
 /** Duration of the arm throw, and the beat where the grenade leaves. The
  *  long throw is the big overhead heave; the short throw is a faster, more
@@ -346,6 +371,8 @@ export class Viewmodel {
   recRot: Spring3 = new Spring3();
   settle: Spring3 = new Spring3(2.05, 0.77);
   sprintT: number = 0;
+  /** Smoothed `ViewState.steadiness`: stance/movement steps would otherwise snap the sway. */
+  steadiness: number = 1;
 
   constructor(ctx: ViewmodelContext, mats: ReticleMaterials) {
     this.ctx = ctx;
@@ -569,7 +596,7 @@ export class Viewmodel {
     }
     this.active = w;
     w.animation.reset();
-    w.group.visible = true;
+    w.group.visible = !this._grenadeState && !this._radioState && !this._bandageState;
     this.recPos.reset();
     this.recRot.reset();
     this.settle.reset();
@@ -1043,6 +1070,7 @@ export class Viewmodel {
     const sprintTarget = s.sprint && !this.clip ? 1 : 0;
     this.sprintT = damp(this.sprintT, sprintTarget, 9, dt);
     this.lowReadyT = damp(this.lowReadyT, s.lowReady ? 1 : 0, 8, dt);
+    this.steadiness = damp(this.steadiness, s.steadiness, 6, dt);
 
     const hipP = def.hipPos;
     const hipR = def.hipRot;
@@ -1081,7 +1109,9 @@ export class Viewmodel {
       this._baseQuat.slerp(this._adsQuat, ads);
     }
 
-    const swayScale = def.swayScale * lerp(1, 0.22, ads) * lerp(1, 1.5, this.sprintT);
+    // Sprint keeps its own sway.
+    const hipSway = lerp(HIP_SWAY * this.steadiness, 1, this.sprintT);
+    const swayScale = def.swayScale * lerp(hipSway, 0.22, ads) * lerp(1, 1.5, this.sprintT);
     this.noiseT += dt;
     const n = this.noise;
     const nr = this.noiseRates;
@@ -1124,10 +1154,11 @@ export class Viewmodel {
       clamp(av.pitch * 0.014, -0.04, 0.04) * lagScale,
       clamp(-Math.abs(av.yaw) * 0.006, -0.03, 0.03) * lagScale
     );
+    // Pitch/yaw lag is hip aim error; roll spins about the bore and keeps the turn's feel.
     this.lagRot.step(
       dt,
-      clamp(-av.pitch * 0.075, -0.24, 0.24) * lagScale,
-      clamp(av.yaw * 0.085, -0.3, 0.3) * lagScale,
+      clamp(-av.pitch * 0.022, -0.07, 0.07) * lagScale,
+      clamp(av.yaw * 0.025, -0.09, 0.09) * lagScale,
       clamp(-av.yaw * 0.055, -0.2, 0.2) * lagScale
     );
     px += this.lag.x;

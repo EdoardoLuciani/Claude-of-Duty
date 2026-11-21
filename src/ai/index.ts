@@ -1,5 +1,5 @@
 /** Soldiers, navigation, perception, squads and wave progression.
- * Build navigation and the garrison during init; frame queries use bounded budgets.
+ * Build navigation during init; frame queries use bounded budgets.
  * Prewarm borrows real materials/geometry without actors, simulation, IDs or RNG consumption.
  * API/event and worker ownership contracts live in ARCHITECTURE.md.
  */
@@ -8,13 +8,13 @@ import * as THREE from 'three';
 
 import type { SystemId, EngineContext, EngineSystems } from '../core/context.ts';
 import type { EngineEventMap } from '../core/events.ts';
+import { GRENADE_FUSE, clearGrenades, updateGrenades, type LiveGrenade } from '../core/grenades.ts';
 import type { SoldierRecord } from '../core/model-metadata.ts';
 import type { Rng } from '../core/rng.ts';
 import type { PhysicsSystem } from '../physics/index.ts';
 import type { SkySystem } from '../sky/index.ts';
-import { GRENADE_RADIUS, GRENADE_DAMAGE, GRENADE_FUSE } from '../weapons/index.ts';
 import { isAliveTeammate } from './actor.ts';
-import { Agent, STATE, PATH_OUTCOME } from './agent.ts';
+import { Agent, STATE } from './agent.ts';
 import type { AgentOptions } from './agent.ts';
 import { AttachmentQueries } from './attachment-queries.ts';
 import { GroundShadows } from './grounding.ts';
@@ -23,11 +23,12 @@ import { createLadderDescriptors } from './ladder.ts';
 import type { LadderDescriptor } from './ladder.ts';
 import { NAV_VERSION } from './nav-format.ts';
 import { SurfaceNav, CoverMap, NAV_PENDING, NAV_CANCELLED } from './nav.ts';
+import { PATH_DEFERRED, type PathCompletion, type PathResult } from './path-result.ts';
 import { RIG } from './rig.ts';
 import { prepareSoldierSurfaces, resolveVariantName, VARIANTS } from './soldier.ts';
 import { Squad } from './squad.ts';
 import { SoldierMaterialsNode } from './textures-tsl.ts';
-import { COMBAT, GRENADE } from './tuning.ts';
+import { COMBAT, GRENADE, OPENING_WAVE_DELAY } from './tuning.ts';
 import { isVector3Like } from './validation.ts';
 
 export type AiVariant = Pick<SoldierRecord, 'geometry' | 'weapon' | 'stats' | 'variant'> & {
@@ -143,10 +144,7 @@ export class AiSystem {
   grid: SurfaceNav | null = null;
   cover: CoverMap | null = null;
   inspect: boolean = false;
-  /** dev: force the garrison to spawn even in deterministic capture runs */
-  forcePopulate: boolean = false;
-  /** Wave director: the boot garrison is wave 1; every time the field goes
-   *  quiet the next wave arrives after a short beat. Unlimited by design. */
+
   _wave: number = 0;
   _waveTotal: number = 0;
   _waveRemaining: number = 0;
@@ -211,12 +209,7 @@ export class AiSystem {
     position: new THREE.Vector3(),
     velocity: new THREE.Vector3(),
   };
-  _grenades: {
-    body: ReturnType<PhysicsSystem['addRigidBody']>;
-    mesh: THREE.Mesh;
-    fuse: number;
-    agent: Agent;
-  }[] = [];
+  _grenades: LiveGrenade<ReturnType<PhysicsSystem['addRigidBody']>>[] = [];
   _grenadeArc: GrenadeArc = { dx: 0, dz: 0, dist: 0, vy: 0, vh: 0, tAir: 0, y: 0, valid: false };
   _grenadePoint: THREE.Vector3 = new THREE.Vector3();
   _grenadeStep: THREE.Vector3 = new THREE.Vector3();
@@ -225,11 +218,6 @@ export class AiSystem {
   /** Shared solve budget, including endpoint checks. Serve deferred actors
    *  round-robin before fresh requests; entering combat must not burst solves. */
   pathsPerFrame: number = 2;
-  lastPathOutcome: string | null = null;
-  lastPathResFloor: number = NaN;
-  lastPathReason: string | null = null;
-  declare lastPathStartSurface: number;
-  declare lastPathGoalSurface: number;
   _pathCursor: number = 0;
   _frustum: THREE.Frustum = new THREE.Frustum();
   _mvp: THREE.Matrix4 = new THREE.Matrix4();
@@ -266,7 +254,6 @@ export class AiSystem {
     this.ground = new GroundShadows(this.root, 16);
 
     this.stats.pathsDeferred = 0;
-    this.lastPathStartSurface = this.lastPathGoalSurface = 0;
 
     this._wireEvents(ctx);
     console.info(
@@ -305,7 +292,7 @@ export class AiSystem {
     // handed to the player. Missing or incompatible cooked data fails boot;
     // there is deliberately no first-frame bake or legacy-grid fallback.
     await this._buildNav();
-    if (!ctx.config.deterministic || this.forcePopulate) this.startWave(1);
+    if (!ctx.config.deterministic) this._queueOpeningWave();
     await this.prewarmMaterials();
   }
 
@@ -958,7 +945,7 @@ export class AiSystem {
     return s;
   }
 
-  /** Remove the previous run and immediately stage a fresh wave. */
+  /** Remove the previous run and rearm the opening countdown. */
   resetForNewGame(): void {
     this.grid?.worker?.clear();
     for (const a of this.agents) a.dispose();
@@ -966,11 +953,7 @@ export class AiSystem {
     this.ladderClaims.clear();
     this._ladderQueue.clear();
     this.squads.length = 0;
-    for (const g of this._grenades) {
-      this.phys.removeRigidBody(g.body);
-      g.mesh.removeFromParent();
-    }
-    this._grenades.length = 0;
+    clearGrenades(this._grenades, this._phys);
     this._wave = 0;
     this._waveTotal = 0;
     this._waveRemaining = 0;
@@ -980,7 +963,13 @@ export class AiSystem {
     this.stats.agents = 0;
     this.stats.alive = 0;
     this.cover?.releaseAll();
-    if (!this.ctx.config.deterministic && this.grid) this.startWave(1);
+    if (!this.ctx.config.deterministic && this.grid) this._queueOpeningWave();
+  }
+
+  private _queueOpeningWave(): void {
+    this._wavePending = true;
+    // Scaled time is frozen until Start hands over control, and during pause.
+    this._nextWaveAt = this.ctx.time.elapsed + OPENING_WAVE_DELAY;
   }
 
   /** 0 at night, 1 in full daylight. Drives both flash gains below. */
@@ -1163,28 +1152,13 @@ export class AiSystem {
       object3D: mesh,
       surfaceType: 'metal',
     });
-    this._grenades.push({ body, mesh, fuse: GRENADE_FUSE, agent });
+    this._grenades.push({ body, mesh, fuse: GRENADE_FUSE, source: agent });
     agent.animator.fire(0.35);
     return true;
   }
 
   _updateGrenades(dt: number): void {
-    for (let i = this._grenades.length - 1; i >= 0; i--) {
-      const g = this._grenades[i];
-      g.fuse -= dt;
-      if (g.fuse > 0) continue;
-      const p = g.body.position;
-      this.ctx.events.emit('explosion', {
-        kind: 'grenade',
-        position: new THREE.Vector3(p.x, p.y, p.z),
-        radius: GRENADE_RADIUS,
-        damage: GRENADE_DAMAGE,
-        source: g.agent,
-      });
-      this.phys.removeRigidBody(g.body);
-      this.root.remove(g.mesh);
-      this._grenades.splice(i, 1);
-    }
+    updateGrenades(this._grenades, dt, this.ctx, this._phys);
   }
 
   update(dt: number, ctx: EngineContext): void {
@@ -1251,9 +1225,8 @@ export class AiSystem {
   }
 
   /**
-   * Wave director. `startWave(1)` opens the run; the moment no real
-   * (non-staged) enemy is alive, `_wavePending` arms a respawn beat and
-   * the next wave spawns at the far spawn points. Waves grow slowly and cap at
+   * Wave director. The opening countdown uses the same pending state as later
+   * waves, without reporting a wave clear. Waves grow slowly and cap at
    * 3 squads x 4 (12 concurrent enemies) to stay inside the frame budget.
    */
   _updateWaves(ctx: EngineContext): void {
@@ -1298,32 +1271,27 @@ export class AiSystem {
     g.end();
   }
 
-  /**
-   * Shared surface query, rationed. Returns the waypoint count, or -1 when this
-   * frame's budget is spent — the caller keeps its old path and asks again next
-   * frame, which is invisible at 60 Hz and turns a squad-wide repath (six solves,
-   * ~5 ms, on the frame the player opens fire) into two solves per frame.
-   */
+  /** Ration completed solves; deferrals preserve both caller buffers for retry. */
   requestPath(
     from: THREE.Vector3,
     dest: THREE.Vector3,
     out: THREE.Vector3[],
+    completion: PathCompletion,
     actor: Agent | null = null
-  ): number {
-    if (!this.grid) {
-      this.lastPathOutcome = PATH_OUTCOME.INVALID;
-      this.lastPathReason = 'nav-unavailable';
-      this.lastPathResFloor = NaN;
-      this.lastPathStartSurface = this.lastPathGoalSurface = 0;
-      return 0;
+  ): PathResult {
+    const grid = this.grid;
+    if (!grid) {
+      completion.outcome = 'invalid';
+      completion.reason = 'nav-unavailable';
+      completion.count = 0;
+      completion.resolvedFloor = NaN;
+      completion.startSurface = completion.goalSurface = 0;
+      return completion;
     }
     if (this._pathBudget <= 0) {
       this.stats.pathsDeferred++;
-      this.lastPathOutcome = PATH_OUTCOME.DEFERRED;
-      this.lastPathReason = 'frame-budget';
-      return -1;
+      return PATH_DEFERRED.budget;
     }
-    const grid = this.grid;
     const solve = (): number =>
       actor && out === actor.path
         ? grid.findRoute(from, dest, actor.route, actor)
@@ -1331,17 +1299,16 @@ export class AiSystem {
     const n = grid.worker ? grid.worker.run(actor?.id ?? -1, 'path', solve, from) : solve();
     if (n === NAV_PENDING || n === NAV_CANCELLED) {
       this.stats.pathsDeferred++;
-      this.lastPathOutcome = PATH_OUTCOME.DEFERRED;
-      this.lastPathReason = n === NAV_PENDING ? 'attachment-pending' : 'attachment-superseded';
-      return -1;
+      return n === NAV_PENDING ? PATH_DEFERRED.pending : PATH_DEFERRED.superseded;
     }
     this._pathBudget--;
-    this.lastPathOutcome = this.grid.lastOutcome;
-    this.lastPathReason = this.grid.lastReason;
-    this.lastPathResFloor = this.grid.resolvedFloor;
-    this.lastPathStartSurface = this.grid.startSurface;
-    this.lastPathGoalSurface = this.grid.goalSurface;
-    return n;
+    completion.count = n;
+    completion.outcome = grid.lastOutcome;
+    completion.reason = grid.lastReason;
+    completion.resolvedFloor = grid.resolvedFloor;
+    completion.startSurface = grid.startSurface;
+    completion.goalSurface = grid.goalSurface;
+    return completion;
   }
 
   _servePendingPaths(): void {
@@ -1831,11 +1798,7 @@ export class AiSystem {
     this.ladderClaims?.clear();
     this._ladderQueue?.clear();
     this.squads.length = 0;
-    for (const g of this._grenades) {
-      this.phys?.removeRigidBody(g.body);
-      this.root.remove(g.mesh);
-    }
-    this._grenades.length = 0;
+    clearGrenades(this._grenades, this._phys);
     this.ground?.dispose();
     this.grid?.dispose();
     this.grid = null;

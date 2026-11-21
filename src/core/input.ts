@@ -36,6 +36,17 @@ const GAME_KEYS: ReadonlySet<string> = new Set(
     .filter((binding): boolean => !binding.startsWith('Mouse'))
 );
 
+declare global {
+  // Fullscreen keyboard lock (WHATWG Fullscreen) and Chromium's Keyboard Lock
+  // API are not in the bundled DOM typings yet.
+  interface FullscreenOptions {
+    keyboardLock?: 'browser';
+  }
+  interface Navigator {
+    keyboard?: { lock(codes: string[]): Promise<void> };
+  }
+}
+
 type InputConfig = { sensitivity: number; invertY: boolean };
 type Point2 = { x: number; y: number };
 type InputHandlers = {
@@ -68,6 +79,8 @@ export class Input {
   wheel: number = 0;
   _pendingWheel: number = 0;
   pointerLocked: boolean = false;
+  /** True for the frame after a held pointer lock was lost; a denied request never sets it. */
+  lockLost: boolean = false;
   // Keyboard events can still drive movement when pointer lock is denied or
   // while the pointer-lock transition is in flight. Remember that the canvas
   // was clicked so browser shortcuts are suppressed for that active game
@@ -140,6 +153,18 @@ export class Input {
     } catch {
       /* not eligible — keep running unlocked */
     }
+  }
+
+  /**
+   * Fullscreen with keyboard lock on game keys. Call after requestPointerLock:
+   * the fullscreen request consumes the click's user activation.
+   */
+  requestFullscreen(): void {
+    if (!document.fullscreenEnabled || document.fullscreenElement) return;
+    document.documentElement
+      .requestFullscreen({ keyboardLock: 'browser' })
+      .then((): Promise<void> | undefined => navigator.keyboard?.lock([...GAME_KEYS]))
+      .catch((): void => {}); // Windowed play remains supported.
   }
 
   /** True while keyboard input belongs to the active game rather than the menu. */
@@ -215,7 +240,9 @@ export class Input {
   }
 
   _onLockChange(): void {
-    this.pointerLocked = document.pointerLockElement === this.canvas;
+    const locked = document.pointerLockElement === this.canvas;
+    if (this.pointerLocked && !locked) this.lockLost = true;
+    this.pointerLocked = locked;
     if (!this.pointerLocked) this._onBlur();
   }
 
@@ -245,6 +272,7 @@ export class Input {
     this._started.clear();
     this.look.x = this.look.y = this._rawLook.x = this._rawLook.y = 0;
     this.wheel = this._pendingWheel = 0;
+    this.lockLost = false;
     this.stick.moveX = this.stick.moveY = this.stick.lookX = this.stick.lookY = 0;
   }
 
@@ -285,7 +313,9 @@ export class Input {
     this._pollGamepad();
   }
 
-  endFrame(): void {}
+  endFrame(): void {
+    this.lockLost = false;
+  }
 
   _pollGamepad(): void {
     if (!this.enabled) {
