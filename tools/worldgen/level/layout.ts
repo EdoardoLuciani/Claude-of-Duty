@@ -35,6 +35,7 @@ export const ALLEYS: { rect: [number, number, number, number]; surface: string }
  * Buildings. `w` is the X extent, `d` the Z extent.
  * Interiors are described in normalised room coordinates (0..1 across the
  * interior), so a plan survives a change of footprint.
+ * Balconies are [side, floor, bay, depth in metres, railing]; floor and bay are zero-based.
  */
 export const BUILDINGS: BuildingSpec[] = [
   // ------------------------------------------------------------- west row --
@@ -50,10 +51,13 @@ export const BUILDINGS: BuildingSpec[] = [
     streetSide: 1,
     secondarySide: 0,
     damage: 0.15,
-    balconies: 0.3,
-    // The full-width terrace is the street frontage; separate balcony rails
-    // inside it duplicate that form.
-    omitBalconies: { 1: { 0: true, 2.799999999999999: true } },
+    balconies: [
+      [0, 1, 0, 1.102, 'metal'],
+      [0, 1, 1, 1.2583, 'metal'],
+      [1, 1, 4, 1.1295, 'concrete'],
+    ],
+    // This doorway opens onto the setback terrace rather than a separate slab.
+    bayKinds: { 1: { 1: { 2: 'balconyDoor' } } },
     doorBays: { 0: 2, 1: 1 },
     enterable: true,
     interiorFloors: 1,
@@ -104,7 +108,13 @@ export const BUILDINGS: BuildingSpec[] = [
     streetSide: 1,
     secondarySide: 2,
     damage: 0.25,
-    balconies: 0.55,
+    balconies: [
+      [1, 1, 0, 1.2704, 'concrete'],
+      [2, 1, 0, 1.0859, 'metal'],
+      [2, 1, 1, 1.1292, 'metal'],
+      [2, 1, 2, 1.2994, 'metal'],
+      [2, 1, 3, 1.1557, 'concrete'],
+    ],
     arches: true,
     doorBays: { 1: 1, 2: 3 },
     enterable: true,
@@ -156,9 +166,12 @@ export const BUILDINGS: BuildingSpec[] = [
     streetSide: 1,
     secondarySide: 0,
     damage: 0.3,
-    balconies: 0.6,
-    // Flagged balcony: it hangs over the setback terrace with nothing to open onto.
-    omitBalconies: { 1: { '-1.625': true } },
+    balconies: [
+      [0, 1, 0, 1.034, 'concrete'],
+      [0, 1, 2, 1.3493, 'metal'],
+      [0, 1, 3, 1.3094, 'metal'],
+      [1, 1, 0, 1.2584, 'metal'],
+    ],
     doorBays: { 1: 2 },
     // The interior camera stands in the shop and looks out through bay 1 of the
     // street facade, so that bay is an open shopfront by hand, not by dice.
@@ -238,9 +251,9 @@ export const BUILDINGS: BuildingSpec[] = [
     streetSide: 1,
     secondarySide: 2,
     damage: 0.55,
+    balconies: [[1, 1, 0, 1.2482, 'metal']],
     ruin: true,
     ruinSide: 1,
-    balconies: 0.3,
     doorBays: { 1: 0 },
     enterable: true, // walkable ruin; the dark shell had no collision
     wallCuts: [{ side: 2, f: 1, x: -1.625, w: 1.8, h: 2.36 }],
@@ -293,14 +306,15 @@ export const BUILDINGS: BuildingSpec[] = [
     streetSide: 1,
     secondarySide: 0,
     damage: 0.3,
-    balconies: 0.5,
-    // Same as W2 — both upper street balconies hang over the terrace.
-    omitBalconies: { 1: { '-1.5625': true, 1.5625: true } },
+    balconies: [[0, 1, 1, 1.2836, 'concrete']],
     arches: true,
     doorBays: { 0: 3, 1: 3 },
     // This existing shop opening carries the stair route. Raise its shutter
     // and remove the low counter instead of leaving an unexecutable shortcut.
-    bayKinds: { 0: { 0: { 2: { kind: 'shop', clearanceOnly: true } } } },
+    bayKinds: {
+      0: { 0: { 2: { kind: 'shop', clearanceOnly: true } } },
+      1: { 1: { 1: 'balconyDoor' } }, // opens onto the setback terrace
+    },
     enterable: true,
     interiorFloors: 1,
     roofProps: 4,
@@ -347,6 +361,11 @@ export const BUILDINGS: BuildingSpec[] = [
     wallKey: 'plaster_blue',
     streetSide: 3,
     damage: 0.2,
+    balconies: [
+      [3, 1, 0, 1.3481, 'metal'],
+      [3, 1, 3, 1.0929, 'concrete'],
+      [3, 1, 4, 1.1643, 'concrete'],
+    ],
     doorBays: { 3: 2 },
     enterable: true,
     interiorFloors: 1,
@@ -397,7 +416,16 @@ export const BUILDINGS: BuildingSpec[] = [
     streetSide: 3,
     secondarySide: 0,
     damage: 0.3,
-    balconies: 0.45,
+    balconies: [
+      [0, 1, 1, 1.3004, 'metal'],
+      [0, 1, 2, 1.0724, 'concrete'],
+      [0, 1, 4, 1.2615, 'concrete'],
+      [0, 2, 3, 1.2991, 'concrete'],
+      [0, 2, 4, 1.2177, 'concrete'],
+      [3, 1, 0, 1.3041, 'metal'],
+      [3, 1, 2, 1.227, 'metal'],
+      [3, 2, 0, 1.1272, 'concrete'],
+    ],
     doorBays: { 3: 2, 0: 1 },
     enterable: true,
     roofAccess: true,
@@ -465,7 +493,19 @@ export const BUILDINGS: BuildingSpec[] = [
     streetSide: 3,
     secondarySide: 2,
     damage: 0.3,
-    balconies: 0.7,
+    balconies: [
+      [3, 1, 0, 1.2571, 'metal'],
+      [3, 1, 1, 1.0557, 'metal'],
+      [3, 1, 2, 1.1904, 'metal'],
+      [3, 1, 3, 1.0496, 'concrete'],
+      [3, 2, 1, 1.2926, 'metal'],
+      [3, 2, 2, 1.151, 'concrete'],
+      [3, 2, 4, 1.1872, 'metal'],
+    ],
+    // Retain the side entrances without adding slabs over the exterior stair.
+    bayKinds: {
+      2: { 1: { 0: 'balconyDoor', 2: 'balconyDoor', 4: 'balconyDoor' }, 2: { 1: 'balconyDoor' } },
+    },
     doorBays: { 2: 3, 3: 1 },
     enterable: true,
     interiorFloors: 1,
@@ -476,12 +516,12 @@ export const BUILDINGS: BuildingSpec[] = [
       {
         side: 2,
         doorX: -0.4,
+        clearAwnings: true,
         w: 1.2,
         dir: 1,
         railing: 'right',
         postEvery: 2,
         endRail: false,
-        clearBalconies: true,
       },
       {
         side: 2,
@@ -522,6 +562,11 @@ export const BUILDINGS: BuildingSpec[] = [
     streetSide: 3,
     secondarySide: 0,
     damage: 0.75,
+    balconies: [
+      [0, 1, 1, 1.0082, 'metal'],
+      [0, 1, 4, 1.2331, 'metal'],
+      [3, 1, 4, 1.0227, 'metal'],
+    ],
     ruin: true,
     ruinSide: 3,
     collapse: true,
@@ -565,8 +610,13 @@ export const BUILDINGS: BuildingSpec[] = [
     streetSide: 3,
     secondarySide: 0,
     damage: 0.35,
-    balconies: 0.4,
-    omitBalconies: { 3: { 5.6: true } },
+    balconies: [
+      [0, 2, 2, 1.0156, 'metal'],
+      [3, 1, 1, 1.3411, 'metal'],
+      [3, 2, 0, 1.3222, 'metal'],
+      [3, 2, 2, 1.1864, 'concrete'],
+    ],
+    bayKinds: { 3: { 2: { 4: 'balconyDoor' } } },
     arches: true,
     doorBays: { 0: 1, 3: 2 },
     enterable: true,
@@ -635,7 +685,7 @@ export const BUILDINGS: BuildingSpec[] = [
     wallKey: 'plaster_sand',
     streetSide: 2,
     damage: 0.3,
-    balconies: 0.2,
+    balconies: [[2, 3, 1, 1.0996, 'metal']],
     roofProps: 4,
   },
   {
@@ -714,6 +764,12 @@ export const BUILDINGS: BuildingSpec[] = [
     wallKey: 'plaster_sand',
     streetSide: 2,
     damage: 0.2,
+    balconies: [
+      [2, 1, 0, 1.2717, 'metal'],
+      [2, 1, 3, 1.3246, 'metal'],
+      [2, 2, 3, 1.0941, 'metal'],
+      [2, 2, 6, 1.0563, 'metal'],
+    ],
     roofProps: 2,
   },
   {
@@ -726,6 +782,10 @@ export const BUILDINGS: BuildingSpec[] = [
     wallKey: 'plaster_blue',
     streetSide: 2,
     damage: 0.2,
+    balconies: [
+      [2, 1, 0, 1.1839, 'metal'],
+      [2, 1, 5, 1.1681, 'metal'],
+    ],
     roofProps: 2,
   },
   {
@@ -738,6 +798,11 @@ export const BUILDINGS: BuildingSpec[] = [
     wallKey: 'plaster_cream',
     streetSide: 0,
     damage: 0.15,
+    balconies: [
+      [0, 1, 2, 1.2772, 'metal'],
+      [0, 1, 5, 1.1123, 'metal'],
+      [0, 1, 6, 1.0149, 'concrete'],
+    ],
     roofProps: 2,
   },
   {
@@ -750,6 +815,14 @@ export const BUILDINGS: BuildingSpec[] = [
     wallKey: 'plaster_pink',
     streetSide: 0,
     damage: 0.15,
+    balconies: [
+      [0, 1, 0, 1.0064, 'metal'],
+      [0, 1, 1, 1.2332, 'metal'],
+      [0, 1, 2, 1.1131, 'concrete'],
+      [0, 1, 5, 1.0729, 'concrete'],
+      [0, 2, 1, 1.2213, 'metal'],
+      [0, 2, 3, 1.0153, 'concrete'],
+    ],
     roofProps: 2,
   },
 ];

@@ -48,7 +48,7 @@ interface ExteriorStair extends StairOptions {
   dir?: number;
   out?: number;
   endRail?: boolean;
-  clearBalconies?: boolean;
+  clearAwnings?: boolean;
 }
 interface StairHole extends RectXZ {
   rails?: ('east' | 'west' | 'north' | 'south')[];
@@ -94,7 +94,13 @@ export interface BuildingSpec {
   skipSides?: number[];
   doorBays?: Partial<Record<number, number>>;
   arches?: boolean;
-  balconies?: number;
+  balconies?: [
+    side: number,
+    floor: number,
+    bay: number,
+    depth: number,
+    railing: 'concrete' | 'metal',
+  ][];
   shops?: boolean;
   ruin?: boolean;
   ruinSide?: number;
@@ -102,7 +108,6 @@ export interface BuildingSpec {
   roofProps?: number;
   roofAccess?: boolean;
   collapse?: boolean;
-  omitBalconies?: Partial<Record<number, Partial<Record<number, boolean>>>>;
   bayKinds?: Partial<
     Record<number, Partial<Record<number, Partial<Record<number, BayKind | BayOverride>>>>>
   >;
@@ -193,7 +198,15 @@ export interface BuildingInfo {
     reserved: boolean;
     authored: boolean;
   }>;
-  balconies: Array<{ side: number; x: number; y: number; w: number; d: number; pm: THREE.Matrix4 }>;
+  balconies: Array<{
+    side: number;
+    floor: number;
+    bay: number;
+    x: number;
+    y: number;
+    d: number;
+    pm: THREE.Matrix4;
+  }>;
   windows: Array<{
     side: number;
     f: number;
@@ -491,6 +504,8 @@ export function buildBuilding(A: Assembler, spec: BuildingSpec): BuildingInfo {
       }
     }
   }
+  if (spec.balconies && info.balconies.length !== spec.balconies.length)
+    throw new Error(`[world] ${spec.id} has duplicate or out-of-range balcony bays`);
   info.roofY = y;
   info.top = y;
   if (spec.enterable) {
@@ -639,8 +654,8 @@ function buildFacade(
 
   const ruinTop = spec.ruin && f === floors - 1;
   const cut = spec.wallCuts?.find((c): boolean => c.side === side && c.f === f);
-  const clearBal = spec.exteriorStairs?.some(
-    (s): boolean | undefined => s.side === side && s.clearBalconies
+  const clearAwnings = spec.exteriorStairs?.some(
+    (stair): boolean => stair.side === side && !!stair.clearAwnings
   );
   const reservedBays = stairReservedBays(spec, side, f, info, len, bw, bays);
   // A walkable room stands behind this floor's windows (not a dark backing card).
@@ -669,7 +684,6 @@ function buildFacade(
     } else {
       if (rng.float() < (openFace ? 0.88 : 0.6)) {
         kind = spec.arches && f === 1 ? 'arch' : 'window';
-        if (openFace && f >= 1 && rng.float() < (spec.balconies ?? 0.35)) kind = 'balconyDoor';
       }
     }
     if (ruinTop && rng.float() < 0.5) kind = kind === 'blank' ? 'blank' : 'ragged';
@@ -680,9 +694,16 @@ function buildFacade(
      * connects an alley to a stairwell). A string names the kind; an object
      * additionally passes options to the kit element.
      */
-    let forced = spec.bayKinds?.[side]?.[f]?.[b];
-    if (typeof forced === 'string') forced = { kind: forced };
-    if (forced) kind = forced.kind;
+    const override = spec.bayKinds?.[side]?.[f]?.[b];
+    const forced = typeof override === 'string' ? { kind: override } : override;
+    const deck = spec.balconies?.find(
+      ([s, floor, bay]): boolean => s === side && floor === f && bay === b
+    );
+    if (deck && kitA !== A)
+      throw new Error(
+        `[world] ${spec.id} balcony conflicts with an obstruction at ${side}/${f}/${b}`
+      );
+    kind = deck ? 'balconyDoor' : (forced?.kind ?? kind);
 
     switch (kind) {
       case 'door': {
@@ -741,7 +762,7 @@ function buildFacade(
         if (rng.float() < 0.8) {
           const aw = sw + 0.5;
           deco.push((): ReturnType<typeof awning> =>
-            awning(clearBal ? sinkAdds(A) : kitA, pm, bx, o.y + o.h / 2 + 0.55, aw, rng, {
+            awning(clearAwnings ? sinkAdds(A) : kitA, pm, bx, o.y + o.h / 2 + 0.55, aw, rng, {
               depth: rng.range(1.3, 1.9),
               key: rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream']),
               legs: rng.float() < 0.4,
@@ -809,29 +830,16 @@ function buildFacade(
         }
         const bwid = Math.min(bw - 0.35, 2.6);
         deco.push((): void => {
-          const leafOpen = rng.float() < 0.5 ? rng.range(0.6, 1.5) : 0;
           doorUnit(kitA, pm, o, rng, {
             t,
-            open: floorIsEnterable(spec, f) ? Math.PI / 2 : leafOpen,
+            open: floorIsEnterable(spec, f) ? Math.PI / 2 : 0,
             leafKey: 'wood_dark',
           });
-          const balY = 0.02;
-          const depth = rng.range(1.0, 1.35);
-          const railing = rng.float() < 0.45 ? 'concrete' : 'metal';
-          // An authored obstruction keeps this bay clear of a balcony.
-          if (spec.omitBalconies?.[side]?.[bx]) return;
-          const bal = balcony(clearBal ? sinkAdds(A) : kitA, pm, bx, balY, bwid, rng, {
-            depth,
-            railing,
-            key: spec.wallKey ?? 'plaster_cream',
-          });
-          // `y` here is PANEL-LOCAL, like info.windows/info.awnings: `pm`
-          // already carries the floor height. Publishing the world floor `y`
-          // made dressing place balcony clutter at 2*floorY (props and rugs
-          // floating in mid-air above the street).
-          if (!reserved && !clearBal) {
-            info.balconies.push({ side, x: bx, y: balY, w: bal.w, d: bal.d, pm });
-          }
+          if (!deck) return;
+          const [, , , depth, railing] = deck;
+          const balY = 0.02; // panel-local; pm already carries the floor height
+          balcony(A, pm, bx, balY, bwid, { depth, railing, key: wallKey });
+          info.balconies.push({ side, floor: f, bay: b, x: bx, y: balY, d: depth, pm });
         });
         break;
       }

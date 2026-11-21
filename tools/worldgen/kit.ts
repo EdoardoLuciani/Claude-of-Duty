@@ -747,12 +747,9 @@ export function balcony(
   x: number,
   y: number,
   w: number,
-  rng: Rng,
-  opts: { depth?: number; key?: string; railing?: 'concrete' | 'metal'; railKey?: string } = {}
-): { x: number; y: number; w: number; d: number } {
-  const d = opts.depth ?? 1.15;
+  { depth: d, key, railing }: { depth: number; key: string; railing: 'concrete' | 'metal' }
+): void {
   const box = BOX(A);
-  const key = opts.key ?? 'concrete';
   // slab, slightly sagging feel via thickness taper
   A.add(key, BOX_SOFT(A), LL(pm, x, y + 0.06, -d / 2, 0, w, 0.13, d), {
     masks: [0.45, 0.55, 0.3],
@@ -764,7 +761,7 @@ export function balcony(
     });
   }
   // railing
-  if (opts.railing === 'concrete') {
+  if (railing === 'concrete') {
     A.add(key, box, LL(pm, x, y + 0.55, -d + 0.06, 0, w, 0.85, 0.12), { masks: [0.5, 0.5, 0.2] });
     A.add(key, box, LL(pm, x - w / 2 + 0.06, y + 0.55, -d / 2, 0, 0.12, 0.85, d), {
       masks: [0.5, 0.5, 0.2],
@@ -774,7 +771,7 @@ export function balcony(
     });
   } else {
     const bar = BOX_THIN(A);
-    const rk = opts.railKey ?? 'metal_rust';
+    const rk = 'metal_rust';
     // top and mid rails
     A.add(rk, bar, LL(pm, x, y + 1.0, -d + 0.04, 0, w, 0.05, 0.05), { masks: [0.9, 0.45, 0] });
     A.add(rk, bar, LL(pm, x, y + 0.52, -d + 0.04, 0, w, 0.035, 0.035), { masks: [0.9, 0.45, 0] });
@@ -815,7 +812,6 @@ export function balcony(
       }
     }
   }
-  return { x, y, w, d };
 }
 
 // ================================================================= parapet ==

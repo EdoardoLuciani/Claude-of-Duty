@@ -660,6 +660,7 @@ function dressBuilding(A: Assembler, rng: Rng, info: BuildingInfo): void {
   // ---- balconies get lived in ----
   for (const bal of info.balconies) {
     const pm = bal.pm;
+    const rng = keyedRng('balcony-rug', spec.id, bal.side, bal.floor, bal.bay);
     // rug over the railing — instantly reads as inhabited
     if (rng.float() < 0.55) {
       const cloth = clothGeometry(rng.range(0.8, 1.4), rng.range(0.7, 1.1), {
@@ -687,6 +688,7 @@ function dressBuilding(A: Assembler, rng: Rng, info: BuildingInfo): void {
   // The ROOF plate, not the ground footprint. On a setback building the two
   // differ by a couple of metres, and using the footprint hangs water tanks,
   // aerials and crate stacks in mid-air over the terrace void.
+  rng = keyedRng('roof-dress', spec.id);
   const rs = info.roofSpec ?? spec;
   const rx0 = rs.x - rs.w / 2 + 1.0;
   const rx1 = rs.x + rs.w / 2 - 1.0;

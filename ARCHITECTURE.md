@@ -152,7 +152,8 @@ as `unknown-thickness`, overlapping solids as `overlapping-solids`.
 Checked TypeScript in `tools/worldgen/` is the world source. Map layout,
 configuration, intel sites and prop transforms live in `level/`; `level/placements/`
 is data-only and `placement.ts` owns validation, placement and clutter clearance.
-See the [world editing map](tools/worldgen/README.md). `bun tools/export-world.ts` builds meshes
+Facade balcony slabs and railings are authored by side, floor and bay, independently
+of procedural dressing. See the [world editing map](tools/worldgen/README.md). `bun tools/export-world.ts` builds meshes
 and cooks collision with meshoptimizer from canonical instance buckets. Visual-only
 coalescing may join whole non-distance-LOD buckets within a bounded X/Z span
 independent of the canonical grid. It never changes collision or navigation inputs.
