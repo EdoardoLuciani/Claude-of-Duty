@@ -8,6 +8,13 @@ import { Assembler } from '#worldgen/builder';
 import { BUILDINGS } from '#worldgen/level/layout';
 
 const box = new THREE.Box3();
+const identity = new THREE.Matrix4();
+const down = new THREE.Vector3(0, -1, 0);
+const seatProbes = [
+  new THREE.Vector3(-9.984, 3.62, -8.674), // W2 bucket
+  new THREE.Vector3(5.611, 3.62, 16.262), // E1 bucket
+  new THREE.Vector3(-4.041, 9.72, -48.289), // BS3 carton
+];
 
 /** Every merged piece and surviving instance as `key min max` -> { n, x, z }. */
 type Piece = { n: number; x: number; z: number };
@@ -33,8 +40,27 @@ function emitted(): Map<string, Piece> {
     materials: { get: (name): THREE.Material => Object.assign(new THREE.Material(), { name }) },
   });
   // Record merged pieces without merging them: nothing reads the batches here.
-  A.add = (key, geo, matrix): Assembler => (record(key, geo, matrix), A);
+  const unsupported = new Set(
+    seatProbes.map((origin): THREE.Raycaster => new THREE.Raycaster(origin, down, 0, 0.06))
+  );
+  const seat = new THREE.Mesh(undefined, new THREE.MeshBasicMaterial());
+  A.add = (key, geo, matrix): Assembler => {
+    record(key, geo, matrix);
+    seat.geometry = geo;
+    seat.matrixWorld.copy(matrix ?? identity);
+    for (const probe of unsupported) {
+      if (
+        box.max.y >= probe.ray.origin.y - probe.far &&
+        probe.ray.intersectsBox(box) &&
+        probe.intersectObject(seat, false).length
+      )
+        unsupported.delete(probe);
+    }
+    return A;
+  };
   buildWorld(A);
+  seat.material.dispose();
+  assert.equal(unsupported.size, 0, 'baked balcony props keep a physical seat');
   // Instances after clutter clearance, so culling differences count too.
   for (const [id, proto] of A._protos) {
     assert(proto.geo, 'unfinalized prototypes retain their geometry');

@@ -4,7 +4,9 @@ This directory is authoritative world source; dev/build/tests generate missing o
 stale `public/models/world/` products. Outputs are ignored, not committed.
 Runtime behavior belongs to `src/world/`.
 
-- `level/layout.ts`: streets, buildings, rooms, gates and set pieces.
+- `level/layout.ts`: streets, buildings, rooms, gates and set pieces. Balcony slabs
+  and railings are authored by facade side, floor and bay; a `balconyDoor` in
+  `bayKinds` alone opens without a slab (e.g. onto a terrace).
 - `level/config.ts`: transform/spawns; `level/intel.ts`: intel drop sites.
 - `level/placements/`: data-only prop transforms, one `PlacementRow` per line, grouped by area.
 - `props.ts`/`dressing.ts`: props; `buildings.ts`/`kit.ts`: construction.

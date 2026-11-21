@@ -395,7 +395,8 @@ const map = await loadMap(),
 }
 for (const [from, target, reachable] of [
   [[-3.384, 0.091, -3.351], [-5.65, 8.16, 8.512], true],
-  [[-12, 0.074, -17.265], [-12.943, 8.165, -6.762], false],
+  // BN1 has no authored access, unlike the walkable W3 ruin and its ladder.
+  [[26.542, 0.136, 44.337], [23.005, 8.16, 46.693], false],
 ] as const) {
   const ai = makeAi(grid);
   const a = makeAgent({
