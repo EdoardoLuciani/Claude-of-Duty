@@ -168,23 +168,23 @@ const REPLACED = {
   optic: ['removableIrons', 'IRON_sights'],
   muzzle: ['removableMuzzleDevice', 'MUZZLE_device'],
 } as const;
-/** Slots whose mounted attachment may replace an authored base part. */
-export const REPLACED_SLOTS = [
-  'optic',
-  'muzzle',
-] as const satisfies readonly (keyof typeof REPLACED)[];
 
-/** Base part a mounted optic/muzzle replaces, with its optional `<name>_removed` stand-in;
- * null when the weapon keeps it (fixed irons, permanent muzzle hardware). */
-export function replacedNodes(
+type SlotVisuals = { bare: THREE.Object3D | undefined; fitted: THREE.Object3D | undefined };
+
+/** Authored hardware whose visibility follows the slot, excluding permanent parts. */
+export function slotVisuals(
   model: WeaponModelRecord,
-  slot: (typeof REPLACED_SLOTS)[number]
-): { installed: THREE.Object3D; removed: THREE.Object3D | undefined } | null {
+  slot: (typeof SLOTS)[number]
+): SlotVisuals | undefined {
+  if (slot === 'rail') {
+    const fitted = model.root.getObjectByName('RAIL_adapter');
+    return fitted ? { bare: undefined, fitted } : undefined;
+  }
   const [flag, name] = REPLACED[slot];
-  if (!WEAPON_DEFS[model.id][flag]) return null;
+  if (!WEAPON_DEFS[model.id][flag]) return;
   return {
-    installed: requiredNode(model.scene, name),
-    removed: model.scene.getObjectByName(`${name}_removed`),
+    bare: requiredNode(model.scene, name),
+    fitted: model.scene.getObjectByName(`${name}_removed`),
   };
 }
 
@@ -231,11 +231,10 @@ export function mountAttachments(
   const slots = opticId ? (WEAPON_DEFS[model.id].fits?.optic?.[opticId]?.railSlots ?? 0) : 0;
   opticSlot.group.position.z = -slots * PICATINNY_PITCH;
   const rail = stageMount(model, 'rail', config.rail, config.rail && assets[config.rail]);
-  const railAdapter = model.root.getObjectByName('RAIL_adapter');
   // isAttachmentConfig guarantees a fitted can for any installed muzzle.
   const can = fittedCan(model.id, config.muzzle) ?? null;
   const muzzle = stageMount(model, 'muzzle', can, can && assets[can]);
-  const replaced = { optic: replacedNodes(model, 'optic'), muzzle: replacedNodes(model, 'muzzle') };
+  const visuals = SLOTS.map((slot): SlotVisuals | undefined => slotVisuals(model, slot));
   let mountedOptic: WeaponEntry['mountedOptic'] = null;
   const sight = new THREE.Vector3().fromArray(model.nodes.sight);
   if (opticId !== null && opticAsset && opticSlot.parent) {
@@ -250,17 +249,15 @@ export function mountAttachments(
     };
     sight.copy(mountedOptic.sight).applyMatrix4(transform);
   }
-  // Staging succeeded: attach instances and switch the replaced base parts.
+  // Staging succeeded: attach instances and switch the slot hardware.
   opticSlot.parent?.add(opticSlot.group);
   rail.parent?.add(rail.group);
   muzzle.parent?.add(muzzle.group);
-  if (railAdapter) railAdapter.visible = config.rail !== null;
-  // Fixed irons and permanent muzzle hardware stay under a mounted attachment.
-  for (const slot of REPLACED_SLOTS) {
-    const nodes = replaced[slot];
-    if (!nodes) continue;
-    nodes.installed.visible = config[slot] === null;
-    if (nodes.removed) nodes.removed.visible = config[slot] !== null;
+  for (const [i, slot] of SLOTS.entries()) {
+    const nodes = visuals[i];
+    const fitted = config[slot] !== null;
+    if (nodes?.bare) nodes.bare.visible = !fitted;
+    if (nodes?.fitted) nodes.fitted.visible = fitted;
   }
   return {
     opticGroup: opticSlot.group,

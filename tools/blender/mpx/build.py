@@ -386,11 +386,11 @@ def build(output, render=False, quick=False):
 
     # Hollow 8-inch shell. Slots and angled vents are actual through openings.
     hg_start, hg_end = .096, .300
-    section = [(-.016,.036),(.016,.036),(.024,.024),(.025,-.015),(.017,-.026),
-               (-.017,-.026),(-.025,-.015),(-.024,.024)]
-    # The front lip slopes back at the bottom instead of ending in a square skirt.
-    verts = [(x-(.006 if x==hg_end and z==-.026 else 0),y,z)
-             for x in (hg_start,hg_end) for y,z in section]
+    # Section points give y, z and front-lip setback (only at the bottom corners).
+    section = [(-.016,.036,0),(.016,.036,0),(.024,.024,0),(.025,-.015,0),
+               (.017,-.026,.006),(-.017,-.026,.006),(-.025,-.015,0),(-.024,.024,0)]
+    verts = ([(hg_start,y,z) for y,z,_ in section] +
+             [(hg_end-setback,y,z) for y,z,setback in section])
     faces = [(i,(i+1) % 8,(i+1) % 8+8,i+8) for i in range(8)]
     hg = mesh('Hollow five-slot M-LOK handguard', verts, faces, bevel=0)
     active(hg)
