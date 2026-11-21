@@ -15,6 +15,7 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[3]
 OUT = ROOT / '.cache/blender/player/arms'
+POSES = Path(__file__).with_name('pose-reference.json')
 PUBLIC = ROOT / 'public/models/player'
 OUT.mkdir(parents=True, exist_ok=True)
 PUBLIC.mkdir(parents=True, exist_ok=True)
@@ -496,7 +497,7 @@ scene.cycles.samples = 32
 
 # Blender-authored pose actions: neutral -> contact -> neutral, with eased
 # approach and a stable hold. Export full actions for independent DCC review.
-poses = json.loads(Path(__file__).with_name('pose-reference.json').read_text())
+poses = json.loads(POSES.read_text())
 rig.animation_data_create()
 baked_poses = {}
 pose_ease = []
@@ -591,7 +592,7 @@ manifest = {'generator':'tools/blender/player_arms/build.py', 'runtime':'public/
     'gloveMaxDeviationMetres':glove_deviation,
     'triangles':sum(len(p.vertices)-2 for o in meshes for p in o.data.polygons),
     'thumbRestY':thumb_angle, 'units':'metres', 'scope':'deformation meshes and finger-pose actions; game-owned weapon trajectories',
-    'sha256': {str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest() for p in [Path(__file__), Path(__file__).with_name('pose-reference.json'), PUBLIC/'arms.glb', ROOT/'src/weapons/hand-poses.ts']}}
+    'sha256': {str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest() for p in [Path(__file__), POSES, PUBLIC/'arms.glb', ROOT/'src/weapons/hand-poses.ts']}}
 (OUT/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
 if '--render' in sys.argv:
     scene.render.filepath=str(OUT/'overview.png')

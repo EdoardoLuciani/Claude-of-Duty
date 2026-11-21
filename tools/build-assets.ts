@@ -27,7 +27,7 @@ import {
   writeSync,
 } from 'node:fs';
 import { availableParallelism } from 'node:os';
-import { basename, dirname, join, relative, resolve, sep } from 'node:path';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { REVISION } from 'three';
@@ -35,6 +35,7 @@ import { REVISION } from 'three';
 import {
   GLTFPACK_VERSION,
   MODEL_COOKS,
+  authoredDirectory,
   isModelId,
   modelCookBaseFlags,
   type ModelId,
@@ -76,11 +77,6 @@ const blender = (script: string): [string, ...string[]] => [
   script,
 ];
 const bun = (...args: string[]): [string, ...string[]] => [process.execPath, ...args];
-/** Committed weapon calibration; its sibling manifest.json is a cook product. */
-const calibration = (directory: string): string[] => {
-  const file = `src/weapons/authored/${basename(directory)}/hand-reference.json`;
-  return existsSync(join(ROOT, file)) ? [file] : [];
-};
 
 const ARMS: AssetStep = {
   id: 'arms',
@@ -151,6 +147,7 @@ const STANDALONE_TOOLS: Partial<Record<ModelId, string[]>> = {
 /** One Blender build plus its gltfpack cook for a MODEL_COOKS entry. */
 function cookStep(id: ModelId, salt: string[]): AssetStep {
   const { directory, source, output } = MODEL_COOKS[id];
+  const authored = authoredDirectory(id);
   const tools = STANDALONE_TOOLS[id] ?? [`tools/blender/${id}`, ...(SHARED_TOOLS[id] ?? [])];
   return {
     id,
@@ -162,7 +159,7 @@ function cookStep(id: ModelId, salt: string[]): AssetStep {
             ...(id === 'm67' || id === 'ammo_pickup' || id === 'intel_case'
               ? []
               : ['tools/blender/picatinny.py']),
-            ...calibration(directory),
+            ...(authored ? [`${authored}/hand-reference.json`] : []),
           ],
     // Only this model's cook settings, so one profile edit rebuilds one model.
     salt: [...salt, JSON.stringify(MODEL_COOKS[id]), ...modelCookBaseFlags(id), GLTFPACK_VERSION],

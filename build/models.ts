@@ -2,7 +2,7 @@
 /** Shared gltfpack cook for generated runtime models. */
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, statSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync, statSync } from 'node:fs';
 import { availableParallelism, tmpdir } from 'node:os';
 import { basename, dirname, extname, join, resolve } from 'node:path';
 
@@ -38,6 +38,7 @@ export const GLTFPACK_FLAGS = [...GEOMETRY_FLAGS, '-tu', '-tq', '8'];
 // Opt assets in here after validating their adapters and visual/animation fidelity.
 // Simplification is model-specific, never a blanket default for all models.
 // `directory` holds native Blender products; `output` is repo-relative under public/.
+// `authored` holds the committed calibration and manifest that weapon code imports.
 const attachment = (
   directory: string,
   source: string,
@@ -84,36 +85,42 @@ export const MODEL_COOKS = {
   },
   m590: {
     directory: '.cache/blender/weapons/m590',
+    authored: 'src/weapons/authored/m590',
     source: 'm590.glb',
     output: 'public/models/weapons/m590.runtime.glb',
     flags: ['-si', '0.50', '-se', '0.0002', '-sp', '-vc', '16'],
   },
   m4: {
     directory: '.cache/blender/weapons/m4a1-block-ii',
+    authored: 'src/weapons/authored/m4a1-block-ii',
     source: 'm4a1-block-ii.glb',
     output: 'public/models/weapons/m4a1-block-ii.runtime.glb',
     flags: ['-noq', '-vc', '16', '-kv'],
   },
   mcx: {
     directory: '.cache/blender/weapons/mcx-virtus',
+    authored: 'src/weapons/authored/mcx-virtus',
     source: 'mcx-virtus.glb',
     output: 'public/models/weapons/mcx-virtus.runtime.glb',
     flags: ['-si', '0.65', '-se', '0.0002', '-sp', '-vc', '16'],
   },
   evolys: {
     directory: '.cache/blender/weapons/fn-evolys-762',
+    authored: 'src/weapons/authored/fn-evolys-762',
     source: 'fn-evolys-762.glb',
     output: 'public/models/weapons/fn-evolys-762.runtime.glb',
     flags: [],
   },
   ax338: {
     directory: '.cache/blender/weapons/ax338',
+    authored: 'src/weapons/authored/ax338',
     source: 'ax338.glb',
     output: 'public/models/weapons/ax338.runtime.glb',
     flags: ['-vc', '16', '-vp', '16'],
   },
   mpx: {
     directory: '.cache/blender/weapons/sig-mpx',
+    authored: 'src/weapons/authored/sig-mpx',
     source: 'mpx.glb',
     output: 'public/models/weapons/mpx.runtime.glb',
     flags: ['-km', '-vc', '16', '-si', '0.7', '-se', '0.0002', '-sp'],
@@ -130,6 +137,7 @@ export const MODEL_COOKS = {
   ]),
   p320: {
     directory: '.cache/blender/weapons/p320-compact',
+    authored: 'src/weapons/authored/p320-compact',
     source: 'p320-compact.glb',
     output: 'public/models/weapons/p320-compact.runtime.glb',
     flags: ['-si', '0.50', '-se', '0.001', '-sp'],
@@ -140,6 +148,11 @@ export type ModelId = keyof typeof MODEL_COOKS;
 
 export function isModelId(value: string): value is ModelId {
   return Object.hasOwn(MODEL_COOKS, value);
+}
+
+export function authoredDirectory(id: ModelId): string | undefined {
+  const model = MODEL_COOKS[id];
+  return 'authored' in model ? model.authored : undefined;
 }
 
 export function modelCookBaseFlags(id: ModelId): string[] {
@@ -201,9 +214,9 @@ if (import.meta.main) {
       join(dir, model.source),
       directory ? join(dir, basename(model.output)) : join(ROOT, model.output)
     );
-    // Weapon code imports the native manifest; publish canonical builds beside calibration.
-    const authored = join(ROOT, 'src/weapons/authored', basename(model.directory));
-    if (!directory && existsSync(authored))
-      copyFileSync(join(dir, 'manifest.json'), join(authored, 'manifest.json'));
+    // Canonical cooks publish the fresh native manifest that weapon code imports.
+    const authored = authoredDirectory(name);
+    if (!directory && authored)
+      copyFileSync(join(dir, 'manifest.json'), join(ROOT, authored, 'manifest.json'));
   }
 }

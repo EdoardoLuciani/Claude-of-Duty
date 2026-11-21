@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 // Offline fitting inputs. Blender owns the resulting wrist/finger curves.
 import assert from 'node:assert/strict';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 
 import * as THREE from 'three';
 import { GLTFLoader, type GLTFLoaderPlugin } from 'three/addons/loaders/GLTFLoader.js';
@@ -331,7 +331,7 @@ function foreendGap(p: THREE.Vector3): number {
 // offline solve after changing grip-profile.json; runtime never evaluates it.
 const manifest: unknown = JSON.parse(
   readFileSync(
-    new URL('../../../src/weapons/authored/ax338/manifest.json', import.meta.url),
+    new URL('../../../.cache/blender/weapons/ax338/manifest.json', import.meta.url),
     'utf8'
   )
 );
@@ -814,6 +814,5 @@ result.bolt = contact(
 );
 validateHoldingReference(result);
 fitHoldingHand(result);
-mkdirSync(out, { recursive: true });
 writeReference(result);
 console.log('AX338 hand reference written; regenerate Blender actions after changes.');
