@@ -323,6 +323,7 @@ export class PauseMenu {
     this.ctx.time.scale = this._prevScale ?? 1;
     this.ctx.peek('player')?.setControlEnabled(true);
     this.ctx.input.requestPointerLock();
+    this.ctx.input.requestFullscreen();
     this.ctx.events.emit('ui:pause', { paused: false });
   }
 

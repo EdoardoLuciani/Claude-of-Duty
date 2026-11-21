@@ -18,7 +18,8 @@ on supplies, new weapons, and attachments. No download. Just open the game and h
 
 Use a desktop browser and device with **WebGPU** support. No installation is needed.
 Open the game, let it load, and click **Start** to capture your mouse. If capture is denied,
-click **Retry Start**; fullscreen is optional.
+click **Retry Start**. The **Start** and **Resume** buttons also request fullscreen with keyboard
+lock where supported; fullscreen is not required to play.
 
 | Controls                  | Action                                  |
 | ------------------------- | --------------------------------------- |
