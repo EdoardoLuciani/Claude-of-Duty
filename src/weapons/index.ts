@@ -98,6 +98,8 @@ interface WeaponHudState {
   lethalCount: number;
   cooking: boolean;
   grenadeEquipped: boolean;
+  /** Whether the screen-centre crosshair applies: hip shots follow the bore, a throw does not. */
+  crosshair: boolean;
 }
 interface WeaponStats {
   tris: number;
@@ -267,6 +269,7 @@ export class WeaponSystem {
     lethalCount: GRENADES_PER_LIFE,
     cooking: false,
     grenadeEquipped: false,
+    crosshair: false,
   };
 
   constructor() {
@@ -747,6 +750,7 @@ export class WeaponSystem {
     h.lethalCount = this.grenades;
     h.cooking = this.cooking;
     h.grenadeEquipped = this.grenadeEquipped;
+    h.crosshair = this.grenadeEquipped;
     return h;
   }
 
@@ -1700,7 +1704,8 @@ export class WeaponSystem {
   }
 
   _restSpread(def: WeaponState['def'], st: WeaponPoseState): number {
-    const base = lerp(def.spreadHip, def.spreadAds, this.adsProgress) * st.steadiness;
+    const base =
+      lerp(def.spreadHip ?? def.spreadAds, def.spreadAds, this.adsProgress) * st.steadiness;
     return st.sprint ? base * SPREAD_MODS.sprinting : base;
   }
 

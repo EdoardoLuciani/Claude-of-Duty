@@ -114,7 +114,6 @@ const HANDLING: Record<
   scope: { adsTime: 1.18 },
   // Can mass at the muzzle slows aiming; its gas trap softens every shot.
   suppressor: { adsTime: 1.08, recoil: 0.88 },
-  // The laser's value is showing where hip shots go.
   laser: {},
 };
 /** Kick magnitudes a recoil effect scales; spring, bracing and pattern shape stay authored. */

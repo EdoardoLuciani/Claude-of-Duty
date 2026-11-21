@@ -475,8 +475,7 @@ export class UiSystem {
       s.reloadProgress = ws.reloadProgress;
       s.ads = ws.ads;
       s.baseSpread = 4 + ws.spread * 40;
-      // Hip shots follow the bore: only a grenade keeps the screen-centre reticle.
-      s.hidden = !ws.grenadeEquipped;
+      s.hidden = !ws.crosshair;
       s.lethalCount = ws.lethalCount;
       s.cooking = ws.cooking;
       s.grenadeEquipped = ws.grenadeEquipped;

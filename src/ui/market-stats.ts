@@ -44,9 +44,9 @@ const ROWS: ReadonlyArray<{
   },
   {
     label: 'Base hip spread',
-    title: 'Random hip-fire cone radius before stance, movement and firing modifiers.',
+    title: 'Hip-fire dispersion cone radius (a pellet pattern); weapon sway adds the aim error.',
     better: -1,
-    value: (def): number => def.spreadHip,
+    value: (def): number => def.spreadHip ?? def.spreadAds,
     format: degrees,
   },
   {
