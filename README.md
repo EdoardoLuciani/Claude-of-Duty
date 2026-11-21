@@ -122,7 +122,7 @@ Toolbar buttons also provide zoom and reset. Inspection never spends credits.
 Weapon cards open a customization draft: choose an optic, suppressor and laser from
 verified fits, then **Buy Build / Apply Changes** or **Cancel**. The preview changes
 immediately, along with a stats table comparing the base weapon, the owned build and
-the draft (damage, fire rate, magazine, velocity, spread, recoil and ADS time, each
+the draft (damage, fire rate, magazine, velocity, hip sway, ADS spread, recoil and ADS time, each
 change labelled better or worse); gameplay and credits change only on confirmation.
 Owned weapons charge only for new attachments, while a new weapon also costs its base
 price. Removing or replacing an attachment discards it without a refund. Closing the

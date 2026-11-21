@@ -43,11 +43,12 @@ const ROWS: ReadonlyArray<{
     format: (v): string => `${v} m/s`,
   },
   {
-    label: 'Base hip spread',
-    title: 'Hip-fire dispersion cone radius (a pellet pattern); weapon sway adds the aim error.',
+    label: 'Hip sway',
+    title:
+      'Hip-fire sway relative to the M4: hip shots follow the barrel, so this scales hip aim error before stance and movement.',
     better: -1,
-    value: (def): number => def.spreadHip ?? def.spreadAds,
-    format: degrees,
+    value: (def): number => def.swayScale,
+    format: (v): string => `${v.toFixed(2)}×`,
   },
   {
     label: 'Base ADS spread',
