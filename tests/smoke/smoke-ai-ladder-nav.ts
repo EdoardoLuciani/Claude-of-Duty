@@ -311,12 +311,15 @@ try {
   await drive((): boolean => onShaft(owner));
   const queued = climber(at(d.points[0], 2, 1.5));
   queued._goTo(queuedGoal);
-  let handedOver = false;
+  let waited = false,
+    handedOver = false;
   await drive(
     (): boolean => arrived(owner, ownerGoal) && arrived(queued, queuedGoal),
     (): void => {
       const claim = ai.ladderClaims.get(d.id);
+      if (claim === owner && ai.ladderBusy(owner, d)) waited = true;
       if (claim === queued && !handedOver) {
+        assert.ok(waited, 'the next climber queued while the owner still held the shaft');
         handedOver = true;
         assert.ok(owner.position.y > top - 0.1, 'the owner landed before the handover');
       }
