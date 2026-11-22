@@ -246,9 +246,6 @@ def build(output,render=False,quick=False):
     box('Butt spacer',(0,-.005,.349),(.027,.150,.025),steel,stock,.001)
     cyl('Length of pull lock',(-.026,-.029,.308),.008,.008,black,stock,'X',32)
     cyl('Butt pad adjustment wheel',(0,-.035,.351),.009,.034,black,stock,'X',32)
-    for i in range(24):
-        a=i*math.tau/24
-        cyl('Pad wheel knurl',(0,-.035+math.sin(a)*.009,.351+math.cos(a)*.009),.0007,.034,black,stock,'X',8,0)
     for side in (-1,1):
         cyl('Stock sling cup',(side*.024,.017,.145),.0055,.002,steel,stock,'X',32)
         cyl('Stock sling recess',(side*.0251,.017,.145),.0038,.0004,black,stock,'X',24,0)
@@ -271,14 +268,17 @@ def build(output,render=False,quick=False):
     cut(tube,mesh('CUT free float bore',inside,[tuple(range(7,-1,-1)),tuple(range(8,16))]+[(i,(i+1)%8,(i+1)%8+8,i+8) for i in range(8)],None,None,0))
     box('Forend rear collar',(0,.075,hg0+.002),(.058,.053,.009),black,hg,.004)
     cut(bpy.context.object,cyl('CUT collar clearance',(0,.075,hg0+.002),.021,.020,None,None,'Z',32,0))
+    # One continuous KeySlot outline, repeated with the vents in a single cut.
+    arc=math.pi-math.asin(.55)
+    slot=[(.005*math.cos(a),.005*math.sin(a)) for a in np.linspace(-arc,arc,15)]+[(-.012,.00275),(-.0135,.00125),(-.0135,-.00125),(-.012,-.00275)]
+    cutters=[profile('CUT KeySlot',[(z+dz,row+dy) for dz,dy in slot],.018,None,None,x=side*.025,bevel=0)
+             for side in (-1,1) for row in (.064,.085) for z in np.linspace(hg0-.025,hg1+.025,15)]
+    cutters += [box('CUT upper vent',(side*.019,.100,z),(.012,.013,.017),None,None,.001)
+                for side in (-1,1) for z in np.linspace(hg0-.030,hg1+.030,9)]
+    active(cutters[0])
+    for cutter in cutters[1:]:cutter.select_set(True)
+    bpy.ops.object.join();cut(tube,cutters[0])
     for side in (-1,1):
-        for row in (.064,.085):
-            for z in np.linspace(hg0-.025,hg1+.025,15):
-                # KeySlot: a circular head and a narrower longitudinal neck.
-                cut(tube,cyl('CUT KeySlot round',(side*.025,row,float(z)),.005,.018,None,None,'X',28,0))
-                cut(tube,box('CUT KeySlot neck',(side*.025,row,float(z)-.006),(.018,.0055,.015),None,None,.0015))
-        for z in np.linspace(hg0-.030,hg1+.030,9):
-            cut(tube,box('CUT upper vent',(side*.019,.100,float(z)),(.012,.013,.017),None,None,.001))
         profile('Tan forward grip panel',[(hg0,.057),(hg0-.140,.057),(hg0-.137,.028),(hg0+.006,.032)],.006,fde,hg,x=side*.026,bevel=.003)
         # Inboard mounting strip overlaps both the rounded panel shoulder and the
         # tube's lower diagonal wall; a panel sitting below that wall would float.
