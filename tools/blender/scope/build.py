@@ -143,6 +143,10 @@ def build():
         for z in (-.024,-.154):fastener('Mount rail nut',side*.021,.125,z,.004,optic)
     cyl('Elevation drum',(0,axis+.022,-.087),.020,.035,black,optic,'Y',48)
     cyl('Elevation cap',(0,axis+.041,-.087),.018,.006,black,optic,'Y',48)
+    # Real grip relief on the elevation drum; turret graduations are omitted.
+    for i in range(24):
+        a=i*math.tau/24
+        cyl('Elevation knurl',(math.sin(a)*.020,axis+.023,-.087+math.cos(a)*.020),.0007,.011,black,optic,'Y',8,0)
     for side in (-1,1):
         cyl('Windage and parallax',(side*.025,axis,-.087),.016,.023,black,optic,'X',48)
         cyl('Turret cap',(side*.038,axis,-.087),.015,.004,black,optic,'X',48)
