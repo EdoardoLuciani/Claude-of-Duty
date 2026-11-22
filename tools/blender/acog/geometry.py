@@ -35,9 +35,6 @@ def build_acog(asset, body, materials):
         cylinder('ACOG mount crossbolt',(x,0,.051),.0027,.042,steel,'Y')
         knob = cylinder('ACOG slotted thumbscrew',(x,.0225,.051),.0078,.0055,anodized,'Y',vertices=48)
         opening(knob,(x,.026,.051),(.011,.003,.0016),.0003)
-        for i in range(24):
-            a=i*math.tau/24
-            cylinder('ACOG thumbscrew knurl',(x+math.cos(a)*.0074,.0225,.051+math.sin(a)*.0074),.00035,.0038,anodized,'Y',vertices=6,bevel=0)
     frame=Matrix(((0,1,0,-.081),(-1,0,0,0),(0,0,1,.046),(0,0,0,1)))
     picatinny.cut_channel([o for o in asset.objects if o.type=='MESH'],frame,-.049,.049)
     # Hollow forged housing: varying oval sections and swept front hood. The
@@ -85,10 +82,6 @@ def build_acog(asset, body, materials):
     # The small prism access cover is on the opposite side from the windage knob.
     cylinder('ACOG prism access boss',(-.104,.0178,.087),.0058,.006,anodized,'Y')
     cylinder('ACOG prism access cover',(-.104,.0212,.087),.006,.0016,anodized,'Y',vertices=32)
-    for i in range(32):
-        a=i*math.tau/32
-        cylinder('ACOG elevation knurl',(-.099+math.cos(a)*.0088,math.sin(a)*.0088,.11542),.0003,.0045,anodized,'Z',vertices=6,bevel=0)
-        cylinder('ACOG windage knurl',(-.099+math.cos(a)*.0083,-.0273,.087+math.sin(a)*.0083),.0003,.002,anodized,'Y',vertices=6,bevel=0)
     # Clear protective collector cover and a thin internal red fiber, with a
     # diagonal cradle running from the adjustment shoulder to the objective hood.
     profile('ACOG collector cradle',[(-.090,.101),(-.080,.104),(-.037,.109),(-.007,.112),(-.005,.114),(-.036,.113),(-.080,.108),(-.091,.105)],.007,anodized,bevel=.0006)
