@@ -112,16 +112,6 @@ const SPENT_HULL_STEP: AssetStep = {
   commands: [blender('tools/blender/spent_hull/build.py'), bun('tools/blender/spent_hull/cook.ts')],
 };
 
-// Shared authoring sources outside a weapon's own tooling directory.
-const SHARED_TOOLS: Partial<Record<ModelId, string[]>> = {
-  mcx: ['tools/blender/review_hands.py', 'tools/blender/hand-reference.ts'],
-  m4: ['tools/blender/review_hands.py', 'tools/blender/hand-reference.ts'],
-  p320: ['tools/blender/review_hands.py', 'tools/blender/hand-reference.ts'],
-  m590: ['tools/blender/review_hands.py', 'tools/blender/hand-reference.ts'],
-  ax338: ['tools/blender/review_hands.py', 'tools/blender/hand-reference.ts'],
-  evolys: ['tools/blender/review_hands.py', 'tools/blender/hand-reference.ts'],
-  mpx: ['tools/blender/review_hands.py', 'tools/blender/hand-reference.ts'],
-};
 const STANDALONE_TOOLS: Partial<Record<ModelId, string[]>> = {
   intel_case: ['tools/blender/intel_case'],
   ammo_pickup: ['tools/blender/ammo_pickup'],
@@ -148,7 +138,12 @@ const STANDALONE_TOOLS: Partial<Record<ModelId, string[]>> = {
 function cookStep(id: ModelId, salt: string[]): AssetStep {
   const { directory, source, output } = MODEL_COOKS[id];
   const authored = authoredDirectory(id);
-  const tools = STANDALONE_TOOLS[id] ?? [`tools/blender/${id}`, ...(SHARED_TOOLS[id] ?? [])];
+  // Weapons also depend on the shared review-arm baker and hand calibration helper.
+  const tools = STANDALONE_TOOLS[id] ?? [
+    `tools/blender/${id}`,
+    'tools/blender/review_hands.py',
+    'tools/blender/hand-reference.ts',
+  ];
   return {
     id,
     inputs:

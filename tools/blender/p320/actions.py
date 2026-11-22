@@ -7,17 +7,13 @@ import json
 import math
 import bpy
 from mathutils import Vector, Quaternion, Euler, Matrix
-from review_hands import author_review_hands
+from review_hands import author_review_hands, eq
 
 C=Matrix(((1,0,0),(0,0,-1),(0,1,0)))
 CI=C.inverted()
 
 def xyz(v):return C@Vector(v)
 def quat(q):return (C@q.to_matrix()@CI).to_quaternion()
-def eq(e):
-    # Three's intrinsic XYZ composes Rx*Ry*Rz; mathutils Euler XYZ uses the
-    # opposite multiplication order. Single hinges hid this on finger tests.
-    return Quaternion((1,0,0),e[0]) @ Quaternion((0,1,0),e[1]) @ Quaternion((0,0,1),e[2])
 
 def author_actions(root,asset,rig,parts,mag,spare,slide,barrel,trigger,catch,round_live):
     scene=bpy.context.scene
