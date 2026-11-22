@@ -143,18 +143,10 @@ def build():
         for z in (-.024,-.154):fastener('Mount rail nut',side*.021,.125,z,.004,optic)
     cyl('Elevation drum',(0,axis+.022,-.087),.020,.035,black,optic,'Y',48)
     cyl('Elevation cap',(0,axis+.041,-.087),.018,.006,black,optic,'Y',48)
-    # Real relief on the controls; numeric typography/layout is inferred, not an
-    # exact reticle/turret calibration or a claim of a particular specimen serial.
+    # Real grip relief on the elevation drum; turret graduations are omitted.
     for i in range(24):
         a=i*math.tau/24
         cyl('Elevation knurl',(math.sin(a)*.020,axis+.023,-.087+math.cos(a)*.020),.0007,.011,black,optic,'Y',8,0)
-    for i in range(12):
-        a=i*math.tau/12
-        bpy.ops.object.text_add(location=xyz((math.sin(a)*.0203,axis+.029,-.087+math.cos(a)*.0203)))
-        o=bpy.context.object;o.data.body=str(i*2);o.data.size=.0026;o.data.align_x='CENTER'
-        right=xyz((math.cos(a),0,-math.sin(a)));up=xyz((0,1,0))
-        o.rotation_euler=Matrix((right,up,right.cross(up))).transposed().to_euler()
-        active(o);bpy.ops.object.convert(target='MESH');finish(o,'Elevation graduation',mark,optic,0)
     for side in (-1,1):
         cyl('Windage and parallax',(side*.025,axis,-.087),.016,.023,black,optic,'X',48)
         cyl('Turret cap',(side*.038,axis,-.087),.015,.004,black,optic,'X',48)
@@ -162,8 +154,6 @@ def build():
         cyl('Recessed optical glass',(0,axis,z),r,.0005,glass,optic,'Z',64,0)
     for side in (-1,1):
         text('SCHMIDT & BENDER',(side*.0212,axis-.004,.058),.003,side,optic)
-        for i in range(8):
-            text(str(i*5),(side*.0379,axis+.009-i*.002,-.094),.0018,side,optic)
     # Source and runtime share identical UVs and atlas regions; never save an
     # untextured DCC source and unwrap only the GLB after saving it.
     for o in list(asset.objects):
