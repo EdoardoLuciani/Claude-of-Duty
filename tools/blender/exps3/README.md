@@ -1,7 +1,7 @@
 # EOTECH EXPS3-0 attachment
 
 Shared holographic optic for every weapon except the P320. `tools/blender/exps3/build.py` owns geometry/export;
-`exps3_bake.py` owns the atlas. Blend/native GLB/maps/manifest and cooked runtime
+`bake.py` owns the atlas. Blend/native GLB/maps/manifest and cooked runtime
 GLB are generated products. References, rights and visual limitations live in
 `reference-review.json`.
 
@@ -33,7 +33,10 @@ offset; `check_picatinny.py` verifies every clamp and weapon rail.
 
 ## Rendering
 
-Body/glass remain separate with three PBR maps. Glass is thin alpha, without a
+The editable high-detail source projects onto a lighter body mesh with three PBR
+atlases. The hood keeps its brand marks, printed adjuster labels and index dots,
+and a simplified yellow warning label. The captive wire is modeled without its
+small fittings. Separate front and rear glass use thin alpha without a
 scene-transmission pass. The ring/dot reticle is drawn by the live-axis viewmodel
 reticle (catalog data in `src/weapons/attachment-rules.ts`), not baked into the mesh;
 the ring keeps its world-angular size and hides once it would leave the clear opening.

@@ -12,7 +12,7 @@ UV_DENSITY = {'print':32, 'relief':12, 'edge':4, 'casting':.5, 'plain':1, 'hidde
 
 BAKED_DETAILS = ('Rear cast brand', 'Hood brand ', 'Printed mark ', 'Battery polarity ',
     'Warning label ', 'Laser warning ', 'NV moulded legend', 'DOWN index ',
-    'RIGHT index ', 'DOWN rotation ', 'RIGHT rotation ', 'DOWN moulded ', 'RIGHT moulded ')
+    'RIGHT index ', 'DOWN rotation ', 'RIGHT rotation ')
 
 
 def active(obj):
@@ -61,8 +61,6 @@ def detail_anchor(name):
     if name.startswith('NV moulded legend'):
         return 'NV rubber key'
     for control in ('DOWN','RIGHT'):
-        if name.startswith(control+' moulded '):
-            return control+' domed recessed dial'
         if name.startswith((control+' index ',control+' rotation ')):
             return 'Protective bent-metal hood | 1.8mm wall'
     if name.endswith(' moulded arrow'):
@@ -98,12 +96,12 @@ def density_group(obj, polygon):
     if name == 'Electronics lower housing':
         return 'hidden' if normal.y < -.8 or normal.z < -.8 else 'plain'
     if name.endswith(' domed recessed dial'):
-        return 'relief' if normal.x > .5 else 'hidden'
+        return 'edge' if normal.x > .5 else 'hidden'
     if name.endswith(' head') or name in ('NV rubber key','Brightness down rubber key','Brightness up rubber key','DOWN centre','RIGHT centre'):
         return 'relief' if normal.dot(centre) > 0 else 'plain'
     if name == 'Scalloped battery cap':
         return 'print' if normal.x > .8 and low_y < 54 and high_y > 48 and low_z < 27 and high_z > 19 else 'plain'
-    if name.startswith(('QD slotted tension nut','Crossbolt adjustment washer','QD oval tension pad','Battery cap retaining collar','Tether crimp sleeve')):
+    if name.startswith(('QD slotted tension nut','Crossbolt adjustment washer','QD oval tension pad','Battery cap retaining collar')):
         return 'edge'
     if name.startswith(('Optical carrier','Lens rear recessed gasket','Lens front recessed gasket')):
         return 'edge' if abs(normal.y) > .8 else 'plain'
