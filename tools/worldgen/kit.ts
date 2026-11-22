@@ -479,7 +479,7 @@ export function windowUnit<T extends WallOpening>(
     );
   }
 
-  // interior curtain / cloth, visible from the street
+  // Curtains on playable windows must also occlude AI sight.
   if (opts.curtain) {
     const c = clothGeometry(w * 0.92, h * 0.95, {
       segX: 7,
@@ -494,7 +494,7 @@ export function windowUnit<T extends WallOpening>(
       opts.curtainKey ?? 'fabric_cream',
       c,
       LL(pm, x + w * 0.03, y, depth + 0.09, 0, 1, 1, 1),
-      { masks: [0.1, 0.35, 0.1], visualOnly: true }
+      { masks: [0.1, 0.35, 0.1], visualOnly: opts.back !== false }
     );
   }
   return o;
