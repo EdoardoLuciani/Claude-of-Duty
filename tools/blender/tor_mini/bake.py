@@ -59,8 +59,6 @@ def bake_asset(output,root,source):
     body.data.update(calc_edges=True)
     body.data.validate(clean_customdata=False)
     assert len(body.data.polygons) <= MAX_TARGET_TRIANGLES,len(body.data.polygons)
-    while body.data.uv_layers:
-        body.data.uv_layers.remove(body.data.uv_layers[0])
     body.data.uv_layers.new(name='AtlasUV')
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.mesh.select_all(action='SELECT')
