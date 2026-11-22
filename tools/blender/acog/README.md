@@ -1,9 +1,8 @@
 # ACOG TA31F / TA51
 
 `tools/blender/acog/{geometry,build}.py` owns the complete standalone optic.
-It builds from an empty scene, never a generated weapon blend or GLB. The original
-MCX primitive, material and planar-UV recipes remain shared source under
-`tools/blender/mcx/`; they preserve the original geometry and packed surface maps.
+It builds from an empty scene, never a generated weapon blend or GLB. The
+primitive, material and planar-UV recipes are shared with `tools/blender/mcx/`.
 `bun tools/build-assets.ts` builds and cooks the optic independently of every weapon.
 
 ```sh
