@@ -11,6 +11,7 @@ export type { AssemblyOptions, InstanceMasks } from './util.ts';
 export interface PrototypeSpec {
   geo: THREE.BufferGeometry;
   visualGeo?: THREE.BufferGeometry;
+  visualOnly?: boolean;
   key: string;
   ballisticSurface?: SurfaceName;
   sheetThickness?: number;
@@ -25,6 +26,7 @@ export interface Prototype {
   id: string;
   geo: THREE.BufferGeometry | null;
   visualGeo: THREE.BufferGeometry | null;
+  visualOnly: boolean;
   key: string;
   ballisticSurface: SurfaceName;
   sheetThickness: number;
@@ -86,6 +88,7 @@ export class Assembler {
   declare _static: Map<string, Accum>;
   declare _protos: Map<string, Prototype>;
   declare _geoCache: Map<string, THREE.BufferGeometry>;
+  private readonly collisionGeometries: THREE.BufferGeometry[] = [];
   declare meshes: THREE.Mesh[];
   declare interiorLights: THREE.Vector3Like[];
   declare lampAnchors: THREE.Vector3Like[];
@@ -236,6 +239,7 @@ export class Assembler {
       id,
       geo: spec.geo,
       visualGeo: spec.visualGeo ?? null,
+      visualOnly: spec.visualOnly ?? false,
       key: spec.key,
       ballisticSurface:
         spec.ballisticSurface ?? PALETTE[spec.key]?.ballisticSurface ?? this.surfaceOf(spec.key),
@@ -342,7 +346,37 @@ export class Assembler {
       mesh.userData.collision = false; // cooked into a separate derived asset
       mesh.updateMatrix();
       root.add(mesh);
-      collisionSource?.add(mesh.clone());
+      if (collisionSource) {
+        if (acc.visualRanges.length === 0) collisionSource.add(mesh.clone());
+        else {
+          const indices = geo.index!.array;
+          let count = indices.length;
+          for (const [start, end] of acc.visualRanges) count -= end - start;
+          if (count > 0) {
+            // Same index width as the render geometry, which shares its positions.
+            const physical =
+              indices instanceof Uint32Array ? new Uint32Array(count) : new Uint16Array(count);
+            let offset = 0;
+            let cursor = 0;
+            for (const [start, end] of acc.visualRanges) {
+              physical.set(indices.subarray(cursor, start), offset);
+              offset += start - cursor;
+              cursor = end;
+            }
+            physical.set(indices.subarray(cursor), offset);
+            // Index ranges survive the render weld; the cooker owns the physics weld.
+            const geometry = new THREE.BufferGeometry()
+              .setAttribute('position', geo.getAttribute('position'))
+              .setAttribute('_solid', geo.getAttribute('_solid'))
+              .setIndex(new THREE.BufferAttribute(physical, 1));
+            const collider = mesh.clone();
+            collider.geometry = geometry;
+            this.collisionGeometries.push(geometry);
+            collisionSource.add(collider);
+          }
+        }
+      }
+      acc.visualRanges.length = 0;
       this.meshes.push(mesh);
       this.stats.staticTris += geo.index!.count / 3;
       this.stats.drawCalls++;
@@ -412,7 +446,7 @@ export class Assembler {
 
       const mat = this.mat(p.key);
       for (const [target, lists] of [
-        [collisionSource, buckets.values()],
+        [p.visualOnly ? null : collisionSource, buckets.values()],
         [root, chunks],
       ] satisfies [THREE.Object3D | null, Iterable<number[]>][]) {
         if (!target) continue;
@@ -474,6 +508,8 @@ export class Assembler {
       m.parent?.remove(m);
     }
     this.meshes.length = 0;
+    for (const geo of this.collisionGeometries) geo.dispose();
+    this.collisionGeometries.length = 0;
     for (const p of this._protos.values()) {
       p.geo?.dispose();
       if (p.visualGeo !== p.geo) p.visualGeo?.dispose();

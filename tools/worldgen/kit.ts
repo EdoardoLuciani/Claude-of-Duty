@@ -391,7 +391,7 @@ export function windowUnit<T extends WallOpening>(
             0,
             rng.range(-0.5, 0.5)
           ),
-          null
+          { visualOnly: true }
         );
       }
     }
@@ -478,7 +478,7 @@ export function windowUnit<T extends WallOpening>(
     );
   }
 
-  // interior curtain / cloth, visible from the street
+  // Curtains on playable windows must also occlude AI sight.
   if (opts.curtain) {
     const c = clothGeometry(w * 0.92, h * 0.95, {
       segX: 7,
@@ -493,7 +493,7 @@ export function windowUnit<T extends WallOpening>(
       opts.curtainKey ?? 'fabric_cream',
       c,
       LL(pm, x + w * 0.03, y, depth + 0.09, 0, 1, 1, 1),
-      { masks: [0.1, 0.35, 0.1] }
+      { masks: [0.1, 0.35, 0.1], visualOnly: opts.back !== false }
     );
   }
   return o;
@@ -1325,6 +1325,7 @@ export function spallPatch(rng: Rng, w: number, h: number, depth = 0.03): THREE.
     out[1] = 0.55 + 0.3 * (1 - Math.abs(nz));
     out[2] = 0.5 * (1 - Math.abs(nz)) + 0.2;
   });
+  g.userData.visualOnly = true; // surface finish, never a ledge
   return g;
 }
 
@@ -1360,7 +1361,7 @@ export function rubbleMound(
         rng.range(-0.4, 0.4),
         rng.range(-0.4, 0.4)
       ),
-      { masks: [0.3, 0.75, 0.45] }
+      { masks: [0.3, 0.75, 0.45], visualOnly: true }
     );
   }
 }

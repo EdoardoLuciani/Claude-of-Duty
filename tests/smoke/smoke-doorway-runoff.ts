@@ -8,11 +8,10 @@ import { BUILDINGS } from '#worldgen/level/layout';
 import { registerProps } from '#worldgen/props';
 
 // E3's keyed cornice runoff used to hang from y=3.29 down to y=1.60,
-// spanning the usable doorway at x=6.488, z=-18.65. Flat stain geometry
-// enters the same collision bake as masonry; it must avoid the opening.
-const assembler = new Assembler({
-  materials: { get: (name): THREE.Material => Object.assign(new THREE.Material(), { name }) },
-});
+// spanning the usable doorway at x=6.488, z=-18.65. A stain must stay
+// on the wall even when it is visual-only.
+const materials = { get: (name: string): THREE.Material => new THREE.MeshBasicMaterial({ name }) };
+const assembler = new Assembler({ materials });
 registerProps(assembler);
 const patches: THREE.Box3[] = [];
 assembler.add = (key, geometry, matrix): Assembler => {
@@ -35,9 +34,26 @@ const opening = new THREE.Box3(
 );
 assert(patches.length > 0, 'retain facade weathering outside the opening');
 assert.equal(patches.filter((patch): boolean => patch.intersectsBox(opening)).length, 0);
-assembler.releaseCache();
-for (const proto of assembler._protos.values()) {
-  assert(proto.geo, 'unfinalized prototypes retain their geometry');
-  proto.geo.dispose();
+assembler.dispose();
+// A stain and its solid wall can share a visual palette/draw without sharing
+// the collision bake. Decorative instances must also stay out of that source.
+const A = new Assembler({ materials });
+const box = new THREE.BoxGeometry();
+const offset = new THREE.Matrix4().makeTranslation(3, 0, 0);
+A.add('plaster_sand', box);
+A.add('plaster_sand', box, offset, { visualOnly: true });
+A.proto('detail', { key: 'plaster_sand', geo: box.clone(), visualOnly: true });
+A.place('detail', new THREE.Matrix4().makeTranslation(6, 0, 0));
+const visible = new THREE.Group();
+const physical = new THREE.Group();
+A.finalize(visible, physical);
+visible.updateMatrixWorld(true);
+physical.updateMatrixWorld(true);
+for (const x of [0, 3, 6]) {
+  const ray = new THREE.Raycaster(new THREE.Vector3(x, 2, 0), new THREE.Vector3(0, -1, 0));
+  assert(ray.intersectObject(visible).length, 'every piece renders');
+  assert.equal(ray.intersectObject(physical).length > 0, x === 0, 'only the wall collides');
 }
-console.log('ok doorway runoff: facade stains do not bridge the E3 traversal opening');
+box.dispose();
+A.dispose();
+console.log('ok doorway runoff: stains stay on masonry and out of the collision bake');
