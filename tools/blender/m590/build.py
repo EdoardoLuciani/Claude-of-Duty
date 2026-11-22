@@ -301,14 +301,18 @@ def build(output, render=False, quick=False):
         tang_rings.append(bottom+list(reversed(top)))
     loft('Rear tang crown continuation',tang_rings,steel,bevel=.0001,rounded=True)
     pad=loft('Rubber buttpad',[butt_ring(-.025),butt_ring(0)],rubber,bevel=.0005,rounded=True)
-    # Recessed diagonal diamond cavities leave a real crossing rubber lattice and perimeter border.
-    # Hidden vent depth and opposite-side relief are inferred, not manufacturer machining data.
+    # Disjoint diamond prisms cut the recessed lattice in one pass, leaving the rubber border intact.
+    diamond_faces=[(3,2,1,0),(4,5,6,7)]+[(i,(i+1)%4,4+(i+1)%4,4+i) for i in range(4)]
+    verts=[];faces=[]
     for side in (-1,1):
         for row in range(2):
             for i in range(19):
                 y=-.106+i*.0065+row*.00325
                 z=butt_z+.006*(y-butt_y)/.068-.007-row*.010
-                cut(pad,profile('CUT buttpad diamond',[(z-.0056,y),(z,y+.0028),(z+.0056,y),(z,y-.0028)],.017,None,None,0,x=side*.027))
+                faces.extend(tuple(len(verts)+j for j in face) for face in diamond_faces)
+                verts.extend((side*.027+dx,y+dy,z+dz) for dx in (-.0085,.0085)
+                             for dy,dz in ((0,-.0056),(.0028,0),(0,.0056),(-.0028,0)))
+    cut(pad,mesh('CUT buttpad lattice',verts,faces,None,None,0))
     cyl('Stock sling stud',(0,-.081,.255),.0025,.009,steel,axis='Y')
     tube('Stock sling eye',(0,-.087,.255),.004,.0025,.003,steel,axis='X',sides=24)
     # Factory full bottom / twin short side Picatinny rails and ribbed tri-rail forend.
