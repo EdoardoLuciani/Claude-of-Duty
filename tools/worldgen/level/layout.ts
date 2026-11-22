@@ -90,7 +90,7 @@ export const BUILDINGS: BuildingSpec[] = [
       {
         // Open-plan living — the old spine wall boxed off half the floor.
         walls: [],
-        furnish: [{ kind: 'living', x0: 0.0, z0: 0.0, x1: 1.0, z1: 1.0 }],
+        furnish: [{ id: 'living', x0: 0.0, z0: 0.0, x1: 1.0, z1: 1.0 }],
       },
     ],
   },
@@ -148,7 +148,7 @@ export const BUILDINGS: BuildingSpec[] = [
     rooms: [
       {
         walls: [[0.42, 0.0, 0.42, 1.0]],
-        furnish: [{ kind: 'shop', x0: 0.42, z0: 0.0, x1: 1.0, z1: 1.0 }],
+        furnish: [{ id: 'shop', x0: 0.42, z0: 0.0, x1: 1.0, z1: 1.0 }],
       },
     ],
   },
@@ -204,9 +204,9 @@ export const BUILDINGS: BuildingSpec[] = [
           [0.0, 0.52, 0.55, 0.52, 0.7],
         ],
         furnish: [
-          { kind: 'shop', x0: 0.55, z0: 0.0, x1: 1.0, z1: 1.0, counter: [-8.14, -3.125, 2.1, 'z'] },
-          { kind: 'storage', x0: 0.0, z0: 0.0, x1: 0.55, z1: 0.52 },
-          { kind: 'living', x0: 0.0, z0: 0.52, x1: 0.55, z1: 1.0 },
+          { id: 'shop', x0: 0.55, z0: 0.0, x1: 1.0, z1: 1.0, counter: [-8.14, -3.125, 2.1, 'z'] },
+          { id: 'storage', x0: 0.0, z0: 0.0, x1: 0.55, z1: 0.52 },
+          { id: 'living', x0: 0.0, z0: 0.52, x1: 0.55, z1: 1.0 },
         ],
       },
       {
@@ -216,16 +216,16 @@ export const BUILDINGS: BuildingSpec[] = [
           [0.48, 0.45, 1.0, 0.45, 0.25],
         ],
         furnish: [
-          { kind: 'living', x0: 0.48, z0: 0.45, x1: 1.0, z1: 1.0 },
-          { kind: 'storage', x0: 0.48, z0: 0.0, x1: 1.0, z1: 0.45 },
-          { kind: 'living', x0: 0.0, z0: 0.0, x1: 0.48, z1: 1.0 },
+          { id: 'living-east', x0: 0.48, z0: 0.45, x1: 1.0, z1: 1.0 },
+          { id: 'storage', x0: 0.48, z0: 0.0, x1: 1.0, z1: 0.45 },
+          { id: 'living-west', x0: 0.0, z0: 0.0, x1: 0.48, z1: 1.0 },
         ],
       },
       {
         walls: [[0.5, 0.0, 0.5, 1.0, 0.5]],
         furnish: [
-          { kind: 'ruin', x0: 0.5, z0: 0.0, x1: 1.0, z1: 1.0 },
-          { kind: 'storage', x0: 0.0, z0: 0.0, x1: 0.5, z1: 1.0 },
+          { id: 'ruin', x0: 0.5, z0: 0.0, x1: 1.0, z1: 1.0 },
+          { id: 'storage', x0: 0.0, z0: 0.0, x1: 0.5, z1: 1.0 },
         ],
       },
     ],
@@ -271,14 +271,14 @@ export const BUILDINGS: BuildingSpec[] = [
       {
         walls: [[0.5, 0.0, 0.5, 0.65, 0.45]],
         furnish: [
-          { kind: 'ruin', x0: 0.5, z0: 0.0, x1: 1.0, z1: 1.0 },
-          { kind: 'ruin', x0: 0.0, z0: 0.0, x1: 0.5, z1: 0.65 },
-          { kind: 'storage', x0: 0.0, z0: 0.65, x1: 0.5, z1: 1.0 },
+          { id: 'ruin-east', x0: 0.5, z0: 0.0, x1: 1.0, z1: 1.0 },
+          { id: 'ruin-west', x0: 0.0, z0: 0.0, x1: 0.5, z1: 0.65 },
+          { id: 'storage', x0: 0.0, z0: 0.65, x1: 0.5, z1: 1.0 },
         ],
       },
       {
         walls: [],
-        furnish: [{ kind: 'ruin', x0: 0.0, z0: 0.0, x1: 1.0, z1: 1.0 }],
+        furnish: [{ id: 'ruin', x0: 0.0, z0: 0.0, x1: 1.0, z1: 1.0 }],
       },
     ],
     roofProps: 2,
@@ -326,9 +326,9 @@ export const BUILDINGS: BuildingSpec[] = [
         [0.0, split, 0.42, split, 0.45],
       ],
       furnish: [
-        { kind: 'workshop', x0: 0.42, z0: 0.0, x1: 1.0, z1: 1.0 },
-        { kind: 'storage', x0: 0.0, z0: 0.0, x1: 0.42, z1: split },
-        { kind: 'living', x0: 0.0, z0: split, x1: 0.42, z1: 1.0 },
+        { id: 'workshop', x0: 0.42, z0: 0.0, x1: 1.0, z1: 1.0 },
+        { id: 'storage', x0: 0.0, z0: 0.0, x1: 0.42, z1: split },
+        { id: 'living', x0: 0.0, z0: split, x1: 0.42, z1: 1.0 },
       ],
     })),
   },
@@ -381,8 +381,8 @@ export const BUILDINGS: BuildingSpec[] = [
         // Storeroom on the street, apartment through a doorway in the spine.
         walls: [[0.56, 0.0, 0.56, 1.0, 0.5]],
         furnish: [
-          { kind: 'storage', x0: 0.0, z0: 0.0, x1: 0.56, z1: 1.0 },
-          { kind: 'living', x0: 0.56, z0: 0.0, x1: 1.0, z1: 1.0 },
+          { id: 'storage', x0: 0.0, z0: 0.0, x1: 0.56, z1: 1.0 },
+          { id: 'living', x0: 0.56, z0: 0.0, x1: 1.0, z1: 1.0 },
         ],
       },
     ],
@@ -450,15 +450,15 @@ export const BUILDINGS: BuildingSpec[] = [
           [0.62, 0.0, 0.62, 0.42, 0.5],
         ],
         furnish: [
-          { kind: 'shop', x0: 0.0, z0: 0.42, x1: 0.62, z1: 1.0, counter: [8.14, 22.4, 2.05, 'z'] },
-          { kind: 'storage', x0: 0.0, z0: 0.0, x1: 0.62, z1: 0.42 },
+          { id: 'shop', x0: 0.0, z0: 0.42, x1: 0.62, z1: 1.0, counter: [8.14, 22.4, 2.05, 'z'] },
+          { id: 'storage', x0: 0.0, z0: 0.0, x1: 0.62, z1: 0.42 },
         ],
       },
       {
         walls: [[0.0, 0.45, 0.62, 0.45, 0.72]],
         furnish: [
-          { kind: 'living', x0: 0.0, z0: 0.45, x1: 0.62, z1: 1.0 },
-          { kind: 'ruin', x0: 0.0, z0: 0.0, x1: 0.62, z1: 0.45 },
+          { id: 'living', x0: 0.0, z0: 0.45, x1: 0.62, z1: 1.0 },
+          { id: 'ruin', x0: 0.0, z0: 0.0, x1: 0.62, z1: 0.45 },
         ],
       },
     ],
@@ -524,15 +524,15 @@ export const BUILDINGS: BuildingSpec[] = [
         ],
         furnish: [
           {
-            kind: 'shop',
+            id: 'shop',
             x0: 0.0,
             z0: 0.0,
             x1: 0.56,
             z1: 0.56,
             counter: [8.14, -7.9304, 4.4, 'z'],
           },
-          { kind: 'ruin', x0: 0.0, z0: 0.56, x1: 0.56, z1: 1.0 },
-          { kind: 'storage', x0: 0.56, z0: 0.0, x1: 1.0, z1: 1.0 },
+          { id: 'ruin', x0: 0.0, z0: 0.56, x1: 0.56, z1: 1.0 },
+          { id: 'storage', x0: 0.56, z0: 0.0, x1: 1.0, z1: 1.0 },
         ],
       },
     ],
@@ -573,14 +573,14 @@ export const BUILDINGS: BuildingSpec[] = [
       {
         walls: [[0.45, 0.0, 0.45, 0.7, 0.4]],
         furnish: [
-          { kind: 'ruin', x0: 0.45, z0: 0.0, x1: 1.0, z1: 1.0 },
-          { kind: 'storage', x0: 0.0, z0: 0.0, x1: 0.45, z1: 0.7 },
-          { kind: 'ruin', x0: 0.0, z0: 0.7, x1: 0.45, z1: 1.0 },
+          { id: 'ruin-east', x0: 0.45, z0: 0.0, x1: 1.0, z1: 1.0 },
+          { id: 'storage', x0: 0.0, z0: 0.0, x1: 0.45, z1: 0.7 },
+          { id: 'ruin-west', x0: 0.0, z0: 0.7, x1: 0.45, z1: 1.0 },
         ],
       },
       {
         walls: [],
-        furnish: [{ kind: 'ruin', x0: 0.0, z0: 0.0, x1: 1.0, z1: 1.0 }],
+        furnish: [{ id: 'ruin', x0: 0.0, z0: 0.0, x1: 1.0, z1: 1.0 }],
       },
     ],
   },
@@ -646,7 +646,7 @@ export const BUILDINGS: BuildingSpec[] = [
       {
         // Open warehouse — the old spine wall boxed off half the floor.
         walls: [],
-        furnish: [{ kind: 'storage', x0: 0.0, z0: 0.0, x1: 1.0, z1: 1.0 }],
+        furnish: [{ id: 'storage', x0: 0.0, z0: 0.0, x1: 1.0, z1: 1.0 }],
       },
     ],
   },

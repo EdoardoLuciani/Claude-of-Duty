@@ -1,14 +1,13 @@
 import * as THREE from 'three';
 
-import type { Rng } from '../../src/core/rng.ts';
 import type { Assembler } from './builder.ts';
-import type { BuildingInfo, RoomKind } from './buildings.ts';
-import { BOX, BOX_FINE, BOX_THIN, IDENT, LL, rubbleMound } from './kit.ts';
+import type { BuildingInfo } from './buildings.ts';
+import { BOX, BOX_FINE, BOX_THIN, IDENT, LL } from './kit.ts';
+import type { RoomFixture, RoomProp } from './level/room-fixtures.ts';
 import type { RectXZ } from './util.ts';
-import { clothGeometry, chamferBox, fillMasks } from './util.ts';
+import { clothGeometry, chamferBox, fillMasks, rockGeometry } from './util.ts';
 
 export interface RoomSpec extends RectXZ {
-  kind: RoomKind;
   y: number;
   h: number;
   counter?: [x: number, z: number, length: number, axis: 'x' | 'z'] | undefined;
@@ -18,16 +17,6 @@ export interface RoomSpec extends RectXZ {
   partitions: RectXZ[];
   voids?: (RectXZ | undefined)[];
 }
-interface RoomSide {
-  px: number;
-  pz: number;
-  tx: number;
-  tz: number;
-  nx: number;
-  nz: number;
-  len: number;
-  yaw: number;
-}
 
 function inDoorway(r: Pick<RoomSpec, 'doors'>, x: number, z: number, rad = 1.25): boolean {
   for (const d of r.doors) {
@@ -36,15 +25,6 @@ function inDoorway(r: Pick<RoomSpec, 'doors'>, x: number, z: number, rad = 1.25)
     if (dx * dx + dz * dz < rad * rad) return true;
   }
   return false;
-}
-
-/** The room edge is the building's outer wall. */
-function sideOnEnvelope(r: Pick<RoomSpec, 'envelope'>, side: number, s: RoomSide): boolean {
-  const e = r.envelope;
-  if (side === 0) return Math.abs(s.pz - e.z0) < 0.3;
-  if (side === 2) return Math.abs(s.pz - e.z1) < 0.3;
-  if (side === 3) return Math.abs(s.px - e.x0) < 0.3;
-  return Math.abs(s.px - e.x1) < 0.3;
 }
 
 const overlap = (a0: number, a1: number, b0: number, b1: number): number =>
@@ -132,319 +112,8 @@ function wallBacking(
   return true;
 }
 
-/**
- * WORLD — procedural interior micro-detail.
- *
- * Gameplay-significant furniture and floor props are explicitly authored in
- * level/placements/interiors.ts. This module only builds attached dressing and small
- * debris whose exact transform does not affect traversal.
- */
-
-/** Furnish one room. Rect is in level space; y is the floor surface. */
-export function furnishRoom(A: Assembler, rng: Rng, r: RoomSpec): void {
-  const { kind, x0, z0, x1, z1, y, h } = r;
-  const w = Math.abs(x1 - x0);
-  const d = Math.abs(z1 - z0);
-  if (w < 1.2 || d < 1.2) return;
-  const cx = (x0 + x1) / 2;
-  const cz = (z0 + z1) / 2;
-  // floor dressing everybody gets: plaster fall, litter
-  for (let i = 0; i < rng.int(4, 9); i++) {
-    const px = rng.range(x0 + 0.2, x1 - 0.2);
-    const pz = rng.range(z0 + 0.2, z1 - 0.2);
-    const ry = rng.float() * 6.28;
-    const scale = rng.range(0.7, 1.3);
-    if (!inDoorway(r, px, pz)) A.put('litter', px, y + 0.015, pz, ry, scale, [1, 1.3, 1]);
-  }
-  for (let i = 0; i < rng.int(2, 5); i++) {
-    const prototype = rng.pick(['brick_a', 'brick_b', 'rock_b']);
-    const px = rng.range(x0 + 0.25, x1 - 0.25);
-    const pz = rng.range(z0 + 0.25, z1 - 0.25);
-    const ry = rng.float() * 6.28;
-    const scale = rng.range(0.5, 1.0);
-    if (!inDoorway(r, px, pz)) A.put(prototype, px, y + 0.04, pz, ry, scale, [1, 1.4, 1]);
-  }
-
-  if (kind === 'shop') furnishShop(A, rng, r, cx, cz);
-  else if (kind === 'living') furnishLiving(A, rng, r, cx, cz);
-  else if (kind === 'workshop') furnishWorkshop(A, rng, r, cx, cz, w, d);
-  else if (kind === 'ruin') furnishRuin(A, rng, r, cx, cz);
-
-  // Everything above dresses the MIDDLE of the room. An interior camera is
-  // almost always 2-3 m off a wall, so the walls and the wall/floor junction
-  // are most of the frame and have to carry the shot on their own.
-  dressWalls(A, rng, r);
-  dressCeiling(A, rng, r);
-
-  // hanging bulb, roughly central, offset so it isn't dead centre
-  if (kind !== 'ruin' || rng.float() < 0.5) {
-    hangingBulb(A, rng, cx + rng.range(-0.8, 0.8), y + h - 0.05, cz + rng.range(-0.8, 0.8));
-  }
-}
-
-/**
- * WALL DRESSING.
- *
- * Runs on every furnished room, along all four walls. A bare interior wall is
- * the single flattest thing a renderer can show you, and the interior shot
- * scored lowest of the eleven for exactly that reason: "zero props, bare stud
- * walls and empty boxes". Each wall gets, at random:
- *
- *   - a plank shelf on two brackets with goods on it
- *   - surface-run electrical conduit and a junction box (every building here
- *     is wired on the surface, and a 3 m vertical line breaks a flat panel
- *     better than any amount of noise)
- *   - something leaning against it at 8-12 degrees
- *   - a swept wedge of dust and plaster fall in the junction itself
- *
- * Everything is placed in contact: the leaning objects touch top and bottom,
- * and the dust wedge straddles the floor join so nothing reads as a decal
- * pasted onto a plane.
- */
-function dressWalls(A: Assembler, rng: Rng, r: RoomSpec): void {
-  const { x0, z0, x1, z1, y, h, kind } = r;
-  const sides = [
-    { px: (x0 + x1) / 2, pz: z0, tx: 1, tz: 0, nx: 0, nz: 1, len: x1 - x0, yaw: 0 },
-    { px: x1, pz: (z0 + z1) / 2, tx: 0, tz: 1, nx: -1, nz: 0, len: z1 - z0, yaw: Math.PI / 2 },
-    { px: (x0 + x1) / 2, pz: z1, tx: 1, tz: 0, nx: 0, nz: -1, len: x1 - x0, yaw: 0 },
-    { px: x0, pz: (z0 + z1) / 2, tx: 0, tz: -1, nx: 1, nz: 0, len: z1 - z0, yaw: Math.PI / 2 },
-  ];
-
-  const at = (s: RoomSide, t: number, off: number): [number, number] => [
-    s.px + s.tx * t + s.nx * off,
-    s.pz + s.tz * t + s.nz * off,
-  ];
-
-  for (let side = 0; side < 4; side++) {
-    const s = sides[side];
-    if (s.len < 1.6) continue;
-    const half = s.len / 2 - 0.35;
-    const horizontal = side === 0 || side === 2;
-    const tangentAt = (t: number): number => (horizontal ? s.px + s.tx * t : s.pz + s.tz * t);
-    const backedByWall = (t: number, halfWidth: number, y0: number, y1: number): boolean => {
-      const c = tangentAt(t);
-      return wallBacking(r, side, c - halfWidth, c + halfWidth, y0, y1);
-    };
-    const dressUp =
-      sideOnEnvelope(r, side, s) ||
-      r.partitions.some((wall): boolean => {
-        if (horizontal) return Math.abs(wall.z1 - wall.z0) < 0.25 && Math.abs(s.pz - wall.z0) < 0.3;
-        return Math.abs(wall.x1 - wall.x0) < 0.25 && Math.abs(s.px - wall.x0) < 0.3;
-      });
-    const wallT = (): number => rng.range(-half, half);
-
-    // ---- surface conduit: two drops and a run under the ceiling ----------
-    if (dressUp && rng.float() < 0.8) {
-      const pipe = A.cache('conduit', (): THREE.BufferGeometry => {
-        const g = new THREE.CylinderGeometry(0.016, 0.016, 1, 6, 1);
-        fillMasks(g, 0.35, 0.5, 0.1);
-        return g;
-      });
-      const runY = y + h - rng.range(0.18, 0.4);
-      const t0 = rng.range(-half, 0);
-      const t1 = t0 + rng.range(0.8, Math.max(1.0, half - t0));
-      // the drop, plus the junction box it feeds
-      const dropT = rng.float() < 0.5 ? t0 : t1;
-      const boxY = y + rng.range(1.15, 1.55);
-      const flexRoll = rng.float();
-      const runMid = (t0 + t1) / 2;
-      const runHalf = Math.abs(t1 - t0) / 2 + 0.03;
-      const dropHalf = 0.11;
-      if (
-        backedByWall(runMid, runHalf, runY - 0.03, runY + 0.03) &&
-        backedByWall(dropT, dropHalf, boxY - 0.38, runY + 0.03)
-      ) {
-        const [rx0, rz0] = at(s, (t0 + t1) / 2, 0.045);
-        if (!inVoid(r, rx0, rz0)) {
-          A.add(
-            'metal_dark',
-            pipe,
-            LL(IDENT, rx0, runY, rz0, s.yaw, 1, Math.abs(t1 - t0), 1, 0, Math.PI / 2)
-          );
-          const [dx, dz] = at(s, dropT, 0.045);
-          A.add('metal_dark', pipe, LL(IDENT, dx, (runY + boxY) / 2, dz, 0, 1, runY - boxY, 1));
-          A.add(
-            'metal_dark',
-            BOX_FINE(A),
-            LL(IDENT, ...insert(at(s, dropT, 0.055), boxY), s.yaw, 0.15, 0.19, 0.09),
-            {
-              masks: [0.55, 0.5, 0.2],
-            }
-          );
-          if (flexRoll < 0.5) {
-            A.add(
-              'metal_dark',
-              pipe,
-              LL(IDENT, ...insert(at(s, dropT + 0.06, 0.05), boxY - 0.28), 0, 0.4, 0.34, 0.4)
-            );
-          }
-        }
-      }
-    }
-
-    // ---- a plank shelf on two brackets, with goods --------------------------
-    if (dressUp && kind !== 'ruin' && rng.float() < 0.55) {
-      const sy = y + rng.range(1.05, 1.65);
-      const sLen = Math.min(rng.range(0.9, 1.8), s.len - 0.6);
-      const st = rng.range(-half + sLen / 2, half - sLen / 2);
-      const [sx, sz] = at(s, st, 0.15);
-      if (
-        !inDoorway(r, sx, sz) &&
-        !inVoid(r, sx, sz) &&
-        backedByWall(st, sLen / 2 + 0.03, sy - 0.2, sy + 0.22)
-      ) {
-        A.add('wood_prop_dark', BOX(A), LL(IDENT, sx, sy, sz, s.yaw, sLen, 0.035, 0.28), {
-          masks: [0.85, 0.5, 0.15],
-        });
-        for (const bt of [-1, 1]) {
-          const [bx, bz] = at(s, st + bt * (sLen / 2 - 0.12), 0.1);
-          A.add('metal_dark', BOX_FINE(A), LL(IDENT, bx, sy - 0.09, bz, s.yaw, 0.03, 0.16, 0.18), {
-            masks: [0.6, 0.6, 0.3],
-          });
-        }
-        for (let i = 0; i < rng.int(2, 5); i++) {
-          const [gx, gz] = at(
-            s,
-            st + rng.range(-sLen / 2 + 0.12, sLen / 2 - 0.12),
-            rng.range(0.11, 0.2)
-          );
-          A.put(
-            rng.pick(['bottle', 'can', 'box_card_b', 'bucket']),
-            gx,
-            sy + 0.02,
-            gz,
-            rng.float() * 6.28,
-            rng.range(0.6, 0.95),
-            [1, 1.1, 1]
-          );
-        }
-      }
-    }
-
-    // ---- something leaning on it -------------------------------------------
-    if (dressUp && rng.float() < 0.5) {
-      const lean = rng.range(0.13, 0.22);
-      const lt = rng.range(-half, half);
-      const lh = rng.range(1.1, 1.8);
-      const lw = rng.range(0.5, 1.0);
-      const off = 0.06 + (Math.sin(lean) * lh) / 2;
-      const [lx, lz] = at(s, lt, off);
-      const key = rng.pick(['plywood', 'corrugated', 'wood_prop_dark']);
-      if (!backedByWall(lt, lw / 2 + 0.04, y, y + lh)) continue;
-      // Tip the top INTO the wall. After the yaw the sheet's local -Z faces
-      // the wall on sides 0/3 and its +Z on sides 1/2, so the sign of the
-      // tilt has to follow the inward normal or the sheet leans out into the
-      // room and floats at both ends.
-      const leanSign = s.nz !== 0 ? -s.nz : -s.nx;
-      if (!inVoid(r, lx, lz)) {
-        A.add(
-          key,
-          BOX_THIN(A),
-          LL(
-            IDENT,
-            lx,
-            y + (Math.cos(lean) * lh) / 2,
-            lz,
-            s.yaw,
-            lw,
-            lh,
-            0.022,
-            leanSign * lean,
-            0
-          ),
-          { masks: [0.7, 0.55, 0.3] }
-        );
-      }
-    }
-
-    // ---- swept dust and plaster fall in the junction ------------------------
-    // A wall does not meet a floor on a line. Three flat lobes straddling the
-    // join plus a handful of chips is the cheapest thing that grounds a room.
-    const nWedge = Math.max(2, Math.round(s.len / 1.5));
-    for (let i = 0; i < nWedge; i++) {
-      const wt = ((i + rng.range(0.2, 0.8)) / nWedge - 0.5) * s.len;
-      if (rng.float() < 0.7) {
-        const [cx2, cz2] = at(s, wt + rng.range(-0.3, 0.3), rng.range(0.06, 0.34));
-        if (inDoorway(r, cx2, cz2)) continue;
-        A.put(
-          rng.pick(['brick_a', 'brick_b', 'rock_b', 'litter', 'litter']),
-          cx2,
-          y + 0.03,
-          cz2,
-          rng.float() * 6.28,
-          rng.range(0.45, 0.9),
-          [1, 1.4, 1]
-        );
-      }
-    }
-
-    // ---- a sack or a cloth hung on a nail ----------------------------------
-    if (dressUp && rng.float() < 0.45) {
-      const ht = wallT();
-      const [hx, hz] = at(s, ht, 0.05);
-      const hy = y + rng.range(1.3, 1.85);
-      const cw = rng.range(0.45, 0.8);
-      const ch = rng.range(0.6, 1.0);
-      if (!backedByWall(ht, cw / 2 + 0.03, hy - ch / 2, hy + ch / 2 + 0.05)) continue;
-      const cl = clothGeometry(cw, ch, {
-        segX: 6,
-        segY: 7,
-        sag: 0.1,
-        wrinkle: 0.09,
-        thickness: 0.003,
-        fray: 0.014,
-        rng,
-      });
-      const clothKey = rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream']);
-      if (!inVoid(r, hx, hz)) {
-        A.addOnce(clothKey, cl, LL(IDENT, hx, hy, hz, s.yaw), {
-          masks: [0.35, 0.6, 0.3],
-        });
-        A.add('metal_dark', BOX_FINE(A), LL(IDENT, hx, hy + 0.34, hz, s.yaw, 0.02, 0.02, 0.05), {
-          masks: [0.7, 0.5, 0],
-        });
-      } else cl.dispose();
-    }
-  }
-}
-
-/** [x, z] + y -> the (x, y, z) argument triple LL wants. */
-function insert(xz: number[], y: number): [number, number, number] {
-  return [xz[0], y, xz[1]];
-}
-
-/**
- * Exposed structure overhead. A ceiling plane with nothing on it reads as the
- * inside of a box; joists, a conduit run and a hanging cable give the top of
- * the frame something to occlude and something for the bulb to rim-light.
- */
-function dressCeiling(A: Assembler, rng: Rng, r: RoomSpec): void {
-  const { x0, z0, x1, z1, y, h } = r;
-  const w = x1 - x0;
-  const d = z1 - z0;
-  if (h < 2.1 || w < 1.6 || d < 1.6) return;
-  const alongX = w < d;
-  const span = alongX ? w : d;
-  const runLen = alongX ? d : w;
-  const n = Math.max(2, Math.round(runLen / rng.range(0.75, 1.15)));
-  for (let i = 1; i < n; i++) {
-    const t = (i / n - 0.5) * runLen;
-    const jx = alongX ? (x0 + x1) / 2 : (x0 + x1) / 2 + t;
-    const jz = alongX ? (z0 + z1) / 2 + t : (z0 + z1) / 2;
-    const thick = rng.range(0.055, 0.075);
-    if (beamHitsVoid(r, alongX, jx, jz, span - 0.05)) continue;
-    A.add(
-      'wood_prop_dark',
-      BOX(A),
-      LL(IDENT, jx, y + h - 0.06, jz, alongX ? 0 : Math.PI / 2, span - 0.05, 0.11, thick),
-      { masks: [0.35, 0.6, 0.45] }
-    );
-  }
-}
-
 /** Bare bulb on a twisted flex — the only light source in most of these rooms. */
-function hangingBulb(A: Assembler, rng: Rng, x: number, yCeil: number, z: number): void {
-  const drop = rng.range(0.35, 0.95);
+function hangingBulb(A: Assembler, x: number, yCeil: number, z: number, drop: number): void {
   const wire = A.cache('bulbwire', (): THREE.BufferGeometry => {
     const g = new THREE.CylinderGeometry(0.006, 0.006, 1, 5, 1);
     fillMasks(g, 0.2, 0.4, 0);
@@ -468,19 +137,14 @@ function hangingBulb(A: Assembler, rng: Rng, x: number, yCeil: number, z: number
 }
 
 // -------------------------------------------------------------- workshop --
-function furnishWorkshop(
+function workbench(
   A: Assembler,
-  rng: Rng,
-  r: RoomSpec,
   cx: number,
+  y: number,
   cz: number,
-  w: number,
-  d: number
+  alongX: boolean,
+  tw: number
 ): void {
-  const { y } = r;
-  const alongX = w >= d;
-  const tw = Math.min(2.2, (alongX ? w : d) - 1.4);
-  if (inDoorway(r, cx, cz, tw / 2 + 0.5)) return;
   A.add(
     'wood_prop_dark',
     BOX(A),
@@ -496,27 +160,11 @@ function furnishWorkshop(
       });
     }
   }
-  for (let i = 0; i < 4; i++) {
-    const t = rng.range(-tw / 2 + 0.18, tw / 2 - 0.18);
-    A.put(
-      rng.pick(['can', 'bottle', 'box_card_b', 'gas_bottle']),
-      cx + (alongX ? t : rng.range(-0.18, 0.18)),
-      y + 0.88,
-      cz + (alongX ? rng.range(-0.18, 0.18) : t),
-      rng.float() * 6.28,
-      rng.range(0.65, 0.9),
-      [1, 1.1, 1]
-    );
-  }
 }
 
-// ------------------------------------------------------------------- shop --
-function furnishShop(A: Assembler, rng: Rng, r: RoomSpec, cx: number, cz: number): void {
+function shopCounter(A: Assembler, r: RoomSpec, counter: NonNullable<RoomSpec['counter']>): void {
   const { y } = r;
-  addRug(A, rng, cx + rng.range(-0.5, 0.5), y, cz + rng.range(-0.5, 0.5), rng.range(1.6, 2.4));
-  if (!r.counter) return;
-
-  const [ccx, ccz, clen, axis] = r.counter;
+  const [ccx, ccz, clen, axis] = counter;
   const alongZ = axis === 'z';
   const cSX = alongZ ? 0.74 : clen;
   const cSZ = alongZ ? clen : 0.74;
@@ -550,133 +198,300 @@ function furnishShop(A: Assembler, rng: Rng, r: RoomSpec, cx: number, cz: number
   A.add('wood_prop_dark', BOX(A), LL(IDENT, ccx, y + 0.28, ccz, 0, cSX - 0.2, 0.04, cSZ - 0.2), {
     masks: [0.4, 0.7, 0.5],
   });
-  const occupied: [number, number][] = [];
-  for (let i = 0; i < 6; i++) {
-    const t = rng.range(-clen / 2 + 0.3, clen / 2 - 0.3);
-    const px = ccx + (alongZ ? rng.range(-0.22, 0.22) : t);
-    const pz = ccz + (alongZ ? t : rng.range(-0.22, 0.22));
-    const hasRoom = occupied.every(([ox, oz]): boolean => Math.hypot(px - ox, pz - oz) >= 0.68);
-    if (rng.float() < 0.45) {
-      const trayYaw = rng.range(-0.4, 0.4) + (alongZ ? Math.PI / 2 : 0);
-      const produceYaw = rng.float() * 6.28;
-      if (hasRoom) {
-        A.put('tray', px, y + 0.94, pz, trayYaw, 1, [1, 1.1, 1]);
-        A.put('produce', px, y + 0.96, pz, produceYaw, 1, [1, 1, 1]);
-        occupied.push([px, pz]);
+}
+
+function setProp(
+  A: Assembler,
+  [name, dx, dy, dz, yaw, scale, grime]: RoomProp,
+  x: number,
+  y: number,
+  z: number
+): void {
+  if (!A.has(name)) throw new Error(`[world] unknown room prop prototype ${name}`);
+  A.put(name, x + dx, y + dy, z + dz, yaw, scale, [1, grime, 1]);
+}
+
+/** Build kit geometry from a room's authored fixtures. Goods follow the
+ * surface they sit on; the furniture does not depend on any cosmetic draws. */
+export function furnishRoom(
+  A: Assembler,
+  id: string,
+  r: RoomSpec,
+  fixtures: readonly RoomFixture[]
+): void {
+  const { x0, x1, z0, z1, y, h } = r;
+  const cx = (x0 + x1) / 2;
+  const cz = (z0 + z1) / 2;
+  const sides = [
+    { x: cx, z: z0, tx: 1, tz: 0, nx: 0, nz: 1, yaw: 0 },
+    { x: x1, z: cz, tx: 0, tz: 1, nx: -1, nz: 0, yaw: Math.PI / 2 },
+    { x: cx, z: z1, tx: 1, tz: 0, nx: 0, nz: -1, yaw: 0 },
+    { x: x0, z: cz, tx: 0, tz: -1, nx: 1, nz: 0, yaw: Math.PI / 2 },
+  ];
+  const point = (side: number, along: number, offset: number): [number, number] => {
+    const s = sides[side];
+    return [s.x + s.tx * along + s.nx * offset, s.z + s.tz * along + s.nz * offset];
+  };
+  const backed = (
+    side: number,
+    x: number,
+    z: number,
+    half: number,
+    y0: number,
+    y1: number
+  ): boolean => {
+    const t = side % 2 === 0 ? x : z;
+    return wallBacking(r, side, t - half, t + half, y0, y1);
+  };
+  for (const f of fixtures) {
+    switch (f[0]) {
+      case 'prop': {
+        const [, ...prop] = f;
+        setProp(A, prop, cx, y, cz);
+        break;
       }
-    } else {
-      const prototype = rng.pick([
-        'box_card_a',
-        'box_card_b',
-        'crate_b',
-        'bottle',
-        'can',
-        'bucket',
-      ]);
-      const yaw = rng.float() * 6.28;
-      const scale = rng.range(0.6, 0.9);
-      if (hasRoom) {
-        A.put(prototype, px, y + 0.94, pz, yaw, scale, [1, 1.15, 1]);
-        occupied.push([px, pz]);
+      case 'shelf': {
+        const [, side, along, height, width, goods] = f;
+        const [x, z] = point(side, along, 0.15);
+        const sy = y + height;
+        if (
+          inDoorway(r, x, z) ||
+          inVoid(r, x, z) ||
+          !backed(side, x, z, width / 2 + 0.03, sy - 0.2, sy + 0.22)
+        )
+          throw new Error(`[world] ${id} shelf on side ${side} has lost its wall or clearance`);
+        const { yaw } = sides[side];
+        A.add('wood_prop_dark', BOX(A), LL(IDENT, x, sy, z, yaw, width, 0.035, 0.28), {
+          masks: [0.85, 0.5, 0.15],
+        });
+        for (const direction of [-1, 1]) {
+          const [bx, bz] = point(side, along + direction * (width / 2 - 0.12), 0.1);
+          A.add('metal_dark', BOX_FINE(A), LL(IDENT, bx, sy - 0.09, bz, yaw, 0.03, 0.16, 0.18), {
+            masks: [0.6, 0.6, 0.3],
+          });
+        }
+        for (const good of goods) setProp(A, good, x, sy, z);
+        break;
+      }
+      case 'counter':
+        if (!r.counter) throw new Error(`[world] ${id} has goods but no shop counter`);
+        shopCounter(A, r, r.counter);
+        for (const good of f[1]) setProp(A, good, r.counter[0], y + 0.93, r.counter[1]);
+        break;
+      case 'bench': {
+        const [, alongX, width, goods] = f;
+        if (inDoorway(r, cx, cz, width / 2 + 0.5))
+          throw new Error(`[world] ${id} workbench blocks a doorway`);
+        workbench(A, cx, y, cz, alongX, width);
+        for (const good of goods) setProp(A, good, cx, y + 0.865, cz);
+        break;
+      }
+      case 'conduit': {
+        const [, side, from, to, height, drop, boxHeight, flex] = f;
+        const at = (t: number, offset: number, dy: number): [number, number, number] => {
+          const [x, z] = point(side, t, offset);
+          return [x, y + dy, z];
+        };
+        const { yaw } = sides[side];
+        const pipe = A.cache('conduit', (): THREE.BufferGeometry => {
+          const geometry = new THREE.CylinderGeometry(0.016, 0.016, 1, 6, 1);
+          return fillMasks(geometry, 0.35, 0.5, 0.1);
+        });
+        A.add(
+          'metal_dark',
+          pipe,
+          LL(
+            IDENT,
+            ...at((from + to) / 2, 0.045, height),
+            yaw,
+            1,
+            Math.abs(to - from),
+            1,
+            0,
+            Math.PI / 2
+          )
+        );
+        A.add(
+          'metal_dark',
+          pipe,
+          LL(IDENT, ...at(drop, 0.045, (height + boxHeight) / 2), 0, 1, height - boxHeight, 1)
+        );
+        A.add(
+          'metal_dark',
+          BOX_FINE(A),
+          LL(IDENT, ...at(drop, 0.055, boxHeight), yaw, 0.15, 0.19, 0.09),
+          {
+            masks: [0.55, 0.5, 0.2],
+          }
+        );
+        if (flex)
+          A.add(
+            'metal_dark',
+            pipe,
+            LL(IDENT, ...at(drop + 0.06, 0.05, boxHeight - 0.28), 0, 0.4, 0.34, 0.4)
+          );
+        break;
+      }
+      case 'lean': {
+        const [, side, along, tilt, height, width, key] = f;
+        const [x, z] = point(side, along, 0.06 + (Math.sin(tilt) * height) / 2);
+        const s = sides[side];
+        const pitch = (s.nz || s.nx) * -tilt;
+        A.add(
+          key,
+          BOX_THIN(A),
+          LL(IDENT, x, y + (Math.cos(tilt) * height) / 2, z, s.yaw, width, height, 0.022, pitch),
+          {
+            masks: [0.7, 0.55, 0.3],
+          }
+        );
+        break;
+      }
+      case 'joist': {
+        const [, dx, dz, alongX, span, thickness] = f;
+        if (beamHitsVoid(r, alongX, cx + dx, cz + dz, span))
+          throw new Error(`[world] ${id} ceiling joist crosses a stair opening`);
+        A.add(
+          'wood_prop_dark',
+          BOX(A),
+          LL(
+            IDENT,
+            cx + dx,
+            y + h - 0.06,
+            cz + dz,
+            alongX ? 0 : Math.PI / 2,
+            span,
+            0.11,
+            thickness
+          ),
+          {
+            masks: [0.35, 0.6, 0.45],
+          }
+        );
+        break;
+      }
+      case 'bulb':
+        hangingBulb(A, cx + f[1], y + h - 0.05, cz + f[2], f[3]);
+        break;
+      case 'rug': {
+        const [, key, dx, dz, w, d, yaw, seed] = f;
+        const g = clothGeometry(w, d, {
+          segX: 8,
+          segY: 6,
+          sag: 0,
+          wrinkle: 0.02,
+          thickness: 0.0038,
+          fray: 0.012,
+          seed,
+        });
+        A.addOnce(key, g, LL(IDENT, cx + dx, y + 0.014, cz + dz, yaw, 1, 1, 1, -Math.PI / 2), {
+          masks: [0.45, 0.55, 0.25],
+        });
+        break;
+      }
+      case 'blanket': {
+        const g = clothGeometry(1.5, 0.9, {
+          segX: 7,
+          segY: 6,
+          sag: 0.05,
+          wrinkle: 0.05,
+          thickness: 0.0032,
+          fray: 0.012,
+          seed: f[1],
+        });
+        A.addOnce(
+          'fabric_teal',
+          g,
+          LL(IDENT, x0 + 1.2, y + 0.19, z1 - 1, 0, 1, 1, 1, -Math.PI / 2),
+          { masks: [0.3, 0.5, 0.2] }
+        );
+        break;
+      }
+      case 'cushion': {
+        const [, key, dx, dz, yaw] = f;
+        const g = fillMasks(chamferBox(0.42, 0.14, 0.42, 0.06), 0.2, 0.4, 0.2);
+        A.addOnce(key, g, LL(IDENT, cx + dx, y + 0.07, cz + dz, yaw));
+        break;
+      }
+      case 'living-drape': {
+        const [, near, seed] = f;
+        const g = clothGeometry(1.7, 1.1, {
+          segX: 8,
+          segY: 7,
+          sag: 0.04,
+          wrinkle: 0.05,
+          thickness: 0.0036,
+          fray: 0.02,
+          bow: -1,
+          seed,
+        });
+        A.addOnce(
+          'fabric_red',
+          g,
+          LL(IDENT, cx - 0.4, y + 1.65, near ? z0 + 0.09 : z1 - 0.09, near ? 0 : Math.PI),
+          { masks: [0.3, 0.4, 0.2] }
+        );
+        break;
+      }
+      case 'wall-drape': {
+        const [, side, along, height, w, drop, key, seed] = f;
+        const [x, z] = point(side, along, 0.05);
+        const { yaw } = sides[side];
+        const g = clothGeometry(w, drop, {
+          segX: 6,
+          segY: 7,
+          sag: 0.1,
+          wrinkle: 0.09,
+          thickness: 0.003,
+          fray: 0.014,
+          seed,
+        });
+        A.addOnce(key, g, LL(IDENT, x, y + height, z, yaw), { masks: [0.35, 0.6, 0.3] });
+        A.add(
+          'metal_dark',
+          BOX_FINE(A),
+          LL(IDENT, x, y + height + 0.34, z, yaw, 0.02, 0.02, 0.05),
+          {
+            masks: [0.7, 0.5, 0],
+          }
+        );
+        break;
+      }
+      case 'ruin': {
+        const [, dx, dz, fragments] = f;
+        const x = cx + dx;
+        const z = cz + dz;
+        for (const [fx, fz, size, yaw, pitch, roll, seed] of fragments)
+          A.addOnce(
+            'concrete',
+            rockGeometry(seed, size, 0, 0.75),
+            LL(IDENT, x + fx, y + size * 0.3, z + fz, yaw, 1, 1, 1, pitch, roll),
+            {
+              masks: [0.3, 0.75, 0.45],
+              visualOnly: true,
+            }
+          );
+        break;
+      }
+      case 'ruin-drape': {
+        const [, dx, dz, yaw, seed] = f;
+        const g = clothGeometry(1.4, 1.1, {
+          segX: 7,
+          segY: 7,
+          sag: 0.24,
+          wrinkle: 0.075,
+          twist: 0.08,
+          fray: 0.02,
+          seed,
+        });
+        A.addOnce(
+          'fabric_cream',
+          g,
+          LL(IDENT, cx + dx, y + 0.035, cz + dz, yaw, 1, 1, 1, -Math.PI / 2),
+          { masks: [0.4, 0.7, 0.3], visualOnly: true }
+        );
+        break;
       }
     }
   }
-}
-
-// ----------------------------------------------------------------- living --
-function furnishLiving(A: Assembler, rng: Rng, r: RoomSpec, cx: number, cz: number): void {
-  const { x0, z0, z1, y } = r;
-  addRug(A, rng, cx, y, cz, rng.range(2.0, 2.8));
-  // blanket
-  const bl = clothGeometry(1.5, 0.9, {
-    segX: 7,
-    segY: 6,
-    sag: 0.05,
-    wrinkle: 0.05,
-    thickness: 0.0032,
-    fray: 0.012,
-    rng,
-  });
-  A.addOnce('fabric_teal', bl, LL(IDENT, x0 + 1.2, y + 0.19, z1 - 1.0, 0, 1, 1, 1, -Math.PI / 2), {
-    masks: [0.3, 0.5, 0.2],
-  });
-  // cushions
-  for (let i = 0; i < 3; i++) {
-    const g = chamferBox(0.42, 0.14, 0.42, 0.06);
-    fillMasks(g, 0.2, 0.4, 0.2);
-    A.addOnce(
-      rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream']),
-      g,
-      LL(IDENT, cx + rng.range(-1, 1), y + 0.07, cz + rng.range(-1, 1), rng.float() * 6.28)
-    );
-  }
-  // Prefer the near wall without bridging a facade opening.
-  const rugX = cx - 0.4;
-  const rugY = y + 1.65;
-  const onNear = wallBacking(r, 0, rugX - 0.85, rugX + 0.85, rugY - 0.55, rugY + 0.55);
-  const onFar = wallBacking(r, 2, rugX - 0.85, rugX + 0.85, rugY - 0.55, rugY + 0.55);
-  const wall = clothGeometry(1.7, 1.1, {
-    segX: 8,
-    segY: 7,
-    sag: 0.04,
-    wrinkle: 0.05,
-    thickness: 0.0036,
-    fray: 0.02,
-    bow: -1,
-    rng,
-  });
-  if (onNear || onFar) {
-    A.addOnce(
-      'fabric_red',
-      wall,
-      LL(IDENT, rugX, rugY, onNear ? z0 + 0.09 : z1 - 0.09, onNear ? 0 : Math.PI),
-      { masks: [0.3, 0.4, 0.2] }
-    );
-  } else {
-    wall.dispose();
-  }
-}
-
-// ------------------------------------------------------------------- ruin --
-function furnishRuin(A: Assembler, rng: Rng, r: RoomSpec, cx: number, cz: number): void {
-  const { y } = r;
-  // The sheet shares the mound's offset.
-  const mx = cx + rng.range(-1, 1);
-  const mz = cz + rng.range(-1, 1);
-  const mr = rng.range(1.4, 2.2);
-  if (inDoorway(r, mx, mz, mr + 0.45)) return;
-  rubbleMound(A, rng, mx, y, mz, mr, 22);
-  const sYaw = rng.float() * 6.28;
-  const sheet = clothGeometry(1.4, 1.1, {
-    segX: 7,
-    segY: 7,
-    sag: 0.24,
-    wrinkle: 0.075,
-    twist: 0.08,
-    fray: 0.02,
-    rng,
-  });
-  A.addOnce('fabric_cream', sheet, LL(IDENT, mx, y + 0.035, mz, sYaw, 1, 1, 1, -Math.PI / 2), {
-    masks: [0.4, 0.7, 0.3],
-    visualOnly: true,
-  });
-}
-
-// ---------------------------------------------------------------- helpers --
-function addRug(A: Assembler, rng: Rng, x: number, y: number, z: number, size: number): void {
-  const g = clothGeometry(size, size * rng.range(0.55, 0.75), {
-    segX: 8,
-    segY: 6,
-    sag: 0.0,
-    wrinkle: 0.02,
-    thickness: 0.0038,
-    fray: 0.012,
-    rng,
-  });
-  A.addOnce(
-    rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream']),
-    g,
-    LL(IDENT, x, y + 0.014, z, rng.range(-0.4, 0.4), 1, 1, 1, -Math.PI / 2),
-    { masks: [0.45, 0.55, 0.25] }
-  );
 }

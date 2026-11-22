@@ -6,6 +6,7 @@ import * as THREE from 'three';
 
 import { buildWorld } from '#worldgen/build';
 import { Assembler } from '#worldgen/builder';
+import { GROUND_STONES } from '#worldgen/level/ground-stones';
 import { PLACEMENT_ROWS } from '#worldgen/level/placements/index';
 
 import { StaticWorld } from '../src/physics/bvh.ts';
@@ -76,6 +77,8 @@ const ids = new Map(
     id.includes('/') ? id : `${name}/${id}`,
   ])
 );
+for (const [i, [name, x, y, z]] of GROUND_STONES.entries())
+  ids.set(key(name, [x, y, z]), `ground-stones/${i + 1} (${name})`);
 const material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
 const assembler = new Assembler({ materials: { get: (): THREE.Material => material } });
 const visible = new THREE.Group();
@@ -152,7 +155,7 @@ for (const prop of props) {
   if (!sampled || nearest < minGap) continue;
   const position = new THREE.Vector3().setFromMatrixPosition(prop.matrix).toArray();
   results.push({
-    name: ids.get(key(prop.name, position)) ?? `${prop.name} (generated)`,
+    name: ids.get(key(prop.name, position)) ?? prop.name,
     position,
     gap: Number.isFinite(nearest) ? nearest : null,
   });

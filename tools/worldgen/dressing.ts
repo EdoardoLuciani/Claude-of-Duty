@@ -18,6 +18,7 @@ import {
   spallPatch,
 } from './kit.ts';
 import { STREET, BUILDINGS, SET_PIECES, GATE } from './level/layout.ts';
+import { ROOF_FIXTURES } from './level/roof-fixtures.ts';
 import { burntCar } from './props.ts';
 import { isOpen, groundY } from './queries.ts';
 import type { ClothOptions } from './util.ts';
@@ -626,7 +627,6 @@ export function dressBuildings(A: Assembler, infos: BuildingInfo[]): void {
 
 function dressBuilding(A: Assembler, rng: Rng, info: BuildingInfo): void {
   const spec = info.spec;
-  const top = info.roofY;
 
   // ---- AC units, conduit and sat dishes hung off the open facades ----
   for (const wnd of info.windows) {
@@ -695,27 +695,15 @@ function dressBuilding(A: Assembler, rng: Rng, info: BuildingInfo): void {
     }
   }
 
-  // ---- roof detail ----
-  // Roofs are playable ground in this map (balconies and parapets are the
-  // elevation layer), so they get real density, not a token water tank.
-  // The ROOF plate, not the ground footprint. On a setback building the two
-  // differ by a couple of metres, and using the footprint hangs water tanks,
-  // aerials and crate stacks in mid-air over the terrace void.
-  rng = keyedRng('roof-dress', spec.id);
+  // Fixtures follow the roof plate, including any setback.
+  const roof = ROOF_FIXTURES[spec.id];
+  if (!roof) return;
   const rs = info.roofSpec ?? spec;
-  const rx0 = rs.x - rs.w / 2 + 1.0;
-  const rx1 = rs.x + rs.w / 2 - 1.0;
-  const rz0 = rs.z - rs.d / 2 + 1.0;
-  const rz1 = rs.z + rs.d / 2 - 1.0;
-  const roofY = top + 0.02;
-  // Collision-cooked roof dressing must not lid the roof stair hole or block the
-  // ladder climb-out beside it (1.1 m exit + capsule radius).
-  const hole = spec.stairHoles?.[info.floorY.length];
-  const blocksHole = (b: THREE.Box3): boolean => !!hole && overlapsRect(b, hole, 1.2);
-  // rooftop laundry line between the parapets
-  if (rs.w > 10 && rng.float() < 0.4) {
-    const a = [rs.x - rs.w / 2 + 0.4, roofY + 1.0, rng.range(rz0, rz1)];
-    const b = [rs.x + rs.w / 2 - 0.4, roofY + 0.96, rng.range(rz0, rz1)];
+  const roofY = info.roofY + 0.02;
+  if (roof.line) {
+    const [nearZ, farZ, garments] = roof.line;
+    const a = [rs.x - rs.w / 2 + 0.4, roofY + 1.0, rs.z + nearZ];
+    const b = [rs.x + rs.w / 2 - 0.4, roofY + 0.96, rs.z + farZ];
     const line = catenaryTube(a, b, 0.3, 0.01, { seg: 10, radial: 4 });
     A.addOnce('metal_dark', line, null, { masks: [0.3, 0.6, 0] });
     for (const sx of [-1, 1]) {
@@ -737,50 +725,35 @@ function dressBuilding(A: Assembler, rng: Rng, info: BuildingInfo): void {
         }
       );
     }
-    const n = rng.int(2, 5);
-    for (let i = 0; i < n; i++) {
-      const t = (i + 0.5) / n;
-      const cloth = laundryCloth(line, t, rng.range(0.5, 0.8), rng.range(0.45, 0.8), {
+    for (const [t, key, w, h, sag, wrinkle, twist, fray, seed, grime] of garments) {
+      const cloth = laundryCloth(line, t, w, h, {
         segX: 7,
         segY: 8,
-        sag: rng.range(0.12, 0.22),
-        wrinkle: rng.range(0.045, 0.075),
-        twist: rng.range(0.08, 0.18),
-        fray: rng.range(0.01, 0.025),
-        rng,
+        sag,
+        wrinkle,
+        twist,
+        fray,
+        seed,
       });
-      A.addOnce(rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream', 'burlap']), cloth, null, {
-        masks: [0.3, rng.range(0.4, 0.8), 0.2],
-      });
+      A.addOnce(key, cloth, null, { masks: [0.3, grime, 0.2] });
     }
   }
-  // aerials: thin, tall, and they do a lot for a skyline
-  for (let i = 0; i < rng.int(1, 3); i++) {
-    const px = rng.range(rx0, rx1);
-    const pz = rng.range(rz0, rz1);
-    const h = rng.range(1.4, 3.2);
-    // Footprint including the crossbars.
+
+  const hole = spec.stairHoles?.[info.floorY.length];
+  for (const [x, z, h, bars] of roof.aerials ?? []) {
+    const px = rs.x + x;
+    const pz = rs.z + z;
     _box.min.set(px - 0.5, roofY, pz - 0.5);
     _box.max.set(px + 0.5, roofY, pz + 0.5);
-    if (blocksHole(_box)) continue;
+    if (hole && overlapsRect(_box, hole, 1.2))
+      throw new Error(`[world] ${spec.id} roof aerial blocks stair access`);
     const pipe = A.cache('aerial', (): THREE.BufferGeometry => tubeY(0.018, 1, { radial: 5 }));
     A.add('metal_rust', pipe, LL(IDENT, px, roofY, pz, 0, 1, h, 1), { masks: [0.9, 0.5, 0.1] });
-    for (let k = 0; k < 4; k++) {
+    for (const [k, [yaw, length]] of bars.entries()) {
       A.add(
         'metal_rust',
         pipe,
-        LL(
-          IDENT,
-          px,
-          roofY + h * (0.5 + k * 0.11),
-          pz,
-          rng.float() * 3.14,
-          1,
-          rng.range(0.25, 0.5),
-          1,
-          0,
-          Math.PI / 2
-        ),
+        LL(IDENT, px, roofY + h * (0.5 + k * 0.11), pz, yaw, 1, length, 1, 0, Math.PI / 2),
         { masks: [0.9, 0.5, 0.1] }
       );
     }

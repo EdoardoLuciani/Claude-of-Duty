@@ -813,14 +813,14 @@ export function driftBerm(
 
 /** Noise-deformed rock / masonry chunk. */
 export function rockGeometry(
-  rng: Rng,
+  source: Rng | number,
   size = 0.3,
   detail = 1,
   squash = 0.7
 ): THREE.IcosahedronGeometry {
   const g = new THREE.IcosahedronGeometry(size * 0.5, detail);
   const pa = g.getAttribute('position');
-  const seed = rng.float() * 40;
+  const seed = typeof source === 'number' ? source : source.float() * 40;
   for (let i = 0; i < pa.count; i++) {
     _v0.fromBufferAttribute(pa, i);
     const n = fbm3(_v0.x * 7 + seed, _v0.y * 7 + seed, _v0.z * 7 + seed, 2);

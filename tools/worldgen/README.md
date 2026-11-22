@@ -11,6 +11,12 @@ Runtime behavior belongs to `src/world/`.
 - `level/frontages.ts`: playable facade bays, window sizes and obstructions,
   shop shutters, and awning depths/supports. A playable floor needs one entry
   per bay on each facade; unlisted backdrop facades may vary procedurally.
+- `level/pavement.ts`, `level/ground-covers.ts`, `level/ground-stones.ts`:
+  authored pavement spans, covers and loose stones in level space.
+- `level/room-fixtures.ts`: room dressing by building, floor and room ID.
+  Offsets for shelf, counter and bench goods are relative to their support.
+- `level/roof-fixtures.ts`: aerials and laundry relative to the roof footprint;
+  garments attach along the authored cable.
 - `level/config.ts`: transform/spawns; `level/intel.ts`: intel drop sites.
 - `level/placements/`: data-only prop transforms, one `PlacementRow` per line, grouped by area.
 - `props.ts`/`dressing.ts`: props; `buildings.ts`/`kit.ts`: construction.

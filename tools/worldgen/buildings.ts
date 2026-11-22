@@ -26,6 +26,7 @@ import {
   worldOf,
 } from './kit.ts';
 import { FRONTAGES } from './level/frontages.ts';
+import { ROOM_FIXTURES } from './level/room-fixtures.ts';
 import type { ClearanceBox } from './placement.ts';
 import type { RectXZ, WallOpening } from './util.ts';
 import { fbm3, keyedRng, runoffStreak } from './util.ts';
@@ -54,10 +55,9 @@ interface StairHole extends RectXZ {
   rails?: ('east' | 'west' | 'north' | 'south')[];
   railKey?: string;
 }
-export type RoomKind = 'living' | 'shop' | 'storage' | 'workshop' | 'ruin';
 interface RoomPlan {
   walls: [number, number, number, number, (number | null)?][];
-  furnish?: ({ kind: RoomKind; counter?: RoomSpec['counter'] } & RectXZ)[];
+  furnish?: ({ id: string; counter?: RoomSpec['counter'] } & RectXZ)[];
 }
 type BayKind = 'blank' | 'door' | 'shop' | 'window' | 'arch' | 'balconyDoor' | 'ragged';
 interface BayOverride {
@@ -1431,22 +1431,32 @@ function buildInterior(
 
     // furnishing
     if (plan?.furnish) {
+      const used = new Set<string>();
       for (const r of plan.furnish) {
-        furnishRoom(A, keyedRng('room', spec.id, f, r.x0, r.z0, r.kind), {
-          kind: r.kind,
-          counter: r.counter,
-          x0: x0 + r.x0 * iw,
-          z0: z0 + r.z0 * id,
-          x1: x0 + r.x1 * iw,
-          z1: z0 + r.z1 * id,
-          y: fy,
-          h: fh,
-          envelope: { x0, z0, x1: x0 + iw, z1: z0 + id },
-          facadeOpenings: info.facadeOpenings.filter((opening): boolean => opening.f === f),
-          partitions,
-          doors,
-          voids: Object.values(spec.stairHoles ?? {}),
-        });
+        const roomId = `${spec.id}/${f}/${r.id}`;
+        if (used.has(roomId)) throw new Error(`[world] duplicate furnished room ${roomId}`);
+        used.add(roomId);
+        const fixtures = ROOM_FIXTURES[roomId];
+        if (!fixtures) throw new Error(`[world] missing authored fixtures for room ${roomId}`);
+        furnishRoom(
+          A,
+          roomId,
+          {
+            counter: r.counter,
+            x0: x0 + r.x0 * iw,
+            z0: z0 + r.z0 * id,
+            x1: x0 + r.x1 * iw,
+            z1: z0 + r.z1 * id,
+            y: fy,
+            h: fh,
+            envelope: { x0, z0, x1: x0 + iw, z1: z0 + id },
+            facadeOpenings: info.facadeOpenings.filter((opening): boolean => opening.f === f),
+            partitions,
+            doors,
+            voids: Object.values(spec.stairHoles ?? {}),
+          },
+          fixtures
+        );
       }
     }
   }
