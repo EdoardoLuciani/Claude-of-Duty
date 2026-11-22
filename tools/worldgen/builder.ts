@@ -350,19 +350,35 @@ export class Assembler {
         if (acc.visualRanges.length === 0) collisionSource.add(mesh.clone());
         else {
           const indices = geo.index!.array;
-          const physical: number[] = [];
+          let count = indices.length;
           let cursor = 0;
+          let wide = false;
+          // Match Three's index width for the retained indices: 0xffff is
+          // reserved for primitive restart in a 16-bit index buffer.
+          const needsWideIndex = (end: number): void => {
+            while (!wide && cursor < end) wide = indices[cursor++] >= 0xffff;
+          };
           for (const [start, end] of acc.visualRanges) {
-            while (cursor < start) physical.push(indices[cursor++]);
+            count -= end - start;
+            needsWideIndex(start);
             cursor = end;
           }
-          while (cursor < indices.length) physical.push(indices[cursor++]);
-          if (physical.length) {
+          needsWideIndex(indices.length);
+          if (count > 0) {
+            const physical = wide ? new Uint32Array(count) : new Uint16Array(count);
+            let offset = 0;
+            cursor = 0;
+            for (const [start, end] of acc.visualRanges) {
+              physical.set(indices.subarray(cursor, start), offset);
+              offset += start - cursor;
+              cursor = end;
+            }
+            physical.set(indices.subarray(cursor), offset);
             // Index ranges survive the render weld; the cooker owns the physics weld.
             const geometry = new THREE.BufferGeometry()
               .setAttribute('position', geo.getAttribute('position'))
               .setAttribute('_solid', geo.getAttribute('_solid'))
-              .setIndex(physical);
+              .setIndex(new THREE.BufferAttribute(physical, 1));
             const collider = mesh.clone();
             collider.geometry = geometry;
             this.collisionGeometries.push(geometry);

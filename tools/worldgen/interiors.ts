@@ -3,14 +3,13 @@ import * as THREE from 'three';
 import type { Assembler } from './builder.ts';
 import type { BuildingInfo } from './buildings.ts';
 import { BOX, BOX_FINE, BOX_THIN, IDENT, LL } from './kit.ts';
-import type { RoomFixture, RoomProp } from './level/room-fixtures.ts';
+import type { CounterFootprint, RoomFixture, RoomProp } from './level/room-fixtures.ts';
 import type { RectXZ } from './util.ts';
 import { clothGeometry, chamferBox, fillMasks, rockGeometry } from './util.ts';
 
-export interface RoomSpec extends RectXZ {
+interface RoomSpec extends RectXZ {
   y: number;
   h: number;
-  counter?: [x: number, z: number, length: number, axis: 'x' | 'z'] | undefined;
   doors: { x: number; z: number }[];
   envelope: RectXZ;
   facadeOpenings: BuildingInfo['facadeOpenings'];
@@ -144,11 +143,13 @@ function workbench(
   cz: number,
   alongX: boolean,
   tw: number
-): void {
+): number {
+  const top = 0.82;
+  const thickness = 0.09;
   A.add(
     'wood_prop_dark',
     BOX(A),
-    LL(IDENT, cx, y + 0.82, cz, alongX ? 0 : Math.PI / 2, tw, 0.09, 0.72),
+    LL(IDENT, cx, y + top, cz, alongX ? 0 : Math.PI / 2, tw, thickness, 0.72),
     { masks: [0.8, 0.55, 0.25] }
   );
   for (const sx of [-1, 1]) {
@@ -160,9 +161,10 @@ function workbench(
       });
     }
   }
+  return y + (top + thickness / 2);
 }
 
-function shopCounter(A: Assembler, r: RoomSpec, counter: NonNullable<RoomSpec['counter']>): void {
+function shopCounter(A: Assembler, r: RoomSpec, counter: CounterFootprint): number {
   const { y } = r;
   const [ccx, ccz, clen, axis] = counter;
   const alongZ = axis === 'z';
@@ -175,7 +177,9 @@ function shopCounter(A: Assembler, r: RoomSpec, counter: NonNullable<RoomSpec['c
     if (inDoorway(r, px, pz))
       throw new Error(`[world] authored shop counter at ${ccx}/${ccz} blocks a doorway`);
   }
-  A.add('wood_prop_dark', BOX(A), LL(IDENT, ccx, y + 0.9, ccz, 0, cSX, 0.06, cSZ), {
+  const top = 0.9;
+  const thickness = 0.06;
+  A.add('wood_prop_dark', BOX(A), LL(IDENT, ccx, y + top, ccz, 0, cSX, thickness, cSZ), {
     masks: [0.9, 0.4, 0.1],
   });
   A.add(
@@ -198,6 +202,7 @@ function shopCounter(A: Assembler, r: RoomSpec, counter: NonNullable<RoomSpec['c
   A.add('wood_prop_dark', BOX(A), LL(IDENT, ccx, y + 0.28, ccz, 0, cSX - 0.2, 0.04, cSZ - 0.2), {
     masks: [0.4, 0.7, 0.5],
   });
+  return y + (top + thickness / 2);
 }
 
 function setProp(
@@ -273,17 +278,19 @@ export function furnishRoom(
         for (const good of goods) setProp(A, good, x, sy, z);
         break;
       }
-      case 'counter':
-        if (!r.counter) throw new Error(`[world] ${id} has goods but no shop counter`);
-        shopCounter(A, r, r.counter);
-        for (const good of f[1]) setProp(A, good, r.counter[0], y + 0.93, r.counter[1]);
+      case 'counter': {
+        const [, footprint, goods] = f;
+        const top = shopCounter(A, r, footprint);
+        const [x, z] = footprint;
+        for (const good of goods) setProp(A, good, x, top, z);
         break;
+      }
       case 'bench': {
         const [, alongX, width, goods] = f;
         if (inDoorway(r, cx, cz, width / 2 + 0.5))
           throw new Error(`[world] ${id} workbench blocks a doorway`);
-        workbench(A, cx, y, cz, alongX, width);
-        for (const good of goods) setProp(A, good, cx, y + 0.865, cz);
+        const top = workbench(A, cx, y, cz, alongX, width);
+        for (const good of goods) setProp(A, good, cx, top, cz);
         break;
       }
       case 'conduit': {

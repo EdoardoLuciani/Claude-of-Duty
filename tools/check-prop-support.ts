@@ -9,8 +9,10 @@ import { Assembler } from '#worldgen/builder';
 import { GROUND_STONES } from '#worldgen/level/ground-stones';
 import { PLACEMENT_ROWS } from '#worldgen/level/placements/index';
 
+import { isMesh } from '../src/core/three-guards.ts';
 import { StaticWorld } from '../src/physics/bvh.ts';
 import { makeHitRecord } from '../src/physics/math.ts';
+import { solidIds } from '../src/physics/solids.ts';
 import { LAYER } from '../src/physics/surfaces.ts';
 
 const { values } = parseArgs({
@@ -104,24 +106,27 @@ const props: {
 const mesh = new THREE.Mesh();
 mesh.matrixWorldAutoUpdate = false;
 for (const child of canonical.children) {
-  if (!(child instanceof THREE.Mesh)) continue;
+  if (!isMesh(child)) continue;
+  const { geometry } = child;
   if (!(child instanceof THREE.InstancedMesh)) {
     world.addMesh(child, 'concrete');
     continue;
   }
   const name = child.name.slice('prop_'.length);
-  if (!candidates.has(name) && name !== 'tray') continue;
-  const geometry = assembler._protos.get(name)?.geo;
-  if (!geometry) continue;
-  geometry.computeBoundingBox();
+  const candidate = candidates.has(name);
+  if (!candidate && name !== 'tray') continue;
+  // The audit owns these meshes. Cache connected components on the shared
+  // prototype, while registering separate physics object IDs per instance.
+  if (!geometry.hasAttribute('_solid'))
+    geometry.setAttribute('_solid', new THREE.BufferAttribute(solidIds(geometry).ids, 1));
+  if (!geometry.boundingBox) geometry.computeBoundingBox();
   mesh.geometry = geometry;
   mesh.name = name;
   for (let i = 0; i < child.count; i++) {
     child.getMatrixAt(i, matrix);
     mesh.matrixWorld.copy(matrix);
     const object = world.addMesh(mesh, 'concrete');
-    if (object >= 0 && candidates.has(name))
-      props.push({ name, geometry, object, matrix: matrix.clone() });
+    if (object >= 0 && candidate) props.push({ name, geometry, object, matrix: matrix.clone() });
   }
 }
 world.build();

@@ -6,15 +6,16 @@ Runtime behavior belongs to `src/world/`.
 
 - `level/layout.ts`: streets, buildings, rooms, gates and set pieces. Balcony slabs
   and railings are authored by facade side, floor and bay; a `balconyDoor` in
-  `bayKinds` alone opens without a slab (e.g. onto a terrace). Shop-room
-  counters and solid street rubble have explicit footprints here.
+  `bayKinds` alone opens without a slab (e.g. onto a terrace). Solid street
+  rubble has explicit footprints here.
 - `level/frontages.ts`: playable facade bays, window sizes and obstructions,
   shop shutters, and awning depths/supports. A playable floor needs one entry
   per bay on each facade; unlisted backdrop facades may vary procedurally.
 - `level/pavement.ts`, `level/ground-covers.ts`, `level/ground-stones.ts`:
   authored pavement spans, covers and loose stones in level space.
 - `level/room-fixtures.ts`: room dressing by building, floor and room ID.
-  Offsets for shelf, counter and bench goods are relative to their support.
+  Counter footprints and their goods share a record. Shelf, counter and bench
+  goods use offsets from their support.
 - `level/roof-fixtures.ts`: aerials and laundry relative to the roof footprint;
   garments attach along the authored cable.
 - `level/config.ts`: transform/spawns; `level/intel.ts`: intel drop sites.

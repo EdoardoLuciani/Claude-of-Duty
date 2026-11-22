@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 import type { Rng } from '../../src/core/rng.ts';
 import type { Assembler } from './builder.ts';
-import { furnishRoom, type RoomSpec } from './interiors.ts';
+import { furnishRoom } from './interiors.ts';
 import type { GeometrySink, ParapetGap, StairOptions } from './kit.ts';
 import {
   facadeWall,
@@ -57,7 +57,7 @@ interface StairHole extends RectXZ {
 }
 interface RoomPlan {
   walls: [number, number, number, number, (number | null)?][];
-  furnish?: ({ id: string; counter?: RoomSpec['counter'] } & RectXZ)[];
+  furnish?: ({ id: string } & RectXZ)[];
 }
 type BayKind = 'blank' | 'door' | 'shop' | 'window' | 'arch' | 'balconyDoor' | 'ragged';
 interface BayOverride {
@@ -1442,7 +1442,6 @@ function buildInterior(
           A,
           roomId,
           {
-            counter: r.counter,
             x0: x0 + r.x0 * iw,
             z0: z0 + r.z0 * id,
             x1: x0 + r.x1 * iw,

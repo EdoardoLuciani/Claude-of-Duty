@@ -204,7 +204,7 @@ export const BUILDINGS: BuildingSpec[] = [
           [0.0, 0.52, 0.55, 0.52, 0.7],
         ],
         furnish: [
-          { id: 'shop', x0: 0.55, z0: 0.0, x1: 1.0, z1: 1.0, counter: [-8.14, -3.125, 2.1, 'z'] },
+          { id: 'shop', x0: 0.55, z0: 0.0, x1: 1.0, z1: 1.0 },
           { id: 'storage', x0: 0.0, z0: 0.0, x1: 0.55, z1: 0.52 },
           { id: 'living', x0: 0.0, z0: 0.52, x1: 0.55, z1: 1.0 },
         ],
@@ -450,7 +450,7 @@ export const BUILDINGS: BuildingSpec[] = [
           [0.62, 0.0, 0.62, 0.42, 0.5],
         ],
         furnish: [
-          { id: 'shop', x0: 0.0, z0: 0.42, x1: 0.62, z1: 1.0, counter: [8.14, 22.4, 2.05, 'z'] },
+          { id: 'shop', x0: 0.0, z0: 0.42, x1: 0.62, z1: 1.0 },
           { id: 'storage', x0: 0.0, z0: 0.0, x1: 0.62, z1: 0.42 },
         ],
       },
@@ -529,7 +529,6 @@ export const BUILDINGS: BuildingSpec[] = [
             z0: 0.0,
             x1: 0.56,
             z1: 0.56,
-            counter: [8.14, -7.9304, 4.4, 'z'],
           },
           { id: 'ruin', x0: 0.0, z0: 0.56, x1: 0.56, z1: 1.0 },
           { id: 'storage', x0: 0.56, z0: 0.0, x1: 1.0, z1: 1.0 },
