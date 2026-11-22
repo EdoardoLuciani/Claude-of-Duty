@@ -82,8 +82,7 @@ camera setback and does not rescale the model.
 - `animations.py`: runtime sampling/reset; `finishes.py`: finish colors/tiles.
 
 Hand calibration and shared arms are read-only. Refit separately with
-`bun tools/blender/mpx/hand-reference.ts`. Shared review-arm baking lives in
-[`../review_hands.py`](../review_hands.py), independent of EVOLYS tooling.
+`bun tools/blender/mpx/hand-reference.ts`.
 Save editable components/sparse actions before runtime joins.
 Keep the smart-project atlas, original UV0 grain and padded 4×4 UV1 finish tiles.
 The base has no optical surfaces. Deployed and folded irons, thread protector
