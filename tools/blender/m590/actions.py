@@ -165,5 +165,5 @@ def author_actions(root,asset,rig,parts,forend,bolt,trigger,shell):
             key(rig,k*d,(.025*amount,-.13*amount,.24*amount),(-22*amount,20*amount,12*amount))
         events(name,d,[(.995,'end')]);finish(name)
     # Shared review skins are baked from these controls, never exported.
-    hands=author_review_hands(root,rig,hand_controls,all_parts,clips,basis=C,label='M590')
-    return clips,controls,hands
+    author_review_hands(root,rig,hand_controls,all_parts,clips,basis=C,label='M590')
+    return clips,controls

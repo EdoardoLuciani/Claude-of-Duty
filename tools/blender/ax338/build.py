@@ -356,7 +356,7 @@ def build(output,render=False,quick=False):
         for loop in o.data.uv_layers.active.data:loop.uv.x=x0+loop.uv.x*scale
     # Keep editable component meshes in the source. Runtime consolidation does not
     # export review arms, and never changes the source file after this save.
-    clips,controls,hands=author_actions(ROOT,asset,rig,[rig,bolt,trigger,mag,spare],mag,spare,bolt,trigger)
+    clips,controls=author_actions(ROOT,asset,rig,[rig,bolt,trigger,mag,spare],mag,spare,bolt,trigger)
     for o in bpy.data.objects:
         if o.animation_data:
             o.animation_data.action=None

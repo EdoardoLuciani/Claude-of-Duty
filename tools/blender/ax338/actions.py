@@ -197,5 +197,5 @@ def author_actions(root,asset,rig,parts,mag,spare,bolt,trigger):
         clips[name]['events']=[{'time':.995*d,'event':'end'}];finish(name)
 
     # Shared review skins are baked from these controls, never exported.
-    hands=author_review_hands(root,rig,hand_controls,all_parts,clips,basis=C,label='AX338')
-    return clips,controls,hands
+    author_review_hands(root,rig,hand_controls,all_parts,clips,basis=C,label='AX338')
+    return clips,controls

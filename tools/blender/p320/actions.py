@@ -6,7 +6,7 @@ import copy
 import json
 import math
 import bpy
-from mathutils import Vector, Quaternion, Euler, Matrix
+from mathutils import Vector, Quaternion, Matrix
 from review_hands import author_review_hands, eq
 
 C=Matrix(((1,0,0),(0,0,-1),(0,1,0)))

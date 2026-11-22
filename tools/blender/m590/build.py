@@ -356,7 +356,7 @@ def build(output, render=False, quick=False):
                 uv.data[loop].uv=(v[axes[0]]*8,v[axes[1]]*8)
     for o in list(asset.objects):
         if o.type=='MESH':surface_uv(o)
-    clips,controls,hands=author_actions(ROOT,asset,rig,[rig,body,forend,bolt,trigger,shell],forend,bolt,trigger,shell)
+    clips,controls=author_actions(ROOT,asset,rig,[rig,body,forend,bolt,trigger,shell],forend,bolt,trigger,shell)
     scene['clips']=json.dumps(clips);scene['basis']='game (x,y,z) -> Blender (x,-z,y); export_yup=True'
     scene.frame_start=0;scene.frame_end=360
 
