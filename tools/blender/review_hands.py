@@ -10,6 +10,7 @@ SUFFIX=' | authored hands (shared appearance)'
 def without_review_hands():
     """Exclude review arms from the view layer, so glTF sampling skips their skins."""
     layers=[l for l in bpy.context.view_layer.layer_collection.children if l.name.endswith(SUFFIX)]
+    assert layers,'review arms are missing from the view layer'
     for layer in layers:layer.exclude=True
     try:yield
     finally:

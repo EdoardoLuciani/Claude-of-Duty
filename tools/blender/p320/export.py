@@ -67,12 +67,12 @@ def sample_controls(asset):
 
 
 def export_asset(asset, coords, output):
-    sample_controls(asset)
-    bpy.ops.object.select_all(action='DESELECT')
-    for obj in asset.objects:
-        if obj != coords:
-            obj.select_set(True)
     with without_review_hands():
+        sample_controls(asset)
+        bpy.ops.object.select_all(action='DESELECT')
+        for obj in asset.objects:
+            if obj != coords:
+                obj.select_set(True)
         bpy.ops.export_scene.gltf(
             filepath=str(output / 'p320-compact.glb'), export_format='GLB', use_selection=True,
             export_animations=True, export_animation_mode='ACTIONS', export_merge_animation='NLA_TRACK',
