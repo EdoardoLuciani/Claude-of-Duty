@@ -7,6 +7,7 @@ import json
 import math
 import bpy
 from mathutils import Vector, Quaternion, Euler, Matrix
+from review_hands import author_review_hands
 
 C=Matrix(((1,0,0),(0,0,-1),(0,1,0)))
 CI=C.inverted()
@@ -190,96 +191,6 @@ def author_actions(root,asset,rig,parts,mag,spare,slide,barrel,trigger,catch,rou
         pose('right',15 if drawing else 12,p=indexed(curled=True))
         finish(name,end)
 
-    # Append the original glove/sleeve appearance and pose its real skin in
-    # Blender. Exported controls drive those same named joints in the game.
-    hand_collection=bpy.data.collections.new('P320 | authored hands (shared appearance)')
-    scene.collection.children.link(hand_collection)
-    source=root/'.cache/blender/player/arms/player-arms.blend'
-    with bpy.data.libraries.load(str(source),link=False) as (available,loaded):
-        loaded.objects=list(available.objects)
-    loaded_objects=[o for o in loaded.objects if o]
-    source_rig=next(o for o in loaded_objects if o.type=='ARMATURE')
-    source_meshes=[o for o in loaded_objects if o.type=='MESH' and any(m.type=='ARMATURE' for m in o.modifiers)]
-    hands=[];armatures={}
-    for side in ('left','right'):
-        arm=source_rig.copy();arm.data=source_rig.data.copy();arm.animation_data_clear()
-        arm.name='P320_arm_'+side;hand_collection.objects.link(arm);hands.append(arm);armatures[side]=arm
-        arm.parent=rig;arm.matrix_parent_inverse=Matrix.Identity(4)
-        arm.location=(0,0,0);arm.rotation_euler=(0,0,0);arm.scale=(-1,1,1) if side=='right' else (.97,.97,.97)
-        for o in source_meshes:
-            clone=o.copy();clone.data=o.data;clone.name='P320_'+side+'_'+o.name
-            hand_collection.objects.link(clone);clone.parent=arm;clone.matrix_parent_inverse=Matrix.Identity(4)
-            clone.location=(0,0,0);clone.rotation_euler=(0,0,0);clone.scale=(1,1,1)
-            for mod in clone.modifiers:
-                if mod.type=='ARMATURE':mod.object=arm
-            hands.append(clone)
-    # Only appended resources used by these copies survive in the scene.
-    for o in loaded_objects:bpy.data.objects.remove(o,do_unlink=True)
-    lengths=[[.045,.028,.022],[.049,.031,.023],[.046,.029,.022],[.038,.024,.020]]
-    xs=[.0298,.0102,-.0104,-.0298]
-    def mat(pos=(0,0,0),q=None,scale=(1,1,1)):
-        return Matrix.LocRotScale(Vector(pos),q or Quaternion(),Vector(scale))
-    def from_control(o):return CI@o.rotation_quaternion.to_matrix()@C
-    def game_matrices(side,bind=False):
-        cs=hand_controls[side];mirror=-1 if side=='right' else 1
-        wrist=Matrix.Identity(4) if bind else mat(CI@cs['wrist'].location,from_control(cs['wrist']).to_quaternion())
-        scale=.97 if side=='left' else 1
-        inner=wrist@mat(scale=(mirror*scale,scale,scale));out={'hand':wrist}
-        for i in range(4):
-            q=eq((0,-xs[i]*2.2,0)) if bind else from_control(cs[f'finger_{i}_root']).to_quaternion()
-            parent=inner@mat((xs[i],-.006,-.096),q)
-            for j in range(3):
-                q=Quaternion() if bind else from_control(cs[f'finger_{i}_{j}']).to_quaternion()
-                tr=(0,0,-lengths[i][j-1]) if j else (0,0,0)
-                if j:out[f'finger_{i}_{j}_flex']=parent@mat(tr,Quaternion().slerp(q,.5))
-                parent=parent@mat(tr,q);out[f'finger_{i}_{j}']=parent
-        tq=eq((0,-.95,0)) if bind else from_control(cs['thumb_base']).to_quaternion()
-        out['thumb_base']=inner@mat((.037,-.009,-.040),tq)
-        out['thumb_web']=inner@mat((.037,-.009,-.040),eq((0,-.95,0)).slerp(tq,.5))
-        parent=out['thumb_base']
-        for j in range(2):
-            q=Quaternion() if bind else from_control(cs[f'thumb_{j}']).to_quaternion()
-            tr=(0,0,-.05) if j else (0,0,0)
-            if j:out['thumb_1_flex']=parent@mat(tr,Quaternion().slerp(q,.5))
-            parent=parent@mat(tr,q);out[f'thumb_{j}']=parent
-        if bind:
-            out['upper']=mat((0,0,.63*scale));out['fore']=mat((0,0,.3*scale))
-        else:
-            shoulder=Vector((-.29,-.04,.50) if side=='left' else (.075,-.04,.50))
-            hand=wrist.translation;delta=hand-shoulder;d=max(.04,min(.627,delta.length));direction=delta.normalized()
-            pole=Vector((-.4 if side=='left' else .4,-.7,.7));pole=(pole-direction*pole.dot(direction)).normalized()
-            a=(.33**2+d*d-.30**2)/(2*d);h=math.sqrt(max(0,.33**2-a*a));elbow=shoulder+direction*a+pole*h
-            for name,start,end in [('upper',shoulder,elbow),('fore',elbow,hand)]:
-                z=(start-end).normalized();y=Vector((0,1,0));y=(y-z*y.dot(z)).normalized();x=y.cross(z)
-                q=Matrix((x,y,z)).transposed().to_quaternion();out[name]=mat(start,q)
-        return out
-    bind={s:game_matrices(s,True) for s in armatures}
-    cm=C.to_4x4();cmi=CI.to_4x4()
-    for name,info in clips.items():
-        for o in all_parts:
-            for track in o.animation_data.nla_tracks:track.mute=track.name!=name
-        for side,arm in armatures.items():
-            arm.animation_data_create();arm.animation_data.action=bpy.data.actions.new(name+' | '+arm.name)
-            for t in arm.animation_data.nla_tracks:t.mute=True
-        for f in range(0,info['frames'][1]+1,2):
-            scene.frame_set(f)
-            for side,arm in armatures.items():
-                current=game_matrices(side);s=Matrix.Diagonal((-1,1,1,1) if side=='right' else (.97,.97,.97,1))
-                desired={}
-                for pb in arm.pose.bones:
-                    transform=cm@current[pb.name]@bind[side][pb.name].inverted()@cmi
-                    desired[pb.name]=s.inverted()@transform@s@pb.bone.matrix_local
-                for pb in arm.pose.bones:
-                    pb.rotation_mode='QUATERNION'
-                    # Solve basis explicitly. Assigning pb.matrix sequentially
-                    # consults stale evaluated parent poses until depsgraph update.
-                    basis=pb.bone.matrix_local.inverted()
-                    if pb.parent:
-                        basis=basis@pb.parent.bone.matrix_local@desired[pb.parent.name].inverted()
-                    pb.matrix_basis=basis@desired[pb.name]
-                    for prop in ('location','rotation_quaternion','scale'):pb.keyframe_insert(prop,frame=f,group=pb.name)
-        for arm in armatures.values():
-            ad=arm.animation_data;a=ad.action;t=ad.nla_tracks.new();t.name=name
-            st=t.strips.new(name,0,a);st.action_frame_start=0;st.action_frame_end=info['frames'][1];st.extrapolation='HOLD'
-            ad.action=None;t.mute=True
+    # Shared review skins are baked from these controls, never exported.
+    hands=author_review_hands(root,rig,hand_controls,all_parts,clips,basis=C,label='P320')
     return clips,controls,hands

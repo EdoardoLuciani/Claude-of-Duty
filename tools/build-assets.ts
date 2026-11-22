@@ -115,10 +115,10 @@ const SPENT_HULL_STEP: AssetStep = {
 // Shared authoring sources outside a weapon's own tooling directory.
 const SHARED_TOOLS: Partial<Record<ModelId, string[]>> = {
   mcx: ['tools/blender/review_hands.py', 'tools/blender/hand-reference.ts'],
-  m4: ['tools/blender/hand-reference.ts'],
-  p320: ['tools/blender/hand-reference.ts'],
-  m590: ['tools/blender/hand-reference.ts'],
-  ax338: ['tools/blender/hand-reference.ts'],
+  m4: ['tools/blender/review_hands.py', 'tools/blender/hand-reference.ts'],
+  p320: ['tools/blender/review_hands.py', 'tools/blender/hand-reference.ts'],
+  m590: ['tools/blender/review_hands.py', 'tools/blender/hand-reference.ts'],
+  ax338: ['tools/blender/review_hands.py', 'tools/blender/hand-reference.ts'],
   evolys: ['tools/blender/review_hands.py', 'tools/blender/hand-reference.ts'],
   mpx: ['tools/blender/review_hands.py', 'tools/blender/hand-reference.ts'],
 };

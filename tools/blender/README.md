@@ -85,8 +85,8 @@ transitions, and do not replace in-engine captures and final human approval.
 - Build factory-empty into an absolute `--output` scratch directory first.
   `--render` is optional; `--quick` changes preview samples/resolution only.
 - Shared review-arm appearance and versioned hand calibration are read-only
-  inputs, not exported duplicate arms. `review_hands.py` owns the shared
-  EVOLYS/MPX/MCX review-arm baker; each caller supplies its own basis, controls and
+  inputs, not exported duplicate arms. `review_hands.py` owns the review-arm
+  baker shared by every weapon; each caller supplies its own basis, controls and
   clips. Source attachment checks include those skins. Missing inputs fail. Refit
   calibration separately and intentionally, never automatically during a normal rebuild.
 - Save editable components/modifiers/sparse poses before preparing runtime copies.

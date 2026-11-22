@@ -62,8 +62,7 @@ normal-encoding exceptions are bounded in the source map.
 
 Ordinary rebuilds treat hand calibration and shared review arms as inputs. Refit intentionally with
 `bun tools/blender/evolys/hand-reference.ts`, never during ordinary rebuilds.
-[`../review_hands.py`](../review_hands.py) owns shared review-arm baking for EVOLYS
-and MPX.
+[`../review_hands.py`](../review_hands.py) owns review-arm baking shared by every weapon.
 Save editable sparse actions before export. Fire/Last_Shot last 60/700 s;
 preserve held endpoint samples, matching NLA names and TRS resets.
 

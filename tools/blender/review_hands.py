@@ -72,3 +72,4 @@ def author_review_hands(root,rig,hand_controls,all_parts,clips,*,basis,label,fra
                     for prop in ('location','rotation_quaternion','scale'):pb.keyframe_insert(prop,frame=f,group=pb.name)
         for arm in arms.values():
             ad=arm.animation_data;a=ad.action;t=ad.nla_tracks.new();t.name=name;st=t.strips.new(name,0,a);st.action_frame_start=0;st.action_frame_end=math.ceil(info['frames'][1]);st.extrapolation='HOLD';ad.action=None;t.mute=True
+    return list(collection.objects)
