@@ -53,6 +53,8 @@ export interface ClothOptions {
   hem?: number;
   fray?: number;
   bow?: number;
+  /** Position of the upper seam in local space, by normalized cloth width. */
+  topEdge?: (u: number) => THREE.Vector3Like;
 }
 
 /**
@@ -868,6 +870,7 @@ export function clothGeometry(w: number, h: number, opts: ClothOptions = {}): TH
      * it bows out into the street instead of through the wall behind it.
      */
     bow = 1,
+    topEdge,
   } = opts;
   const u0 = uRange ? uRange[0] : 0;
   const u1 = uRange ? uRange[1] : 1;
@@ -889,6 +892,9 @@ export function clothGeometry(w: number, h: number, opts: ClothOptions = {}): TH
     return f < 0.5 ? f * 4 - 1 : 3 - f * 4;
   };
 
+  const seam = topEdge
+    ? Array.from({ length: nx }, (_, i): THREE.Vector3Like => topEdge(u0 + (i / segX) * (u1 - u0)))
+    : null;
   for (let j = 0; j < ny; j++) {
     for (let i = 0; i < nx; i++) {
       const k = j * nx + i;
@@ -914,9 +920,11 @@ export function clothGeometry(w: number, h: number, opts: ClothOptions = {}): TH
         y -= fray * (0.3 + 0.7 * Math.abs(Math.sin(u * 8.7 + seed * 1.7)));
         x += fray * 0.35 * Math.sin(u * 15.3 + seed);
       }
-      P[k * 3] = x;
-      P[k * 3 + 1] = y;
-      P[k * 3 + 2] = z;
+      const pin = seam?.[i];
+      const blend = v * v;
+      P[k * 3] = pin ? THREE.MathUtils.lerp(x, pin.x, blend) : x;
+      P[k * 3 + 1] = pin ? y + blend * (pin.y - (y + (1 - v) * h)) : y;
+      P[k * 3 + 2] = pin ? THREE.MathUtils.lerp(z, pin.z, blend) : z;
       UV[k * 2] = uu;
       UV[k * 2 + 1] = v;
       // the hem: a rolled bead at the bottom, a narrower one at the other edges

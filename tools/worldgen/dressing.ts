@@ -20,6 +20,7 @@ import {
 import { STREET, BUILDINGS, SET_PIECES, GATE } from './level/layout.ts';
 import { burntCar } from './props.ts';
 import { isOpen, groundY } from './queries.ts';
+import type { ClothOptions } from './util.ts';
 import {
   clothGeometry,
   catenaryTube,
@@ -440,6 +441,41 @@ function streetLampGrounding(A: Assembler): void {
 }
 
 // --- cables, laundry --------------------------------------------------------
+/** Fit the upper seam to the actual rendered cable, including droop and sway. */
+function laundryCloth(
+  line: THREE.TubeGeometry,
+  t: number,
+  w: number,
+  h: number,
+  opts: ClothOptions
+): THREE.BufferGeometry {
+  const { path, tubularSegments: segments } = line.parameters;
+  const a = path.getPointAt(0);
+  const b = path.getPointAt(1);
+  const span = Math.hypot(b.x - a.x, b.z - a.z);
+  const yaw = Math.atan2(a.z - b.z, b.x - a.x);
+  const point = new THREE.Vector3();
+  const next = new THREE.Vector3();
+  // TubeGeometry spaces its rings by arc length; interpolate between those rings.
+  const onLine = (f: number): THREE.Vector3 => {
+    const at = THREE.MathUtils.clamp(f, 0, 1) * segments;
+    const i = Math.min(Math.floor(at), segments - 1);
+    path.getPointAt(i / segments, point);
+    path.getPointAt((i + 1) / segments, next);
+    return point.lerp(next, at - i);
+  };
+  const centre = onLine(t).clone();
+  const frame = LL(IDENT, centre.x, centre.y - h / 2, centre.z, yaw).clone();
+  const inverse = frame.clone().invert();
+  return clothGeometry(w, h, {
+    ...opts,
+    topEdge: (u): THREE.Vector3 =>
+      onLine(t + ((u - 0.5) * w) / span)
+        .clone()
+        .applyMatrix4(inverse),
+  }).applyMatrix4(frame);
+}
+
 function overheadLines(A: Assembler): void {
   const insulator = (x: number, y: number, z: number): void => {
     A.add('concrete_dark', BOX_FINE(A), LL(IDENT, x, y, z, 0, 0.24, 0.16, 0.1), {
@@ -477,20 +513,13 @@ function overheadLines(A: Assembler): void {
     const dx = x1 - x0;
     const dz = z1 - z0;
     const len = Math.hypot(dx, dz);
-    const ry = Math.atan2(-dz, dx);
     const n = Math.max(2, Math.round(len / 1.7));
-    const K = Math.cosh(1.5) - 1;
     for (let i = 0; i < n; i++) {
       const t = (i + 0.5) / n;
       if (rng.float() < 0.12) continue;
-      // hang from the line where the line actually is: same catenary as the tube
-      const droop = (Math.cosh(1.5) - Math.cosh((t - 0.5) * 3)) / K;
-      const px = x0 + dx * t;
-      const pz = z0 + dz * t;
-      const py = y0 + (y1 - y0) * t - SAG * droop - 0.03;
       const w = rng.range(0.72, 1.15);
       const h = rng.range(0.85, 1.45);
-      const cloth = clothGeometry(w, h, {
+      const cloth = laundryCloth(line, t, w, h, {
         segX: 9,
         segY: 10,
         sag: rng.range(0.18, 0.3),
@@ -502,12 +531,9 @@ function overheadLines(A: Assembler): void {
         fray: rng.range(0.01, 0.03),
         bow: x0 > 0 ? -1 : 1,
       });
-      A.addOnce(
-        rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream', 'burlap']),
-        cloth,
-        LL(IDENT, px, py - h / 2 + 0.02, pz, ry, 1, 1, 1),
-        { masks: [0.3, rng.range(0.4, 0.8), 0.2] }
-      );
+      A.addOnce(rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream', 'burlap']), cloth, null, {
+        masks: [0.3, rng.range(0.4, 0.8), 0.2],
+      });
     }
   }
 }
@@ -632,7 +658,7 @@ function dressBuilding(A: Assembler, rng: Rng, info: BuildingInfo): void {
       A.addOnce('metal_dark', line, null, { masks: [0.3, 0.6, 0] });
       for (let i = 0; i < 2; i++) {
         const t = 0.3 + i * 0.4;
-        const cloth = clothGeometry(rng.range(0.3, 0.5), rng.range(0.4, 0.7), {
+        const cloth = laundryCloth(line, t, rng.range(0.3, 0.5), rng.range(0.4, 0.7), {
           segX: 5,
           segY: 6,
           sag: 0.1,
@@ -641,18 +667,9 @@ function dressBuilding(A: Assembler, rng: Rng, info: BuildingInfo): void {
           fray: 0.012,
           rng,
         });
-        A.addOnce(
-          rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream']),
-          cloth,
-          LL(
-            IDENT,
-            a[0] + (b[0] - a[0]) * t,
-            a[1] - 0.35,
-            a[2] + (b[2] - a[2]) * t,
-            ryOf(pm) + Math.PI / 2
-          ),
-          { masks: [0.35, 0.6, 0.2] }
-        );
+        A.addOnce(rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream']), cloth, null, {
+          masks: [0.35, 0.6, 0.2],
+        });
       }
     }
   }
@@ -727,7 +744,7 @@ function dressBuilding(A: Assembler, rng: Rng, info: BuildingInfo): void {
     const n = rng.int(2, 5);
     for (let i = 0; i < n; i++) {
       const t = (i + 0.5) / n;
-      const cloth = clothGeometry(rng.range(0.5, 0.8), rng.range(0.45, 0.8), {
+      const cloth = laundryCloth(line, t, rng.range(0.5, 0.8), rng.range(0.45, 0.8), {
         segX: 7,
         segY: 8,
         sag: rng.range(0.12, 0.22),
@@ -736,18 +753,9 @@ function dressBuilding(A: Assembler, rng: Rng, info: BuildingInfo): void {
         fray: rng.range(0.01, 0.025),
         rng,
       });
-      A.addOnce(
-        rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream', 'burlap']),
-        cloth,
-        LL(
-          IDENT,
-          a[0] + (b[0] - a[0]) * t,
-          a[1] - 0.5 - 0.22 * Math.sin(t * Math.PI),
-          a[2] + (b[2] - a[2]) * t,
-          0
-        ),
-        { masks: [0.3, rng.range(0.4, 0.8), 0.2] }
-      );
+      A.addOnce(rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream', 'burlap']), cloth, null, {
+        masks: [0.3, rng.range(0.4, 0.8), 0.2],
+      });
     }
   }
   // aerials: thin, tall, and they do a lot for a skyline
@@ -804,7 +812,7 @@ function alleyLines(A: Assembler): void {
     const n = rng.int(2, 4);
     for (let i = 0; i < n; i++) {
       const f = (i + 0.5) / n;
-      const cloth = clothGeometry(rng.range(0.45, 0.8), rng.range(0.5, 1.0), {
+      const cloth = laundryCloth(t, f, rng.range(0.45, 0.8), rng.range(0.5, 1.0), {
         segX: 6,
         segY: 8,
         sag: rng.range(0.12, 0.22),
@@ -813,18 +821,9 @@ function alleyLines(A: Assembler): void {
         fray: rng.range(0.01, 0.025),
         rng,
       });
-      A.addOnce(
-        rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream', 'burlap']),
-        cloth,
-        LL(
-          IDENT,
-          x0 + (x1 - x0) * f,
-          y0 + (y1 - y0) * f - 0.6 - 0.4 * Math.sin(f * Math.PI),
-          z0 + (z1 - z0) * f,
-          Math.atan2(-(z1 - z0), x1 - x0)
-        ),
-        { masks: [0.3, rng.range(0.4, 0.8), 0.2] }
-      );
+      A.addOnce(rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream', 'burlap']), cloth, null, {
+        masks: [0.3, rng.range(0.4, 0.8), 0.2],
+      });
     }
   }
 }
