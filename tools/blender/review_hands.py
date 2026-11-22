@@ -1,7 +1,19 @@
 """Shared Blender review-arm baking; no weapon geometry or runtime exports."""
+from contextlib import contextmanager
 import math
 import bpy
 from mathutils import Vector, Quaternion, Matrix
+
+SUFFIX=' | authored hands (shared appearance)'
+
+@contextmanager
+def without_review_hands():
+    """Exclude review arms from the view layer, so glTF sampling skips their skins."""
+    layers=[l for l in bpy.context.view_layer.layer_collection.children if l.name.endswith(SUFFIX)]
+    for layer in layers:layer.exclude=True
+    try:yield
+    finally:
+        for layer in layers:layer.exclude=False
 
 # Three's intrinsic XYZ composes Rx*Ry*Rz; mathutils Euler XYZ uses the opposite order.
 def eq(e):return Quaternion((1,0,0),e[0])@Quaternion((0,1,0),e[1])@Quaternion((0,0,1),e[2])
@@ -12,7 +24,7 @@ def author_review_hands(root,rig,hand_controls,all_parts,clips,*,basis,label,fra
     C=basis;CI=C.inverted()
     orientation=C@source_basis.inverted()
     scene=bpy.context.scene
-    collection=bpy.data.collections.new(label+' | authored hands (shared appearance)');scene.collection.children.link(collection)
+    collection=bpy.data.collections.new(label+SUFFIX);scene.collection.children.link(collection)
     with bpy.data.libraries.load(str(root/'.cache/blender/player/arms/player-arms.blend'),link=False) as (available,loaded):loaded.objects=list(available.objects)
     objects=[o for o in loaded.objects if o];source=next(o for o in objects if o.type=='ARMATURE')
     meshes=[o for o in objects if o.type=='MESH' and any(m.type=='ARMATURE' for m in o.modifiers)]

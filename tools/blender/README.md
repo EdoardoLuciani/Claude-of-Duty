@@ -87,7 +87,9 @@ transitions, and do not replace in-engine captures and final human approval.
 - Shared review-arm appearance and versioned hand calibration are read-only
   inputs, not exported duplicate arms. `review_hands.py` owns the review-arm
   baker shared by every weapon; each caller supplies its own basis, controls and
-  clips. Source attachment checks include those skins. Missing inputs fail. Refit
+  clips. Source attachment checks include those skins. Wrap the glTF export in
+  `without_review_hands()`: otherwise the exporter re-evaluates the arm skins on
+  every frame it samples. Missing inputs fail. Refit
   calibration separately and intentionally, never automatically during a normal rebuild.
 - Save editable components/modifiers/sparse poses before preparing runtime copies.
   Preserve each weapon's own UV strategy, sampling lattice, fractional endpoints,

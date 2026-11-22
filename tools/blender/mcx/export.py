@@ -1,5 +1,6 @@
 """Deterministic surface coordinates and one unmodified Blender glTF export."""
 import bpy
+from review_hands import without_review_hands
 from mathutils import Vector
 
 from mcx.finishes import consolidate_finishes
@@ -173,23 +174,24 @@ def export_asset(asset, parts, output):
     bpy.ops.object.select_all(action='DESELECT')
     for obj in asset.objects:
         obj.select_set(True)
-    bpy.ops.export_scene.gltf(
-        filepath=str(output / 'mcx-virtus.glb'),
-        export_format='GLB',
-        use_selection=True,
-        export_animations=True,
-        export_animation_mode='ACTIONS',
-        export_merge_animation='NLA_TRACK',
-        export_anim_single_armature=False,
-        export_force_sampling=False,
-        export_frame_range=False,
-        export_optimize_animation_keep_anim_object=True,
-        export_extras=True,
-        export_yup=True,
-        export_materials='EXPORT',
-        export_cameras=False,
-        export_lights=False,
-    )
+    with without_review_hands():
+        bpy.ops.export_scene.gltf(
+            filepath=str(output / 'mcx-virtus.glb'),
+            export_format='GLB',
+            use_selection=True,
+            export_animations=True,
+            export_animation_mode='ACTIONS',
+            export_merge_animation='NLA_TRACK',
+            export_anim_single_armature=False,
+            export_force_sampling=False,
+            export_frame_range=False,
+            export_optimize_animation_keep_anim_object=True,
+            export_extras=True,
+            export_yup=True,
+            export_materials='EXPORT',
+            export_cameras=False,
+            export_lights=False,
+        )
 
     stats = {'triangles': 0, 'vertices': 0, 'meshes': 0, 'material_slots': 0}
     for obj in asset.objects:
