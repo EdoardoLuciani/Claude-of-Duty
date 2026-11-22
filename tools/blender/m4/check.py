@@ -44,7 +44,7 @@ def tree(objects):
 def attached(a,b):return bool(tree(a).overlap(tree(b)))
 def near(a,b,tolerance=.001):assert abs(a-b)<=tolerance,f'{a*1000:.3f} mm != {b*1000:.3f} mm'
 
-stock=pick(('LMT ','SOPMOD ','Buttpad '))
+stock=pick(('LMT ','SOPMOD '))
 charging=[o for o in meshes if o.parent and o.parent.name=='charging_handle']
 rear=pick('MaTech ')
 assert stock and charging and rear
@@ -118,14 +118,15 @@ assert bounds(pick('Low-profile '))[1][1]<.094,'replacement gas block exceeds th
 assert attached(pick('Brass deflector'),upper),'deflector casting is detached'
 assert attached(pick('Forward assist housing'),upper),'forward-assist housing is detached'
 assert attached(pick('Forward assist housing'),pick('Forward assist paddle')),'forward-assist button is detached'
-# Through-window and hidden/outboard stock storage regressions use the actual
-# rendered triangles, not merely component origins or a reference screenshot.
 front=bpy.data.objects['SOCKET_front_post'];f=CI@front.matrix_world.translation
 assert tree(pick('A2 tower casting')).ray_cast(Vector((-.05,.106,f.z+.006)),Vector((1,0,0)),.1)[0] is None,'A2 triangular casting window is blocked'
-for o in pick('LMT storage tube'):
-    lo,hi=bounds([o])
-    assert hi[1]<.063 and lo[1]>.042,'storage chambers must sit below the buffer axis inside the cheek shell'
-    assert max(abs(lo[0]),abs(hi[0]))<.033,'storage tube protrudes outside the cheek shell'
+caps=tree(pick('LMT storage cap'))
+for x in (-.027,.027):
+    origin,direction=Vector((x,.052,.090)),Vector((0,0,1))
+    cap_hit=caps.ray_cast(origin,direction,.02)[0]
+    stock_hit=stock_tree.ray_cast(origin,direction,.02)[0]
+    assert cap_hit is not None and stock_hit is not None,'missing SOPMOD storage cap'
+    near(cap_hit.z,stock_hit.z,.000002)  # The cheek shell must not hide the cap.
 assert attached(pick('LMT structural web'),pick('LMT SOPMOD body')),'stock web is detached'
 assert attached(pick('LMT rear brace'),pick('LMT SOPMOD body')),'stock rear brace is detached'
 assert attached(pick('LMT rear brace'),pick('SOPMOD rubber buttpad')),'buttpad has no rear-brace support'
