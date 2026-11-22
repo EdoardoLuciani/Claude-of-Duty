@@ -13,7 +13,7 @@ after the objective clears. Ordinary meshes retain independent mechanisms,
 magazines and rounds.
 Preserve lockback, cancellation, chamber accounting, shared hand calibration and
 pooled ejection. One opaque material retains original finish colors and UV0 grain;
-UV1 keeps the original finish-tile indices, including reserved unused finishes.
+UV1 keeps the original tile indices for the finishes used by the model.
 
 Run from the repository root with Blender 5.2.2 and gltfpack 1.3:
 
@@ -87,8 +87,8 @@ Hand calibration and shared arms are read-only. Refit separately with
 Save editable components/sparse actions before runtime joins.
 Keep the smart-project atlas, original UV0 grain and padded 4×4 UV1 finish tiles.
 The base has no optical surfaces. Deployed and folded irons, thread protector
-and suppressor adapter each retain a separate rigid visibility owner. The original
-15 finish tiles stay reserved so surviving finishes keep their atlas positions.
+and suppressor adapter each retain a separate rigid visibility owner. UV1 uses
+explicit sparse slots: unused tiles remain blank without moving any finish.
 Attachment frames preserve shared canonical locals during the adapter basis change.
 
 Ordinary meshes retain original local frames: do not rebase them to reduce draws.

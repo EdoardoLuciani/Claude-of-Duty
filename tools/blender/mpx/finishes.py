@@ -3,17 +3,13 @@ import bpy
 import numpy as np
 
 
-def consolidate_finishes(objects, output, orm, normal):
+def consolidate_finishes(meshes, finish_slots, output, orm, normal):
     """Keep full-resolution UV0 colour grain; UV1 selects padded finish tiles.
 
     Reflectance is exact per-corner linear colour, not an averaged black finish.
     Only the subtle procedural roughness/normal grain is reduced to 248px per
     finish. Geometry lettering and normals remain independent.
     """
-    # Keep all original tile indices even after dropping the integrated optic/can.
-    # Existing receiver, hand and magazine finish UVs must not move.
-    sources = sorted((m for m in bpy.data.materials if m.name[:2].isdigit()), key=lambda m: m.name)
-    assert len(sources) == 15
     size, tile, pad = 1024, 256, 4
 
     def pixels(image):
@@ -21,7 +17,6 @@ def consolidate_finishes(objects, output, orm, normal):
         image.pixels.foreach_get(values)
         return values.reshape(size, size, 4)
 
-    original_orm, original_normal = pixels(orm), pixels(normal)
     # Bilinear resampling at the texel centres; edge padding prevents adjacent
     # finish bleed without moving or reprojecting the original component atlas.
     count = tile - 2 * pad
@@ -37,28 +32,25 @@ def consolidate_finishes(objects, output, orm, normal):
         return ((a * (1-t[:, None, None]) + b * t[:, None, None]) * (1-t[None, :, None])
                 + (c * (1-t[:, None, None]) + d * t[:, None, None]) * t[None, :, None])
 
-    rough_grain = reduce(original_orm)[:, :, 1]
-    normal_grain = reduce(original_normal)[:, :, :3] * 2 - 1
+    rough_grain = reduce(pixels(orm)[:, :, 1:2])[:, :, 0]
+    normal_grain = reduce(pixels(normal)[:, :, :3]) * 2 - 1
     packed_orm = np.ones((size, size, 4), dtype=np.float32)
     packed_normal = np.ones((size, size, 4), dtype=np.float32)
     packed_normal[:, :, :3] = (.5, .5, 1)
     colors = {}
-    for index, source in enumerate(sources):
-        p = source.node_tree.nodes.get('Principled BSDF')
-        mix = next(n for n in source.node_tree.nodes if n.type == 'MIX')
-        colors[source] = tuple(mix.inputs[7].default_value)
-        roughness = next(n for n in source.node_tree.nodes if n.type == 'MATH').inputs[1].default_value
-        strength = next(n for n in source.node_tree.nodes if n.type == 'NORMAL_MAP').inputs['Strength'].default_value
-        values = np.ones((count, count, 4), dtype=np.float32)
-        values[:, :, 1] = rough_grain * roughness
-        values[:, :, 2] = p.inputs['Metallic'].default_value
+    border = ((pad, pad), (pad, pad))
+    for source, slot in finish_slots.items():
+        nodes = source.node_tree.nodes
+        colors[source] = tuple(next(n for n in nodes if n.type == 'MIX').inputs[7].default_value)
+        roughness = next(n for n in nodes if n.type == 'MATH').inputs[1].default_value
+        strength = next(n for n in nodes if n.type == 'NORMAL_MAP').inputs['Strength'].default_value
         norms = normal_grain.copy()
         norms[:, :, :2] *= strength
         norms /= np.linalg.norm(norms, axis=2, keepdims=True)
-        normals = np.ones_like(values); normals[:, :, :3] = norms * .5 + .5
-        x, y = (index % 4) * tile, (index // 4) * tile
-        for target, data in [(packed_orm, values), (packed_normal, normals)]:
-            target[y:y+tile, x:x+tile] = np.pad(data, ((pad,pad),(pad,pad),(0,0)), mode='edge')
+        x, y = (slot % 4) * tile, (slot // 4) * tile
+        packed_orm[y:y+tile, x:x+tile, 1] = np.pad(rough_grain * roughness, border, mode='edge')
+        packed_orm[y:y+tile, x:x+tile, 2] = nodes['Principled BSDF'].inputs['Metallic'].default_value
+        packed_normal[y:y+tile, x:x+tile, :3] = np.pad(norms * .5 + .5, (*border, (0, 0)), mode='edge')
 
     def image(name, values):
         result = bpy.data.images.new(name, width=size, height=size, alpha=False)
@@ -70,7 +62,7 @@ def consolidate_finishes(objects, output, orm, normal):
 
     orm_atlas = image('mpx-finish-orm', packed_orm)
     normal_atlas = image('mpx-finish-normal', packed_normal)
-    result = sources[0].copy()
+    result = next(iter(finish_slots)).copy()
     result.name = 'MPX | consolidated opaque finishes'
     nodes, links = result.node_tree.nodes, result.node_tree.links
     p = nodes.get('Principled BSDF')
@@ -90,8 +82,7 @@ def consolidate_finishes(objects, output, orm, normal):
     sep = next(n for n in nodes if n.type == 'SEPARATE_COLOR')
     links.new(sep.outputs['Blue'], p.inputs['Metallic'])
 
-    for obj in objects:
-        if obj.type != 'MESH': continue
+    for obj in meshes:
         mesh = obj.data
         uv0 = mesh.uv_layers.active
         uv1 = mesh.uv_layers.new(name='finish_uv')
@@ -104,12 +95,12 @@ def consolidate_finishes(objects, output, orm, normal):
         for face in mesh.polygons:
             source = finishes[face.index]
             assert source is not None, (obj.name, face.index, 'unassigned finish')
-            index = sources.index(source)
+            slot = finish_slots[source]
             face.material_index = 0
             for loop in face.loop_indices:
                 uv = uv0.data[loop].uv
-                uv1.data[loop].uv = ((index % 4 * tile + pad + uv.x * count) / size,
-                                     (index // 4 * tile + pad + uv.y * count) / size)
+                uv1.data[loop].uv = ((slot % 4 * tile + pad + uv.x * count) / size,
+                                     (slot // 4 * tile + pad + uv.y * count) / size)
                 color.data[loop].color = colors[source]
         mesh.uv_layers.active = uv0
         mesh.update()
