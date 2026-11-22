@@ -34,8 +34,16 @@ Run from the repository root after `bun ci`:
 ```sh
 bun tools/export-world.ts
 bun tools/export-world.ts --check
+bun tools/check-prop-support.ts
 bun run verify
 ```
+
+`check-prop-support.ts` samples beneath ground-seated props and stacks against the
+assembled meshes, ignoring each prop's own geometry. It reports candidate gaps
+with level coordinates and placement IDs where available. Use `--gap=0.15` to
+raise the threshold, `--json` for structured output, or `--check` for a failing
+exit status. This is a review aid: it does not test hanging cloth, mounts, or
+whether a stack with contact is stable.
 
 Use `bun tools/export-world.ts --out=/tmp/world-review` for isolated output.
 Commit source only, not generated assets. `--force` rebuilds unchanged inputs and
