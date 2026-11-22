@@ -2,8 +2,8 @@
 import math
 from pathlib import Path
 import bpy
-import bmesh
 from mathutils import Vector, Matrix
+from mathutils.bvhtree import BVHTree
 from .materials import build_source_materials
 import picatinny
 
@@ -103,16 +103,6 @@ def build_geometry(asset):
         o=cyl(name,loc,r,length,mat,parent,'Y',64)
         cut(o,cyl('CUT',loc,inner,length+.003,None,None,'Y',48,0));return o
 
-    def text(label,loc,size,side=-1,parent=body,mat=mark,depth=0):
-        d=bpy.data.curves.new(label,'FONT');d.body=label;d.size=size;d.extrude=depth;d.resolution_u=4
-        if font: d.font=font
-        o=bpy.data.objects.new('Mark | '+label,d);asset.objects.link(o);o.location=loc
-        o.rotation_euler=Matrix(((0,0,side),(side,0,0),(0,1,0))).to_euler()
-        o.parent=parent;o.matrix_parent_inverse=parent.matrix_world.inverted();d.materials.append(mat)
-        return o
-    font_path='/usr/share/fonts/dejavu-sans-fonts/DejaVuSansCondensed-Oblique.ttf'
-    font=bpy.data.fonts.load(font_path) if Path(font_path).exists() else None
-
     # Slide: hollow underside, machined top chamfers, genuine recessed serrations.
     section=[(-.0134,.022),(-.0134,.042),(-.0094,.0497),(.0094,.0497),(.0134,.042),(.0134,.022)]
     verts=[(x,y-(.004 if y<0 and z<.04 else 0),z) for y in (-.039,.130) for x,z in section]
@@ -139,9 +129,19 @@ def build_geometry(asset):
     # Ejection-side external extractor, flush to the port edge.
     box('Extractor claw housing',(.0131,.028,.0395),(.0015,.018,.0058),steel,slide,.0005)
     cyl('Extractor pin cap',(.014,.021,.036),.0014,.0005,barrel_mat,slide)
-    label=text('SIGSAUER  P320',(-.01338,.114,.0423),.0048,-1,slide,mark)
-    label.rotation_euler=Matrix(((0,.46,-.888),(-1,0,0),(0,.888,.46))).to_euler()
-    text('9mm x 19',(.0128,.050,.041),.0026,1,barrel,mark)
+    wordmark = bpy.data.curves.new('SIGSAUER  P320', 'FONT')
+    wordmark.body = 'SIGSAUER  P320'
+    wordmark.size = .0048
+    wordmark.resolution_u = 4
+    font_path = Path('/usr/share/fonts/dejavu-sans-fonts/DejaVuSansCondensed-Oblique.ttf')
+    if font_path.exists():
+        wordmark.font = bpy.data.fonts.load(str(font_path))
+    wordmark.materials.append(mark)
+    label = bpy.data.objects.new('Mark | SIGSAUER  P320', wordmark)
+    asset.objects.link(label)
+    label.parent = slide
+    label.location = (-.01338, .114, .0423)
+    label.rotation_euler = Matrix(((0,.46,-.888),(-1,0,0),(0,.888,.46))).to_euler()
 
     # A continuously lofted grip, with a palm swell and rounded rectangular sections.
     # Each station: z, y centre, half fore/aft depth, half width.
@@ -192,10 +192,6 @@ def build_geometry(asset):
     rail_y=.097
     frame_matrix=Matrix.Translation((0,rail_y,.002))@Matrix.Rotation(math.pi,4,'Y')
     rail_parts=picatinny.build_rail('Frame | integral accessory rail',frame_matrix,.069-rail_y,.117-rail_y,polymer,body,asset,bottom=-.012)
-    for side in (-1,1):
-        text('SIGSAUER',(side*.0161,-.004 if side==-1 else -.028,-.036),.0042,side,body,polymer,.00012)
-        # Compact-medium molding under the dust cover, not a bright white label.
-        text('COMPACT MEDIUM',(side*.01291,.111 if side==-1 else .073,.010),.0024,side,body,polymer,.00006)
     # Side controls. The magazine button is triangular, not the old circular button.
     profile('Magazine release | checkered face',[(-.003,-.012),(.007,-.018),(.005,-.023),(-.004,-.022)],.002,steel,body,.0007,-.014)
     for y in [-.001,.001,.003,.005]:
@@ -208,9 +204,8 @@ def build_geometry(asset):
     for side in (-1,1):
         profile('Ambidextrous slide catch', [(-.012,.024),(-.001,.024),(.001,.020),(-.003,.017),(-.011,.018)],.0025,steel,catch,.0006,side*.014)
         for z in [.019,.0205,.022]:box('Slide catch | serration',(side*.0154,-.006,z),(.0002,.007,.00035),nitron,catch,.00012)
-    # Visible serialized chassis window; fictional serial, no real specimen copied.
+    # Recessed chassis window without a serial decal.
     box('Serial window',(.0130,-.028,.009),(.0005,.025,.0042),cavity,body,.0004)
-    text('P320  00015',(.01331,-.038,.0077),.0020,1,body,mark)
 
     # Moving barrel and guide rod are visible in both muzzle and open-slide poses.
     tube('Barrel | crowned muzzle',(0,.070,.037),.0068,.0044,.119)
@@ -244,7 +239,6 @@ def build_geometry(asset):
         for z in [-.063,-.045,-.027]:
             y=-.009+(z+.065)*.22
             cut(m,cyl('CUT',(side*.0106,y,z),.0012,.004,None,None,'X',16,0))
-            text(str({-.063:15,-.045:10,-.027:5}[z]),(side*.01035,y+.003*side,z-.001),.0020,side,mag,mark)
         # Shallow stamped longitudinal flutes, not floating ribs.
         for yy in (-.014,.003):
             c=box('CUT',(side*.0115,yy,-.038),(.003,.0028,.068),None,None,0)
@@ -320,47 +314,17 @@ def build_geometry(asset):
         # material slot that would have no active atlas bake target.
         for index, material in enumerate(o.data.materials):
             if material is None:o.data.materials[index]=o.data.materials[0]
-    # Conform every bake-source glyph to its actual assembly, not just the grip.
-    # The old floating barrel label sat 3.3 mm outside the chamber side: it could
-    # render as geometry but would miss a sensible high-to-low bake cage entirely.
-    from mathutils.bvhtree import BVHTree
-    assembly_surfaces={}
-    for parent in {o.parent for o in weapon_meshes}:
-        vertices=[];polygons=[]
-        for o in weapon_meshes:
-            if o.parent!=parent or o.name.startswith('Mark |'):continue
-            start=len(vertices)
-            vertices.extend(o.matrix_world@v.co for v in o.data.vertices)
-            polygons.extend(tuple(start+i for i in p.vertices) for p in o.data.polygons)
-        assembly_surfaces[parent]=BVHTree.FromPolygons(vertices,polygons)
-    for o in weapon_meshes:
-        if not o.name.startswith('Mark |'):continue
-        # Project only the outward glyph cap. Flattening an extruded font's
-        # front AND back would create coincident reversed bake surfaces.
-        bm=bmesh.new();bm.from_mesh(o.data)
-        bmesh.ops.delete(bm,geom=[face for face in bm.faces if face.normal.z<.5],context='FACES')
-        bm.to_mesh(o.data);bm.free();o.data.update()
-        inv=o.matrix_world.inverted()
-        direction=(o.matrix_world.to_3x3()@Vector((0,0,1))).normalized()
-        projected=0
-        for v in o.data.vertices:
-            p=o.matrix_world@v.co
-            hit,normal,_,_=assembly_surfaces[o.parent].ray_cast(p+direction*.01,-direction,.022)
-            if hit:
-                v.co=inv@(hit+normal*.00009)
-                projected+=1
-        o['bake_projected_vertices']=projected
-    # Constant physical source finishes bake readable markings into the shared
-    # low atlas; glyphs never get independent rendered UV islands or materials.
-    letter_materials={}
-    for o in weapon_meshes:
-        if not o.name.startswith('Mark |'):continue
-        source=o.data.materials[0]
-        if source.name not in letter_materials:
-            m=bpy.data.materials.new('Lettering | '+source.name);m.use_nodes=True
-            p=m.node_tree.nodes.get('Principled BSDF');p.inputs['Base Color'].default_value=source.diffuse_color
-            p.inputs['Roughness'].default_value=.65;p.inputs['Metallic'].default_value=.1
-            letter_materials[source.name]=m
-        o.data.materials.clear();o.data.materials.append(letter_materials[source.name])
+    # Conform the flat wordmark to the evaluated slide chamfer before baking.
+    slide_surface = BVHTree.FromPolygons([shroud.matrix_world @ v.co for v in shroud.data.vertices],
+                                        [tuple(p.vertices) for p in shroud.data.polygons])
+    inverse = label.matrix_world.inverted()
+    direction = (label.matrix_world.to_3x3() @ Vector((0, 0, 1))).normalized()
+    for vertex in label.data.vertices:
+        point = label.matrix_world @ vertex.co
+        hit, normal, _, _ = slide_surface.ray_cast(point + direction * .01, -direction, .022)
+        assert hit is not None, 'wordmark must sit on the slide'
+        vertex.co = inverse @ (hit + normal * .00009)
+    label['bake_projected_vertices'] = len(label.data.vertices)
+    label.data.update()
     # The source is procedural; only the reduced surfaces need atlas UVs.
     return asset, coords, [rig,body,slide,barrel,trigger,catch,mag,spare,round_live,round_spare], weapon_meshes

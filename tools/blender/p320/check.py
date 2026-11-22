@@ -15,34 +15,20 @@ for suffix in ('base','orm','normal','emission'):
     assert images and images[0].packed_file, 'packed '+suffix
     expected=1024
     assert list(images[0].size)==[expected,expected]
-marks=[o for o in s.objects if o.name.startswith('Mark |')]
-assert len(marks)==13
-for mark in marks:
-    assert mark['bake_projected_vertices']==len(mark.data.vertices), mark.name
-    assert all(p.normal.z>0 for p in mark.data.polygons), 'no reversed coincident glyph caps'
+wordmark=bpy.data.objects['Mark | SIGSAUER  P320']
+assert wordmark['bake_projected_vertices']==len(wordmark.data.vertices), wordmark.name
+assert all(p.normal.z>0 for p in wordmark.data.polygons), 'no reversed coincident glyph caps'
 maximum=0
 skin_error=0
 arm=bpy.data.objects['P320_SKIN']
 basis=Matrix.Rotation(math.pi/2,4,'X')
 surface=bpy.data.objects['P320_surface']
 assert len(surface.data.materials)==1
-assert len(surface.data.uv_layers)==2
-assert surface.data.uv_layers[1].name=='BaseColorUV'
-assert s['p320_color_panels']==13
+assert len(surface.data.uv_layers)==1
 # The integral accessory rail must not protrude ahead of the loaded slide nose.
 frame=bpy.data.objects['Frame | continuous compact medium polymer shell']
 slide=bpy.data.objects['Slide | chamfered Nitron shell']
 assert max((frame.matrix_world@v.co).y for v in frame.data.vertices)<=max((slide.matrix_world@v.co).y for v in slide.data.vertices), 'accessory rail extends past slide nose'
-color_uv=surface.data.uv_layers['BaseColorUV'].data
-panels=surface.data.attributes['color_panel'].data
-marked_area=total_area=0
-for face in surface.data.polygons:
-    a,b,c=[color_uv[i].uv for i in face.loop_indices]
-    u,v=b-a,c-a
-    area=abs(u.x*v.y-u.y*v.x)/2
-    total_area+=area
-    if panels[face.index].value:marked_area+=area
-assert .75<marked_area/total_area<.90, 'most occupied color UV area belongs to lettering panels'
 for uv in surface.data.uv_layers:
     assert all(0<=coord<=1 for loop in uv.data for coord in loop.uv)
 surface.data.calc_loop_triangles()
@@ -97,7 +83,7 @@ sys.path[:0] = [str(Path(__file__).resolve().parent), str(Path(__file__).resolve
 from attachments import check_mounts, check_sight_emission
 check_sight_emission(surface)
 check_mounts(clips)
-print(f'P320_BLENDER_OK: 8 synchronized actions, wrists {maximum*1000:.4f} mm, mechanical skin/source matrix error {skin_error:.9f}, packed atlases, {marked_area/total_area:.1%} lettering UV1, rigid weights and discrete magazines')
+print(f'P320_BLENDER_OK: 8 synchronized actions, wrists {maximum*1000:.4f} mm, mechanical skin/source matrix error {skin_error:.9f}, packed shared-UV atlases, rigid weights and discrete magazines')
 
 # Actual shared rail attachment, independent of the optic catalog.
 from tor_mini.mounts import check_laser_mount

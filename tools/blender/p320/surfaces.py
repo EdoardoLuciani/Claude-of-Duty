@@ -65,7 +65,7 @@ def build_surfaces(asset, sources):
 
 
 def emphasize_marks(surfaces):
-    """Preserve lettering/ribs and sub-millimetre SIGLITE insets in the atlas."""
+    """Preserve the wordmark and sub-millimetre SIGLITE insets in the atlas."""
     from mathutils.bvhtree import BVHTree
     for surface, sources in surfaces:
         mesh = surface.data
@@ -92,7 +92,7 @@ def emphasize_marks(surfaces):
                                    [tuple(p.vertices) for p in mesh.polygons], all_triangles=True)
         priority = {}
         for source in sources:
-            if not source.name.startswith(BAKE_ONLY):
+            if not source.name.startswith(('Mark |', 'SIGLITE |')):
                 continue
             factor = 8 if source.name.startswith('SIGLITE |') else 4
             for vertex in source.data.vertices:

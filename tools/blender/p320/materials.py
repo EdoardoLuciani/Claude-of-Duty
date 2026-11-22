@@ -1,7 +1,6 @@
 """P320 procedural finishes and unique-UV atlas baking; no cached asset inputs."""
 import bpy
 from .surfaces import active, build_surfaces, stash_sources
-from .color_uv import COLOR_UV, layout_color
 
 ATLAS_RESOLUTIONS = {'base': 1024, 'orm': 1024, 'normal': 1024, 'emission': 1024}
 # Cycles samples per map. Normal projection needs the most to keep fine bump
@@ -50,7 +49,8 @@ def build_source_materials(coords):
     barrel_mat = material('Barrel | polished nitriding',(.061,.065,.070),.29,.72,.12)
     mag_mat = material('Magazine | blued stamped steel',(.033,.039,.044),.37,.75,.18)
     cavity = material('Recess | shadowed coating',(.007,.008,.009),.86,0,.12)
-    mark = material('Laser etching | subtle warm grey',(.18,.18,.17),.65,.15,.08)
+    mark = bpy.data.materials.new('Laser etching | subtle warm grey'); mark.use_nodes = True
+    mark.node_tree.nodes.get('Principled BSDF').inputs['Base Color'].default_value = (.18,.18,.17,1)
     brass = material('Visible dummy round | brass',(.38,.22,.07),.33,1,.1)
     copper = material('Visible dummy round | copper',(.30,.105,.045),.32,1,.1)
     white = material('SIGLITE | white surround',(.68,.69,.63),.58,0,.05)
@@ -58,16 +58,12 @@ def build_source_materials(coords):
     return nitron, polymer, stipple, steel, barrel_mat, mag_mat, cavity, mark, brass, copper, white
 
 def bake_orm(asset, surfaces):
-    # Bake roughness/metalness from the low surfaces' own materials, not by
-    # projection: BAKE_ONLY lettering and SIGLITE finishes stay out of ORM
-    # (they still reach base, normal and emission). Join only temporary copies
-    # so runtime ownership and geometry stay intact.
+    # Bake scalar finishes directly, keeping projected details out of ORM.
+    # Joining temporary copies avoids paying bake setup for each island owner.
     copies = []
     for surface, _ in surfaces:
         clone = surface.copy()
         clone.data = surface.data.copy()
-        clone.data.uv_layers.active_index = 0
-        clone.data.uv_layers[0].active_render = True
         asset.objects.link(clone)
         copies.append(clone)
     meshes = {clone.data for clone in copies}
@@ -86,7 +82,6 @@ def bake_orm(asset, surfaces):
 def bake_atlas(output, asset, weapon_meshes):
     scene = bpy.context.scene
     surfaces = build_surfaces(asset, weapon_meshes)
-    layout_color(surfaces)
     atlas = {}
     for name, resolution in ATLAS_RESOLUTIONS.items():
         im = bpy.data.images.new('P320_' + name, width=resolution, height=resolution, alpha=False)
@@ -99,9 +94,7 @@ def bake_atlas(output, asset, weapon_meshes):
     bake.use_selected_to_active = True
     bake.max_ray_distance = .0024
     all_mats = {slot.material for obj in weapon_meshes for slot in obj.material_slots if slot.material}
-    # Base, normal and emission project from the high source, including the
-    # former lettering/traction geometry; ORM is baked directly (bake_orm).
-    # The emission map keeps the small sight dots in the SAME material section.
+    # Project the wordmark, traction and SIGLITE surfaces into the shared atlas.
     samples = scene.cycles.samples
     for name in atlas:
         scene.cycles.samples = ATLAS_SAMPLES[name]
@@ -148,9 +141,6 @@ def bake_atlas(output, asset, weapon_meshes):
                     continue
                 # Cast from outside the rear rings above the slide's sloped sight face.
                 bake.cage_extrusion = .0015 if is_slide else .0012
-                mesh = surface.data
-                mesh.uv_layers.active_index = mesh.uv_layers.find(COLOR_UV) if name == 'base' else 0
-                mesh.uv_layers.active.active_render = True
                 active(surface)
                 for source in sources:
                     source.select_set(True)
@@ -174,9 +164,6 @@ def bake_atlas(output, asset, weapon_meshes):
         t = n.new('ShaderNodeTexImage')
         t.image = im
         if name == 'base':
-            coordinates = n.new('ShaderNodeUVMap')
-            coordinates.uv_map = COLOR_UV
-            l.new(coordinates.outputs['UV'], t.inputs['Vector'])
             l.new(t.outputs[0], p.inputs['Base Color'])
         elif name == 'emission':
             l.new(t.outputs[0], p.inputs['Emission Color'])
@@ -191,8 +178,6 @@ def bake_atlas(output, asset, weapon_meshes):
             l.new(sep.outputs[1], p.inputs['Roughness'])
             l.new(sep.outputs[2], p.inputs['Metallic'])
     for surface, _ in surfaces:
-        surface.data.uv_layers.active_index = 0
-        surface.data.uv_layers[0].active_render = True
         surface.data.materials.clear()
         surface.data.materials.append(baked)
         for poly in surface.data.polygons:

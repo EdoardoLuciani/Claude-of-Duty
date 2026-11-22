@@ -67,7 +67,7 @@ def check_sight_emission(surface):
             assert hit is not None, 'missing rear sight housing'
             polygon = surface.data.polygons[face]
             vertices = [surface.matrix_world @ surface.data.vertices[i].co for i in polygon.vertices]
-            coords = [Vector((*surface.data.uv_layers['BaseColorUV'].data[i].uv, 0)) for i in polygon.loop_indices]
+            coords = [Vector((*surface.data.uv_layers[0].data[i].uv, 0)) for i in polygon.loop_indices]
             uv = barycentric_transform(hit, *vertices, *coords)
             base = bpy.data.images['P320_base']
             pixel = (int(uv.y * base.size[1]) * base.size[0] + int(uv.x * base.size[0])) * 4
