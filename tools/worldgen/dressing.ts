@@ -705,8 +705,7 @@ function dressBuilding(A: Assembler, rng: Rng, info: BuildingInfo): void {
     const a = [rs.x - rs.w / 2 + 0.4, roofY + 1.0, rs.z + nearZ];
     const b = [rs.x + rs.w / 2 - 0.4, roofY + 0.96, rs.z + farZ];
     const line = catenaryTube(a, b, 0.3, 0.01, { seg: 10, radial: 4 });
-    // A 1 cm cable is not cover; collision would cap ladder and stair climb-outs.
-    A.addOnce('metal_dark', line, null, { masks: [0.3, 0.6, 0], visualOnly: true });
+    A.addOnce('metal_dark', line, null, { masks: [0.3, 0.6, 0] });
     for (const sx of [-1, 1]) {
       A.add(
         'metal_rust',
@@ -726,8 +725,8 @@ function dressBuilding(A: Assembler, rng: Rng, info: BuildingInfo): void {
         }
       );
     }
-    for (const [t, key, w, h, sag, wrinkle, twist, fray, seed, grime] of garments) {
-      const cloth = laundryCloth(line, t, w, h, {
+    for (const [i, [key, w, h, sag, wrinkle, twist, fray, seed, grime]] of garments.entries()) {
+      const cloth = laundryCloth(line, (i + 0.5) / garments.length, w, h, {
         segX: 7,
         segY: 8,
         sag,

@@ -1325,6 +1325,7 @@ export function spallPatch(rng: Rng, w: number, h: number, depth = 0.03): THREE.
     out[1] = 0.55 + 0.3 * (1 - Math.abs(nz));
     out[2] = 0.5 * (1 - Math.abs(nz)) + 0.2;
   });
+  g.userData.visualOnly = true; // surface finish, never a ledge
   return g;
 }
 

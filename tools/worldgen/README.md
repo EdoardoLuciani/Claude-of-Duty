@@ -20,7 +20,7 @@ Runtime behavior belongs to `src/world/`.
   the room; ruin rubble is a seeded mound. Shelves, conduits and leaning sheets
   fail the bake when their wall or clearance is gone.
 - `level/roof-fixtures.ts`: aerials and laundry relative to the roof footprint;
-  garments attach along the authored cable.
+  garments hang evenly spaced along the authored cable.
 - `level/config.ts`: transform/spawns; `level/intel.ts`: intel drop sites.
 - `level/placements/`: data-only prop transforms, one `PlacementRow` per line, grouped by area.
 - `props.ts`/`dressing.ts`: props; `buildings.ts`/`kit.ts`: construction.
@@ -43,6 +43,7 @@ The assembler owns geometry lifetime; support/collision/navigation use canonical
 geometry even when visuals have derivatives. Never author separate collision
 meshes or hand-edit products. Mark visual-only pieces at assembly so collision
 and navigation never include them, even if they share a palette with solids.
+Cable, stain and spall generators mark their own geometry.
 Navigation shares runtime controller algorithms.
 
 Run from the repository root after `bun ci`:

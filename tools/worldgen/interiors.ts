@@ -3,7 +3,8 @@ import * as THREE from 'three';
 import type { Assembler } from './builder.ts';
 import type { BuildingInfo } from './buildings.ts';
 import { BOX, BOX_FINE, BOX_THIN, IDENT, LL, rubbleMound } from './kit.ts';
-import type { CounterFootprint, RoomFixture, RoomProp } from './level/room-fixtures.ts';
+import type { CounterFootprint, RoomProp } from './level/room-fixtures.ts';
+import { ROOM_FIXTURES } from './level/room-fixtures.ts';
 import type { RectXZ } from './util.ts';
 import { clothGeometry, chamferBox, fillMasks, keyedRng } from './util.ts';
 
@@ -218,12 +219,9 @@ function setProp(
 
 /** Build kit geometry from a room's authored fixtures. Goods follow the
  * surface they sit on; the furniture does not depend on any cosmetic draws. */
-export function furnishRoom(
-  A: Assembler,
-  id: string,
-  r: RoomSpec,
-  fixtures: readonly RoomFixture[]
-): void {
+export function furnishRoom(A: Assembler, id: string, r: RoomSpec): void {
+  const fixtures = ROOM_FIXTURES[id];
+  if (!fixtures) throw new Error(`[world] missing authored fixtures for room ${id}`);
   const { x0, x1, z0, z1, y, h } = r;
   const cx = (x0 + x1) / 2;
   const cz = (z0 + z1) / 2;
@@ -322,21 +320,12 @@ export function furnishRoom(
         A.add(
           'metal_dark',
           pipe,
-          LL(
-            IDENT,
-            ...at((from + to) / 2, 0.045, height),
-            yaw,
-            1,
-            Math.abs(to - from),
-            1,
-            0,
-            Math.PI / 2
-          )
+          LL(IDENT, rx, y + height, rz, yaw, 1, Math.abs(to - from), 1, 0, Math.PI / 2)
         );
         A.add(
           'metal_dark',
           pipe,
-          LL(IDENT, ...at(drop, 0.045, (height + boxHeight) / 2), 0, 1, height - boxHeight, 1)
+          LL(IDENT, dx, y + (height + boxHeight) / 2, dz, 0, 1, height - boxHeight, 1)
         );
         A.add(
           'metal_dark',

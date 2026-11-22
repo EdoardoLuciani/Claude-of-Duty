@@ -19,6 +19,7 @@ export type MaskPainter = (
   out: number[]
 ) => void;
 export interface AssemblyOptions {
+  /** Render-only; defaults to the geometry's `userData.visualOnly` mark. */
   visualOnly?: boolean;
   masks?: InstanceMasks;
   paint?: MaskPainter;
@@ -299,7 +300,7 @@ export class Accum {
       this.tris += pa.count / 3;
     }
     const end = this.idx!.length;
-    if (opts?.visualOnly && end > start) {
+    if ((opts?.visualOnly ?? geo.userData.visualOnly === true) && end > start) {
       const last = this.visualRanges.at(-1);
       if (last?.[1] === start) last[1] = end;
       else this.visualRanges.push([start, end]);
@@ -723,6 +724,7 @@ export function runoffStreak(
   g.setIndex(idx);
   g.computeBoundingBox();
   g.computeBoundingSphere();
+  g.userData.visualOnly = true; // a surface stain, never a ledge
   return g;
 }
 
@@ -1127,6 +1129,8 @@ export function catenaryTube(
   const curve = new THREE.CatmullRomCurve3(pts);
   const g = new THREE.TubeGeometry(curve, seg, radius, radial, false);
   g.computeBoundingBox();
+  // A centimetre cable is not cover; simplified, it collapses into a sheet.
+  g.userData.visualOnly = true;
   return g;
 }
 

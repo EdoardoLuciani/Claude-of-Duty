@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { buildWorld } from '#worldgen/build';
 import { Assembler } from '#worldgen/builder';
 import { GROUND_STONES } from '#worldgen/level/ground-stones';
-import { PLACEMENT_ROWS } from '#worldgen/level/placements/index';
+import { PLACEMENTS } from '#worldgen/placement';
 import { seatY } from '#worldgen/queries';
 
 import { isMesh } from '../src/core/three-guards.ts';
@@ -75,10 +75,7 @@ const candidates = new Set([
 const key = (name: string, p: readonly number[]): string =>
   `${name}:${p.map((n): string => n.toFixed(3)).join(',')}`;
 const ids = new Map(
-  PLACEMENT_ROWS.map(([name, id, p]): [string, string] => [
-    key(name, p),
-    id.includes('/') ? id : `${name}/${id}`,
-  ])
+  PLACEMENTS.map(({ prototype, id, position }): [string, string] => [key(prototype, position), id])
 );
 for (const [i, [name, x, z]] of GROUND_STONES.entries())
   ids.set(key(name, [x, seatY(x, z), z]), `ground-stones/${i + 1} (${name})`);

@@ -26,7 +26,6 @@ import {
   worldOf,
 } from './kit.ts';
 import { FRONTAGES } from './level/frontages.ts';
-import { ROOM_FIXTURES } from './level/room-fixtures.ts';
 import type { ClearanceBox } from './placement.ts';
 import type { RectXZ, WallOpening } from './util.ts';
 import { fbm3, keyedRng, runoffStreak } from './util.ts';
@@ -60,10 +59,7 @@ interface RoomPlan {
   furnish?: ({ id: string } & RectXZ)[];
 }
 type BayKind = 'blank' | 'door' | 'shop' | 'window' | 'arch' | 'balconyDoor' | 'ragged';
-interface BayOverride {
-  kind: BayKind;
-  floorBridge?: boolean;
-}
+type BalconyDoor = 'balconyDoor' | { kind: 'balconyDoor'; floorBridge: true };
 export interface BuildingSpec {
   id: string;
   x: number;
@@ -104,9 +100,7 @@ export interface BuildingSpec {
   roofProps?: number;
   roofAccess?: boolean;
   collapseDebris?: [x: number, z: number];
-  bayKinds?: Partial<
-    Record<number, Partial<Record<number, Partial<Record<number, BayKind | BayOverride>>>>>
-  >;
+  bayKinds?: Partial<Record<number, Partial<Record<number, Partial<Record<number, BalconyDoor>>>>>>;
   stairHoles?: Partial<Record<number, StairHole>>;
   ladders?: {
     floor?: number;
@@ -662,7 +656,9 @@ function buildFacade(
     const reserved = reservedBays.has(b);
     // A reserved bay still runs its facade element, but the adds land in a
     // sink; its opening is left out of the cut and the damage passes.
-    const kitA = reserved || (cut && Math.abs(bx - cut.x) < bw * 0.5) ? sinkAdds(A) : A;
+    // A reserved or cut bay keeps its opening but builds no kit geometry.
+    const suppressed = reserved || (!!cut && Math.abs(bx - cut.x) < bw * 0.5);
+    const kitA = suppressed ? sinkAdds(A) : A;
     const pushOpening = (o: FacadeOpening): void => {
       o.reserved = reserved;
       openings.push(o);
@@ -679,22 +675,17 @@ function buildFacade(
       if (ruinTop && kind !== 'blank' && rng.float() < 0.5) kind = 'ragged';
     }
 
-    /**
-     * Hand-authored override for the bays that carry a sightline the map
-     * depends on (the shop the interior camera looks out of, the doorway that
-     * connects an alley to a stairwell). A string names the kind; an object
-     * additionally passes options to the kit element.
-     */
+    // A balcony door without a slab, e.g. onto a terrace; the object form
+    // also bridges the floor to the slab beyond.
     const override = spec.bayKinds?.[side]?.[f]?.[b];
-    const forced = typeof override === 'string' ? { kind: override } : override;
     const deck = spec.balconies?.find(
       ([s, floor, bay]): boolean => s === side && floor === f && bay === b
     );
-    if (deck && kitA !== A)
+    if (deck && suppressed)
       throw new Error(
         `[world] ${spec.id} balcony conflicts with an obstruction at ${side}/${f}/${b}`
       );
-    kind = deck ? 'balconyDoor' : (forced?.kind ?? kind);
+    if (deck || override) kind = 'balconyDoor';
 
     switch (kind) {
       case 'door': {
@@ -743,7 +734,11 @@ function buildFacade(
             to: [...worldOf(pm, bx, 0, 1.15)],
           });
         }
-        if (canopy && kitA === A) {
+        if (canopy && suppressed)
+          throw new Error(
+            `[world] ${spec.id} awning conflicts with an obstruction at ${side}/${f}/${b}`
+          );
+        if (canopy) {
           const [depth, supports] = canopy;
           const aw = sw + 0.5;
           const awY = o.y + o.h / 2 + 0.55;
@@ -811,7 +806,7 @@ function buildFacade(
         const ww = Math.min(room, 1.15);
         const o = { x: bx, y: 1.12, w: ww, h: 2.24, kind };
         pushOpening(o);
-        if (forced?.floorBridge && !reserved) {
+        if (typeof override === 'object' && !reserved) {
           // Fill the floor seam at this existing opening.
           A.add('floor_concrete', BOX(A), LL(pm, bx, -0.1, t * 0.5, 0, o.w, 0.2, t * 2), {
             masks: [0.3, 0.55, 0.35],
@@ -920,7 +915,7 @@ function buildFacade(
       g.dispose();
       return;
     }
-    A.addOnce(wallKey, g, LL(pm, x, y, depth, 0, 1, 1, 1), { visualOnly: true });
+    A.addOnce(wallKey, g, LL(pm, x, y, depth, 0, 1, 1, 1));
   };
   for (const o of openings) {
     if (o.kind === 'ragged' || o.reserved) continue;
@@ -988,7 +983,7 @@ function buildFacade(
       g.dispose();
       continue;
     }
-    A.addOnce('brick_fine', g, LL(pm, sx, sy, 0.01, 0, 1, 1, 1), { visualOnly: true });
+    A.addOnce('brick_fine', g, LL(pm, sx, sy, 0.01, 0, 1, 1, 1));
   }
   // patched render — a slightly different mix where somebody repaired it. Kept
   // in the same value family as the wall, or it reads as a paper poster.
@@ -1001,9 +996,7 @@ function buildFacade(
     // Same value family as the wall: a bright white patch on cream render reads
     // as a sheet of paper stuck to the building.
     if (!inOpening(px, py, pw * 0.5, ph * 0.5, wallHoles, 0.12)) {
-      A.addOnce(PATCH_KEY[wallKey] ?? 'plaster_sand', g, LL(pm, px, py, 0.013, 0, 1, 1, 1), {
-        visualOnly: true,
-      });
+      A.addOnce(PATCH_KEY[wallKey] ?? 'plaster_sand', g, LL(pm, px, py, 0.013, 0, 1, 1, 1));
     } else g.dispose();
   }
 
@@ -1434,26 +1427,19 @@ function buildInterior(
         const roomId = `${spec.id}/${f}/${r.id}`;
         if (used.has(roomId)) throw new Error(`[world] duplicate furnished room ${roomId}`);
         used.add(roomId);
-        const fixtures = ROOM_FIXTURES[roomId];
-        if (!fixtures) throw new Error(`[world] missing authored fixtures for room ${roomId}`);
-        furnishRoom(
-          A,
-          roomId,
-          {
-            x0: x0 + r.x0 * iw,
-            z0: z0 + r.z0 * id,
-            x1: x0 + r.x1 * iw,
-            z1: z0 + r.z1 * id,
-            y: fy,
-            h: fh,
-            envelope: { x0, z0, x1: x0 + iw, z1: z0 + id },
-            facadeOpenings: info.facadeOpenings.filter((opening): boolean => opening.f === f),
-            partitions,
-            doors,
-            voids: Object.values(spec.stairHoles ?? {}),
-          },
-          fixtures
-        );
+        furnishRoom(A, roomId, {
+          x0: x0 + r.x0 * iw,
+          z0: z0 + r.z0 * id,
+          x1: x0 + r.x1 * iw,
+          z1: z0 + r.z1 * id,
+          y: fy,
+          h: fh,
+          envelope: { x0, z0, x1: x0 + iw, z1: z0 + id },
+          facadeOpenings: info.facadeOpenings.filter((opening): boolean => opening.f === f),
+          partitions,
+          doors,
+          voids: Object.values(spec.stairHoles ?? {}),
+        });
       }
     }
   }
