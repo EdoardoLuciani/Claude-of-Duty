@@ -7,7 +7,6 @@ import math
 
 import bpy
 from mathutils import Matrix, Vector
-import numpy as np
 from mcx.primitives import create_primitives
 import picatinny
 
@@ -15,17 +14,12 @@ def build_geometry(materials):
     asset = bpy.data.collections.new("MCX VIRTUS | authored components")
     bpy.context.scene.collection.children.link(asset)
     anodized = materials['anodized']
-    edge = materials['edge']
     polymer = materials['polymer']
     rubber = materials['rubber']
     steel = materials['steel']
-    ceramic = materials['ceramic']
     brass = materials['brass']
     copper = materials['copper']
-    marking = materials['marking']
     red = materials['red']
-    glass = materials['glass']
-    fiber = materials['fiber']
     coating = materials['coating']
 
     def empty(name, loc=(0, 0, 0), parent=None):
@@ -57,7 +51,10 @@ def build_geometry(materials):
     # Barrel, muzzle device and muzzle datums share this bore axis.
     bore = .009
 
-    active, finish, box, profile, loft, forging, cylinder, ellipsoid, cut, opening, tube, cord, screw, text = create_primitives(asset, body, materials)
+    active, finish, box, profile, loft, forging, cylinder, ellipsoid, cut, opening, tube, _, _, text = create_primitives(asset, body, materials)
+
+    def fastener(x, y, z, radius, parent=body):
+        cylinder('Fastener head', (x, y*1.015, z), radius, .0012, steel, 'Y', parent, vertices=16)
 
     def build_receiver():
         # Exterior profiles traced against the gray 9-inch VIRTUS SBR photographs.
@@ -73,8 +70,8 @@ def build_geometry(materials):
         opening(upper, (-.006,-.022,.013), (.085,.024,.020), .0035)
         box('Port interior shadow', (-.006,.001,.013), (.089,.008,.021), rubber)
         for side in (-1,1):
-            screw(.036, side*.022, -.017, .0033)
-            screw(-.150, side*.021, -.012, .0042)
+            fastener(.036, side*.022, -.017, .0033)
+            fastener(-.150, side*.021, -.012, .0042)
         # Steel carrier, dust cover and rear deflector on the ejection side only.
         cylinder('Bolt carrier visible through port', (-.005,-.010,.013), .0105, .099, steel, parent=bolt)
         box('Carrier extraction recess', (.004,-.021,.015), (.018,.001,.009), polymer, bolt, .001)
@@ -87,7 +84,6 @@ def build_geometry(materials):
         profile('Brass deflector', [(-.057,-.006),(-.048,.002),(-.050,.025),(-.062,.027),(-.069,.019),(-.069,.001)], .011, coating, y=-.0275, bevel=.002)
         cylinder('Forward assist housing', (-.094,-.030,.013), .007, .026, coating)
         cylinder('Forward assist button', (-.110,-.030,.013), .0075, .006, steel)
-        for z in (.010,.013,.016): box('Forward assist serration',(-.1135,-.030,z),(.0006,.011,.0007),polymer,bevel=.0001)
         # Lower shoulders, rounded rear grip transition and narrower magazine well.
         forging('Ambidextrous lower receiver', [(-.178,-.012,-.004,.018),
             (-.165,-.024,-.005,.0195),(-.148,-.033,-.007,.021),(-.125,-.044,-.008,.021),
@@ -117,8 +113,8 @@ def build_geometry(materials):
         profile('Curved trigger blade', front + back_edge[::-1], .007, steel, trigger, .0007)
         cylinder('Trigger axle', (-.065,0,-.034), .0035, .012, steel, 'Y', trigger)
         for side in (-1,1):
-            screw(-.123,side*.021,-.018,.0031)
-            screw(-.074,side*.021,-.032,.0021)
+            fastener(-.123,side*.021,-.018,.0031)
+            fastener(-.074,side*.021,-.032,.0021)
             cylinder('Selector hub', (-.107,side*.021,-.028), .006,.003,steel,'Y')
             profile('Ambidextrous selector paddle', [(-.111,-.023),(-.099,-.024),(-.094,-.030),(-.098,-.034),(-.111,-.032)], .004, steel, y=side*.022, bevel=.001)
             cylinder('Selector fire index', (-.097,side*.021,-.017), .001,.0005,red,'Y',vertices=12)
@@ -131,7 +127,6 @@ def build_geometry(materials):
         profile('Magazine release fence', [(-.049,-.027),(-.039,-.025),(-.029,-.029),
             (-.029,-.044),(-.043,-.053),(-.049,-.047)], .004, coating, y=-.021, bevel=.002)
         box('Magazine release button', (-.039,-.024,-.036), (.007,.003,.016), steel, bevel=.0015)
-        for z in np.linspace(-.041,-.031,5): box('Release grip serration',(-.039,-.026,float(z)),(.005,.001,.0006),polymer,bevel=.0001)
         box('Bolt release paddle', (-.057,.024,-.031), (.011,.005,.016), steel, release, .0015)
         # Molded grip: a narrow web expands into a rounded-rectangle palm section.
         # Side-view station coordinates are photo-inferred, not a scanned grip.
@@ -219,7 +214,7 @@ def build_geometry(materials):
                 for side in (-1,1):
                     box('Front sight protective ear',(x+.004,side*.008,.074),(.004,.003,.020),polymer,irons)
 
-            for side in (-1,1): screw(x+.004,side*.018,.055,.003)
+            for side in (-1,1): fastener(x+.004,side*.018,.055,.003)
 
     def build_charging_handle():
         # OEM KIT-MCX-CHARGE-HANDLE-SM: swept rear bow, separate hooked small
@@ -238,7 +233,6 @@ def build_geometry(materials):
             obj = profile('Charging latch',points,.009,anodized,handle,.001)
             obj.rotation_euler.x = -math.pi/2; obj.location.z = .030
             cylinder('Charging latch pivot',(-.175,side*.021,.0355),.0013,.0007,steel,'Z',handle,12,0)
-            for i in range(6): box('Latch serration',(-.190+i*.0018,side*.035,.030),(.0007,.001,.007),polymer,handle,.0001)
         # Factory VIRTUS folding/telescoping stock, with its molded butt body and
         # exposed straight adjustment spine (not a minimalist two-strut skeleton).
 
@@ -279,12 +273,10 @@ def build_geometry(materials):
         # The latch rides the underside of the spine within the tapered shoulder.
         profile('Length adjustment latch',[(-.353,-.004),(-.320,-.004),(-.327,-.008),
             (-.344,-.019),(-.353,-.017)],.022,polymer,stock,.0012)
-        for i in range(7):
-            box('Stock latch serration',(-.350+i*.0025,0,-.018+i*.00085),(.001,.023,.0014),rubber,stock,.0002)
         for side in (-1,1):
             socket = cylinder('Stock sling socket',(-.419,side*.021,-.008),.0065,.003,steel,'Y',stock)
             cut(socket,cylinder('CUT',(-.419,side*.021,-.008),.0042,.008,None,'Y',None,24,0))
-            screw(-.199,side*.015,-.007,.003,stock)
+            fastener(-.199,side*.015,-.007,.003,stock)
             text('SIG SAUER',(-.421 if side==-1 else -.397,side*.020,-.027),.0035,side,stock,mat=polymer)
 
     def build_magazines():
