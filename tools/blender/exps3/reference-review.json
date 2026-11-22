@@ -38,6 +38,7 @@
     "Original reference-backed game art, not manufacturer CAD, a scan, or claimed final human visual acceptance.",
     "48.2mm optical centre above the original art zero (43.4mm above the QD saddle contact) and 30x22mm clear opening are inferred from registered photos. Manufacturer specs do not certify these datums. Shared gameplay fits and their sampled checks are documented in README.md; they do not certify real-world installation.",
     "Window curvature, internal holographic laminate/laser, hidden battery internals, exact fastener threads and detailed mount tolerances are not reconstructed.",
+    "Warning artwork is simplified; regulatory fine print, duplicate moulded adjuster legends and captive-wire fittings are not reconstructed.",
     "Public photos are not calibrated views; silhouettes and apparent small features do not certify all dimensions or surface finish.",
     "Glass uses a single neutral AR-tinted PBR approximation for front glass and rear laminate; a spectral AR coating and real hologram are not simulated.",
     "Attachment-free defaults are unchanged. All seven weapons use the shared gameplay/inspection solver and existing market build flow; see README.md for fitting and acceptance limits."

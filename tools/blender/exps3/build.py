@@ -199,8 +199,8 @@ def text(name, value, pos, size, mat, parent, side='left', angle=0, relief=0):
     data.resolution_u = 1 if LOW_POLY else 3
     if relief:
         data.extrude = relief * MM
-        data.bevel_depth = (0 if LOW_POLY else .015 if relief >= .1 else .008 if relief >= .05 else 0) * MM
-        data.bevel_resolution = 1 if relief >= .1 else 0
+        data.bevel_depth = 0 if LOW_POLY else .015 * MM
+        data.bevel_resolution = 1
     obj = bpy.data.objects.new(name, data)
     bpy.context.collection.objects.link(obj)
     obj.location = tuple(v * MM for v in pos)
@@ -335,21 +335,6 @@ def hood_print(obj, plane):
         vertex.co = inverse @ p
     obj.data.update()
     return obj
-
-
-def adjuster_x(radius):
-    return float(np.interp(radius,[5.75,7.5,9.5,10.2],[23.8,23.6,22.6,21.9]))
-
-
-def wire_loop(name, pos, radius, mat, parent):
-    bpy.ops.mesh.primitive_torus_add(major_segments=16 if LOW_POLY else 24,minor_segments=6 if LOW_POLY else 8,
-        major_radius=radius*MM,minor_radius=.16*MM,
-        location=tuple(v*MM for v in pos),rotation=(math.pi/2,0,0))
-    obj = bpy.context.object
-    obj.name, obj.parent = name, parent
-    obj.data.materials.append(mat)
-    bpy.ops.object.transform_apply(location=False,rotation=True,scale=True)
-    return finish(obj,0)
 
 
 def shroud(mat, parent):
@@ -497,47 +482,25 @@ def build_geometry(mats):
     cap = finish(mesh('Scalloped battery cap', verts, faces, mats['hood'], root), .08)
     subtract(box('Battery cap groove cutter',(29,46.2,23),(1.8,2.1,28),mats['hood'],root,0),cap)
     box('Battery cap recessed groove floor',(28.115,46.2,23),(.02,2.08,22.8),mats['ink'],root,0)
-    collar = ring_x('Battery cap retaining collar',46.2,23,14.1,13.3,25.8,27.1,mats['body'],root)
+    ring_x('Battery cap retaining collar',46.2,23,14.1,13.3,25.8,27.1,mats['body'],root)
     text('Battery polarity marking', '+', (29.34,51.2,23), 5, mats['rubber'], root, 'right')
-    # Both tether ends have visible threaded eyes and crimp sleeves. Wire pose
-    # remains an exterior approximation; no hidden captive mechanism is modelled.
-    ring_x('Hood tether eye',23,39,1.65,1.2,hood_x(39)-.1,hood_x(39)+.7,mats['body'],root)
-    subtract(cylinder('Hood tether eye bore',(25,23,39),1.2,5,mats['hood'],root,bevel=0),hood)
-    ring_x('Cap tether eye',44,36.5,1.2,.65,26.1,27.1,mats['body'],root)
-    subtract(cylinder('Cap tether eye bore',(26.5,44,36.5),.65,3,mats['body'],root,bevel=0),collar)
-    wire_loop('Hood tether folded loop',(25,23,40.3),1.4,mats['steel'],root)
-    wire_loop('Cap tether folded loop',(27.3,44,37.2),1,mats['steel'],root)
-    # Steel tether routed clear of the upper sight window.
+    # Seat the tether ends in the hood and collar; the wire runs outside the clear aperture.
     curve = bpy.data.curves.new('Cap tether wire', 'CURVE')
     curve.dimensions = '3D'
     curve.bevel_depth = .00028
     curve.bevel_resolution = 2
     spline = curve.splines.new('BEZIER')
     spline.bezier_points.add(3)
-    for p,co in zip(spline.bezier_points, [(26.4,23,40.3),(28,30,45),(28,40,43),(28.3,44,37.2)]):
+    for p,co in zip(spline.bezier_points, [(hood_x(39)-.1,23,39),(28,30,45),(28,40,43),(26.9,44,36.5)]):
         p.co = tuple(v*MM for v in co)
         p.handle_left_type = p.handle_right_type = 'AUTO'
     tether = bpy.data.objects.new('Battery cap captive tether', curve)
     bpy.context.collection.objects.link(tether)
     tether.parent = root
     curve.materials.append(mats['steel'])
-    bpy.context.view_layer.update()
-    sleeves = []
-    for index,start,end in [(0,.1,.35),(2,.5,.95)]:
-        a,b = spline.bezier_points[index:index+2]
-        def point(t):
-            return ((1-t)**3*a.co+3*(1-t)**2*t*a.handle_right+
-                    3*(1-t)*t*t*b.handle_left+t**3*b.co).copy()
-        sleeves.append((point(start),point(end)))
     active(tether)
     bpy.ops.object.convert(target='MESH')
     finish(bpy.context.object, 0)
-    for i,(a,b) in enumerate(sleeves):
-        sleeve = cylinder('Tether crimp sleeve '+str(i),(a+b)/(2*MM),.7,(b-a).length/MM,
-                          mats['steel'],root,'Z',16,.08)
-        sleeve.rotation_euler = (b-a).to_track_quat('Z','Y').to_euler()
-        active(sleeve)
-        bpy.ops.object.transform_apply(location=False,rotation=True,scale=True)
     # Raised QD mount; all internal purchase surfaces use the common rail gauge.
     import picatinny
     # Raised quick-detach mount with real open rail channel and clamp shoulders.
@@ -591,10 +554,6 @@ def build_geometry(mats):
         centre = cylinder(name+' centre',(23.25,y,z),5.6,.7,mats['steel'],root)
         subtract(box(name+' tool groove cutter',(23.65,y,z),(1.1,9.9,1.1),mats['steel'],root,0),centre)
         box(name+' recessed slot floor',(23.115,y,z),(.02,9.8,1),mats['ink'],root,0)
-        for i in range(8):
-            a = i*math.tau/8
-            cylinder(name+' moulded index '+str(i),(adjuster_x(6.5)+.02,y+6.5*math.cos(a),z+6.5*math.sin(a)),
-                     .3,.08,mats['rubber'],root,sides=8,bevel=0)
         for i in range(20):
             a = i*math.tau/20
             dot = cylinder(name+' index '+str(i),(26.35,y+12.2*math.cos(a),z+12.2*math.sin(a)),
@@ -602,36 +561,6 @@ def build_geometry(mats):
             hood_print(dot,26.35)
         hood_print(text(name+' rotation direction',name,(26.6,y-7.8,z+10),2.3,
                         mats['paint'],root,'right',.8),26.6)
-        for i,char in enumerate(name):
-            a = math.radians(145-i*15)
-            letter = text(name+' moulded '+str(i),char,(0,y+7.9*math.cos(a),z+7.9*math.sin(a)),
-                          2.0,mats['rubber'],root,'right',a-math.pi/2,relief=.08)
-            transform = letter.matrix_basis
-            inverse = transform.inverted()
-            for vertex in letter.data.vertices:
-                p = transform @ vertex.co
-                p.x += (adjuster_x(math.hypot(p.y/MM-y,p.z/MM-z))+.02)*MM
-                vertex.co = inverse @ p
-            letter.data.update()
-        # Prominent curved moulded arrow, separate from the white hood print.
-        arc = []
-        for radius,angles in [(7.55,np.linspace(170,232,9)),(7.05,np.linspace(232,170,9))]:
-            arc += [(y+radius*math.cos(math.radians(a)),z+radius*math.sin(math.radians(a)))
-                    for a in angles]
-        arrow_obj = prism(name+' moulded curved arrow',arc,0,.12,mats['rubber'],root,bevel=0)
-        tip = [(y-8.1,z+1.1),(y-7,z+2.7),(y-6.3,z+1.2)]
-        arrow_tip = prism(name+' moulded curved arrow tip',tip,0,.12,mats['rubber'],root,bevel=0)
-        # Conform the head interior too: a corner-only triangle cuts into the dome.
-        bm = bmesh.new()
-        bm.from_mesh(arrow_tip.data)
-        bmesh.ops.subdivide_edges(bm,edges=list(bm.edges),cuts=3,use_grid_fill=True)
-        bm.to_mesh(arrow_tip.data)
-        bm.free()
-        for obj in (arrow_obj,arrow_tip):
-            for vertex in obj.data.vertices:
-                vertex.co.x += (adjuster_x(math.hypot(vertex.co.y/MM-y,vertex.co.z/MM-z))-.02)*MM
-            obj.data.update()
-            surface_normals(obj)
         arrow = [(y+a,z+b) for a,b in [(-13.6,-1),(-13.9,3),(-15,2.2),
                  (-13.8,5.5),(-12,2.7),(-13,3.0),(-12.7,-1)]]
         hood_print(prism(name+' white rotation arrow',arrow,26.4,26.44,mats['paint'],root,bevel=0),26.4)
@@ -653,17 +582,9 @@ def build_geometry(mats):
         brand_icon('Printed mark '+side,(sign*23.84,-2.5,54),mats['paint'],root,side)
     box('Warning label black border', (-26.12,-2.5,32.5), (.15,23.2,10), mats['ink'], root, .3)
     box('Warning label yellow field', (-26.23,-2.5,32.5), (.08,22,8.8), mats['yellow'], root, .15)
-    for i,line in enumerate(['CLASS 1 LASER PRODUCT','Laser product complies with',
-                             '21 CFR, Part 1040.10,','1040.11 and','IEC 60825-1:2014']):
-        text('Laser warning line '+str(i), line, (-26.55,-5.0,35.4-i*1.35), .95, mats['ink'], root)
+    text('Laser warning heading', 'CLASS 1 LASER PRODUCT', (-26.55,-5,32.5), .95, mats['ink'], root)
     prism('Laser warning triangle', [(2.3,29.4),(8.1,29.4),(5.2,35.6)], -26.58,-26.56, mats['ink'], root, bevel=0)
     prism('Laser warning triangle inset', [(3.0,29.8),(7.4,29.8),(5.2,34.7)], -26.62,-26.60, mats['yellow'], root, bevel=0)
-    cylinder('Laser warning sunburst centre', (-26.66,5.2,31.5), .45,.02, mats['ink'], root, sides=12, bevel=0)
-    for i in range(12):
-        a = i*math.tau/12
-        stripe = [(5.2+r*math.cos(a+d),31.5+r*math.sin(a+d))
-                  for r,d in [(0.7,-.04),(1.5,-.04),(1.5,.04),(0.7,.04)]]
-        prism('Laser warning ray '+str(i), stripe, -26.68,-26.66, mats['ink'], root, bevel=0)
     # The channel also passes through the low rear casting; clearing only the
     # separate jaws left the cover intruding into a real rail's upper shoulders.
     bpy.context.view_layer.update()
