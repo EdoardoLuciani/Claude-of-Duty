@@ -10,9 +10,8 @@ import { registerProps } from '#worldgen/props';
 // E3's keyed cornice runoff used to hang from y=3.29 down to y=1.60,
 // spanning the usable doorway at x=6.488, z=-18.65. A stain must stay
 // on the wall even when it is visual-only.
-const assembler = new Assembler({
-  materials: { get: (name): THREE.Material => Object.assign(new THREE.Material(), { name }) },
-});
+const materials = { get: (name: string): THREE.Material => new THREE.MeshBasicMaterial({ name }) };
+const assembler = new Assembler({ materials });
 registerProps(assembler);
 const patches: THREE.Box3[] = [];
 assembler.add = (key, geometry, matrix): Assembler => {
@@ -35,16 +34,10 @@ const opening = new THREE.Box3(
 );
 assert(patches.length > 0, 'retain facade weathering outside the opening');
 assert.equal(patches.filter((patch): boolean => patch.intersectsBox(opening)).length, 0);
-assembler.releaseCache();
-for (const proto of assembler._protos.values()) {
-  assert(proto.geo, 'unfinalized prototypes retain their geometry');
-  proto.geo.dispose();
-}
+assembler.dispose();
 // A stain and its solid wall can share a visual palette/draw without sharing
 // the collision bake. Decorative instances must also stay out of that source.
-const A = new Assembler({
-  materials: { get: (): THREE.Material => new THREE.MeshBasicMaterial() },
-});
+const A = new Assembler({ materials });
 const box = new THREE.BoxGeometry();
 const offset = new THREE.Matrix4().makeTranslation(3, 0, 0);
 A.add('plaster_sand', box);

@@ -5,12 +5,18 @@ type FrontageBay =
   | 'blank'
   | 'door'
   | 'ragged'
-  | [kind: 'shop', shutterDrop: number, awning?: [depth: number, supports: 'posts' | 'cantilever']]
+  | [
+      kind: 'shop',
+      access: number | 'entry' | 'clearance',
+      awning?: [depth: number, supports: 'posts' | 'cantilever'],
+    ]
   | [kind: 'window' | 'arch', width: number, state: WindowState, ...details: WindowDetail[]];
 
 /** Playable frontages, keyed by building / zero-based floor / facade side.
  * Entries follow bay order along the facade. Use 'blank' under a balcony or
- * terrace door owned by layout.ts. An omitted awning tuple means no awning. */
+ * terrace door owned by layout.ts. A number sets shutter drop on a shop with
+ * a counter. Both access modes clear the opening; only 'entry' emits a route hint.
+ * An omitted awning tuple means no awning. */
 // oxfmt-ignore
 export const FRONTAGES: Partial<Record<string, readonly FrontageBay[]>> = {
   'BN1/0/0': ['blank', 'blank', ['window', 1.097915, 'open', 'grille'], ['window', 1.146469, 'open', 'broken', 'grille'], ['window', 1.296977, 'curtain', 'grille'], ['window', 1.23831, 'boarded'], 'blank'],
@@ -67,7 +73,7 @@ export const FRONTAGES: Partial<Record<string, readonly FrontageBay[]>> = {
   'W1/0/2': [['window', 1.120249, 'open', 'broken'], ['window', 1.13888, 'curtain'], 'blank', 'door', 'blank'],
   'W1/0/3': ['blank', ['window', 1.072316, 'glazed', 'grille'], ['window', 1.265178, 'curtain', 'grille']],
   'W2/0/0': ['blank', ['window', 1.110158, 'glazed', 'grille'], ['window', 1.210195, 'open'], ['window', 1.242563, 'curtain', 'grille'], ['window', 1.077746, 'glazed', 'grille']],
-  'W2/0/1': [['shop', 0, [1.314312, 'posts']], ['shop', 0, [1.457984, 'cantilever']], 'door', ['window', 1.29179, 'curtain']],
+  'W2/0/1': [['shop', 0, [1.314312, 'posts']], ['shop', 'entry', [1.457984, 'cantilever']], 'door', ['window', 1.29179, 'curtain']],
   'W2/0/2': [['window', 1.268475, 'open', 'broken'], ['window', 1.10331, 'glazed', 'grille'], 'blank', 'blank', ['window', 1.183153, 'open', 'grille']],
   'W2/0/3': [['window', 1.136996, 'open', 'broken', 'grille'], ['window', 1.212959, 'curtain', 'grille'], ['window', 1.051848, 'glazed'], ['window', 1.272372, 'open', 'broken', 'grille']],
   'W2/1/0': ['blank', ['window', 1.22605, 'boarded', 'shutters'], 'blank', 'blank'],
@@ -82,7 +88,7 @@ export const FRONTAGES: Partial<Record<string, readonly FrontageBay[]>> = {
   'W3/1/1': ['blank', 'blank', 'ragged', 'ragged', ['window', 1.184097, 'open', 'broken', 'shutters']],
   'W3/1/2': ['ragged', ['window', 1.28649, 'open', 'broken', 'shutters'], 'ragged', ['window', 1.159761, 'open', 'broken']],
   'W3/1/3': ['blank', 'blank', 'blank', 'ragged', ['window', 1.171506, 'open', 'broken']],
-  'W4/0/0': [['window', 1.126794, 'open', 'broken'], ['window', 1.088981, 'open', 'broken', 'grille'], ['shop', 0, [1.887224, 'cantilever']], 'door', ['shop', 0]],
+  'W4/0/0': [['window', 1.126794, 'open', 'broken'], ['window', 1.088981, 'open', 'broken', 'grille'], ['shop', 'clearance', [1.887224, 'cantilever']], 'door', ['shop', 0]],
   'W4/0/1': [['window', 1.236771, 'open', 'broken'], ['shop', 0.546298], ['shop', 0], 'door'],
   'W4/0/2': [['window', 1.176629, 'open', 'grille'], 'blank', 'blank', 'blank', ['window', 1.262157, 'glazed']],
   'W4/0/3': [['window', 1.213244, 'curtain'], 'blank', ['window', 1.254239, 'boarded'], ['window', 1.139565, 'open', 'broken', 'grille']],

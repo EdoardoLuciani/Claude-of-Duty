@@ -63,7 +63,6 @@ type BayKind = 'blank' | 'door' | 'shop' | 'window' | 'arch' | 'balconyDoor' | '
 interface BayOverride {
   kind: BayKind;
   floorBridge?: boolean;
-  clearanceOnly?: boolean;
 }
 export interface BuildingSpec {
   id: string;
@@ -155,7 +154,6 @@ interface FacadeContext {
 interface FacadeOpening extends WallOpening {
   kind: string;
   reserved?: boolean;
-  authored?: boolean;
 }
 export interface TraversableOpening {
   kind: 'door' | 'shop';
@@ -193,7 +191,6 @@ export interface BuildingInfo {
     y0: number;
     y1: number;
     reserved: boolean;
-    authored: boolean;
   }>;
   balconies: Array<{
     side: number;
@@ -729,13 +726,15 @@ function buildFacade(
         if (kit?.[0] !== 'shop')
           throw new Error(`[world] ${spec.id} shop needs an authored frontage bay`);
         const sw = Math.min(bw - 0.75, 3.1);
-        const o = { x: bx, y: 1.32, w: sw, h: 2.58, kind, authored: !!forced };
+        const o = { x: bx, y: 1.32, w: sw, h: 2.58, kind };
         pushOpening(o);
-        // The frontage sets the shutters/awning. Only a traversal override opens the route.
-        const usable = floorIsEnterable(spec, f) && !!forced;
-        const drop = usable ? 0 : kit[1];
+        const [, access, canopy] = kit;
+        const usable = typeof access !== 'number';
+        if (usable && !floorIsEnterable(spec, f))
+          throw new Error(`[world] ${spec.id} shop access needs an enterable floor`);
+        const drop = typeof access === 'number' ? access : 0;
         deco.push((): WallOpening => shopfront(kitA, pm, o, rng, { t, drop, counter: !usable }));
-        if (usable && !reserved && !forced!.clearanceOnly) {
+        if (access === 'entry' && !reserved) {
           info.traversable.push({
             kind: 'shop',
             side,
@@ -744,8 +743,8 @@ function buildFacade(
             to: [...worldOf(pm, bx, 0, 1.15)],
           });
         }
-        if (kit[2] && kitA === A) {
-          const [depth, supports] = kit[2];
+        if (canopy && kitA === A) {
+          const [depth, supports] = canopy;
           const aw = sw + 0.5;
           const awY = o.y + o.h / 2 + 0.55;
           const clothRng = keyedRng('awning-cloth', spec.id, side, f, b);
@@ -763,6 +762,7 @@ function buildFacade(
       case 'window':
       case 'arch': {
         const fixed = kit?.[0] === kind ? kit : undefined;
+        const details = fixed?.slice(3);
         const arched = kind === 'arch';
         const w = fixed?.[1] ?? Math.min(room, arched ? 1.35 : rng.range(1.05, 1.3));
         const height = arched ? 1.9 : f === 0 ? 1.62 : 1.48;
@@ -775,8 +775,8 @@ function buildFacade(
           ...(arched ? { arch: 0.62 } : {}),
         };
         pushOpening(o);
-        const broken = fixed
-          ? fixed.slice(3).includes('broken')
+        const broken = details
+          ? details.includes('broken')
           : rng.float() < (arched ? 0.2 : (spec.damage ?? 0.15) * 1.6);
         const st =
           fixed?.[2] ??
@@ -791,11 +791,11 @@ function buildFacade(
             state: st,
             fixed: !!fixed,
             back: !walkable,
-            grille: fixed
-              ? fixed.slice(3).includes('grille')
+            grille: details
+              ? details.includes('grille')
               : !arched && f === 0 && st !== 'boarded' && rng.float() < 0.55,
-            shutters: fixed
-              ? fixed.slice(3).includes('shutters')
+            shutters: details
+              ? details.includes('shutters')
               : !arched && f > 0 && (st === 'shuttered' || rng.float() < 0.4),
             shutterKey:
               spec.shutterKey ??
@@ -865,7 +865,6 @@ function buildFacade(
       y1: wp[1] + o.h / 2,
       // Kept for furnishing to see the authored wall.
       reserved: !!o.reserved,
-      authored: !!o.authored,
     });
   }
   let wallHoles = openings.filter((o): boolean => !o.reserved);
@@ -1436,8 +1435,6 @@ function buildInterior(
         furnishRoom(A, keyedRng('room', spec.id, f, r.x0, r.z0, r.kind), {
           kind: r.kind,
           counter: r.counter,
-          // so furnishing never stacks a shelf across a shopfront opening
-          street: spec.streetSide,
           x0: x0 + r.x0 * iw,
           z0: z0 + r.z0 * id,
           x1: x0 + r.x1 * iw,

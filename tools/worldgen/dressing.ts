@@ -568,14 +568,9 @@ function facadeHangings(A: Assembler): void {
 // --- rubble -----------------------------------------------------------------
 function rubbleDust(A: Assembler): void {
   for (const [x, z, yaw, w, h, d] of SET_PIECES.rubbleCover) {
-    A.add(
-      'concrete_prop',
-      BOX_SOFT(A),
-      LL(IDENT, x, groundY(x, z) + h / 2 - 0.04, z, yaw, w, h, d),
-      {
-        masks: [0.3, 0.75, 0.45],
-      }
-    );
+    A.addBox('concrete_prop', BOX_SOFT(A), x, groundY(x, z) + h / 2 - 0.04, z, yaw, w, h, d, {
+      masks: [0.3, 0.75, 0.45],
+    });
   }
   for (const [x, z, radius, count] of SET_PIECES.rubble) {
     const rng = keyedRng('rubble', x, z);

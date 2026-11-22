@@ -170,15 +170,8 @@ export const BUILDINGS: BuildingSpec[] = [
       [0, 1, 3, 1.3094, 'metal'],
       [1, 1, 0, 1.2584, 'metal'],
     ],
-    // The interior camera stands in the shop and looks out through bay 1 of the
-    // street facade, so that bay is an open shopfront by hand, not by dice.
-    bayKinds: {
-      1: {
-        0: { 1: 'shop' },
-        // Join the inset apartment slab to its existing terrace doorway.
-        1: { 1: { kind: 'balconyDoor', floorBridge: true } },
-      },
-    },
+    // Join the inset apartment slab to its existing terrace doorway.
+    bayKinds: { 1: { 1: { 1: { kind: 'balconyDoor', floorBridge: true } } } },
     enterable: true,
     roofAccess: false,
     roofProps: 5,
@@ -211,7 +204,7 @@ export const BUILDINGS: BuildingSpec[] = [
           [0.0, 0.52, 0.55, 0.52, 0.7],
         ],
         furnish: [
-          { kind: 'shop', x0: 0.55, z0: 0.0, x1: 1.0, z1: 1.0, counter: [-8.14, -3.125, 2.1] },
+          { kind: 'shop', x0: 0.55, z0: 0.0, x1: 1.0, z1: 1.0, counter: [-8.14, -3.125, 2.1, 'z'] },
           { kind: 'storage', x0: 0.0, z0: 0.0, x1: 0.55, z1: 0.52 },
           { kind: 'living', x0: 0.0, z0: 0.52, x1: 0.55, z1: 1.0 },
         ],
@@ -304,12 +297,7 @@ export const BUILDINGS: BuildingSpec[] = [
     damage: 0.3,
     balconies: [[0, 1, 1, 1.2836, 'concrete']],
     arches: true,
-    // This existing shop opening carries the stair route. Raise its shutter
-    // and remove the low counter instead of leaving an unexecutable shortcut.
-    bayKinds: {
-      0: { 0: { 2: { kind: 'shop', clearanceOnly: true } } },
-      1: { 1: { 1: 'balconyDoor' } }, // opens onto the setback terrace
-    },
+    bayKinds: { 1: { 1: { 1: 'balconyDoor' } } }, // opens onto the setback terrace
     enterable: true,
     interiorFloors: 1,
     roofProps: 4,
@@ -462,7 +450,7 @@ export const BUILDINGS: BuildingSpec[] = [
           [0.62, 0.0, 0.62, 0.42, 0.5],
         ],
         furnish: [
-          { kind: 'shop', x0: 0.0, z0: 0.42, x1: 0.62, z1: 1.0, counter: [8.14, 22.4, 2.05] },
+          { kind: 'shop', x0: 0.0, z0: 0.42, x1: 0.62, z1: 1.0, counter: [8.14, 22.4, 2.05, 'z'] },
           { kind: 'storage', x0: 0.0, z0: 0.0, x1: 0.62, z1: 0.42 },
         ],
       },
@@ -535,7 +523,14 @@ export const BUILDINGS: BuildingSpec[] = [
           [0.0, 0.56, 0.56, 0.56, 0.4],
         ],
         furnish: [
-          { kind: 'shop', x0: 0.0, z0: 0.0, x1: 0.56, z1: 0.56, counter: [8.14, -7.9304, 4.4] },
+          {
+            kind: 'shop',
+            x0: 0.0,
+            z0: 0.0,
+            x1: 0.56,
+            z1: 0.56,
+            counter: [8.14, -7.9304, 4.4, 'z'],
+          },
           { kind: 'ruin', x0: 0.0, z0: 0.56, x1: 0.56, z1: 1.0 },
           { kind: 'storage', x0: 0.56, z0: 0.0, x1: 1.0, z1: 1.0 },
         ],

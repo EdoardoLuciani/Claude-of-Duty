@@ -296,8 +296,12 @@ export class Accum {
       for (let i = 0; i < pa.count; i++) this.idx!.push(base + i);
       this.tris += pa.count / 3;
     }
-    if (opts?.visualOnly && this.idx!.length > start)
-      this.visualRanges.push([start, this.idx!.length]);
+    const end = this.idx!.length;
+    if (opts?.visualOnly && end > start) {
+      const last = this.visualRanges.at(-1);
+      if (last?.[1] === start) last[1] = end;
+      else this.visualRanges.push([start, end]);
+    }
     return this;
   }
 

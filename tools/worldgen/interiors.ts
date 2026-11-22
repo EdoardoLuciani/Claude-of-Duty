@@ -11,8 +11,7 @@ export interface RoomSpec extends RectXZ {
   kind: RoomKind;
   y: number;
   h: number;
-  street?: number | undefined;
-  counter?: [x: number, z: number, length: number] | undefined;
+  counter?: [x: number, z: number, length: number, axis: 'x' | 'z'] | undefined;
   doors: { x: number; z: number }[];
   envelope: RectXZ;
   facadeOpenings: BuildingInfo['facadeOpenings'];
@@ -517,8 +516,8 @@ function furnishShop(A: Assembler, rng: Rng, r: RoomSpec, cx: number, cz: number
   addRug(A, rng, cx + rng.range(-0.5, 0.5), y, cz + rng.range(-0.5, 0.5), rng.range(1.6, 2.4));
   if (!r.counter) return;
 
-  const [ccx, ccz, clen] = r.counter;
-  const alongZ = r.street === 1 || r.street === 3;
+  const [ccx, ccz, clen, axis] = r.counter;
+  const alongZ = axis === 'z';
   const cSX = alongZ ? 0.74 : clen;
   const cSZ = alongZ ? clen : 0.74;
   for (let i = 0; i <= 6; i++) {

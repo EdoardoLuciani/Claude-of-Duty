@@ -333,6 +333,7 @@ export class Assembler {
       if (acc.empty) continue;
       const source = acc.build();
       const geo = mergeVertices(source);
+      source.dispose();
       const mesh = new THREE.Mesh(geo, this.mat(key));
       mesh.name = `world_${key}`;
       mesh.castShadow = true;
@@ -348,7 +349,7 @@ export class Assembler {
       if (collisionSource) {
         if (acc.visualRanges.length === 0) collisionSource.add(mesh.clone());
         else {
-          const indices = source.index!.array;
+          const indices = geo.index!.array;
           const physical: number[] = [];
           let cursor = 0;
           for (const [start, end] of acc.visualRanges) {
@@ -357,15 +358,19 @@ export class Assembler {
           }
           while (cursor < indices.length) physical.push(indices[cursor++]);
           if (physical.length) {
-            source.setIndex(physical);
+            // Index ranges survive the render weld; the cooker owns the physics weld.
+            const geometry = new THREE.BufferGeometry()
+              .setAttribute('position', geo.getAttribute('position'))
+              .setAttribute('_solid', geo.getAttribute('_solid'))
+              .setIndex(physical);
             const collider = mesh.clone();
-            collider.geometry = mergeVertices(source);
-            this.collisionGeometries.push(collider.geometry);
+            collider.geometry = geometry;
+            this.collisionGeometries.push(geometry);
             collisionSource.add(collider);
           }
         }
       }
-      source.dispose();
+      acc.visualRanges.length = 0;
       this.meshes.push(mesh);
       this.stats.staticTris += geo.index!.count / 3;
       this.stats.drawCalls++;
