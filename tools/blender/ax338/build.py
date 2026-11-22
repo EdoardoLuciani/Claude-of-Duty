@@ -16,6 +16,7 @@ from mathutils import Matrix, Vector
 ROOT=Path(__file__).resolve().parents[3]
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import picatinny
+from review_hands import without_review_hands
 from ax338.actions import author_actions
 from ax338.export import prepare_export_actions, validate_export
 from ax338.finishes import consolidate_finishes
@@ -405,7 +406,8 @@ def build(output,render=False,quick=False):
     bpy.ops.object.select_all(action='DESELECT')
     for o in asset.objects:o.select_set(True)
     bpy.context.view_layer.objects.active=rig
-    bpy.ops.export_scene.gltf(filepath=str(OUT/'ax338.glb'),export_format='GLB',use_selection=True,export_animations=True,export_animation_mode='ACTIONS',export_merge_animation='NLA_TRACK',export_frame_range=False,export_force_sampling=False,export_optimize_animation_keep_anim_object=True,export_sampling_interpolation_fallback='LINEAR',export_extras=True,export_yup=True,export_cameras=False,export_lights=False)
+    with without_review_hands():
+        bpy.ops.export_scene.gltf(filepath=str(OUT/'ax338.glb'),export_format='GLB',use_selection=True,export_animations=True,export_animation_mode='ACTIONS',export_merge_animation='NLA_TRACK',export_frame_range=False,export_force_sampling=False,export_optimize_animation_keep_anim_object=True,export_sampling_interpolation_fallback='LINEAR',export_extras=True,export_yup=True,export_cameras=False,export_lights=False)
     stats=validate_export(OUT/'ax338.glb',clips)
     manifest={'asset':'Early AX338 / Dark Earth / factory brake / removable rail irons / no optional attachments','units':'metres','clips':clips,'stats':stats,'textureResolution':1024,'contactGeometry':{'magazine':contact_boxes,'pistolGripSections':grip_sections},'dimensions':{'barrel':.6858,'overall':1.250,'barrelFace':breech,'barrelCrown':crown,'muzzle':muzzle,'butt':butt,'ironSightRadius':rear-front,'ironSightHeight':sight_y,'magazineBodyHeight':.105,'magazineDepth':.104,'magazineThickness':.034,'magazineHeight':.1125},'source':'tools/blender/ax338/build.py + tools/blender/ax338/actions.py + tools/blender/ax338/export.py; calibration stage: tools/blender/ax338/hand-reference.ts'}
     (OUT/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')

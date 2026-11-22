@@ -17,6 +17,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import picatinny
+from review_hands import without_review_hands
 from mpx.actions import author_actions
 from mpx.animations import prepare_export_actions
 from mpx.finishes import consolidate_finishes
@@ -727,14 +728,15 @@ def build(output, render=False, quick=False):
     bpy.ops.object.select_all(action='DESELECT')
     for o in export.objects: o.select_set(True)
     bpy.context.view_layer.objects.active=copy_by_source[rig]
-    bpy.ops.export_scene.gltf(filepath=str(OUT/'mpx.glb'),export_format='GLB',use_selection=True,
-                              export_animations=True,export_animation_mode='ACTIONS',export_merge_animation='NLA_TRACK',
-                              export_frame_range=False,export_force_sampling=False,
-                              export_optimize_animation_keep_anim_object=True,
-                              export_sampling_interpolation_fallback='LINEAR',
-                              export_extras=True,export_yup=True,export_cameras=False,export_lights=False,
-                              export_vertex_color='ACTIVE',export_all_vertex_colors=False,
-                              export_rest_position_armature=False)
+    with without_review_hands():
+        bpy.ops.export_scene.gltf(filepath=str(OUT/'mpx.glb'),export_format='GLB',use_selection=True,
+                                  export_animations=True,export_animation_mode='ACTIONS',export_merge_animation='NLA_TRACK',
+                                  export_frame_range=False,export_force_sampling=False,
+                                  export_optimize_animation_keep_anim_object=True,
+                                  export_sampling_interpolation_fallback='LINEAR',
+                                  export_extras=True,export_yup=True,export_cameras=False,export_lights=False,
+                                  export_vertex_color='ACTIVE',export_all_vertex_colors=False,
+                                  export_rest_position_armature=False)
     raw=(OUT/'mpx.glb').read_bytes()
     length,kind=struct.unpack_from('<II',raw,12)
     assert kind==0x4e4f534a

@@ -13,6 +13,7 @@ import numpy as np
 from mathutils import Vector, Matrix
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import picatinny
+from review_hands import without_review_hands
 from m590.actions import author_actions
 ROOT=Path(__file__).resolve().parents[3]
 from m590.export_actions import prepare_export_actions, validate_export
@@ -458,10 +459,11 @@ def build(output, render=False, quick=False):
     bpy.ops.object.select_all(action='DESELECT')
     for o in export.objects:o.select_set(True)
     bpy.context.view_layer.objects.active=copies[rig]
-    bpy.ops.export_scene.gltf(filepath=str(OUT/'m590.glb'),export_format='GLB',use_selection=True,
-        export_animations=True,export_animation_mode='ACTIONS',export_merge_animation='NLA_TRACK',export_frame_range=False,
-        export_force_sampling=False,export_optimize_animation_keep_anim_object=True,
-        export_sampling_interpolation_fallback='LINEAR',export_extras=True,export_yup=True,export_cameras=False,export_lights=False)
+    with without_review_hands():
+        bpy.ops.export_scene.gltf(filepath=str(OUT/'m590.glb'),export_format='GLB',use_selection=True,
+            export_animations=True,export_animation_mode='ACTIONS',export_merge_animation='NLA_TRACK',export_frame_range=False,
+            export_force_sampling=False,export_optimize_animation_keep_anim_object=True,
+            export_sampling_interpolation_fallback='LINEAR',export_extras=True,export_yup=True,export_cameras=False,export_lights=False)
     raw=(OUT/'m590.glb').read_bytes();length,kind=struct.unpack_from('<II',raw,12);assert kind==0x4e4f534a
     j=json.loads(raw[20:20+length])
     validate_export(j, raw[28+length:], clips)
