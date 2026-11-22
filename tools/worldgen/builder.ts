@@ -351,23 +351,13 @@ export class Assembler {
         else {
           const indices = geo.index!.array;
           let count = indices.length;
-          let cursor = 0;
-          let wide = false;
-          // Match Three's index width for the retained indices: 0xffff is
-          // reserved for primitive restart in a 16-bit index buffer.
-          const needsWideIndex = (end: number): void => {
-            while (!wide && cursor < end) wide = indices[cursor++] >= 0xffff;
-          };
-          for (const [start, end] of acc.visualRanges) {
-            count -= end - start;
-            needsWideIndex(start);
-            cursor = end;
-          }
-          needsWideIndex(indices.length);
+          for (const [start, end] of acc.visualRanges) count -= end - start;
           if (count > 0) {
-            const physical = wide ? new Uint32Array(count) : new Uint16Array(count);
+            // Same index width as the render geometry, which shares its positions.
+            const physical =
+              indices instanceof Uint32Array ? new Uint32Array(count) : new Uint16Array(count);
             let offset = 0;
-            cursor = 0;
+            let cursor = 0;
             for (const [start, end] of acc.visualRanges) {
               physical.set(indices.subarray(cursor, start), offset);
               offset += start - cursor;

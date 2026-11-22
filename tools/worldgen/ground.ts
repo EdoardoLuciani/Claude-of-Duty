@@ -6,7 +6,7 @@ import { GULLIES, MANHOLES } from './level/ground-covers.ts';
 import { GROUND_STONES } from './level/ground-stones.ts';
 import { STREET, ALLEYS } from './level/layout.ts';
 import { PAVEMENT } from './level/pavement.ts';
-import { ALLEY_MOUTHS } from './queries.ts';
+import { ALLEY_MOUTHS, seatY } from './queries.ts';
 import { fbm3, paintMasks } from './util.ts';
 
 /**
@@ -81,6 +81,8 @@ export function buildGround(A: Assembler): void {
     }
 
     for (const [from, to, h] of PAVEMENT[side]) {
+      if (mouths.some((mouth): boolean => from < mouth.z1 - 0.001 && to > mouth.z0 + 0.001))
+        throw new Error(`[world] pavement ${from}..${to} on side ${side} covers an alley mouth`);
       const cz = (from + to) / 2;
       A.add('concrete', BOX_SOFT(A), LL(IDENT, cx, h / 2, cz, 0, wSlab - 0.05, h, to - from), {
         masks: [0.6, 0.45, 0.2],
@@ -116,8 +118,8 @@ export function buildGround(A: Assembler): void {
   }
 
   // Small loose stones at the street and alley material seams.
-  for (const [name, x, y, z, yaw, scale, grime] of GROUND_STONES)
-    A.put(name, x, y, z, yaw, scale, [1, grime, 1]);
+  for (const [name, x, z, yaw, scale, grime] of GROUND_STONES)
+    A.put(name, x, seatY(x, z), z, yaw, scale, [1, grime, 1]);
 
   // ------------------------------------------------------------ covers --
   // manholes and gully gratings

@@ -71,6 +71,18 @@ function terrainY(x: number, z: number): number {
   return hC * (u + w - 1) + hB * (1 - u) + hD * (1 - w);
 }
 
+/** Lowest ground hint under a small loose object, so it never hovers off a step. */
+export function seatY(x: number, z: number): number {
+  const reach = 0.4;
+  return Math.min(
+    groundY(x, z),
+    groundY(x - reach, z),
+    groundY(x + reach, z),
+    groundY(x, z - reach),
+    groundY(x, z + reach)
+  );
+}
+
 /** Cheap analytic ground hint; physics owns the exact collision height.
  * Tracks the surfaces buildGround() actually renders — road camber, pavement
  * tops, alley overlays and the undulating sand — so scattered dressing lands

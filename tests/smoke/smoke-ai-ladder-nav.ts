@@ -32,8 +32,8 @@ assert.deepEqual(
 );
 const nav = await SurfaceNav.load(f.surfaceRaw, f.physics, expected);
 assert.equal(nav.ladderLinks.size, 6);
-assert.equal(new Set(nav.walkingComponents.values()).size, 254);
-assert.equal(new Set(nav.components.values()).size, 248);
+assert.equal(new Set(nav.walkingComponents.values()).size, 257);
+assert.equal(new Set(nav.components.values()).size, 251);
 const v = (p: Vector3Like): Vector3 => new Vector3().copy(p);
 for (const d of descriptors) {
   const before = [v({ x: 123, y: 456, z: 789 })],

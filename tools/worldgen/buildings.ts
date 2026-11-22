@@ -761,10 +761,10 @@ function buildFacade(
       }
       case 'window':
       case 'arch': {
-        const fixed = kit?.[0] === kind ? kit : undefined;
-        const details = fixed?.slice(3);
+        const authored = kit?.[0] === kind ? kit : undefined;
+        const details = authored?.slice(3);
         const arched = kind === 'arch';
-        const w = fixed?.[1] ?? Math.min(room, arched ? 1.35 : rng.range(1.05, 1.3));
+        const w = authored?.[1] ?? Math.min(room, arched ? 1.35 : rng.range(1.05, 1.3));
         const height = arched ? 1.9 : f === 0 ? 1.62 : 1.48;
         const o = {
           x: bx,
@@ -779,17 +779,16 @@ function buildFacade(
           ? details.includes('broken')
           : rng.float() < (arched ? 0.2 : (spec.damage ?? 0.15) * 1.6);
         const st =
-          fixed?.[2] ??
+          authored?.[2] ??
           (broken && !arched
             ? 'open'
             : windowState(rng, f, spec.damage ?? 0.15, { allowLit: !openFace || f > 0 }));
-        const windowRng = fixed ? keyedRng('window-dress', spec.id, f, side, b) : rng;
+        const windowRng = authored ? keyedRng('window-dress', spec.id, f, side, b) : rng;
         deco.push((): WallOpening =>
           windowUnit(kitA, pm, o, windowRng, {
             t,
             broken,
             state: st,
-            fixed: !!fixed,
             back: !walkable,
             grille: details
               ? details.includes('grille')
@@ -798,11 +797,10 @@ function buildFacade(
               ? details.includes('shutters')
               : !arched && f > 0 && (st === 'shuttered' || rng.float() < 0.4),
             shutterKey:
-              spec.shutterKey ??
-              (fixed ? 'metal_blue' : rng.pick(['metal_blue', 'metal_green', 'wood_dark'])),
+              spec.shutterKey ?? windowRng.pick(['metal_blue', 'metal_green', 'wood_dark']),
             curtain:
               st === 'curtain' ||
-              (!fixed && (arched || st === 'glazed') && windowRng.float() < 0.3),
+              (!authored && (arched || st === 'glazed') && windowRng.float() < 0.3),
             lintel: !arched,
           })
         );

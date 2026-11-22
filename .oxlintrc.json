@@ -19,7 +19,12 @@
       }
     },
     {
-      "files": ["tools/worldgen/level/placements/**"],
+      "files": [
+        "tools/worldgen/level/placements/**",
+        "tools/worldgen/level/room-fixtures.ts",
+        "tools/worldgen/level/ground-stones.ts",
+        "tools/worldgen/level/roof-fixtures.ts"
+      ],
       "rules": { "oxc/approx-constant": "off" }
     },
     {

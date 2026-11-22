@@ -12,10 +12,13 @@ Runtime behavior belongs to `src/world/`.
   shop shutters, and awning depths/supports. A playable floor needs one entry
   per bay on each facade; unlisted backdrop facades may vary procedurally.
 - `level/pavement.ts`, `level/ground-covers.ts`, `level/ground-stones.ts`:
-  authored pavement spans, covers and loose stones in level space.
+  authored pavement spans, covers and loose stones in level space. Pavement may
+  not cover an alley mouth; stones are seated on the ground at build time.
 - `level/room-fixtures.ts`: room dressing by building, floor and room ID.
   Counter footprints and their goods share a record. Shelf, counter and bench
-  goods use offsets from their support.
+  goods use offsets from their support. Ceiling joists are a count spread across
+  the room; ruin rubble is a seeded mound. Shelves, conduits and leaning sheets
+  fail the bake when their wall or clearance is gone.
 - `level/roof-fixtures.ts`: aerials and laundry relative to the roof footprint;
   garments attach along the authored cable.
 - `level/config.ts`: transform/spawns; `level/intel.ts`: intel drop sites.

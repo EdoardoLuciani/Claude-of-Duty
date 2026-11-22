@@ -2,10 +2,10 @@ import * as THREE from 'three';
 
 import type { Assembler } from './builder.ts';
 import type { BuildingInfo } from './buildings.ts';
-import { BOX, BOX_FINE, BOX_THIN, IDENT, LL } from './kit.ts';
+import { BOX, BOX_FINE, BOX_THIN, IDENT, LL, rubbleMound } from './kit.ts';
 import type { CounterFootprint, RoomFixture, RoomProp } from './level/room-fixtures.ts';
 import type { RectXZ } from './util.ts';
-import { clothGeometry, chamferBox, fillMasks, rockGeometry } from './util.ts';
+import { clothGeometry, chamferBox, fillMasks, keyedRng } from './util.ts';
 
 interface RoomSpec extends RectXZ {
   y: number;
@@ -299,6 +299,21 @@ export function furnishRoom(
           const [x, z] = point(side, t, offset);
           return [x, y + dy, z];
         };
+        const [rx, rz] = point(side, (from + to) / 2, 0.045);
+        const [dx, dz] = point(side, drop, 0.045);
+        if (
+          inVoid(r, rx, rz) ||
+          !backed(
+            side,
+            rx,
+            rz,
+            Math.abs(to - from) / 2 + 0.03,
+            y + height - 0.03,
+            y + height + 0.03
+          ) ||
+          !backed(side, dx, dz, 0.11, y + boxHeight - 0.38, y + height + 0.03)
+        )
+          throw new Error(`[world] ${id} conduit on side ${side} has lost its wall`);
         const { yaw } = sides[side];
         const pipe = A.cache('conduit', (): THREE.BufferGeometry => {
           const geometry = new THREE.CylinderGeometry(0.016, 0.016, 1, 6, 1);
@@ -342,6 +357,8 @@ export function furnishRoom(
       case 'lean': {
         const [, side, along, tilt, height, width, key] = f;
         const [x, z] = point(side, along, 0.06 + (Math.sin(tilt) * height) / 2);
+        if (inVoid(r, x, z) || !backed(side, x, z, width / 2 + 0.04, y, y + height))
+          throw new Error(`[world] ${id} leaning ${key} on side ${side} has lost its wall`);
         const s = sides[side];
         const pitch = (s.nz || s.nx) * -tilt;
         A.add(
@@ -354,27 +371,24 @@ export function furnishRoom(
         );
         break;
       }
-      case 'joist': {
-        const [, dx, dz, alongX, span, thickness] = f;
-        if (beamHitsVoid(r, alongX, cx + dx, cz + dz, span))
-          throw new Error(`[world] ${id} ceiling joist crosses a stair opening`);
-        A.add(
-          'wood_prop_dark',
-          BOX(A),
-          LL(
-            IDENT,
-            cx + dx,
-            y + h - 0.06,
-            cz + dz,
-            alongX ? 0 : Math.PI / 2,
-            span,
-            0.11,
-            thickness
-          ),
-          {
-            masks: [0.35, 0.6, 0.45],
-          }
-        );
+      case 'joists': {
+        // Evenly spaced across the short span; stair openings stay clear.
+        const n = f[1];
+        const alongX = x1 - x0 < z1 - z0;
+        const span = (alongX ? x1 - x0 : z1 - z0) - 0.05;
+        const run = alongX ? z1 - z0 : x1 - x0;
+        for (let i = 1; i < n; i++) {
+          const t = (i / n - 0.5) * run;
+          const jx = alongX ? cx : cx + t;
+          const jz = alongX ? cz + t : cz;
+          if (beamHitsVoid(r, alongX, jx, jz, span)) continue;
+          A.add(
+            'wood_prop_dark',
+            BOX(A),
+            LL(IDENT, jx, y + h - 0.06, jz, alongX ? 0 : Math.PI / 2, span, 0.11, 0.065),
+            { masks: [0.35, 0.6, 0.45] }
+          );
+        }
         break;
       }
       case 'bulb':
@@ -465,19 +479,8 @@ export function furnishRoom(
         break;
       }
       case 'ruin': {
-        const [, dx, dz, fragments] = f;
-        const x = cx + dx;
-        const z = cz + dz;
-        for (const [fx, fz, size, yaw, pitch, roll, seed] of fragments)
-          A.addOnce(
-            'concrete',
-            rockGeometry(seed, size, 0, 0.75),
-            LL(IDENT, x + fx, y + size * 0.3, z + fz, yaw, 1, 1, 1, pitch, roll),
-            {
-              masks: [0.3, 0.75, 0.45],
-              visualOnly: true,
-            }
-          );
+        const [, dx, dz, radius] = f;
+        rubbleMound(A, keyedRng('room-ruin', id, dx, dz), cx + dx, y, cz + dz, radius, 22);
         break;
       }
       case 'ruin-drape': {

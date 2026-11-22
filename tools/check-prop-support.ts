@@ -8,6 +8,7 @@ import { buildWorld } from '#worldgen/build';
 import { Assembler } from '#worldgen/builder';
 import { GROUND_STONES } from '#worldgen/level/ground-stones';
 import { PLACEMENT_ROWS } from '#worldgen/level/placements/index';
+import { seatY } from '#worldgen/queries';
 
 import { isMesh } from '../src/core/three-guards.ts';
 import { StaticWorld } from '../src/physics/bvh.ts';
@@ -79,8 +80,8 @@ const ids = new Map(
     id.includes('/') ? id : `${name}/${id}`,
   ])
 );
-for (const [i, [name, x, y, z]] of GROUND_STONES.entries())
-  ids.set(key(name, [x, y, z]), `ground-stones/${i + 1} (${name})`);
+for (const [i, [name, x, z]] of GROUND_STONES.entries())
+  ids.set(key(name, [x, seatY(x, z), z]), `ground-stones/${i + 1} (${name})`);
 const material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
 const assembler = new Assembler({ materials: { get: (): THREE.Material => material } });
 const visible = new THREE.Group();

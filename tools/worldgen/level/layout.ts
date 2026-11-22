@@ -554,7 +554,7 @@ export const BUILDINGS: BuildingSpec[] = [
     ],
     ruin: true,
     ruinSide: 3,
-    collapseDebris: [14.547053, -22.714754],
+    collapseDebris: [14.547, -22.715],
     enterable: true,
     roofProps: 2,
     wallCuts: [{ side: 1, f: 1, x: 3.2, w: 1.8, h: 2.36 }],

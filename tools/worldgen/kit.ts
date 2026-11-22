@@ -33,7 +33,6 @@ export interface FacadeSpec extends WallPanelOptions {
 }
 export type WindowState = 'boarded' | 'open' | 'shuttered' | 'ajar' | 'curtain' | 'lit' | 'glazed';
 interface WindowOptions {
-  fixed?: boolean;
   t?: number;
   frameKey?: string;
   depth?: number;
@@ -306,7 +305,7 @@ export function windowUnit<T extends WallOpening>(
     // its edge against the dark room behind it. A walkable room (`back:false`)
     // gets no swung leaves: they are collision at head height across its routes.
     openL = true;
-    openR = state === 'open' || (!opts.fixed && rng.float() < 0.4);
+    openR = state === 'open' || rng.float() < 0.4;
     const sw = cm(w / 2 - 0.03);
     const sh = cm(h);
     const leaf = (hx: number, yaw: number): void =>
@@ -317,17 +316,17 @@ export function windowUnit<T extends WallOpening>(
         { masks: [0.8, 0.45, 0.2] }
       );
     const leaves = opts.back !== false;
-    if (leaves) leaf(x - w / 2 + 0.04, opts.fixed ? -1.05 : rng.range(-1.35, -0.75));
+    if (leaves) leaf(x - w / 2 + 0.04, rng.range(-1.35, -0.75));
     if (!openR) {
       A.add(frameKey, box, LL(pm, x, y, depth, 0, 0.045, h - 0.1, fd * 0.85), null);
     } else if (leaves) {
-      leaf(x + w / 2 - 0.04, opts.fixed ? 1.05 : rng.range(0.75, 1.35));
+      leaf(x + w / 2 - 0.04, rng.range(0.75, 1.35));
     }
   }
 
   // ---- plywood board nailed over the opening ------------------------------
   if (boarded) {
-    const n = opts.fixed ? 4 : rng.int(3, 5);
+    const n = rng.int(3, 5);
     for (let i = 0; i < n; i++) {
       const bh = (h + 0.05) / n;
       A.add(
@@ -335,7 +334,7 @@ export function windowUnit<T extends WallOpening>(
         box,
         LL(
           pm,
-          x + (opts.fixed ? 0 : rng.range(-0.04, 0.04)),
+          x + rng.range(-0.04, 0.04),
           y - (h + 0.05) / 2 + (i + 0.5) * bh,
           depth - 0.05,
           0,
@@ -343,13 +342,13 @@ export function windowUnit<T extends WallOpening>(
           bh - 0.012,
           0.026,
           0,
-          opts.fixed ? 0 : rng.range(-0.02, 0.02)
+          rng.range(-0.02, 0.02)
         ),
         { masks: [0.75, 0.55, 0.25] }
       );
     }
     // a gap left at the top where a board is missing, showing the dark room
-    if (!opts.fixed && rng.float() < 0.5) {
+    if (rng.float() < 0.5) {
       A.add('metal_rust', box, LL(pm, x, y + h / 2 - 0.1, depth - 0.08, 0, w * 0.5, 0.03, 0.02), {
         masks: [0.9, 0.6, 0],
       });
@@ -368,7 +367,7 @@ export function windowUnit<T extends WallOpening>(
       const [px, py, pw, ph] = panes[i];
       // A swung-open leaf takes its glazing with it; the closed half keeps its.
       if (px < x ? openL : openR) continue;
-      if (broken && (opts.fixed || rng.float() < 0.55)) continue;
+      if (broken && rng.float() < 0.55) continue;
       A.add('window_glass', PANE(A), LL(pm, px, py, depth, 0, pw, ph, 1), {
         masks: [0.1, 0.3, 0],
       });
@@ -445,8 +444,8 @@ export function windowUnit<T extends WallOpening>(
     // `state:'shuttered'` means shut for the afternoon — both leaves flat on the
     // reveal, which is a completely different silhouette from a half-open pair.
     const shut = state === 'shuttered';
-    const swungL = !shut && (opts.fixed || rng.float() < 0.45);
-    const swungR = !shut && (opts.fixed || rng.float() < 0.45);
+    const swungL = shut ? false : rng.float() < 0.45;
+    const swungR = shut ? false : rng.float() < 0.45;
     A.add(
       key,
       louvre,
@@ -455,7 +454,7 @@ export function windowUnit<T extends WallOpening>(
         x - w / 2 + (swungL ? 0.02 : sw / 2),
         y,
         -0.03,
-        swungL ? (opts.fixed ? 1.2 : rng.range(0.9, 1.5)) : 0,
+        swungL ? rng.range(0.9, 1.5) : 0,
         1,
         1,
         1
@@ -470,7 +469,7 @@ export function windowUnit<T extends WallOpening>(
         x + w / 2 - (swungR ? 0.02 : sw / 2),
         y,
         -0.03,
-        swungR ? (opts.fixed ? -1.2 : -rng.range(0.9, 1.5)) : 0,
+        swungR ? -rng.range(0.9, 1.5) : 0,
         1,
         1,
         1
@@ -1053,7 +1052,6 @@ export function stripedCloth(
     const gv = rng ? rng.range(0.85, 1.18) : 1;
     A.addOnce(keys[i % keys.length], g, m, {
       masks: [masks[0], Math.min(1, masks[1] * gv), masks[2]],
-      visualOnly: true,
     });
   }
 }
