@@ -6,25 +6,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import can
 
 root, out = can.begin('SUPPRESSOR9MM', '.cache/blender/attachments/compact-9mm')
-
-
-def material(name, color, metal, rough):
-    mat = can.material(name, color, rough, metal)
-    # Fine coating roughness, not large invented damage or white edge paint.
-    noise = mat.node_tree.nodes.new('ShaderNodeTexNoise')
-    noise.inputs['Scale'].default_value = 1900
-    bump = mat.node_tree.nodes.new('ShaderNodeBump')
-    bump.inputs['Strength'].default_value = .14
-    bump.inputs['Distance'].default_value = .00004
-    mat.node_tree.links.new(noise.outputs['Fac'], bump.inputs['Height'])
-    mat.node_tree.links.new(bump.outputs['Normal'],
-                            mat.node_tree.nodes.get('Principled BSDF').inputs['Normal'])
-    return mat
-
-
-coat = material('Compact 9mm | graphite ceramic', (.032, .036, .041), .15, .61)
-steel = material('Booster | nitrided piston', (.075, .081, .089), .8, .32)
-edge = material('Booster | machined collars', (.12, .13, .14), .75, .4)
+coat = can.material('Compact 9mm | graphite ceramic', (.032, .036, .041), .61, .15)
+steel = can.material('Booster | nitrided piston', (.075, .081, .089), .32, .8)
+edge = can.material('Booster | machined collars', (.12, .13, .14), .4, .75)
 
 
 def tube(name, rear, front, radius, inner, mat):
