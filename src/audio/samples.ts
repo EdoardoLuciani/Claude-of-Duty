@@ -83,12 +83,11 @@ const CONTACT_URLS = {
   ...FOLEY_URLS,
   ...COMBAT_URLS,
   ...REACTION_URLS,
-  ...CALLOUT_URLS,
   ...ENVIRONMENT_URLS,
   ...RADIO_URLS,
   ...EXPLOSION_URLS,
 };
-type ContactKind = keyof typeof CONTACT_URLS;
+type ContactKind = keyof typeof CONTACT_URLS | keyof typeof CALLOUT_URLS;
 /** Round-robin indices are kept modulo the bank size; a miss means an unloaded slot. */
 function loaded(buffers: readonly AudioBuffer[], index: number, label: string): AudioBuffer {
   const buffer = buffers.at(index);
@@ -113,7 +112,7 @@ export class WeaponSampleBank {
     this.actx = actx;
   }
 
-  async load(): Promise<number> {
+  async load(includeCallouts = true): Promise<number> {
     const jobs = this._loadBank(URLS, this.buffers, this.indices, 0);
     jobs.push(
       this._loadBuffer(HEARTBEAT_URL).then((buffer): void => {
@@ -126,6 +125,8 @@ export class WeaponSampleBank {
       jobs.push(this._loadInto(this.aircraftBuffers, index, url))
     );
     jobs.push(...this._loadBank(CONTACT_URLS, this.hitBuffers, this.hitIndices, -1));
+    if (includeCallouts)
+      jobs.push(...this._loadBank(CALLOUT_URLS, this.hitBuffers, this.hitIndices, -1));
     jobs.push(...this._loadBank(RELOAD_URLS, this.reloadBuffers, this.reloadIndices, -1));
     // Finish all decodes before start() tears down a failed bank.
     for (const result of await Promise.allSettled(jobs))
@@ -147,8 +148,8 @@ export class WeaponSampleBank {
 
   private _loadBank<K extends string>(
     urls: Record<K, readonly string[]>,
-    buffers: Partial<Record<K, AudioBuffer[]>>,
-    indices: Partial<Record<K, number>>,
+    buffers: Partial<Record<NoInfer<K>, AudioBuffer[]>>,
+    indices: Partial<Record<NoInfer<K>, number>>,
     initialIndex: number
   ): Promise<void>[] {
     const jobs: Promise<void>[] = [];

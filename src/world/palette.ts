@@ -308,6 +308,107 @@ export const PALETTE = {
     },
   },
 
+  // Training Grounds: the warm cut bank gives way to cooler scrub in the distance.
+  training_gravel: {
+    name: 'gravel',
+    surface: 'dirt',
+    opts: { vertexMasks: true, tint: 0xbcad93, scale: 1.7, detile: 0.9, wear: [0, 0.5, 0.45, 0] },
+  },
+  training_yard_asphalt: {
+    name: 'asphalt',
+    surface: 'concrete',
+    opts: { vertexMasks: true, tint: 0x7b8189, detile: 0.85, weather: [0.19, 0.04, 0.1, 0.2] },
+  },
+  training_hardstand: {
+    name: 'concrete_floor',
+    surface: 'concrete',
+    opts: { vertexMasks: true, tint: 0xb1a295, scale: 2.5, detile: 0.6 },
+  },
+  training_masonry: {
+    name: 'concrete',
+    surface: 'concrete',
+    opts: { vertexMasks: true, tint: 0xbab09c, scale: 1.5, weather: [0.5, 0.6, 0.85, 0.55] },
+  },
+  training_earth_bank: {
+    name: 'dirt',
+    surface: 'dirt',
+    opts: {
+      vertexMasks: true,
+      tint: 0xb49c73,
+      scale: 2.8,
+      detile: 0.9,
+      weather: [0.48, 0.65, 0.5, 0.45],
+    },
+  },
+  training_scrub: {
+    name: 'foliage',
+    surface: 'foliage',
+    opts: { vertexMasks: true, tint: 0x949460, scale: 0.5 },
+  },
+  training_foothill: {
+    name: 'dirt',
+    surface: 'dirt',
+    opts: { vertexMasks: true, tint: 0x89976b, scale: 6.5, detile: 0.9, normalStrength: 0.45 },
+  },
+  training_ridgeline: {
+    name: 'dirt',
+    surface: 'dirt',
+    opts: { vertexMasks: true, tint: 0x7c939e, scale: 11, detile: 0.9, normalStrength: 0.3 },
+  },
+  training_roof: {
+    name: 'corrugated',
+    surface: 'metal',
+    opts: { vertexMasks: true, tint: 0x788880, scale: 1.1 },
+  },
+  training_board_range: {
+    name: 'plaster',
+    surface: 'metal',
+    opts: { tint: 0x3c7166, scale: 0.8, normalStrength: 0.22, weather: [0.15, 0.1, 0.1, 0.16] },
+  },
+  training_board_yard: {
+    name: 'plaster',
+    surface: 'metal',
+    opts: { tint: 0xaa651e, scale: 0.8, normalStrength: 0.22, weather: [0.15, 0.1, 0.1, 0.16] },
+  },
+  training_board_bay: {
+    name: 'plaster',
+    surface: 'metal',
+    opts: { tint: 0xa34534, scale: 0.8, normalStrength: 0.22, weather: [0.15, 0.1, 0.1, 0.16] },
+  },
+
+  // training signage and markings
+  training_white: {
+    name: 'plaster',
+    surface: 'plaster',
+    ballisticSurface: 'wood',
+    opts: { tint: 0xfdf4d8, normalStrength: 0.25 },
+  },
+  training_ink: {
+    name: 'plaster',
+    surface: 'plaster',
+    opts: { tint: 0x222c2f, normalStrength: 0.25 },
+  },
+  training_letter: {
+    name: 'plaster',
+    surface: 'plaster',
+    opts: {
+      tint: 0xfff6dd,
+      normalStrength: 0.1,
+      weather: [0.07, 0.08, 0.05, 0.07],
+      three: { emissive: 0xdfebeb, emissiveIntensity: 0.06 },
+    },
+  },
+  training_yellow: {
+    name: 'plaster',
+    surface: 'plaster',
+    opts: { tint: 0xefbd58, normalStrength: 0.25 },
+  },
+  training_red: {
+    name: 'plaster',
+    surface: 'plaster',
+    opts: { tint: 0xe0624a, normalStrength: 0.25 },
+  },
+
   // emissive
   /** Bare interior bulb. Tiny surface, so it needs real radiance to read. */
   emissive_warm: {

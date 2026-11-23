@@ -58,6 +58,7 @@ interface PlayerHudState {
 }
 
 export class PlayerSystem {
+  private recoveryFloor = -Infinity;
   declare movement: PlayerMovement;
   declare rig: CameraRig;
   declare health: Health;
@@ -200,6 +201,7 @@ export class PlayerSystem {
     this.healCtrl = new HealController(this);
 
     // ---- spawn -----------------------------------------------------------
+    if (ctx.config.mode === 'training') this.recoveryFloor = ctx.get('world').bounds.min.y;
     const spawn = this._resolveSpawn();
     this.movement.init(this.physics, spawn.feet);
     this.movement.yaw = spawn.yaw;
@@ -335,6 +337,12 @@ export class PlayerSystem {
     if (!this.controlEnabled) return;
     this.movement.adsAmount = this.adsAmount;
     this.movement.step(h);
+    if (this.movement.position.y < this.recoveryFloor) {
+      // Recover a fall beyond the authored floor without firing respawn events or resetting gear.
+      const { feet, yaw } = this._resolveSpawn();
+      feet.y += STANCE.stand.eye;
+      this.teleport(feet, yaw);
+    }
   }
 
   update(dt: number, ctx: PlayerContext): void {
@@ -389,9 +397,9 @@ export class PlayerSystem {
   }
 
   async prewarmMaterials(ctx: PlayerContext): Promise<{ ok: boolean; reason?: string }> {
-    // Warm native spot-shadow depth variants before the first toggle.
     this.lateUpdate();
-    const result = await ctx.get('ai').prewarmShadowCaster(this.flashlight);
+    // Weapons already warm the world casters. Survival also needs the skinned caster.
+    const result = (await ctx.peek('ai')?.prewarmShadowCaster(this.flashlight)) ?? { ok: true };
     this.flashlight.shadow.needsUpdate = false;
     return result;
   }
@@ -658,13 +666,13 @@ export class PlayerSystem {
     const r = e.radius;
     const d = this._tmp.copy(e.position).distanceTo(eye);
     if (d > r * 1.6) return;
-    const exposure = this.physics.explosionExposure(e.position, this.feetPosition, eye);
     const falloff = Math.pow(clamp01(1 - d / r), 1.6);
     this.rig.addTrauma(clamp01(falloff * 1.4));
     this.health.addSuppression(HEALTH.suppression.perExplosion * falloff);
-    if (exposure > 0 && falloff > 0.02) {
+    if (falloff <= 0.02) return;
+    const exposure = this.physics.explosionExposure(e.position, this.feetPosition, eye);
+    if (exposure > 0)
       this.applyDamage(e.damage * falloff * exposure, e.position, { type: 'explosion' });
-    }
   }
 
   _onBulletSegment(e: PlayerEventsMap['bullet:segment']): void {

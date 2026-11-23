@@ -212,7 +212,7 @@ export class PixiFeedback {
     dirty =
       poseHudNode(
         this.score,
-        true,
+        s.visible,
         1,
         this.width / 2,
         63.2,

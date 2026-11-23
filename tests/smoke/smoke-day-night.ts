@@ -95,6 +95,18 @@ skyLights.shared = fixture<SkySystem['shared']>({
 });
 const providers = { sky: skyLights };
 const lightingCtx = createTestContext({ providers });
+// A shared material must not accumulate lighting hooks or retain former sessions.
+const shared = new MeshStandardNodeMaterial();
+/* oxlint-disable typescript/unbound-method -- comparing hook identity, never invoking it. */
+const original = shared.setupEnvironment;
+for (let i = 0; i < 2; i++) {
+  const fill = new IndirectFill(lightingCtx);
+  fill.patch(shared);
+  assert.notEqual(shared.setupEnvironment, original);
+  fill.dispose();
+  assert.equal(shared.setupEnvironment, original);
+}
+/* oxlint-enable typescript/unbound-method */
 let shadowSetups = 0;
 const render = fixture<RenderSystem>({
   _syncSun: captureMethod(RenderSystem.prototype, '_syncSun'),
@@ -248,7 +260,7 @@ bulb.userData.owNightIntensity = 22;
 const nightCtx = createTestContext({ providers: { sky: fixture<SkySystem>({ sunAltitude: -1 }) } });
 const world = fixture<WorldSystem>({
   setStreetlightPower: captureMethod(WorldSystem.prototype, 'setStreetlightPower'),
-  _updateLights: captureMethod(WorldSystem.prototype, '_updateLights'),
+  updatePracticalLights: captureMethod(WorldSystem.prototype, 'updatePracticalLights'),
   ctx: nightCtx,
   lamps: [lamp],
   bulbs: [bulb],

@@ -5,6 +5,7 @@ import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 import type { EngineError } from '../../src/core/events.ts';
 import { ModelSystem } from '../../src/core/models.ts';
+import { DEFAULT_PLAYABLE_MAP } from '../../src/core/playable-maps.ts';
 import type { FrameHook, Subsystem } from '../../src/core/registry.ts';
 import { addLifecycle, createCoreFixture } from '../lib/core-fixture.ts';
 
@@ -186,19 +187,47 @@ try {
       JSON.stringify({ asset: { version: '2.0' }, scenes: [{ nodes: [] }], scene: 0 }),
       ''
     );
-  let meta: { version: number; assets: { visual: string; collision: string; nav?: string } } = {
-    version: 2,
-    assets: { visual: 'visual', collision: 'collision', nav: 'nav.gz' },
+  const assets: { visual: string; collision: string; nav?: string } = {
+    visual: 'visual',
+    collision: 'collision',
+    nav: 'nav.gz',
   };
+  const meta = {
+    version: 2,
+    mapId: undefined as string | undefined,
+    assets,
+    sourceHash: 'fixture',
+    transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+    bounds: { min: [-1, -1, -1], max: [1, 1, 1] },
+    spawns: [],
+    lights: [],
+    stats: { staticTris: 0, instTris: 0, instances: 0, drawCalls: 0, collideTris: 0 },
+  };
+  const requests: string[] = [];
   globalThis.fetch = Object.assign(
     async (input: Parameters<typeof fetch>[0]): Promise<Response> => {
       const url = input instanceof Request ? input.url : String(input);
+      requests.push(url);
       return url.endsWith('level.json') ? Response.json(meta) : new Response(null, { status: 503 });
     },
     { preconnect: fetch.preconnect }
   );
-  await assert.rejects(models._prefetchWorld(), /HTTP 503/, 'retain the real load failure');
-  meta = { version: 2, assets: { visual: 'visual', collision: 'collision' } };
+  await assert.rejects(models._prefetchWorld(), /HTTP 503/, 'legacy Survival still loads nav');
+  meta.mapId = 'other-courtyard';
+  await assert.rejects(models._prefetchWorld(), /unexpected world manifest map ID or mode/);
+  const other = new ModelSystem({
+    ...DEFAULT_PLAYABLE_MAP,
+    id: meta.mapId,
+    bundleDirectory: 'other',
+  });
+  other._loadWorldGLB = models._loadWorldGLB.bind(models);
+  await assert.rejects(other._prefetchWorld(), /HTTP 503/, 'same mode, different map bundle');
+  assert.deepEqual(requests.slice(-2), [
+    'models/world/other/level.json',
+    'models/world/other/nav.gz',
+  ]);
+  meta.mapId = undefined;
+  delete assets.nav;
   await assert.rejects(models._prefetchWorld(), /missing navigation asset/);
 } finally {
   globalThis.fetch = fetch;

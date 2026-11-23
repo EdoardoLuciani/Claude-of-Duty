@@ -15,6 +15,7 @@ import type { UiSystem } from '../../src/ui/index.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
 import { audioFixture } from '../lib/audio-banks.ts';
 import { fixtureEntries, fixtureBuffer, FixtureAudioBuffer } from '../lib/audio-fixture.ts';
+import { createTestContext } from '../lib/context.ts';
 import { fixture } from '../lib/fixture.ts';
 const { actx, sources } = audioFixture();
 const oscillators = actx.oscillators;
@@ -79,6 +80,7 @@ const events = new EventBus(),
   calls: string[] = [];
 events.on('radio:strike', (): number => calls.push('radio_strike'));
 const w = new WeaponSystem();
+w.ctx = createTestContext({ events });
 w.carpetBombs = 2;
 assert(w._equipRadio());
 w.radioSys = new RadioSystem();

@@ -1,7 +1,7 @@
 import type { EngineContext } from '../core/context.ts';
 import { damp } from '../core/math.ts';
 import type { MarketSystem } from '../market/index.ts';
-import { isAttachmentConfig, SLOTS } from '../weapons/attachment-rules.ts';
+import { SLOTS } from '../weapons/attachment-rules.ts';
 import { isWeaponId } from '../weapons/defs.ts';
 import { marketIcon } from './market-icons.ts';
 import { MarketInspection } from './market-inspection.ts';
@@ -11,8 +11,6 @@ import { el, setText, setStyle, setClass } from './util.ts';
 type MarketItem = ReturnType<MarketSystem['getHudState']>['items'][number];
 type MarketOffer = ReturnType<MarketSystem['getHudState']>['attachments'][number];
 type MarketSlot = MarketItem['slot'];
-type MarketApi = MarketSystem;
-type MarketContext = Pick<EngineContext, 'get' | 'peek'>;
 interface BuildControl {
   select: HTMLSelectElement;
   // Pooled HUD offers: read in place every frame, never looked up.
@@ -36,16 +34,20 @@ function targetCard(target: EventTarget | null): HTMLElement | null {
   return target instanceof Element ? target.closest('[data-item]') : null;
 }
 
-/** Between-wave shop animates on raw wall time while simulation is frozen.
- * Weapon cards open a draft; supplies buy immediately. SKIP/Esc leaves;
- * number keys do not buy.
- */
+/** The Supply Market and Range Station share the native catalog, draft and inspection.
+ * Survival supplies buy immediately; range resupply and target reset are free actions.
+ * The overlay animates on raw wall time while gameplay is frozen. */
 export class MarketOverlay {
-  ctx: MarketContext;
-  market: MarketApi;
-  root: HTMLDialogElement;
-  waveLine: HTMLElement;
-  credits: HTMLElement;
+  readonly market: MarketSystem;
+  readonly root: HTMLDialogElement;
+  private readonly training: boolean;
+  private readonly body: HTMLElement;
+  private readonly leave: HTMLButtonElement;
+  private readonly rangeStatus: HTMLElement | null;
+  private attempt = 0;
+  private disposed = false;
+  private readonly waveLabel: HTMLElement | null;
+  private readonly creditsLabel: HTMLElement;
   _onClick: (event: MouseEvent) => void;
   _onOver: (event: MouseEvent) => void;
   _onKey: (event: KeyboardEvent) => void;
@@ -54,10 +56,8 @@ export class MarketOverlay {
   buildPanel: HTMLElement;
   buildControls: BuildControl[] = [];
   stats: MarketStats;
-  baseCost: HTMLElement;
-  buildTotal: HTMLElement;
+  quote: { baseCost: HTMLElement; total: HTMLElement; discardWarning: HTMLElement };
   buildStatus: HTMLElement;
-  discardWarning: HTMLElement;
   confirm: HTMLButtonElement;
   _selectedId: string | null = null;
   cards: MarketCard[] = [];
@@ -67,33 +67,44 @@ export class MarketOverlay {
   _pulse: number = 0;
   _hoverId: string | null = null;
 
-  constructor(parent: HTMLElement, ctx: MarketContext) {
-    this.ctx = ctx;
+  constructor(
+    parent: HTMLElement,
+    private readonly ctx: EngineContext
+  ) {
+    const training = (this.training = ctx.config.mode === 'training');
     this.market = ctx.get('market');
 
     this.root = el('dialog', 'ow-market ow-dialog', parent);
     this.root.setAttribute('aria-labelledby', 'ow-market-title');
-    // Esc (native cancel) closes the dialog; route it through the same skip path.
-    // `close` is queued, so ignore a stale event if the shop has reopened since.
-    this.root.onclose = (): void => {
-      if (this.active && !this.root.open) this.skip();
-    };
+    if (training) {
+      this.root.oncancel = (event): void => {
+        event.preventDefault(); // Keep the modal until mouse capture succeeds.
+        this.skip();
+      };
+      document.addEventListener('pointerlockchange', this.lockChanged);
+      document.addEventListener('pointerlockerror', this.lockDenied);
+    } else {
+      // Esc closes the shop. Ignore a queued close if the shop has reopened since.
+      this.root.onclose = (): void => {
+        if (this.active && !this.root.open) this.skip();
+      };
+    }
     const panel = el('div', 'ow-market-panel', this.root);
 
     const head = el('div', 'ow-market-head', panel);
-    this.waveLine = el('div', 'ow-market-wave', head, '');
-    const title = el('div', 'ow-market-title', head, 'SUPPLY MARKET');
+    this.waveLabel = training ? null : el('div', 'ow-market-wave', head);
+    const title = el('div', 'ow-market-title', head, training ? 'RANGE STATION' : 'SUPPLY MARKET');
     title.id = 'ow-market-title';
     // Start focus on the title: focusing the first card would preview it.
     title.tabIndex = -1;
     title.autofocus = true;
     const cred = el('div', 'ow-market-cred', head);
-    this.credits = el('b', null, cred, '000000');
+    this.creditsLabel = el('b', null, cred, '');
     el('i', null, cred, 'CREDITS');
 
-    const body = el('div', 'ow-market-body', panel);
-    const catalog = el('div', 'ow-market-catalog', body);
-    this.inspection = new MarketInspection(body, ctx.get('weapons'));
+    this.body = el('div', 'ow-market-body', panel);
+    const catalog = el('div', 'ow-market-catalog', this.body);
+    this.inspection = new MarketInspection(this.body, ctx.get('weapons'));
     this.buildPanel = el('section', 'ow-market-build', this.inspection.root);
     this.buildPanel.hidden = true;
     this.buildPanel.setAttribute('aria-label', 'Weapon customization');
@@ -114,14 +125,15 @@ export class MarketOverlay {
       }
       const cost = el('span', 'ow-market-build-cost', row);
       this.buildControls.push({ select, options, cost });
-      select.onchange = (): void => {
-        const build = this.market.getHudState().build;
-        if (!build) return;
-        const config: unknown = { ...build.config, [slot]: select.value || null };
-        if (isAttachmentConfig(config, build.id) && this.market.setBuild(config))
-          this._preview(build.id);
-        this._updateBuild();
-      };
+      select.onchange = (): void =>
+        this.run('selectAttachment', (): void => {
+          if (this.body.inert) return;
+          const build = this.market.getHudState().build;
+          if (!build) return;
+          if (this.market.setBuild({ ...build.config, [slot]: select.value || null }))
+            this._preview(build.id);
+          this._updateBuild();
+        });
     }
     el(
       'p',
@@ -131,37 +143,61 @@ export class MarketOverlay {
         'shots and shrinks the muzzle flash; the laser beam does not predict spread or drop.'
     );
     this.stats = new MarketStats(this.buildPanel);
-    this.baseCost = el('div', 'ow-market-build-base', this.buildPanel);
-    this.discardWarning = el('p', 'ow-market-build-warning', this.buildPanel);
+    const baseCost = el('div', 'ow-market-build-base', this.buildPanel);
+    const discardWarning = el('p', 'ow-market-build-warning', this.buildPanel);
     const total = el('div', 'ow-market-build-total', this.buildPanel);
     el('span', null, total, 'TOTAL');
-    this.buildTotal = el('b', null, total, '0');
+    this.quote = { baseCost, discardWarning, total: el('b', null, total, '0') };
     this.buildStatus = el('p', 'ow-market-inspect-help', this.buildPanel);
     this.buildStatus.setAttribute('role', 'status');
     const actions = el('div', 'ow-market-build-actions', this.buildPanel);
-    this.confirm = el('button', 'ow-market-buy', actions, 'BUY BUILD');
+    this.confirm = el(
+      'button',
+      'ow-market-buy',
+      actions,
+      training ? 'APPLY & RESUME' : 'BUY BUILD'
+    );
     this.confirm.type = 'button';
-    this.confirm.onclick = (): void => {
-      if (!this.market.confirmBuild()) {
-        this.ctx.peek('ui')?.sfx('market_deny', 0.75);
-        return;
-      }
-      this._pulse = 1;
-      this.ctx.peek('ui')?.sfx('market_buy', 0.9);
-      this._updateBuild();
-    };
+    this.confirm.onclick = (): void =>
+      this.run('confirmBuild', (): void => {
+        if (this.body.inert) return;
+        if (!this.market.confirmBuild()) {
+          this.setRangeStatus('This build could not be equipped.');
+          this.ctx.peek('ui')?.sfx('market_deny', 0.75);
+          return;
+        }
+        if (training) this.requestResume();
+        else {
+          this._pulse = 1;
+          this.ctx.peek('ui')?.sfx('market_buy', 0.9);
+          this._updateBuild();
+        }
+      });
     const cancel = el('button', 'ow-market-build-cancel', actions, 'CANCEL');
     cancel.type = 'button';
-    cancel.onclick = (): void => {
-      const id = this._selectedId;
-      this.market.cancelBuild();
-      this._selectedId = null;
-      this._updateBuild();
-      if (id) {
-        this._preview(id);
-        this.cards.find((row): boolean => row.card.dataset.item === id)?.card.focus();
-      }
-    };
+    cancel.onclick = (): void =>
+      this.run('cancelBuild', (): void => {
+        if (this.body.inert) return;
+        const id = this._selectedId;
+        this.market.cancelBuild();
+        this._selectedId = null;
+        this._updateBuild();
+        if (id) {
+          this._preview(id);
+          this.cards.find((row): boolean => row.card.dataset.item === id)?.card.focus();
+        }
+      });
+    if (training) {
+      this.buildPanel.append(this.stats.root); // Keep status and actions visible above the stats.
+      const reset = el('button', 'ow-market-skip', catalog, 'Reset Targets');
+      reset.type = 'button';
+      reset.onclick = (): void =>
+        this.run('resetTargets', (): void => {
+          if (this.body.inert) return;
+          this.ctx.get('fx').resetPracticeMarks();
+          this.setRangeStatus('Target marks cleared.');
+        });
+    }
     const items = this.market.getHudState().items;
     let secN = 1,
       lastSlot: MarketSlot | '' = '',
@@ -180,27 +216,41 @@ export class MarketOverlay {
     }
 
     const foot = el('div', 'ow-market-foot', panel);
-    const skip = el('button', 'ow-market-skip', foot, 'SKIP ▸');
-    skip.type = 'button';
-    skip.addEventListener('click', (): void => this.skip());
-    el('div', 'ow-market-hint', foot, 'ESC SKIP · SELECT A WEAPON TO CUSTOMIZE · CONFIRM TO APPLY');
+    this.leave = el('button', 'ow-market-skip', foot, training ? 'RESUME' : 'SKIP ▸');
+    this.leave.type = 'button';
+    this.leave.onclick = (): void => this.skip();
+    this.rangeStatus = training ? el('div', 'ow-market-hint', foot) : null;
+    this.rangeStatus?.setAttribute('role', 'status');
+    el(
+      'div',
+      'ow-market-hint',
+      foot,
+      training
+        ? 'ESC RESUME · UNLIMITED TRAINING CREDIT'
+        : 'ESC SKIP · SELECT A WEAPON TO CUSTOMIZE · CONFIRM TO APPLY'
+    );
 
-    this._onClick = (e: MouseEvent): void => {
-      const card = targetCard(e.target);
-      if (!this.active || !card) return;
-      const item = this.market
-        .getHudState()
-        .items.find((it): boolean => it.id === card.dataset.item);
-      if (!item) return;
-      if (isWeaponId(item.id)) {
-        if (this._selectedId !== item.id) this.market.beginBuild(item.id);
-      } else this.market.cancelBuild();
-      this._selectedId = item.id;
-      this._preview(item.id);
-      this._updateBuild();
-      if (!isWeaponId(item.id) && e.target instanceof Element && e.target.closest('.ow-market-buy'))
-        this._buy(item.id);
-    };
+    this._onClick = (e: MouseEvent): void =>
+      this.run('selectItem', (): void => {
+        const card = targetCard(e.target);
+        if (!card || this.body.inert) return;
+        const item = this.market
+          .getHudState()
+          .items.find((it): boolean => it.id === card.dataset.item);
+        if (!item) return;
+        if (isWeaponId(item.id)) {
+          if (this._selectedId !== item.id) this.market.beginBuild(item.id);
+        } else this.market.cancelBuild();
+        this._selectedId = item.id;
+        this._preview(item.id);
+        this._updateBuild();
+        if (
+          !isWeaponId(item.id) &&
+          e.target instanceof Element &&
+          e.target.closest('.ow-market-buy')
+        )
+          this._buy(item.id);
+      });
     this._onOver = (e: MouseEvent): void => {
       if (!this.active) return;
       const card = targetCard(e.target);
@@ -243,24 +293,24 @@ export class MarketOverlay {
     el('div', 'ow-market-name', card, item.label);
     el('div', 'ow-market-blurb', card, item.blurb);
 
-    const meta = el('div', 'ow-market-meta', card);
-    const stock = el('div', 'ow-market-stock', meta);
     const gun = isWeaponId(item.id);
     card.tabIndex = 0;
     card.setAttribute('role', 'group');
     card.setAttribute('aria-label', `${item.label}, select to inspect`);
-    const pipMax = item.unit === 'pct' || gun ? 0 : Math.floor(item.max / item.step);
     const pips: HTMLElement[] = [];
+    let fill: HTMLElement | null = null;
+    const meta = el('div', 'ow-market-meta', card);
+    const stock = el('div', 'ow-market-stock', meta);
+    const pipMax = item.unit === 'pct' || gun ? 0 : Math.floor(item.max / item.step);
     if (pipMax > 0) {
       const row = el('div', 'ow-market-pips', stock);
       for (let i = 0; i < pipMax; i++) pips.push(el('i', null, row));
     }
-    const bar = item.unit === 'pct' ? el('div', 'ow-market-bar', stock) : null;
-    const fill = bar ? el('i', null, bar) : null;
+    if (item.unit === 'pct') fill = el('i', null, el('div', 'ow-market-bar', stock));
     const count = el('div', 'ow-market-count', stock, '');
     el('div', 'ow-market-cost', meta, String(item.cost).padStart(4, '0'));
 
-    const btn = el('button', 'ow-market-buy', card, 'BUY');
+    const btn = el('button', 'ow-market-buy', card, gun ? 'CUSTOMIZE' : 'BUY');
     btn.type = 'button';
     btn.setAttribute(
       'aria-label',
@@ -273,7 +323,18 @@ export class MarketOverlay {
   }
 
   show(wave = 0): void {
-    if (this.active) return;
+    if (this.active || this.disposed) return;
+    const { engine, input, events } = this.ctx;
+    const training = this.training;
+    if (
+      training &&
+      (engine.error ||
+        engine.gameplaySuspended ||
+        !input.enabled ||
+        input.frozen ||
+        !this.market.openRange())
+    )
+      return;
     this.active = true;
     this.shown = 0;
     this.wave = wave;
@@ -285,15 +346,29 @@ export class MarketOverlay {
     this.inspection.controls.enabled = false;
     setStyle(this.root, 'display', ''); // Initial focus needs a rendered dialog.
     this.root.showModal();
-    document.exitPointerLock();
+    if (training) {
+      // Retain the weapon pose, reload and live grenades while the range is open.
+      engine.setGameplaySuspended(true);
+      input.enabled = false;
+      input.clear();
+      events.emit('ui:pause', { paused: true });
+    }
+    if (!training || document.pointerLockElement === this.ctx.canvas) document.exitPointerLock();
   }
 
   hide(): void {
     this.active = false;
     this.root.close();
+    if (this.training) {
+      this.market.closeShop();
+      this.shown = 0;
+      setStyle(this.root, 'display', 'none'); // Terminal errors stop the UI update hook too.
+      this.body.inert = false;
+      setText(this.leave, 'RESUME');
+      this.setRangeStatus('');
+    } else this.market.cancelBuild();
     this._hoverId = null;
     this._selectedId = null;
-    this.market.cancelBuild();
     this.buildPanel.hidden = true;
     this.inspection.hide();
   }
@@ -330,32 +405,88 @@ export class MarketOverlay {
       setText(control.cost, line.cost ? `+${line.cost}` : '0');
       if (line.discarded) discarded += `${discarded ? ' · ' : ''}${line.discarded}`;
     }
+    const { baseCost, discardWarning, total } = this.quote;
     setText(
-      this.baseCost,
+      baseCost,
       build.owned ? 'Base weapon · owned' : `Base weapon · ${build.baseCost} credits`
     );
-    setText(this.discardWarning, discarded ? `On confirm, discard ${discarded}. No refund.` : '');
-    this.discardWarning.hidden = !discarded;
-    setText(this.buildTotal, `${build.total} CREDITS`);
-    setText(this.confirm, build.owned ? 'APPLY CHANGES' : 'BUY BUILD');
-    this.confirm.disabled = !build.canConfirm;
+    setText(discardWarning, discarded ? `On confirm, discard ${discarded}. No refund.` : '');
+    discardWarning.hidden = !discarded;
+    setText(total, `${build.total} CREDITS`);
+    if (!this.training) setText(this.confirm, build.owned ? 'APPLY CHANGES' : 'BUY BUILD');
+    this.confirm.disabled = this.body.inert || !build.canConfirm;
     setText(
       this.buildStatus,
       !build.available
         ? 'This build is unavailable: weapon or attachment failed to load.'
-        : !build.affordable
-          ? 'Not enough credits. Edit the build or cancel.'
-          : !build.changed
-            ? 'No changes to apply.'
-            : 'Nothing is spent until you confirm.'
+        : this.training
+          ? build.equipBlocked
+            ? 'Resume to finish cycling before changing weapons.'
+            : 'Try this build for free.'
+          : !build.affordable
+            ? 'Not enough credits. Edit the build or cancel.'
+            : !build.changed
+              ? 'No changes to apply.'
+              : 'Nothing is spent until you confirm.'
     );
   }
 
   skip(): void {
-    this.market.closeShop(); // emits market:close -> ui hides this overlay
+    this.run('resume', (): void => {
+      if (this.training) this.requestResume();
+      else this.market.closeShop(); // emits market:close -> ui hides this overlay
+    });
   }
 
-  _buy(itemId: Parameters<MarketApi['buy']>[0]): void {
+  private setRangeStatus(message: string): void {
+    if (this.rangeStatus) setText(this.rangeStatus, message);
+  }
+
+  private run(action: string, call: () => void): void {
+    if (!this.active || this.ctx.engine.error) return;
+    try {
+      call();
+    } catch (error) {
+      this.ctx.engine.fail('ui', action, error);
+    }
+  }
+
+  private requestResume(): void {
+    this.body.inert = this.confirm.disabled = true;
+    setText(this.leave, 'RETRY RESUME');
+    this.leave.focus();
+    this.setRangeStatus('Waiting for mouse capture. Retry if needed.');
+    const attempt = ++this.attempt;
+    const { canvas, input, engine } = this.ctx;
+    if (document.pointerLockElement === canvas) this.lockChanged();
+    else
+      input.requestPointerLock((requested): void => {
+        if (!requested) {
+          if (attempt === this.attempt) this.lockDenied();
+        } else if ((this.disposed || engine.error) && document.pointerLockElement === canvas) {
+          document.exitPointerLock();
+        }
+      });
+    input.requestFullscreen();
+  }
+
+  private lockDenied = (): void => {
+    if (this.body.inert)
+      this.setRangeStatus('Mouse capture unavailable. Select Retry Resume to try again.');
+  };
+
+  private lockChanged = (): void => {
+    const { canvas, engine, input, events } = this.ctx;
+    if (!this.body.inert || document.pointerLockElement !== canvas || !engine.running) return;
+    this.run('resume', (): void => {
+      this.hide();
+      engine.setGameplaySuspended(false); // Clears pending inputs and pointer-lock loss.
+      input.enabled = true;
+      events.emit('ui:pause', { paused: false });
+    });
+  };
+
+  _buy(itemId: Parameters<MarketSystem['buy']>[0]): void {
     if (!this.market.buy(itemId)) {
       this.ctx.peek('ui')?.sfx('market_deny', 0.75);
       return;
@@ -380,10 +511,12 @@ export class MarketOverlay {
     const s = this.market.getHudState();
     this._updateBuild(s);
     this._pulse = Math.max(0, this._pulse - rawDt * 3);
-    const cred = String(Math.max(0, Math.round(s.credits))).padStart(6, '0');
-    setText(this.credits, cred);
-    setStyle(this.credits, 'filter', this._pulse > 0 ? 'brightness(1.55)' : '');
-    if (this.wave > 0) setText(this.waveLine, `WAVE ${this.wave} CLEARED`);
+    setText(
+      this.creditsLabel,
+      Number.isFinite(s.credits) ? String(Math.max(0, Math.round(s.credits))).padStart(6, '0') : '∞'
+    );
+    setStyle(this.creditsLabel, 'filter', this._pulse > 0 ? 'brightness(1.55)' : '');
+    if (this.waveLabel && this.wave > 0) setText(this.waveLabel, `WAVE ${this.wave} CLEARED`);
 
     for (let i = 0; i < this.cards.length; i++) {
       const it = s.items.at(i);
@@ -407,9 +540,18 @@ export class MarketOverlay {
     this.root.removeEventListener('click', this._onClick);
     this.root.removeEventListener('mouseover', this._onOver);
     this.root.removeEventListener('focusin', this._onFocus);
-    this.inspection.dispose();
+    this.disposed = true;
+    if (this.training) {
+      document.removeEventListener('pointerlockchange', this.lockChanged);
+      document.removeEventListener('pointerlockerror', this.lockDenied);
+      this.market.closeShop();
+    }
     removeEventListener('keydown', this._onKey);
-    this.root.remove();
+    try {
+      this.inspection.dispose();
+    } finally {
+      this.root.remove();
+    }
   }
 }
 

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import { DEFAULT_BINDINGS, bindingLabels, bindingLabel } from '../../src/core/bindings.ts';
 import type { ActionId } from '../../src/core/bindings.ts';
-import { CONTROL_SECTIONS } from '../../src/ui/controls.ts';
+import { controlSections } from '../../src/ui/controls.ts';
 import { PauseMenu } from '../../src/ui/menu.ts';
 import { Prompt } from '../../src/ui/prompts.ts';
 import { createTestContext, createTestInput } from '../lib/context.ts';
@@ -14,8 +14,8 @@ const makeEl = (): HTMLDivElement => document.createElement('div');
 function isActionId(value: string): value is ActionId {
   return Object.hasOwn(DEFAULT_BINDINGS, value);
 }
-const controls = CONTROL_SECTIONS.flatMap(
-  (section): (typeof CONTROL_SECTIONS)[number]['controls'] => section.controls
+const controls = controlSections('survival').flatMap(
+  (section): typeof section.controls => section.controls
 );
 const labels = new Set(controls.flatMap((control): readonly string[] => control.keys));
 for (const action of Object.keys(DEFAULT_BINDINGS)) {

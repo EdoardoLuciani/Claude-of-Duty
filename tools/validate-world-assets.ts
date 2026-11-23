@@ -12,6 +12,12 @@ import { unpackNav, NAV_VERSION } from '../src/ai/nav-format.ts';
 import { isRecord } from '../src/core/guards.ts';
 import { parseWorldManifest } from '../src/core/model-metadata.ts';
 import type { WorldLadder, WorldManifest } from '../src/core/model-metadata.ts';
+import {
+  DEFAULT_PLAYABLE_MAP,
+  matchesWorldMap,
+  PLAYABLE_MAPS,
+  SESSION_MODE_POLICY,
+} from '../src/core/playable-maps.ts';
 import { SURFACE_NAMES } from '../src/physics/surfaces.ts';
 import { PALETTE } from '../src/world/palette.ts';
 import { worldSourceHash } from './worldgen/source-hash.ts';
@@ -341,18 +347,32 @@ function requireUnique(ids: unknown[], label: string): void {
   });
 }
 
+const authoredCounts: Partial<
+  Record<(typeof PLAYABLE_MAPS)[number]['id'], { intel: number; spawns?: number }>
+> = { courtyard: { intel: 14 }, 'training-grounds': { intel: 0, spawns: 1 } };
+
+const mapId = args.map ?? meta?.mapId ?? DEFAULT_PLAYABLE_MAP.id;
+const map = PLAYABLE_MAPS.find((entry): boolean => entry.id === mapId);
 if (meta) {
+  if (!map) fail(`unknown playable map ID ${describe(mapId)}`);
+  else if (!matchesWorldMap(meta, map)) fail(`manifest map ID or mode does not match ${map.id}`);
+  const expected = map && authoredCounts[map.id];
   const { bounds, WORLD, spawns, lights, volumes, query } = meta;
   for (let i = 0; i < 3; i++) {
     if (bounds.min[i] > bounds.max[i]) fail(`manifest bounds are inverted on axis ${i}`);
   }
+  const training = meta.mode === 'training';
   const intel = WORLD?.MARKERS?.INTEL ?? [];
-  if (intel.length !== 14)
-    fail(`WORLD.MARKERS.INTEL must contain 14 authored points, found ${intel.length}`);
+  if (expected && intel.length !== expected.intel)
+    fail(
+      `WORLD.MARKERS.INTEL must contain ${expected.intel} authored points, found ${intel.length}`
+    );
   requireUnique(
     intel.map((marker): string => marker.id),
     'intel marker'
   );
+  if (expected?.spawns !== undefined && spawns.length !== expected.spawns)
+    fail(`manifest.spawns must contain ${expected.spawns} authored points, found ${spawns.length}`);
   if (!spawns.length) fail('manifest.spawns must be a non-empty array');
   requireUnique(
     array(manifest.spawns)!.map((spawn): unknown => object(spawn)?.id),
@@ -369,7 +389,7 @@ if (meta) {
       fail(`manifest.lights[${index}] has invalid kind`);
   });
   if (!volumes) fail('manifest.volumes must be an array');
-  if (!query?.street) fail('manifest.query.street is invalid');
+  if (!training && !query?.street) fail('manifest.query.street is invalid');
   if (!query?.alleys) fail('manifest.query.alleys must be an array');
 }
 
@@ -453,7 +473,10 @@ async function parseNavGzip(
 
 const visualAsset = parseGlbGzip(resolveAsset('visual'), 'visual');
 const collisionAsset = parseGlbGzip(resolveAsset('collision'), 'collision');
-const navAsset = await parseNavGzip(resolveAsset('nav'));
+const navAsset =
+  map && SESSION_MODE_POLICY[map.mode].survivalSystems
+    ? await parseNavGzip(resolveAsset('nav'))
+    : null;
 const visual = inspectVisual(visualAsset);
 const collision = inspectCollision(collisionAsset);
 const actual = visual && collision ? { ...visual, collideTris: collision.collideTris } : null;

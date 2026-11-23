@@ -29,7 +29,7 @@ import {
   velocity,
 } from 'three/tsl';
 import type { NodeFrame } from 'three/webgpu';
-import { Lighting, RenderPipeline, Vector2 } from 'three/webgpu';
+import { Lighting, NodeMaterial, RenderPipeline, Vector2 } from 'three/webgpu';
 import { AgXToneMapping, Color, SRGBColorSpace } from 'three/webgpu';
 import type { Renderer, Node } from 'three/webgpu';
 import type { PassNode, RTTNode, TextureNode, UniformNode } from 'three/webgpu';
@@ -308,6 +308,17 @@ export function createWorldViewPipeline(
       pipeline.render();
     },
     dispose(): void {
+      // Three r187 keeps the last effect material on each module's fullscreen quad.
+      // Material.dispose frees GPU state, not the node graph that captures our session.
+      for (const effect of [taaPass, aoPass, glow]) {
+        if (!effect) continue;
+        const inputs: unknown[] = Object.values(effect);
+        for (const input of inputs) {
+          if (input instanceof NodeMaterial) {
+            input.contextNode = input.colorNode = input.fragmentNode = null;
+          }
+        }
+      }
       detach();
       pipeline.dispose();
       for (const node of intermediates) node.dispose();

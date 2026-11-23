@@ -43,7 +43,7 @@ declare global {
     keyboardLock?: 'browser';
   }
   interface Navigator {
-    keyboard?: { lock(codes: string[]): Promise<void> };
+    keyboard?: { lock(codes: string[]): Promise<void>; unlock(): void };
   }
 }
 
@@ -57,6 +57,7 @@ type InputHandlers = {
   mousemove: (event: MouseEvent) => void;
   wheel: (event: WheelEvent) => void;
   lockchange: () => void;
+  fullscreenchange: () => void;
   blur: () => void;
   contextmenu: (event: MouseEvent) => void;
 };
@@ -78,6 +79,9 @@ export class Input {
   _rawLook: Point2 = { x: 0, y: 0 };
   wheel: number = 0;
   _pendingWheel: number = 0;
+  _fullscreenRequest: Promise<void> | null = null;
+  _ownsFullscreen = false;
+  _detached = false;
   pointerLocked: boolean = false;
   /** True for the frame after a held pointer lock was lost; a denied request never sets it. */
   lockLost: boolean = false;
@@ -109,12 +113,16 @@ export class Input {
       mousemove: this._onMouseMove.bind(this),
       wheel: this._onWheel.bind(this),
       lockchange: this._onLockChange.bind(this),
+      fullscreenchange: (): void => {
+        if (document.fullscreenElement !== document.documentElement) this._ownsFullscreen = false;
+      },
       blur: this._onBlur.bind(this),
       contextmenu: (e): void => e.preventDefault(),
     };
   }
 
   attach(): void {
+    this._detached = false;
     // Capture keyboard events before UI/browser-facing handlers. This matters
     // for modifier shortcuts: the browser must see preventDefault() before it
     // decides what Ctrl/Meta/Alt + a game key means.
@@ -127,10 +135,12 @@ export class Input {
     addEventListener('wheel', this._bound.wheel, { passive: true });
     addEventListener('blur', this._bound.blur);
     document.addEventListener('pointerlockchange', this._bound.lockchange);
+    document.addEventListener('fullscreenchange', this._bound.fullscreenchange);
     this.canvas.addEventListener('contextmenu', this._bound.contextmenu);
   }
 
-  detach(): void {
+  async detach(): Promise<void> {
+    this._detached = true;
     removeEventListener('keydown', this._bound.keydown, this._keyboardCapture);
     removeEventListener('keyup', this._bound.keyup, this._keyboardCapture);
     removeEventListener('mousedown', this._bound.mousedown);
@@ -139,19 +149,26 @@ export class Input {
     removeEventListener('wheel', this._bound.wheel);
     removeEventListener('blur', this._bound.blur);
     document.removeEventListener('pointerlockchange', this._bound.lockchange);
+    document.removeEventListener('fullscreenchange', this._bound.fullscreenchange);
     this.canvas.removeEventListener('contextmenu', this._bound.contextmenu);
+    // A Start/Resume request may settle after the session has stopped.
+    await this._fullscreenRequest;
+    if (this._ownsFullscreen) {
+      this._ownsFullscreen = false;
+      navigator.keyboard?.unlock();
+      if (document.fullscreenElement === document.documentElement) await document.exitFullscreen();
+    }
   }
 
-  requestPointerLock(): void {
-    // Chrome returns a promise that rejects if the document is not eligible
-    // (headless capture, an iframe, a lock request too soon after an exit).
-    // An unhandled rejection there shows up as a page error in the harness, so
-    // swallow it: failing to lock is not a game error.
+  /** Request settlement is not capture: dialogs resume only on pointerlockchange. */
+  requestPointerLock(onRequest?: (requested: boolean) => void): void {
     try {
-      const p = this.canvas.requestPointerLock();
-      void Promise.resolve(p).catch((): void => {});
+      void Promise.resolve(this.canvas.requestPointerLock()).then(
+        (): void => onRequest?.(true),
+        (): void => onRequest?.(false)
+      );
     } catch {
-      /* not eligible — keep running unlocked */
+      onRequest?.(false);
     }
   }
 
@@ -160,11 +177,25 @@ export class Input {
    * the fullscreen request consumes the click's user activation.
    */
   requestFullscreen(): void {
-    if (!document.fullscreenEnabled || document.fullscreenElement) return;
-    document.documentElement
+    if (
+      this._detached ||
+      !document.fullscreenEnabled ||
+      document.fullscreenElement ||
+      this._fullscreenRequest
+    )
+      return;
+    this._fullscreenRequest = document.documentElement
       .requestFullscreen({ keyboardLock: 'browser' })
-      .then((): Promise<void> | undefined => navigator.keyboard?.lock([...GAME_KEYS]))
-      .catch((): void => {}); // Windowed play remains supported.
+      .then((): void => {
+        if (document.fullscreenElement !== document.documentElement) return;
+        this._ownsFullscreen = true;
+        // unlock() also cancels a pending keyboard-lock request.
+        if (!this._detached) void navigator.keyboard?.lock([...GAME_KEYS]).catch((): void => {});
+      })
+      .catch((): void => {}) // Windowed play remains supported.
+      .finally((): void => {
+        this._fullscreenRequest = null;
+      });
   }
 
   /** True while keyboard input belongs to the active game rather than the menu. */

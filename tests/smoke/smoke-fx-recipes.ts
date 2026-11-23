@@ -2,7 +2,31 @@ import assert from 'node:assert/strict';
 
 import * as THREE from 'three';
 
+import { DecalSystem } from '../../src/fx/decals.ts';
 import { ParticleLayer, resetSpawn, STRIDE, disposeQuadSource } from '../../src/fx/particles.ts';
+
+// Evicting one permanent mark must keep the batch visible until the last one goes.
+const atlas = new THREE.Texture();
+const marks = new DecalSystem({ capacity: 8, cols: 4, albedo: atlas, normal: atlas, orm: atlas });
+const mark = {
+  point: new THREE.Vector3(),
+  normal: new THREE.Vector3(0, 1, 0),
+  size: 0.18,
+  tile: 0,
+  now: 0,
+  life: Infinity,
+};
+marks.add(mark);
+marks.add(mark);
+mark.life = 1;
+for (let i = 0; i < marks.capacity - 1; i++) marks.add(mark);
+marks.flush(2);
+assert(marks.mesh.visible);
+marks.add(mark);
+marks.flush(2);
+assert(!marks.mesh.visible);
+marks.dispose();
+atlas.dispose();
 
 // A real particle layer verifies bounded slot reuse, exact packing and upload/expiry lifecycle.
 const texture = new THREE.Texture();

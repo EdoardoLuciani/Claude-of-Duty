@@ -224,19 +224,24 @@ export class WorldSystem {
     }
 
     const sky = this._sky ?? (this._sky = ctx.peek('sky'));
-    if (!ctx.config.deterministic && dt > 0 && !ctx.peek('player')?.dead) {
+    if (
+      ctx.config.mode === 'survival' &&
+      !ctx.config.deterministic &&
+      dt > 0 &&
+      !ctx.peek('player')?.dead
+    ) {
       this._streetlightPower = tickStreetlightOutage(this._outage, dt, sky?.timeOfDay ?? 0);
     }
-    this._updateLights(sky?.sunAltitude ?? 0.6);
+    this.updatePracticalLights(sky?.sunAltitude ?? 0.6);
   }
 
   /** Capture/debug control; automatic outages are disabled in captures. */
   setStreetlightPower(power: number): void {
     this._streetlightPower = Math.max(0, Math.min(1, power));
-    this._updateLights(this.ctx.peek('sky')?.sunAltitude ?? 0.6);
+    this.updatePracticalLights(this.ctx.peek('sky')?.sunAltitude ?? 0.6);
   }
 
-  _updateLights(alt: number): void {
+  updatePracticalLights(alt: number): void {
     // Solar altitude turns lamps on at dusk; power only affects streetlights.
     const mix = 1 - Math.min(1, Math.max(0, (alt + 0.05) / 0.16));
     const mixChanged = Math.abs(mix - this._lampMix) > 0.01;

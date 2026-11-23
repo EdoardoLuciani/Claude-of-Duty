@@ -224,6 +224,7 @@ export class AudioSystem {
   bank: NoiseBank | null = null;
   samples: WeaponSampleBank | null = null;
   _starting: Promise<boolean> | null = null;
+  private _disposed = false;
   deafness: number = 0;
   /* preallocated scratch — update() allocates nothing */
   _probeDirs: Vec3Like[] = [];
@@ -275,7 +276,7 @@ export class AudioSystem {
   /** Player percentages; they outlive graph start/teardown, pause and restart. */
   volumes: VolumeSettings = defaultVolumes();
 
-  constructor() {
+  constructor(private readonly survivalAudio = true) {
     for (let i = 0; i < PROBE_RAYS - 1; i++) {
       const a = (i / (PROBE_RAYS - 1)) * Math.PI * 2;
       this._probeDirs.push({ x: Math.cos(a), y: 0.06, z: Math.sin(a) });
@@ -317,7 +318,7 @@ export class AudioSystem {
    */
   async start(): Promise<boolean> {
     if (this.running) return true;
-    if (this.failed) return false;
+    if (this.failed || this._disposed) return false;
     // A pointer gesture and a menu/API call can land in the same task. Without
     // this guard both calls build complete graphs, doubling every ambience bed
     // and leaving one graph orphaned — exactly the kind of noisy, muddy mix that
@@ -339,11 +340,13 @@ export class AudioSystem {
       this.actx = actx;
 
       await Mixer.prepare(actx);
+      if (this.actx !== actx) return false;
 
       // Preserve the shared deterministic noise used by finite synthesized events.
       this.bank = new NoiseBank(actx, this.rng.fork(), 9.6);
       const samples = (this.samples = new WeaponSampleBank(actx));
-      await samples.load();
+      await samples.load(this.survivalAudio);
+      if (this.actx !== actx) return false;
       const busVolumes: Partial<Record<BusName, number>> = {};
       for (const name of BUS_NAMES) busVolumes[name] = volumeGain(this.volumes[name]);
       const mixer = (this.mixer = new Mixer(actx, this.rng.fork(), {
@@ -358,20 +361,27 @@ export class AudioSystem {
       };
       mixer.buildReverbs();
       this.field = new SpatialField(actx, mixer, this.ctx);
-      this._callouts = new CalloutPlayer(actx, this.field, samples, this.rng.fork());
+      const calloutRng = this.rng.fork();
+      if (this.survivalAudio)
+        this._callouts = new CalloutPlayer(actx, this.field, samples, calloutRng);
       const ambience = (this.ambience = new Ambience(this.rng.fork()));
       ambience.start();
-      const tentRadio = (this.tentRadio = new TentRadio(actx, mixer, this.rng.fork()));
-      void tentRadio.warm();
+      const musicRng = this.rng.fork();
+      if (this.survivalAudio) {
+        this.tentRadio = new TentRadio(actx, mixer, musicRng);
+        void this.tentRadio.warm();
+      }
       mixer.setSpace(this._space, 0.001);
 
       if (actx.state === 'suspended') await actx.resume();
+      if (this.actx !== actx) return false;
       this.running = true;
       this.stats.started = true;
       this.stats.contextState = actx.state;
       console.info(`[audio] online @ ${actx.sampleRate} Hz`);
       return true;
     } catch (err) {
+      if (this._disposed) return false;
       console.warn('[audio] disabled:', err instanceof Error ? err.message : err);
       this.failed = true;
       this._teardown();
@@ -402,6 +412,7 @@ export class AudioSystem {
   }
 
   dispose(): void {
+    this._disposed = true;
     this._disarmGesture();
     for (const off of this._offs) off();
     this._offs.length = 0;

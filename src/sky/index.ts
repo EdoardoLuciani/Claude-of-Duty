@@ -226,8 +226,9 @@ export class SkySystem {
       );
     }
     const q = ctx.config.q;
-
-    this.timeRate = ctx.config.deterministic ? 0 : CLOCK.hoursPerSecond;
+    const clockRate =
+      ctx.config.deterministic || ctx.config.mode === 'training' ? 0 : CLOCK.hoursPerSecond;
+    this.timeRate = clockRate;
 
     // ---- shared uniform nodes --------------------------------------------
     // Every pass, the background and the environment material reference these
@@ -352,8 +353,8 @@ export class SkySystem {
     this._applyFog();
     this.setTimeOfDay(this.hour);
     this._offRestart = ctx.events.on('game:restart', (): void => {
-      this.timeRate = ctx.config.deterministic ? 0 : CLOCK.hoursPerSecond;
-      this.setTimeOfDay(CLOCK.startHour);
+      this.timeRate = clockRate;
+      this.setTimeOfDay(ctx.config.mode === 'training' ? this.hour : CLOCK.startHour);
     });
 
     console.info(

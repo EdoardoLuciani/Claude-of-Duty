@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 
+import { bindingLabel } from '../../src/core/bindings.ts';
+import { DEFAULT_PLAYABLE_MAP, PLAYABLE_MAPS } from '../../src/core/playable-maps.ts';
+import type { PlayableMap } from '../../src/core/playable-maps.ts';
 import { PlayerSystem } from '../../src/player/index.ts';
-import { StartGate } from '../../src/ui/start.ts';
+import { StartGate, StartMenu } from '../../src/ui/start.ts';
 import { createTestContext } from '../lib/context.ts';
 import { createCoreFixture } from '../lib/core-fixture.ts';
 import { fixture } from '../lib/fixture.ts';
@@ -31,6 +34,7 @@ function createElement(tag: string): HTMLElement;
 function createElement(tag: string): HTMLElement {
   const members = {
     style: fixture<CSSStyleDeclaration>({}),
+    textContent: '',
     onclick: null,
     setAttribute(): void {},
     append(): void {},
@@ -55,6 +59,14 @@ function createElement(tag: string): HTMLElement {
     }
     case 'button':
       node = fixture<HTMLButtonElement>(members);
+      break;
+    case 'input':
+      node = fixture<HTMLInputElement>(members);
+      break;
+    case 'fieldset':
+    case 'legend':
+    case 'label':
+      node = fixture<HTMLElement>(members);
       break;
     case 'p':
       node = fixture<HTMLParagraphElement>(members);
@@ -90,7 +102,10 @@ function dispatch(type: string): void {
   if (typeof listener === 'function') listener(event);
   else listener.handleEvent(event);
 }
-function createStartFixture(visible = true): {
+function createStartFixture(
+  visible = true,
+  map: PlayableMap = DEFAULT_PLAYABLE_MAP
+): {
   engine: ReturnType<typeof createCoreFixture>['engine'];
   gate: StartGate;
   click: () => void;
@@ -121,7 +136,7 @@ function createStartFixture(visible = true): {
     assert.equal(engine.viewScene.visible, false);
     order.push('reset');
   });
-  const gate = new StartGate(engine);
+  const gate = new StartGate(engine, map);
   gate.ready();
   const button = [...elements]
     .reverse()
@@ -141,6 +156,31 @@ function createStartFixture(visible = true): {
   };
   return { engine, gate, click, lock, fail, order };
 }
+const selected: PlayableMap[] = [];
+const menu = new StartMenu((map): void => {
+  selected.push(map);
+});
+menu.show();
+for (const map of PLAYABLE_MAPS) {
+  const button = elements.find((node): boolean => node.textContent === map.label);
+  assert(button?.onclick);
+  button.onclick(fixture<PointerEvent>({}));
+}
+assert.deepEqual(selected, PLAYABLE_MAPS);
+menu.dispose();
+
+const training = selected.find((map): boolean => map.id === 'training-grounds');
+assert(training);
+const trainingGate = createStartFixture(true, training).gate;
+assert(
+  elements.some(
+    (node): boolean =>
+      node.textContent?.includes(`with ${bindingLabel('use')}. Targets ahead`) === true
+  ),
+  'the selected range shows orientation with the canonical use binding'
+);
+trainingGate.dispose();
+
 let f = createStartFixture();
 assert.equal(f.engine.viewScene.visible, false);
 assert.equal(f.gate.afterPose(), false);
@@ -210,5 +250,5 @@ flush();
 assert.equal(f.engine.gameplaySuspended, true, 'stopped/disposal loop cannot activate');
 f.gate.dispose();
 console.log(
-  'smoke-start-gate: ok (intent, actual lock, retry, frame boundary, reset, pose, terminal, teardown)'
+  'smoke-start-gate: ok (map chooser, orientation, intent, actual lock, retry, reset, pose, terminal, teardown)'
 );

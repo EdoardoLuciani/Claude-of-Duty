@@ -3,7 +3,7 @@ import { bindingLabel } from '../core/bindings.ts';
 import type { EngineContext } from '../core/context.ts';
 import { hasOwn } from '../core/guards.ts';
 import { clamp, damp } from '../core/math.ts';
-import { CONTROL_SECTIONS } from './controls.ts';
+import { controlSections } from './controls.ts';
 import { el, setText, setStyle, ease } from './util.ts';
 
 const PRESETS = ['low', 'medium', 'high', 'ultra'] as const;
@@ -57,7 +57,7 @@ export class PauseMenu {
   open: boolean = false;
   shown: number = 0;
 
-  constructor(parent: HTMLElement, ctx: MenuContext) {
+  constructor(parent: HTMLElement, ctx: MenuContext, returnToStartMenu?: () => void) {
     this.ctx = ctx;
     this.root = el('dialog', 'ow-menu ow-dialog', parent);
     this.root.setAttribute('aria-labelledby', 'ow-menu-title');
@@ -104,6 +104,16 @@ export class PauseMenu {
     this.resumeBtn.autofocus = true;
     this.resumeBtn.addEventListener('click', (): void => this.close());
     el('div', 'hint', rail, `${bindingLabel('pause').toUpperCase()} RESUME`);
+    if (returnToStartMenu) {
+      const back = el('button', 'ow-btn', rail, 'Return to Start Menu');
+      back.type = 'button';
+      back.addEventListener('click', (): void => {
+        // Leaving a run must not resume its time or reacquire its pointer lock.
+        this.root.close();
+        this.open = false;
+        returnToStartMenu();
+      });
+    }
 
     // ---- gameplay ----------------------------------------------------------
     const game = this._page('Gameplay', (): void => {
@@ -184,7 +194,7 @@ export class PauseMenu {
     reference.tabIndex = 0; // Keyboard users can scroll the reference without leaving the game.
     el('p', 'ow-page-note', reference, 'Keyboard & mouse · Quick reference.');
     const groups = el('div', 'ow-controls-groups', reference);
-    for (const section of CONTROL_SECTIONS) {
+    for (const section of controlSections(ctx.config.mode)) {
       const group = el('section', 'ow-controls-group', groups);
       el('h3', null, group, section.title);
       const list = el('dl', null, group);

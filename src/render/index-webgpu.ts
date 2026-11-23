@@ -625,9 +625,11 @@ export class RenderSystem {
   }
   async dispose(): Promise<void> {
     this._disposing = true;
+    this.renderer.onDeviceLost = (): void => {};
     this._warmAbort.abort(new Error('Renderer disposed during warmup'));
     await this._warmTask?.catch((): void => {});
     await this._meterTask?.catch((): void => {});
+    this.indirect.dispose();
     this._meterPass?.dispose();
     this._graph?.dispose();
     this._volumeShadow?.dispose();
