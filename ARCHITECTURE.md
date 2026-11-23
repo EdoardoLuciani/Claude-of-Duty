@@ -112,7 +112,9 @@ correlated name/payload tuple. Semantics the types don't capture:
   skip gameplay hooks, freeze input/gameplay and require reload. Rendering
   continues unless it failed. Capture pumps reject `engine.error`. Only error
   listeners are individually isolated so UI/recorder retain the original error.
-- `weapon:shell` uses pooled casings; shotgun FX uses the offline spent hull.
+- `weapon:shell` uses pooled world casings; shotgun FX uses the offline spent hull.
+  Player case origins and launch directions are mapped from the animated ejection
+  port through the first-person and world projections. AI cases already use world space.
 
 ## Physics and world
 
@@ -223,7 +225,7 @@ prepass callback validates their birth/reuse history.
 Refresh CSM frustums when the unjittered projection changes. Bias depends on slope/
 cascade texels. Fog borrows native cascade depth/matrices, adding no shadow draw.
 Hoist noise outside the fog march; its uniform uses application frames. Haze keeps
-a private RG target.
+a private RG target for transient, source-local refraction.
 
 Three hashes visible light **IDs** and shadow state. Keep authored practicals and
 FX pools visible with stable identities; dim via `intensity = 0`, not visibility.
@@ -323,10 +325,11 @@ heal timing and effects, and radio owns strike execution.
 The held field radio is a standalone authored GLB. `radio-mesh.ts` loads it during
 weapons boot and binds one retained canvas emissive texture to `SCREEN_radio`.
 The viewmodel mounts it at `GRIP_radio`, owns the asset lifetime, and keeps the
-same model through stow, pause and restart. Equipping raises it into a fixed
-camera-space close-up; the LCD is the only radio interface, showing the select,
-send and stow bindings, charges or the empty state, request locks and the request
-cursor. Weapon keys stow the radio. Neither radio nor grenade equip interrupts a bolt cycle.
+same model through stow, pause and restart. Equipping raises it into a
+camera-space close-up with gentle idle sway and turn lag. The LCD is the only
+radio interface, showing the select, send and stow bindings, charges or the empty
+state, request locks and the request cursor. Weapon keys stow the radio. Neither
+radio nor grenade equip interrupts a bolt cycle.
 Once equipped, the equip key does not consume the accessory's other inputs.
 Request state does not depend on the model. [Radio asset contract](tools/blender/field_radio/README.md).
 
@@ -432,8 +435,10 @@ synthesis is only UI/electronic feedback, healing cues, tinnitus and shop music.
 Requests without a matching recording stay silent. Explosions carry optional
 `kind: 'grenade' | 'bomb'` (default grenade). Radio owns aircraft lifetime; audio
 owns source cleanup. Empty triggers click without a shot, flash or AI hearing
-evidence. Player firearm reports select explicit suppressed/unsuppressed banks from
-the effective firing definition, never a fixed profile or another weapon's bank.
+evidence. A successful fire-mode change plays a recorded mechanical detent on the
+foley bus, without a shot event. Player firearm reports select explicit
+suppressed/unsuppressed banks from the effective firing definition, never a
+fixed profile or another weapon's bank.
 Donor/calibre decisions live in `src/audio/samples/weapon-reports-provenance.json`.
 Callout provenance is `src/audio/samples/callouts/provenance.json`; there
 is no runtime TTS or credential access.

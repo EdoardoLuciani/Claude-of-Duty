@@ -61,8 +61,20 @@ function emitted(): { pieces: Map<string, Piece>; w2Openings: BuildingInfo['faca
   };
   const w2 = buildWorld(A).find((info): boolean => info.spec.id === 'W2');
   assert(w2);
-  seat.material.dispose();
   assert.equal(unsupported.size, 0, 'baked balcony props keep a physical seat');
+  for (const id of ['tyre', 'tyre_small']) {
+    const visual = A._protos.get(id)?.visualGeo;
+    assert(visual);
+    visual.computeBoundingBox();
+    assert(visual.boundingBox);
+    const { min, max } = visual.boundingBox;
+    seat.geometry = visual;
+    seat.matrixWorld.identity();
+    const ray = new THREE.Raycaster(new THREE.Vector3(max.x * 0.74, max.y + 1, 0), down);
+    const hit = ray.intersectObject(seat, false)[0];
+    assert(hit && hit.point.y > (min.y + max.y) / 2, `${id}: top sidewall faces outward`);
+  }
+  seat.material.dispose();
   // Instances after clutter clearance, so culling differences count too.
   for (const [id, proto] of A._protos) {
     assert(proto.geo, 'unfinalized prototypes retain their geometry');

@@ -612,6 +612,9 @@ export class AudioSystem {
           level: o.level,
           send: COMBAT_MIX.drySend,
         });
+      case 'fire_selector':
+        // Switch detent only; reuse the recorded mechanical click without static.
+        return this.samples!.radio('fire_selector', rng, { when, level: o.level });
       case 'grenade_throw':
         return this.samples!.combat('grenade-throw', rng, {
           when,

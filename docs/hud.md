@@ -28,8 +28,11 @@ The market's 3D weapon preview uses its own Three WebGPU renderer.
   countdown uses raw time and its own anchor, independent of interaction prompts.
 - Minimap terrain is baked once on a detached Canvas2D surface, uploaded once and
   presented with retained dynamic cues.
-- Keep the simple icons, magazine bar and 32/16/12 px bottom-readout tiers. The HUD
-  shows no radio inventory or panel; the held radio's LCD is its interface.
+- The magazine bar empties at the removal beat and jumps to the actual ammo count
+  when the new magazine seats. Tube reloads update the count one shell at a time.
+  The separate progress bar tracks the active reload clip.
+- Keep the simple icons and bottom-readout tiers. There is no radio inventory or
+  panel; the held radio's LCD is its interface.
 - Required HUD initialization failures propagate to the native boot/reload dialog,
   never to gameplay without readouts. Preserve the original
   error and restore Pixi's DOM adapter even if partial cleanup fails.

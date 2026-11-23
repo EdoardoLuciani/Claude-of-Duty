@@ -22,7 +22,7 @@ import {
 import { FOLEY_URLS } from './foley-urls.ts';
 import { HIT_MIX, HIT_URLS, type DamageSoundOptions } from './hits.ts';
 import { FALL_BANK, FOLEY_MIX, IMPACT_BANK, STEP_BANK, type FoleyOptions } from './physical.ts';
-import { RADIO_URLS, RADIO_MIX, RADIO_PARTS, type RadioKind } from './radio.ts';
+import { RADIO_URLS, RADIO_MIX, RADIO_PARTS } from './radio.ts';
 import { REACTION_URLS, REACTION_MIX, reactionBank, type ReactionKind } from './reactions.ts';
 import { recordingUrls, recordingUrl } from './recordings.ts';
 import { RELOAD_MIX, RELOAD_URLS, reloadKind, type ReloadKind } from './reloads.ts';
@@ -282,9 +282,9 @@ export class WeaponSampleBank {
     return this._playRecording(buffer, ENVIRONMENT_GAIN[kind] * (o.level ?? 1), o.when, 0.65);
   }
 
-  /** One finite click/static composite; receive-only intel never invents a button press. */
+  /** Play only the recorded components requested by the cue. */
   radio(
-    kind: RadioKind,
+    kind: keyof typeof RADIO_PARTS,
     rng: Rng,
     o: { when?: number | undefined; level?: number | undefined } = {}
   ): AudioVoice {

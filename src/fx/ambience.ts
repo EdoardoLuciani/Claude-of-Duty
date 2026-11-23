@@ -6,9 +6,7 @@ import type { FxSystem } from './index.ts';
 import { resetSpawn, setSpawnColorRamp, setSpawnPosition, setSpawnVelocity } from './particles.ts';
 import { V, cone } from './util.ts';
 
-/** Dust motes follow the camera, heat shimmer sits ahead on sunlit ground, and finite smoke
- * columns share the bounded emitter pool used by explosions.
- */
+/** Dust motes follow the camera; explosions and wrecks share a bounded smoke column pool. */
 
 const MAX_EMITTERS = 24;
 
@@ -41,21 +39,18 @@ export type ColumnOptions = Partial<
 interface AmbienceOptions {
   motes?: number;
   box?: number;
-  shimmer?: boolean;
 }
-type AmbienceFx = Pick<FxSystem, 'rng' | 'emitLit' | 'emitAdd' | 'emitMote' | 'haze' | 'physics'>;
+type AmbienceFx = Pick<FxSystem, 'rng' | 'emitLit' | 'emitAdd' | 'emitMote' | 'haze'>;
 
 export class Ambience {
   fx: AmbienceFx;
   moteCount: number;
   moteBox: number;
   moteEnabled: boolean;
-  shimmerEnabled: boolean;
   emitters: Emitter[] = [];
   moteLife: number = 9;
   moteAcc: number = 0;
   sunFactor: number = 1;
-  shimmerAcc: number = 0;
   _fwd: THREE.Vector3 = new THREE.Vector3();
   _warm: number = 0;
 
@@ -66,8 +61,6 @@ export class Ambience {
     this.moteCount = opts.motes ?? 240;
     this.moteBox = opts.box ?? 22;
     this.moteEnabled = this.moteCount > 0;
-
-    this.shimmerEnabled = opts.shimmer !== false;
   }
 
   _acquire(): Emitter {
@@ -209,34 +202,6 @@ export class Ambience {
     }
   }
 
-  _shimmer(dt: number, now: number, camera: THREE.Camera): void {
-    const fx = this.fx;
-    if (!this.shimmerEnabled || this.sunFactor < 0.35) return;
-    this.shimmerAcc += dt;
-    if (this.shimmerAcc < 0.22) return;
-    this.shimmerAcc = 0;
-    const rng = fx.rng;
-    camera.getWorldDirection(this._fwd);
-    const d = rng.range(3.5, 15);
-    const sx = camera.position.x + this._fwd.x * d + rng.signed() * 4;
-    const sz = camera.position.z + this._fwd.z * d + rng.signed() * 4;
-    let gy = camera.position.y - 1.6;
-    if (fx.physics?.groundHeight) {
-      const h = fx.physics.groundHeight(sx, sz, camera.position.y + 6);
-      if (Number.isFinite(h)) gy = h;
-    }
-    fx.haze(
-      sx,
-      gy + rng.range(0.15, 0.6),
-      sz,
-      rng.range(0.5, 1.2),
-      1.9,
-      rng.range(1.1, 2.0),
-      rng.range(0.12, 0.3) * this.sunFactor,
-      rng.float() < 0.5 ? P.SMOKE_A : P.MIST
-    );
-  }
-
   update(dt: number, now: number, camera: THREE.Camera): void {
     for (const e of this.emitters) {
       if (!e.active) continue;
@@ -254,6 +219,5 @@ export class Ambience {
     }
 
     if (this.moteEnabled) this._motes(dt, now, camera);
-    this._shimmer(dt, now, camera);
   }
 }

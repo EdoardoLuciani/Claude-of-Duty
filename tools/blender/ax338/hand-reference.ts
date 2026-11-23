@@ -446,8 +446,8 @@ function firingClearance(p: THREE.Vector3): number {
 }
 const grips: Record<Side, GripFrame> = {
   right: { pos: [0.044, -0.021, 0.114], finger: [0.06, 0.04, -0.997], back: [1, 0.03, 0.04] },
-  // Support under the moulded panels, within actual hip/ADS arm reach.
-  left: { pos: [-0.069, 0.002, -0.205], finger: [0.76, -0.1, -0.64], back: [-0.13, -0.985, 0.001] },
+  // Seat the palm under the moulded panel, with the thumb along its upper edge.
+  left: { pos: [-0.065, 0.01, -0.197], finger: [0.7, -0.1, -0.71], back: [-0.13, -0.985, 0.001] },
 };
 // Authored holding pose, checked against saved glove skins and neighbouring
 // fingers. Preserve approved wrist/index/thumb; no runtime fitting is added.
@@ -544,7 +544,7 @@ for (const side of ['right', 'left'] as const) {
     'ax338',
     side === 'right'
       ? { thumb: [-0.02, 0.002, 0.078], index: [0.015, 0.012, 0.03], spread: [0, 0.6, 0.62, 0.64] }
-      : { thumb: [-0.041, 0.055, -0.263], thumbPole: [-1, 1, 0] }
+      : { thumb: [-0.032, 0.062, -0.272], thumbPole: [0, 0, -1] }
   );
   arm.setPose('ax338');
   if (side === 'left') {

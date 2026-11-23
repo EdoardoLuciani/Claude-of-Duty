@@ -195,6 +195,22 @@ try {
     frame();
     assert.equal(hud.draws, before + 1, 'unchanged presentation settles again');
   }
+  // Magazine fill follows the removal/seating beats, not the progress bar.
+  state.ammo = 9;
+  state.reloading = true;
+  state.reloadProgress = 0.1;
+  frame();
+  const magazineFill = hud.ammo['magFill'].scale;
+  assert.equal(magazineFill.x, 0.3);
+  state.magazineOut = true;
+  state.reloadProgress = 0.8;
+  frame();
+  assert.equal(magazineFill.x, 0);
+  state.magazineOut = false;
+  state.ammo = 30;
+  frame();
+  assert.equal(magazineFill.x, 1, 'a seated magazine may fill before the clip ends');
+  state.reloading = false;
   state.ammo = 0;
   frame();
   const empty = hud.draws;
