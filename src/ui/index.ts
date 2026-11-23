@@ -4,7 +4,7 @@ import { bindingLabel } from '../core/bindings.ts';
 import type { SystemId, EngineContext } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName } from '../core/events.ts';
 import { clamp, clamp01, damp } from '../core/math.ts';
-import type { CourseGate } from '../core/model-metadata.ts';
+import type { CourseGate, WorldRangeStation } from '../core/model-metadata.ts';
 import { SESSION_MODE_POLICY } from '../core/playable-maps.ts';
 import type { PlayableMap } from '../core/playable-maps.ts';
 import type { WeaponMode } from '../weapons/defs.ts';
@@ -27,7 +27,7 @@ import { el, setStyle } from './util.ts';
 
 const MAX_BLIPS = 48;
 const STATION_RADIUS = 3;
-const STATION_PROMPT = { text: 'Range station', sub: 'Loadout · Resupply · Reset targets' };
+const STATION_PROMPT = { text: 'Supply market', sub: 'Loadout · Resupply · Reset targets' };
 const HEAL_KEY = bindingLabel('heal');
 
 const HUD_DEFAULTS = {
@@ -120,6 +120,7 @@ export class UiSystem {
   banner: Banner = new Banner();
   private courseStep = 0;
   private course: readonly CourseGate[] = [];
+  private station: Readonly<WorldRangeStation> | undefined;
   menu!: PauseMenu;
   startGate: StartGate | null = null;
   pixiHud: PixiHud | null = null;
@@ -136,7 +137,6 @@ export class UiSystem {
   hudVisible: number = 1;
   hudTarget!: number;
   _lastRaw!: number;
-  _marketJustClosed!: boolean;
   _healPrompt: boolean = false;
   _bakeFrame: number = 0;
   _pos: THREE.Vector3 = new THREE.Vector3();
@@ -162,14 +162,14 @@ export class UiSystem {
     this.centreLayer = el('div', 'ow-layer', this.root);
 
     this.rng.fork(); // Keep the minimap's noise stream unchanged after removing damage popups.
-    const { survivalSystems, freeMarket } = SESSION_MODE_POLICY[ctx.config.mode];
+    const { survivalSystems } = SESSION_MODE_POLICY[ctx.config.mode];
     if (survivalSystems) {
       this.minimap = new Minimap(this.rng.fork());
       for (let i = 0; i < MAX_BLIPS; i++)
         this._blips.push({ x: 0, z: 0, kind: 'enemy', heading: 0 });
     }
     this.menu = new PauseMenu(this.root, ctx, this.returnToStartMenu);
-    this.gameOver = new GameOverScreen(this.root, !survivalSystems, (): void => {
+    this.gameOver = new GameOverScreen(this.root, (): void => {
       if (this.startGate) this.startGate.restart();
       else {
         ctx.events.emit('game:restart', { source: 'game-over' });
@@ -178,19 +178,20 @@ export class UiSystem {
     });
     const market = ctx.peek('market');
     if (market) this.shop = new MarketOverlay(this.root, ctx);
-    this.scoreBar.visible = survivalSystems;
-    this.marketCountdown = new MarketCountdown(survivalSystems ? (market?.delay ?? 0) : 0);
+    this.scoreBar.visible = ctx.has('game');
+    this.marketCountdown = new MarketCountdown(market?.delay ?? 0);
 
     this.hudTarget = 1;
     this._lastRaw = ctx.time.raw;
-    this._marketJustClosed = false; // one frame after the shop closes
 
     const on = <K extends EngineEventName>(
       type: K,
       fn: (event: EngineEventMap[K]) => void
     ): number => this._unsubs.push(ctx.events.on(type, fn));
 
-    this.course = ctx.get('world').queries.course;
+    const { course, rangeStation } = ctx.get('world').queries;
+    this.course = course;
+    this.station = rangeStation;
     if (this.course.length) {
       on('player:mantle', (e): void => this.courseAction(e.kind));
       on('bullet:impact', (e): void => {
@@ -258,20 +259,12 @@ export class UiSystem {
       this.shop?.hide();
       this.pixiHud?.setVisible(false);
     });
-    if (!freeMarket) {
-      on('market:open', (e): void => {
-        this.shop?.show(e.wave);
-        this.sfx('market_open', 0.85);
-      });
-      on('market:close', (): void => {
-        this.shop?.hide();
-        this.sfx('market_close', 0.7);
-        // The shop released the pointer and possibly consumed the Escape that
-        // closed it — keep the pause machinery out of this frame entirely.
-        this._marketJustClosed = true;
-        this.ctx.input.requestPointerLock();
-      });
-    }
+    // The overlay closes the market itself, after mouse capture has resumed gameplay.
+    on('market:open', (e): void => {
+      this.shop?.show(e.wave);
+      this.sfx('market_open', 0.85);
+    });
+    on('market:close', (): void => this.sfx('market_close', 0.7));
 
     on('explosion', (e): void => {
       this._tmp.copy(e.position).sub(this._playerPos());
@@ -449,8 +442,7 @@ export class UiSystem {
 
   /** Prepare the market state for integration checks. */
   debugState(name: string): { state: string } {
-    if (name !== 'market' || !this.shop || SESSION_MODE_POLICY[this.ctx.config.mode].freeMarket)
-      throw new Error('Unknown UI debug state');
+    if (name !== 'market' || !this.shop) throw new Error('Unknown UI debug state');
     this.menu.close();
     this.killfeed.clear();
     this.clearPrompt();
@@ -498,15 +490,11 @@ export class UiSystem {
     s.time = t.elapsed;
 
     // ---- pause -----------------------------------------------------------
-    const { freeMarket } = SESSION_MODE_POLICY[ctx.config.mode];
     const playerDead = ctx.peek('player')?.dead === true;
     const marketOpen = ctx.peek('market')?.open === true;
-    // The shop owns the pointer and the Escape key while it is open; letting
-    // the pause machinery see either would open the menu under the shop or
-    // double-toggle on the same Esc that skipped it.
-    if (this._marketJustClosed) {
-      this._marketJustClosed = false;
-    } else if (ctx.input.enabled && !ctx.input.frozen && !playerDead && !marketOpen) {
+    // The shop owns the pointer and the Escape key while it is open; resuming from it
+    // clears pending input, so its Esc cannot also toggle this menu.
+    if (ctx.input.enabled && !ctx.input.frozen && !playerDead && !marketOpen) {
       if (ctx.input.actionPressed('pause')) this.menu.toggle();
       // Losing pointer lock mid-match is the same intent as pressing Escape.
       else if (ctx.input.lockLost) this.menu.show();
@@ -520,22 +508,24 @@ export class UiSystem {
         this.courseAction(player.state === 'climb' ? 'climb' : 'crouch');
     }
     let near = false;
-    if (freeMarket && this.shop) {
+    const station = this.station;
+    if (station && this.shop) {
       const feet = ctx.get('player').feetPosition;
-      const marker = ctx.get('world').queries.rangeStation;
-      near = !!marker && Math.hypot(feet.x - marker.x, feet.z - marker.z) <= STATION_RADIUS;
+      near = Math.hypot(feet.x - station.x, feet.z - station.z) <= STATION_RADIUS;
       if (
         near &&
         !playerDead &&
         !this.menu.open &&
         !marketOpen &&
         ctx.input.enabled &&
+        !ctx.input.frozen &&
+        !ctx.engine.gameplaySuspended &&
         !ctx.get('weapons').grenadeEquipped &&
         !ctx.input.ads
       ) {
         if (!this.prompt.active || this._promptOwner !== this.shop)
           this.setPrompt(STATION_PROMPT, this.shop);
-        if (ctx.input.actionPressed('use')) this.shop.show();
+        if (ctx.input.actionPressed('use')) ctx.get('market').openShop();
       } else this.clearPrompt(this.shop);
     }
     const gates = this.course;
@@ -594,7 +584,7 @@ export class UiSystem {
       s.nextWaveIn = gameState.nextWaveIn;
     }
 
-    const marketState = freeMarket ? null : ctx.peek('market')?.getHudState();
+    const marketState = ctx.peek('market')?.getHudState();
     if (marketState) {
       s.credits = marketState.credits;
       s.marketIn = marketState.marketIn;

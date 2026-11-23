@@ -227,9 +227,6 @@ try {
     'models/world/other/level.json',
     'models/world/other/nav.gz',
   ]);
-  meta.mapId = 'courtyard';
-  delete assets.nav;
-  await assert.rejects(models._prefetchWorld(), /missing navigation asset/);
 } finally {
   globalThis.fetch = fetch;
 }

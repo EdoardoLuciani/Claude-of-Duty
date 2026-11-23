@@ -29,7 +29,7 @@ export class GameOverScreen {
   shown: number = 0;
   delay: number = 2.85;
 
-  constructor(parent: HTMLElement, training: boolean, onRestart: (() => void) | null) {
+  constructor(parent: HTMLElement, onRestart: (() => void) | null) {
     this.onRestart = onRestart;
     this.root = el('dialog', 'ow-gameover ow-dialog', parent);
     this.root.setAttribute('aria-labelledby', 'ow-gameover-title');
@@ -40,18 +40,8 @@ export class GameOverScreen {
     this.title = el('div', 'ow-gameover-title', panel, 'KILLED IN ACTION');
     this.title.id = 'ow-gameover-title';
     el('div', 'ow-gameover-rule', panel);
-    this.summary = el(
-      'div',
-      'ow-gameover-sub',
-      panel,
-      training ? 'Return to the firing line for another run.' : ''
-    );
-    this.button = el(
-      'button',
-      'ow-gameover-button',
-      panel,
-      training ? 'RESTART TRAINING' : 'NEW GAME'
-    );
+    this.summary = el('div', 'ow-gameover-sub', panel, '');
+    this.button = el('button', 'ow-gameover-button', panel, 'NEW GAME');
     this.button.autofocus = true;
     el('div', 'ow-gameover-hint', panel, 'ENTER / SPACE');
 

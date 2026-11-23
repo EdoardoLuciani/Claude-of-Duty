@@ -36,7 +36,7 @@ export class WorldQueries {
   declare ladders: WorldLadder[];
   readonly course: readonly CourseGate[];
   readonly rangeStation: Readonly<WorldRangeStation> | undefined;
-  private readonly rangeTargets: readonly WorldRangeTarget[];
+  readonly rangeTargets: readonly WorldRangeTarget[];
 
   constructor(meta: WorldQueryMetadata) {
     this.buildings = (meta.buildings ?? []).map((building): BuildingFootprint =>

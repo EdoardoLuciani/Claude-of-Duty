@@ -48,8 +48,8 @@ A leading `_` marks a member internal to its subsystem: files in the same direct
 
 Training Grounds loads a separate authored world. Its session registers the same player, physics,
 weapons, FX, radio and market systems, without the Survival director or intel. The firing-line
-counter opens the same market catalog, prices and loadout editor with an unlimited session balance.
-Closing the counter waits for pointer lock before resuming gameplay. Target marks use the resolved world-impact decals. Grenades and radio strikes use the shared blast damage, cover, armour and healing rules in both modes. The optional yard circuit uses ordered action zones from the loaded manifest; UI tracks movement and player bullet impacts on labeled faces, independently of free practice and Survival scoring.
+counter opens the same Supply Market with an unlimited session balance. In both modes the
+market overlay suspends gameplay and waits for pointer lock before resuming it. Target marks use the resolved world-impact decals. Grenades and radio strikes use the shared blast damage, cover, armour and healing rules in both modes. The optional yard circuit uses ordered action zones from the loaded manifest; UI tracks movement and player bullet impacts on labeled faces, independently of free practice and Survival scoring.
 
 Each system declares `static id`, `static deps`, and implements needed hooks:
 `async init(ctx)`, `fixedUpdate(h, ctx)` (120 Hz), `update(dt, ctx)`,
@@ -66,7 +66,7 @@ from their implementations, not handwritten consumer APIs. `Engine.add()` and
 
 The Start menu selects a map from `src/core/playable-maps.ts` before the engine
 initializes. The entry's session mode sets `config.mode`; read mode differences from
-`SESSION_MODE_POLICY` (Survival systems, free issue counter, fixed clock), never from
+`SESSION_MODE_POLICY` (Survival systems, starting credits, fixed clock), never from
 the mode name. Map-specific behavior follows the loaded manifest's markers. The
 manifest records its map ID and mode, and the loader rejects a mismatched bundle. Each entry creates an
 independent session; returning from Pause tears down its engine, input, renderer
@@ -110,7 +110,7 @@ correlated name/payload tuple. Semantics the types don't capture:
 - Each new run starts with a scaled-time countdown to wave 1. Waiting at Start
   and pausing freeze it. The opening countdown does not emit `wave:complete`.
 - A wave clear starts an ammo-looting grace period. The shop opens halfway through
-  the wave countdown and freezes scaled time until dismissed; the remaining countdown
+  the wave countdown and suspends gameplay until dismissed; the remaining countdown
   gives players time to prepare for the next wave.
 - `ai:footstep` is one boot per animated stride plant; cull by distance.
   `ai:bark` requests contact on visual acquisition, reload on reload start, or a
@@ -188,8 +188,8 @@ use canonical `geo`, topology and RNG/instance inputs. Paint-only batches do not
 collision. The exporter builds and validates manifest v2 and content-hashed products
 for each playable map. Survival keeps the root `public/models/world/` bundle and
 Training Grounds uses `public/models/world/training/`. `ModelSystem` loads the selected
-bundle and verifies map identity before loading its assets; only the Survival mode
-bakes and loads navigation. Training does not load enemy ammo pickups. Optional world-space range station and target-face markers
+bundle and verifies map identity before loading its assets. Survival-mode bundles bake
+navigation, and `ModelSystem` loads it when the manifest lists it. Optional world-space range station and target-face markers
 come from the loaded manifest via `WorldQueries`; runtime UI and FX do not import
 authoring coordinates. Preserve instancing/masks; never author separate collision
 geometry. Validate with `bun tools/export-world.ts --check`, world/physics tests and screenshots.
@@ -378,9 +378,8 @@ resolution without importing weapon loading or mounting. `src/weapons/attachment
 owns asset loading and the shared gameplay/inspection mount solver.
 `src/market/attachments.ts` owns prices, not compatibility. Market holds one
 unconfirmed build; selecting, inspecting or editing never changes gameplay or credits.
-Confirmation rechecks credits, shop state and asset readiness. Survival uses
-`weapons.applyBuild()`; the range counter uses `weapons.applyTrainingBuild()` to apply
-or reselect a trial loadout. Both charge the quoted total only after the build succeeds. New weapons are configured before replacing
+Confirmation rechecks credits, shop state and asset readiness, applies
+`weapons.applyBuild()` and charges the quoted total only after the build succeeds. New weapons are configured before replacing
 ownership, so a rejected build never drops the old gun.
 
 `WeaponDef.fits` is a per-slot partial record keyed by attachment ID: each entry

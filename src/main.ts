@@ -129,7 +129,7 @@ async function bootSession(map: PlayableMap): Promise<void> {
   } else {
     engine.add(TrainingUiSystem, returnToStartMenu);
   }
-  engine.add(AudioSystem, survivalSystems);
+  engine.add(AudioSystem);
 
   if (survivalSystems && params.get('telemetry') === '1') {
     const { TelemetrySystem } = await import('./dev/telemetry.ts');

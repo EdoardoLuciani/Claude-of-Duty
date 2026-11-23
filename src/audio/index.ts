@@ -276,7 +276,7 @@ export class AudioSystem {
   /** Player percentages; they outlive graph start/teardown, pause and restart. */
   volumes: VolumeSettings = defaultVolumes();
 
-  constructor(private readonly survivalAudio = true) {
+  constructor() {
     for (let i = 0; i < PROBE_RAYS - 1; i++) {
       const a = (i / (PROBE_RAYS - 1)) * Math.PI * 2;
       this._probeDirs.push({ x: Math.cos(a), y: 0.06, z: Math.sin(a) });
@@ -345,7 +345,7 @@ export class AudioSystem {
       // Preserve the shared deterministic noise used by finite synthesized events.
       this.bank = new NoiseBank(actx, this.rng.fork(), 9.6);
       const samples = (this.samples = new WeaponSampleBank(actx));
-      await samples.load(this.survivalAudio);
+      await samples.load();
       if (this.actx !== actx) return false;
       const busVolumes: Partial<Record<BusName, number>> = {};
       for (const name of BUS_NAMES) busVolumes[name] = volumeGain(this.volumes[name]);
@@ -361,16 +361,11 @@ export class AudioSystem {
       };
       mixer.buildReverbs();
       this.field = new SpatialField(actx, mixer, this.ctx);
-      const calloutRng = this.rng.fork();
-      if (this.survivalAudio)
-        this._callouts = new CalloutPlayer(actx, this.field, samples, calloutRng);
+      this._callouts = new CalloutPlayer(actx, this.field, samples, this.rng.fork());
       const ambience = (this.ambience = new Ambience(this.rng.fork()));
       ambience.start();
-      const musicRng = this.rng.fork();
-      if (this.survivalAudio) {
-        this.tentRadio = new TentRadio(actx, mixer, musicRng);
-        void this.tentRadio.warm();
-      }
+      const tentRadio = (this.tentRadio = new TentRadio(actx, mixer, this.rng.fork()));
+      void tentRadio.warm();
       mixer.setSpace(this._space, 0.001);
 
       if (actx.state === 'suspended') await actx.resume();

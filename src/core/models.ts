@@ -6,7 +6,7 @@ import type { SystemId } from './context.ts';
 import { validateTriangleGeometry } from './geometry-validation.ts';
 import { parseSoldierMetadata, parseWorldManifest } from './model-metadata.ts';
 import type { SoldierRecord, WorldPrefetch } from './model-metadata.ts';
-import { DEFAULT_PLAYABLE_MAP, matchesWorldMap, SESSION_MODE_POLICY } from './playable-maps.ts';
+import { DEFAULT_PLAYABLE_MAP, matchesWorldMap } from './playable-maps.ts';
 import type { PlayableMap } from './playable-maps.ts';
 import { isSkinnedMesh } from './three-guards.ts';
 export type { SoldierRecord, WorldPrefetch } from './model-metadata.ts';
@@ -35,9 +35,6 @@ export class ModelSystem {
     this.loader = new GLTFLoader();
     this._soldiers = new Map();
     this.worldPrefetch = watch(this._prefetchWorld());
-    if (SESSION_MODE_POLICY[this.map.mode].survivalSystems) {
-      for (const name of ['vanguard', 'irregular', 'breacher']) void watch(this.getSoldier(name));
-    }
   }
 
   async _prefetchWorld(): Promise<WorldPrefetch> {
@@ -50,12 +47,10 @@ export class ModelSystem {
     if (!matchesWorldMap(meta, this.map))
       throw new Error(`[models] unexpected world manifest map ID or mode at ${base}/level.json`);
     const { visual, collision, nav } = meta.assets;
-    const needsNav = SESSION_MODE_POLICY[this.map.mode].survivalSystems;
-    if (needsNav && !nav) throw new Error('[models] missing navigation asset');
     const [visualGlb, collisionGlb, navBytes] = await Promise.all([
       this._loadWorldGLB(`${base}/${visual}`),
       this._loadWorldGLB(`${base}/${collision}`),
-      needsNav ? this._loadWorldBytes(`${base}/${nav}`) : undefined,
+      nav ? this._loadWorldBytes(`${base}/${nav}`) : undefined,
     ]);
     this.worldNav = navBytes;
     return { meta, visual: visualGlb, collision: collisionGlb };

@@ -29,17 +29,17 @@ export const PLAYABLE_MAPS = [
 
 /** Everything a session does differently by mode; map content comes from the manifest. */
 export interface SessionModePolicy {
-  /** AI, waves, intel, pickups, telemetry, nav and the Survival HUD. */
+  /** Enemies, waves, intel, telemetry, navigation and the minimap. */
   readonly survivalSystems: boolean;
-  /** The issue counter: unlimited credits, trial equips, no between-wave shop. */
-  readonly freeMarket: boolean;
+  /** Market credits at session start and restart. */
+  readonly startingCredits: number;
   /** Hold the chosen time of day instead of running the session clock. */
   readonly fixedClock: boolean;
 }
 
 export const SESSION_MODE_POLICY = {
-  survival: { survivalSystems: true, freeMarket: false, fixedClock: false },
-  training: { survivalSystems: false, freeMarket: true, fixedClock: true },
+  survival: { survivalSystems: true, startingCredits: 0, fixedClock: false },
+  training: { survivalSystems: false, startingCredits: Infinity, fixedClock: true },
 } as const satisfies Record<RuntimeConfig['mode'], SessionModePolicy>;
 
 export function isSessionMode(value: unknown): value is RuntimeConfig['mode'] {

@@ -12,7 +12,6 @@ import {
   type LiveGrenade,
 } from '../core/grenades.ts';
 import { DEG, clamp, lerp, smootherstep } from '../core/math.ts';
-import { SESSION_MODE_POLICY } from '../core/playable-maps.ts';
 import { Rng } from '../core/rng.ts';
 import { AmmoPickups } from './ammo-pickups.ts';
 import { disposeWeaponLoader } from './asset-loader.ts';
@@ -309,6 +308,7 @@ export class WeaponSystem {
       held.frustumCulled = false; // like the other first-person meshes
       this.viewmodel.grenade.add(held);
     });
+    const radio = this.viewmodel.loadRadio(renderer);
     const mounts = Promise.all([Promise.all(spawn.map(load)), attachments]).then(
       ([records]): void => {
         for (let i = 0; i < spawn.length; i++) {
@@ -321,14 +321,11 @@ export class WeaponSystem {
         }
       }
     );
-    const startup = [mounts, attachments, grenade, this.viewmodel.loadRadio(renderer)];
-    if (SESSION_MODE_POLICY[ctx.config.mode].survivalSystems) {
-      startup.push(
-        AmmoPickups.load(this, renderer).then((pool): void => {
-          this._pickups = pool;
-        })
-      );
-    }
+    // Queue pickup parsing after the spawn weapons, but fetch its bytes alongside theirs.
+    const pickups = AmmoPickups.load(this, renderer).then((pool): void => {
+      this._pickups = pool;
+    });
+    const startup = [mounts, attachments, grenade, radio, pickups];
     try {
       await Promise.all(startup);
       this._restTask = (async (): Promise<void> => {
@@ -374,13 +371,11 @@ export class WeaponSystem {
         this._setDeathDisabled(false);
       })
     );
-    const pickups = this._pickups;
-    if (pickups)
-      this._off.push(
-        ctx.events.on('actor:death', (e): void => {
-          pickups.onActorDeath(e);
-        })
-      );
+    this._off.push(
+      ctx.events.on('actor:death', (e): ReturnType<AmmoPickups['onActorDeath']> =>
+        this.pickups.onActorDeath(e)
+      )
+    );
     this._off.push(ctx.events.on('game:restart', (): void => this.resetForNewGame()));
 
     this.stats = { tris, drawCalls: 0, live: 0, fired: 0 };
@@ -433,10 +428,6 @@ export class WeaponSystem {
    * the gun in its slot and refreshing ammo. A new gun is fitted before ownership changes,
    * so a rejected build never drops the old gun. */
   applyBuild(id: WeaponId, config: AttachmentConfig): boolean {
-    return this.equipBuild(id, config, true);
-  }
-
-  private equipBuild(id: WeaponId, config: AttachmentConfig, supplyAmmo: boolean): boolean {
     if (this.owns(id)) return this.setAttachments(id, config);
     if (!this._configureAttachments(id, config)) return false;
     const state = this._requireState(id);
@@ -444,30 +435,11 @@ export class WeaponSystem {
     for (const weapon of primary.includes(id) ? PRIMARY_IDS : SECONDARY_IDS)
       if (weapon !== id && this.owned.delete(weapon)) this._resetAttachments(weapon);
     this.owned.add(id);
-    // Only a purchase comes with ammunition. Re-selecting a range trial must not
-    // reload it, but it should still occupy the normal primary/secondary slot.
-    if (supplyAmmo) {
-      state.mag = state.def.magSize;
-      state.chambered = true;
-      state.reserve = state.def.reserve;
-    }
+    state.mag = state.def.magSize;
+    state.chambered = true;
+    state.reserve = state.def.reserve;
     this.setWeaponImmediate(id);
     return true;
-  }
-
-  canEquipTrainingWeapon(id: WeaponId): boolean {
-    // Immediate swaps stop the clip before it chambers the next round.
-    return (
-      SESSION_MODE_POLICY[this.ctx.config.mode].freeMarket &&
-      !this.disabled &&
-      (id === this.activeId || (!this.cycling && !this.pumping))
-    );
-  }
-
-  /** Use the session's normal slots and mount path, without a market transaction. */
-  applyTrainingBuild(id: WeaponId, config: AttachmentConfig): boolean {
-    if (!this.canEquipTrainingWeapon(id) || !this.equipBuild(id, config, false)) return false;
-    return (id === this.activeId && !this.switching) || this.setWeaponImmediate(id);
   }
 
   /** Synchronous, outside the frame loop; reject changes to unowned/unloaded guns. */
@@ -1577,11 +1549,7 @@ export class WeaponSystem {
     this.ui?.setPrompt({
       key: bindingLabel('radioSend'),
       text: carpet ? 'NO CHARGES' : 'TOP-SECRET',
-      sub: !carpet
-        ? 'REQUEST LOCKED BY HIGHER AUTHORITY'
-        : SESSION_MODE_POLICY[this.ctx.config.mode].freeMarket
-          ? 'REFILL AT THE ISSUE COUNTER'
-          : 'BUY CARPET BOMB STRIKES AT THE MARKET',
+      sub: carpet ? 'BUY CARPET BOMB STRIKES AT THE MARKET' : 'REQUEST LOCKED BY HIGHER AUTHORITY',
     });
   }
 
@@ -1904,10 +1872,16 @@ export class WeaponSystem {
     return kind;
   }
 
-  /** Equip immediately for market purchases, trial builds and capture. */
+  /** Swap without the draw animation: market purchases, harness and debug. */
   setWeaponImmediate(id: string): boolean {
     if (!isWeaponId(id) || !this.states.has(id)) return false;
     if (!this._hasMesh(id)) return false;
+    // Finish a bolt cycle cut short by the swap; stopClip() below drops its chamber event.
+    const prev = this.state;
+    if (prev && !prev.chambered && prev.mag > 0 && this.cycling) {
+      prev.mag--;
+      prev.chambered = true;
+    }
     this._switchTo = null;
     this.activeId = id;
     // A forced swap can skip the release beat, but not a committed throw.

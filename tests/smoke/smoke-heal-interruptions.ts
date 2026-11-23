@@ -11,7 +11,7 @@ import type { PlayerSystem } from '../../src/player/index.ts';
 import { HEALING } from '../../src/player/tuning.ts';
 import { AmmoPanel } from '../../src/ui/ammo.ts';
 import { Compass, ScoreBar } from '../../src/ui/compass.ts';
-import { controlSections } from '../../src/ui/controls.ts';
+import { CONTROL_SECTIONS } from '../../src/ui/controls.ts';
 import { Crosshair } from '../../src/ui/crosshair.ts';
 import { DamageArcs } from '../../src/ui/damage.ts';
 import { HealthFx } from '../../src/ui/health.ts';
@@ -250,9 +250,9 @@ for (const motion of [
 }
 
 test('menu advertises the actual heal binding', (): void => {
-  const bandage = controlSections('survival')
-    .flatMap((section): (typeof section.controls)[number][] => section.controls)
-    .find((control): boolean => control.description.startsWith('Bandage ('));
+  const bandage = CONTROL_SECTIONS.flatMap(
+    (section): (typeof section.controls)[number][] => section.controls
+  ).find((control): boolean => control.description.startsWith('Bandage ('));
   assert.ok(bandage);
   assert.deepEqual(bandage.keys, bindingLabels('heal'));
   assert.ok(!bandage.keys.includes(bindingLabel('radio')));

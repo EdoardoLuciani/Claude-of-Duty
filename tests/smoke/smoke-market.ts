@@ -11,7 +11,7 @@ import { mountableWeapon, opticAsset, rigidAsset } from '../lib/weapon-attachmen
 /**
  * Bun smoke test for the market and armour systems — no browser.
  * Exercises the credits mirror (score:change), the post-wave grace period,
- * opening/closing (time scale), purchasing rules and reset.
+ * opening/closing, purchasing rules and reset.
  *
  *   bun test ./tests/smoke/smoke-market.ts
  */
@@ -124,10 +124,6 @@ check('still closed at 14s', market.open === false);
 context.time.elapsed += 1;
 market.update();
 check('shop opens when the window elapses', market.open === true);
-check(
-  'time and controls frozen while open',
-  context.time.scale === 0 && player.controlEnabled === false
-);
 check('countdown cleared once open', market.getHudState().marketIn === 0);
 check('next wave countdown is paused at 15s', ai.getWaveState().nextIn === 15);
 
@@ -167,10 +163,7 @@ check(
     item('ammo').action === 'max'
 );
 market.closeShop();
-check(
-  'closed purchases fail and time/controls resume',
-  !market.buy('grenade') && context.time.scale === 1 && player.controlEnabled
-);
+check('closed purchases fail', !market.buy('grenade'));
 
 // ---- dead player blocks the auto-open ------------------------------------
 context.events.emit('wave:complete', { wave: 2, nextWave: 3, delay: ai.waveDelay }); // arm the timer
@@ -190,7 +183,6 @@ check(
 
 // ---- caps ----------------------------------------------------------------
 market.credits = 99999;
-context.time.scale = 0.5;
 market.openShop(2);
 for (let i = 0; i < 3; i++) market.buy('armour');
 check('armour caps at 150', player.health.armour === 150);
@@ -366,8 +358,6 @@ market.buy('carpet');
 check('charges cap at 3', weapons.carpetBombs === 3);
 check('buy at cap rejected', market.buy('carpet') === false);
 market.closeShop();
-check('close restores the previous time scale', context.time.scale === 0.5);
-context.time.scale = 1;
 market.credits = 99999;
 check('carpet unbuyable with the shop closed', market.buy('carpet') === false);
 
@@ -541,7 +531,7 @@ check(
 market.openShop(3);
 context.events.emit('game:restart', {});
 check('restart zeroes credits', market.credits === 0);
-check('restart force-closes an open shop', market.open === false && context.time.scale === 1);
+check('restart force-closes an open shop', market.open === false);
 earn(100);
 check('earns again after restart', market.credits === 100);
 

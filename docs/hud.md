@@ -6,9 +6,10 @@ Pixi renders ammo/reload, health/armour, crosshair, minimap, injury,
 compass/heard pings, hitmarkers/damage arcs, bandage/grenade inventory, FPS,
 score/status, killfeed, prompts/progress and banners/countdown.
 Native HTML retains startup/error controls and menus/shop/game-over.
-The Supply Market and Range Station share the native weapon catalog, attachment
-editor, stats and 3D preview, which uses its own Three WebGPU renderer. The range
-shows an unlimited credit balance for the same weapon and supply offers, plus a target reset. It resumes only after mouse capture succeeds.
+The Supply Market opens at wave breaks and at range counters with the native weapon
+catalog, attachment editor, stats and 3D preview, which uses its own Three WebGPU renderer.
+Opening it suspends gameplay; gameplay resumes only after mouse capture succeeds. Maps
+with range targets add a target reset.
 
 ## Ownership and behavior
 

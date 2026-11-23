@@ -53,7 +53,7 @@ last-bit rounding must not reroll dressing (`smoke-world-seed-stability.ts`).
    maps can share a mode without sharing a bundle or adding startup branches.
 
 Range metadata is optional in any mode: emit world-space `WORLD.MARKERS.RANGE_STATION`
-(XZ) for the free-counter loadout interaction, `WORLD.MARKERS.RANGE_TARGETS` (XYZ centres and
+(XZ) for a market counter, `WORLD.MARKERS.RANGE_TARGETS` (XYZ centres and
 positive width/height of +Z faces) for retained impact marks, and `WORLD.MARKERS.COURSE`
 gates for a tracked parkour circuit. Keep those records
 aligned with the same source data that creates the corresponding geometry.

@@ -8,7 +8,6 @@ import { GRENADE_FUSE } from '../../src/core/grenades.ts';
 import { Input } from '../../src/core/input.ts';
 import { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
-import { MarketSystem } from '../../src/market/index.ts';
 import { PhysicsSystem, type PhysicsRigidBodyOptions } from '../../src/physics/index.ts';
 import { CameraRig } from '../../src/player/camera.ts';
 import { HealController } from '../../src/player/heal.ts';
@@ -93,7 +92,7 @@ function makeHarness(): WeaponHarness {
     scene: new THREE.Scene(),
     camera: new THREE.PerspectiveCamera(),
     events: new EventBus(),
-    providers: { weapons: wp, player, ui: wp.ui },
+    providers: { player, ui: wp.ui },
   });
   wp.rng = new Rng(372);
   // A projectile spawn is the only per-pellet side effect of an accepted shot,
@@ -216,68 +215,6 @@ for (const [primary, first, second] of [
   assert.deepEqual(wp.weaponIds, ['rifle', 'pistol']);
   assert.equal(wp.activeId, 'rifle');
 }
-// Trial builds share the live mount and handling path without becoming purchases or reloads.
-{
-  const { wp } = makeHarness();
-  const id = 'smg';
-  const config = { ...BASE_ATTACHMENTS, optic: 'rmr' } as const;
-  const entry = wp.viewmodel.weapons.get(id);
-  assert(entry);
-  const state = weaponState(wp, id);
-  Object.assign(entry, { def: state.def, ...mountableWeapon(id) });
-  Object.assign(wp.viewmodel, {
-    reticle: new THREE.Object3D(),
-    scopeOverlay: new THREE.Object3D(),
-  });
-  state.mag = 0;
-  state.chambered = false;
-  state.reserve = 3;
-  wp.grenades = 0;
-  wp.state.reserve = 1;
-  assert(!wp.applyTrainingBuild(id, config));
-  assert.equal(wp.grenades, 0);
-  assert.equal(wp.activeId, 'rifle');
-  assert.equal(wp.state.reserve, 1);
-
-  wp.ctx.config.mode = 'training';
-  const market = new MarketSystem();
-  await market.init(wp.ctx);
-  wp.ctx.events.emit('score:change', { score: 300, delta: 300, reason: 'test', kills: 0 });
-  wp.ctx.events.emit('wave:complete', { wave: 1, nextWave: 2, delay: 30 });
-  assert.equal(market.addCredits(300), Infinity);
-  assert.equal(market.getHudState().marketIn, 0);
-  market.openShop(1);
-  assert(!market.open && wp.ctx.time.scale === 1);
-  assert(market.openRange());
-  assert(
-    WEAPON_IDS.every((gun): boolean =>
-      market.getHudState().items.some((item): boolean => item.id === gun)
-    )
-  );
-  assert(market.beginBuild('pistol'));
-  assert(!market.setBuild({ ...BASE_ATTACHMENTS, optic: 'scope' }));
-  assert(market.beginBuild(id) && market.setBuild(config));
-  assert((market.getHudState().build?.total ?? 0) > 0);
-  assert(!market.confirmBuild(), 'a trial still requires the actual attachment asset');
-  assert(!wp.owns(id) && wp.activeId === 'rifle');
-  Object.assign(wp, { _attachments: { rmr: opticAsset() } });
-  assert(market.confirmBuild());
-  assert.equal(market.credits, Infinity);
-  assert.equal(wp.activeId, id);
-  assert.deepEqual(wp.weaponIds, ['rifle', 'smg']);
-  assert(entry.mountedOptic && wp.current.adsFovScale !== undefined);
-  assert(wp.ammo.empty && wp.ammo.reserve === 3);
-  assert(wp.reload() && market.buy('ammo'));
-  assert(wp.reloading && wp.ammo.empty && wp.ammo.reserve === wp.current.reserve);
-  assert(market.setBuild(BASE_ATTACHMENTS) && market.confirmBuild());
-  assert(wp.reloading && wp.ammo.empty && entry.mountedOptic === null);
-  assert(market.buy('grenade') && wp.grenades > 0);
-  assert(market.setBuild(config));
-  market.closeShop();
-  assert(!market.confirmBuild());
-  assert.deepEqual(wp.getAttachments(id), BASE_ATTACHMENTS);
-  market.dispose();
-}
 // Mounted laser switches belong to the gun, not the flashlight or active slot.
 {
   const { wp, input, tap, frame, player } = makeHarness();
@@ -360,9 +297,6 @@ for (const [primary, first, second] of [
   assert(wp.applyBuild('shotgun', BASE_ATTACHMENTS) && wp.tryFire());
   assert.equal(shots.fired, 8, 'one shotgun shell spawns eight pellets');
   assert.equal(wp._pendingShots, 1, 'pellets still produce one accepted-shot event');
-  wp.ctx.config.mode = 'training';
-  assert(!wp.applyTrainingBuild('pistol', BASE_ATTACHMENTS), 'trial cannot interrupt pumping');
-  assert(wp.applyTrainingBuild('shotgun', BASE_ATTACHMENTS) && wp.pumping);
 }
 {
   const { wp, tap } = makeHarness();
@@ -378,17 +312,18 @@ for (const [primary, first, second] of [
     wp.cycling && !wp.radioEquipped && !wp.grenadeEquipped,
     'accessories preserve the bolt cycle'
   );
-  wp.ctx.config.mode = 'training';
-  assert(!wp.applyTrainingBuild('rifle', BASE_ATTACHMENTS), 'trial cannot replace a cycling gun');
-  assert(!wp.applyTrainingBuild('pistol', BASE_ATTACHMENTS), 'trial cannot leave a cycling gun');
-  assert(wp.applyTrainingBuild('sniper', BASE_ATTACHMENTS), 'active build can be reapplied');
-  assert(wp.cycling && wp.owns('sniper') && !wp.state.chambered);
   wp.viewmodel.stopClip();
   wp._fireTimer = 0;
   assert(wp.reload(), 'interrupted bolt cycle can reload a full box with empty chamber');
   assert.equal(wp.viewmodel.clipName, 'reloadEmpty');
   wp._completeReload(true);
   assert(wp.state.chambered && wp.state.mag === wp.current.magSize - 1);
+}
+{
+  const { wp } = makeHarness();
+  assert(wp.applyBuild('sniper', BASE_ATTACHMENTS) && wp.tryFire() && wp.cycling);
+  assert(wp.applyBuild('pistol', BASE_ATTACHMENTS) && wp.setWeaponImmediate('sniper'));
+  assert(wp.state.chambered, 'a market swap finishes the interrupted bolt cycle');
 }
 
 // A market swap selects the new gun without drawing it over a cooking grenade.
@@ -892,10 +827,9 @@ for (const gate of ['frozen', 'disabled']) {
   assert.equal(wp._burstLeft, 2);
 }
 
-// Both modes share the held radio and request flow.
-for (const mode of ['training', 'survival'] as const) {
+// Radio: arrows move the LCD cursor and Enter sends; weapon keys keep selecting weapons.
+{
   const { wp, tap, prompts } = makeHarness();
-  wp.ctx.config.mode = mode;
   let strikes = 0;
   wp.radioSys = fixture<RadioSystem>({
     callStrike(): boolean {
