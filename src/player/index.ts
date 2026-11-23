@@ -201,7 +201,7 @@ export class PlayerSystem {
     this.healCtrl = new HealController(this);
 
     // ---- spawn -----------------------------------------------------------
-    if (ctx.config.mode === 'training') this.recoveryFloor = ctx.get('world').bounds.min.y;
+    this.recoveryFloor = ctx.get('world').bounds.min.y;
     const spawn = this._resolveSpawn();
     this.movement.init(this.physics, spawn.feet);
     this.movement.yaw = spawn.yaw;

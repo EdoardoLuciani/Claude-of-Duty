@@ -1,5 +1,5 @@
 import type { Engine } from '../core/engine.ts';
-import { PLAYABLE_MAPS } from '../core/playable-maps.ts';
+import { PLAYABLE_MAPS, SESSION_MODE_POLICY } from '../core/playable-maps.ts';
 import type { PlayableMap } from '../core/playable-maps.ts';
 import { CLOCK } from '../sky/tuning.ts';
 
@@ -88,7 +88,7 @@ export class StartGate {
     this.status.setAttribute('aria-live', 'polite');
     this.status.style.cssText = 'margin:1.25rem 0;color:#aabdc3';
     this.panel.append(this.status);
-    if (map.mode === 'training') this.addTimeChoice();
+    if (SESSION_MODE_POLICY[map.mode].fixedClock) this.addTimeChoice();
     this.panel.append(this.button);
     document.addEventListener('pointerlockchange', this.lockChanged);
     document.addEventListener('pointerlockerror', this.lockDenied);

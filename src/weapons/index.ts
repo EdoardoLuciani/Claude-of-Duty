@@ -458,7 +458,7 @@ export class WeaponSystem {
   canEquipTrainingWeapon(id: WeaponId): boolean {
     // Immediate swaps stop the clip before it chambers the next round.
     return (
-      this.ctx.config.mode === 'training' &&
+      SESSION_MODE_POLICY[this.ctx.config.mode].freeMarket &&
       !this.disabled &&
       (id === this.activeId || (!this.cycling && !this.pumping))
     );
@@ -1579,7 +1579,7 @@ export class WeaponSystem {
       text: carpet ? 'NO CHARGES' : 'TOP-SECRET',
       sub: !carpet
         ? 'REQUEST LOCKED BY HIGHER AUTHORITY'
-        : this.ctx.config.mode === 'training'
+        : SESSION_MODE_POLICY[this.ctx.config.mode].freeMarket
           ? 'REFILL AT THE ISSUE COUNTER'
           : 'BUY CARPET BOMB STRIKES AT THE MARKET',
     });

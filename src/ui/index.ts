@@ -5,6 +5,7 @@ import type { SystemId, EngineContext } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName } from '../core/events.ts';
 import { clamp, clamp01, damp } from '../core/math.ts';
 import type { CourseGate } from '../core/model-metadata.ts';
+import { SESSION_MODE_POLICY } from '../core/playable-maps.ts';
 import type { PlayableMap } from '../core/playable-maps.ts';
 import type { WeaponMode } from '../weapons/defs.ts';
 import { AmmoPanel } from './ammo.ts';
@@ -118,6 +119,7 @@ export class UiSystem {
   prompt: Prompt = new Prompt();
   banner: Banner = new Banner();
   private courseStep = 0;
+  private course: readonly CourseGate[] = [];
   menu!: PauseMenu;
   startGate: StartGate | null = null;
   pixiHud: PixiHud | null = null;
@@ -160,14 +162,14 @@ export class UiSystem {
     this.centreLayer = el('div', 'ow-layer', this.root);
 
     this.rng.fork(); // Keep the minimap's noise stream unchanged after removing damage popups.
-    const training = ctx.config.mode === 'training';
-    if (!training) {
+    const { survivalSystems, freeMarket } = SESSION_MODE_POLICY[ctx.config.mode];
+    if (survivalSystems) {
       this.minimap = new Minimap(this.rng.fork());
       for (let i = 0; i < MAX_BLIPS; i++)
         this._blips.push({ x: 0, z: 0, kind: 'enemy', heading: 0 });
     }
     this.menu = new PauseMenu(this.root, ctx, this.returnToStartMenu);
-    this.gameOver = new GameOverScreen(this.root, training, (): void => {
+    this.gameOver = new GameOverScreen(this.root, !survivalSystems, (): void => {
       if (this.startGate) this.startGate.restart();
       else {
         ctx.events.emit('game:restart', { source: 'game-over' });
@@ -176,8 +178,8 @@ export class UiSystem {
     });
     const market = ctx.peek('market');
     if (market) this.shop = new MarketOverlay(this.root, ctx);
-    if (training) this.scoreBar.visible = false;
-    this.marketCountdown = new MarketCountdown(training ? 0 : (market?.delay ?? 0));
+    this.scoreBar.visible = survivalSystems;
+    this.marketCountdown = new MarketCountdown(survivalSystems ? (market?.delay ?? 0) : 0);
 
     this.hudTarget = 1;
     this._lastRaw = ctx.time.raw;
@@ -188,7 +190,8 @@ export class UiSystem {
       fn: (event: EngineEventMap[K]) => void
     ): number => this._unsubs.push(ctx.events.on(type, fn));
 
-    if (training) {
+    this.course = ctx.get('world').queries.course;
+    if (this.course.length) {
       on('player:mantle', (e): void => this.courseAction(e.kind));
       on('bullet:impact', (e): void => {
         if (!this.courseStep || e.exit || !this._isPlayerTarget(e.shooter)) return;
@@ -255,7 +258,7 @@ export class UiSystem {
       this.shop?.hide();
       this.pixiHud?.setVisible(false);
     });
-    if (!training) {
+    if (!freeMarket) {
       on('market:open', (e): void => {
         this.shop?.show(e.wave);
         this.sfx('market_open', 0.85);
@@ -348,7 +351,7 @@ export class UiSystem {
       this.root,
       this.centreLayer,
       ctx.get('render').renderer,
-      !training
+      survivalSystems
     );
     this.pixiHud.resize(this.vw, this.vh, this.k);
   }
@@ -357,7 +360,7 @@ export class UiSystem {
 
   /** Free practice stays open. Only actions inside the next marked station count for a run. */
   private courseAction(action: string): void {
-    const gates = this.ctx.get('world').queries.course;
+    const gates = this.course;
     const p = this.ctx.get('player').feetPosition;
     let index = this.courseStep;
     if (matchesGate(gates.at(0), action, p)) index = 0;
@@ -446,7 +449,7 @@ export class UiSystem {
 
   /** Prepare the market state for integration checks. */
   debugState(name: string): { state: string } {
-    if (name !== 'market' || !this.shop || this.ctx.config.mode !== 'survival')
+    if (name !== 'market' || !this.shop || SESSION_MODE_POLICY[this.ctx.config.mode].freeMarket)
       throw new Error('Unknown UI debug state');
     this.menu.close();
     this.killfeed.clear();
@@ -495,7 +498,7 @@ export class UiSystem {
     s.time = t.elapsed;
 
     // ---- pause -----------------------------------------------------------
-    const training = ctx.config.mode === 'training';
+    const { freeMarket } = SESSION_MODE_POLICY[ctx.config.mode];
     const playerDead = ctx.peek('player')?.dead === true;
     const marketOpen = ctx.peek('market')?.open === true;
     // The shop owns the pointer and the Escape key while it is open; letting
@@ -511,15 +514,16 @@ export class UiSystem {
     this.menu.update(rawDt);
     this.gameOver.update(rawDt);
     this.shop?.update(rawDt);
-    if (training && this.courseStep && !playerDead && !ctx.engine.gameplaySuspended) {
+    if (this.courseStep && !playerDead && !ctx.engine.gameplaySuspended) {
       const player = ctx.get('player');
       if (player.state === 'climb' || player.stance === 'crouch')
         this.courseAction(player.state === 'climb' ? 'climb' : 'crouch');
     }
-    if (training && this.shop) {
+    let near = false;
+    if (freeMarket && this.shop) {
       const feet = ctx.get('player').feetPosition;
       const marker = ctx.get('world').queries.rangeStation;
-      const near = marker && Math.hypot(feet.x - marker.x, feet.z - marker.z) <= STATION_RADIUS;
+      near = !!marker && Math.hypot(feet.x - marker.x, feet.z - marker.z) <= STATION_RADIUS;
       if (
         near &&
         !playerDead &&
@@ -533,31 +537,33 @@ export class UiSystem {
           this.setPrompt(STATION_PROMPT, this.shop);
         if (ctx.input.actionPressed('use')) this.shop.show();
       } else this.clearPrompt(this.shop);
-      const gates = ctx.get('world').queries.course;
-      const next = this.courseStep ? gates[this.courseStep] : undefined;
-      if (
-        next &&
-        !near &&
-        !this.menu.open &&
-        !marketOpen &&
-        !playerDead &&
-        ctx.input.enabled &&
-        !ctx.input.ads &&
-        Math.abs(feet.x - next.position[0]) < 10 &&
-        Math.abs(feet.z - next.position[2]) < 30 &&
-        (!this.prompt.active || this._promptOwner === gates)
-      ) {
-        if (!this.prompt.active)
-          this.setPrompt(
-            {
-              key: `${this.courseStep + 1}/${gates.length}`,
-              text: 'Parkour circuit',
-              sub: next.hint,
-            },
-            gates
-          );
-      } else this.clearPrompt(gates);
     }
+    const gates = this.course;
+    const next = this.courseStep ? gates[this.courseStep] : undefined;
+    const feet = next && ctx.get('player').feetPosition;
+    if (
+      next &&
+      feet &&
+      !near &&
+      !this.menu.open &&
+      !marketOpen &&
+      !playerDead &&
+      ctx.input.enabled &&
+      !ctx.input.ads &&
+      Math.abs(feet.x - next.position[0]) < 10 &&
+      Math.abs(feet.z - next.position[2]) < 30 &&
+      (!this.prompt.active || this._promptOwner === gates)
+    ) {
+      if (!this.prompt.active)
+        this.setPrompt(
+          {
+            key: `${this.courseStep + 1}/${gates.length}`,
+            text: 'Parkour circuit',
+            sub: next.hint,
+          },
+          gates
+        );
+    } else this.clearPrompt(gates);
 
     // ---- external state --------------------------------------------------
     const ws = ctx.peek('weapons')?.getHudState();
@@ -588,7 +594,7 @@ export class UiSystem {
       s.nextWaveIn = gameState.nextWaveIn;
     }
 
-    const marketState = training ? null : ctx.peek('market')?.getHudState();
+    const marketState = freeMarket ? null : ctx.peek('market')?.getHudState();
     if (marketState) {
       s.credits = marketState.credits;
       s.marketIn = marketState.marketIn;

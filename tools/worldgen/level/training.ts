@@ -624,7 +624,9 @@ export function buildTraining(A: Assembler): void {
 export function trainingMetadata(
   A: Assembler,
   sourceHash: string
-): Omit<WorldManifest, 'assets' | 'navigation' | 'stats'> & { coordinateSystem: string } {
+): Omit<WorldManifest, 'assets' | 'navigation' | 'stats' | 'mapId' | 'mode'> & {
+  coordinateSystem: string;
+} {
   const spawns: Array<WorldManifest['spawns'][number] & { id: string }> = [
     {
       id: 'firing_line',

@@ -10,7 +10,7 @@ import type {
 } from '../core/model-metadata.ts';
 
 type BuildingFootprint = NonNullable<WorldManifest['buildings']>[number]['spec'];
-type WorldQueryMetadata = Pick<WorldManifest, 'mode' | 'query' | 'volumes' | 'WORLD'> & {
+type WorldQueryMetadata = Pick<WorldManifest, 'query' | 'volumes' | 'WORLD'> & {
   buildings?: readonly (BuildingFootprint | { spec: BuildingFootprint })[] | undefined;
 };
 type ClimbLadder = WorldLadder & { nx: number; nz: number };
@@ -42,10 +42,7 @@ export class WorldQueries {
     this.buildings = (meta.buildings ?? []).map((building): BuildingFootprint =>
       'spec' in building ? building.spec : building
     );
-    const street = meta.query?.street;
-    if (!street && meta.mode !== 'training')
-      throw new Error('[world] manifest is missing query.street metadata');
-    this.street = street;
+    this.street = meta.query?.street;
     this.alleys = meta.query?.alleys ?? [];
     this.ladders = meta.volumes ?? [];
     this.course = meta.WORLD?.MARKERS?.COURSE ?? [];

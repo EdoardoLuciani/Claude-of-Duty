@@ -3,6 +3,7 @@
 
 import type { SystemId, EngineContext } from '../core/context.ts';
 import type { EngineEventMap } from '../core/events.ts';
+import { SESSION_MODE_POLICY } from '../core/playable-maps.ts';
 import type { Health } from '../player/health.ts';
 import type { PlayerSystem } from '../player/index.ts';
 import {
@@ -230,20 +231,20 @@ export class MarketSystem {
   declare _prevScale: number;
   declare _prevControl: boolean;
 
-  private training = false;
+  private free = false;
 
   async init(ctx: EngineContext): Promise<void> {
     this.ctx = ctx;
-    this.training = ctx.config.mode === 'training';
+    this.free = SESSION_MODE_POLICY[ctx.config.mode].freeMarket;
     this.weapons = ctx.get('weapons');
     this.player = ctx.get('player');
     this.health = this.player.health;
-    this.credits = this.training ? Infinity : 0;
+    this.credits = this.free ? Infinity : 0;
     /** When the shop should open (ctx.time.elapsed), 0 when not pending. */
     this._marketAt = 0;
     this._pendingWave = 0;
     this._off.push(ctx.events.on('game:restart', (): void => this.reset()));
-    if (this.training) return;
+    if (this.free) return;
 
     const on = <K extends keyof EngineEventMap>(
       type: K,
@@ -289,14 +290,14 @@ export class MarketSystem {
 
   /** Start a free draft; the range modal owns the gameplay suspension and resume. */
   openRange(): boolean {
-    if (!this.training || this.open) return false;
+    if (!this.free || this.open) return false;
     this.open = true;
     return true;
   }
 
   /** Freeze the run and open the shop. `wave` is the wave just cleared. */
   openShop(wave = 0): void {
-    if (this.training || this.open) return;
+    if (this.free || this.open) return;
     this.open = true;
     this._prevScale = this.ctx.time.scale;
     this._prevControl = this.player.controlEnabled;
@@ -310,7 +311,7 @@ export class MarketSystem {
     this.cancelBuild();
     if (!this.open) return;
     this.open = false;
-    if (this.training) return;
+    if (this.free) return;
     this.ctx.time.scale = this._prevScale;
     this.player.setControlEnabled(this._prevControl);
     this.ctx.events.emit('market:close', {});
@@ -353,7 +354,7 @@ export class MarketSystem {
   confirmBuild(): boolean {
     const build = this.getHudState().build;
     if (!build?.canConfirm) return false;
-    if (this.training) {
+    if (this.free) {
       if (!this.weapons.applyTrainingBuild(build.id, build.config)) return false;
     } else {
       if (!this.weapons.applyBuild(build.id, build.config)) return false;
@@ -373,7 +374,6 @@ export class MarketSystem {
     h.config = config;
     h.owned = this.weapons.owns(id);
     const current = (h.current = this.weapons.getAttachments(id));
-    const training = this.training;
     h.baseCost = 0;
     if (!h.owned) for (const item of CATALOG) if (item.id === id) h.baseCost = item.cost;
     h.total = h.baseCost;
@@ -390,9 +390,9 @@ export class MarketSystem {
     }
     h.available = this.weapons.canConfigure(id, config);
     h.affordable = this.credits >= h.total;
-    h.equipBlocked = training && !this.weapons.canEquipTrainingWeapon(id);
+    h.equipBlocked = this.free && !this.weapons.canEquipTrainingWeapon(id);
     h.canConfirm =
-      this.open && (training || h.changed) && h.available && h.affordable && !h.equipBlocked;
+      this.open && (this.free || h.changed) && h.available && h.affordable && !h.equipBlocked;
     for (const offer of this._hud.attachments) {
       Object.assign(this._candidate, config);
       // Keep slot/id correlation explicit without allocating candidate objects per frame.
@@ -432,7 +432,7 @@ export class MarketSystem {
   }
 
   reset(): void {
-    this.credits = this.training ? Infinity : 0;
+    this.credits = this.free ? Infinity : 0;
     this._marketAt = 0;
     this._pendingWave = 0;
     this.closeShop(); // restores time.scale even if a session was open

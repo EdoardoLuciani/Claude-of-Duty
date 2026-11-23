@@ -195,7 +195,7 @@ async function compileWorld(
         {
           ...metadata,
           mapId: map.id,
-          mode: SESSION_MODE_POLICY[map.mode].manifestMode,
+          mode: map.mode,
           assets: { visual: visualFile, collision: collisionFile, nav: navFile },
           navigation: nav && {
             version: NAV_VERSION,

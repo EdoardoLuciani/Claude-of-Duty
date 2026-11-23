@@ -27,19 +27,28 @@ export const PLAYABLE_MAPS = [
   },
 ] as const satisfies readonly PlayableMap[];
 
+/** Everything a session does differently by mode; map content comes from the manifest. */
+export interface SessionModePolicy {
+  /** AI, waves, intel, pickups, telemetry, nav and the Survival HUD. */
+  readonly survivalSystems: boolean;
+  /** The issue counter: unlimited credits, trial equips, no between-wave shop. */
+  readonly freeMarket: boolean;
+  /** Hold the chosen time of day instead of running the session clock. */
+  readonly fixedClock: boolean;
+}
+
 export const SESSION_MODE_POLICY = {
-  survival: { survivalSystems: true, manifestMode: undefined },
-  training: { survivalSystems: false, manifestMode: 'training' },
-} as const satisfies Record<
-  RuntimeConfig['mode'],
-  { survivalSystems: boolean; manifestMode: 'training' | undefined }
->;
+  survival: { survivalSystems: true, freeMarket: false, fixedClock: false },
+  training: { survivalSystems: false, freeMarket: true, fixedClock: true },
+} as const satisfies Record<RuntimeConfig['mode'], SessionModePolicy>;
+
+export function isSessionMode(value: unknown): value is RuntimeConfig['mode'] {
+  return typeof value === 'string' && Object.hasOwn(SESSION_MODE_POLICY, value);
+}
 
 export function matchesWorldMap(
   manifest: { mapId?: unknown; mode?: unknown },
   map: PlayableMap
 ): boolean {
-  // The original v2 Survival manifest has neither a map ID nor a mode field.
-  const id = manifest.mapId === undefined ? DEFAULT_PLAYABLE_MAP.id : manifest.mapId;
-  return id === map.id && manifest.mode === SESSION_MODE_POLICY[map.mode].manifestMode;
+  return manifest.mapId === map.id && manifest.mode === map.mode;
 }

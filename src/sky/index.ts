@@ -5,6 +5,7 @@ import { PMREMGenerator } from 'three/webgpu';
 import type { Renderer, Node } from 'three/webgpu';
 
 import type { SystemId, EngineContext } from '../core/context.ts';
+import { SESSION_MODE_POLICY } from '../core/playable-maps.ts';
 import type { RenderSystem } from '../render/index-webgpu.ts';
 import { createAtmosphereNodes, createRaymarchSky, createSkyViewLookup } from './atmosphere-tsl.ts';
 import {
@@ -226,8 +227,8 @@ export class SkySystem {
       );
     }
     const q = ctx.config.q;
-    const clockRate =
-      ctx.config.deterministic || ctx.config.mode === 'training' ? 0 : CLOCK.hoursPerSecond;
+    const { fixedClock } = SESSION_MODE_POLICY[ctx.config.mode];
+    const clockRate = ctx.config.deterministic || fixedClock ? 0 : CLOCK.hoursPerSecond;
     this.timeRate = clockRate;
 
     // ---- shared uniform nodes --------------------------------------------
@@ -354,7 +355,7 @@ export class SkySystem {
     this.setTimeOfDay(this.hour);
     this._offRestart = ctx.events.on('game:restart', (): void => {
       this.timeRate = clockRate;
-      this.setTimeOfDay(ctx.config.mode === 'training' ? this.hour : CLOCK.startHour);
+      this.setTimeOfDay(fixedClock ? this.hour : CLOCK.startHour);
     });
 
     console.info(

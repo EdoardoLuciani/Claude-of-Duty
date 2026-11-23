@@ -1,5 +1,6 @@
 import type { EngineContext } from '../core/context.ts';
 import { damp } from '../core/math.ts';
+import { SESSION_MODE_POLICY } from '../core/playable-maps.ts';
 import type { MarketSystem } from '../market/index.ts';
 import { SLOTS } from '../weapons/attachment-rules.ts';
 import { isWeaponId } from '../weapons/defs.ts';
@@ -40,7 +41,7 @@ function targetCard(target: EventTarget | null): HTMLElement | null {
 export class MarketOverlay {
   readonly market: MarketSystem;
   readonly root: HTMLDialogElement;
-  private readonly training: boolean;
+  private readonly free: boolean;
   private readonly body: HTMLElement;
   private readonly leave: HTMLButtonElement;
   private readonly rangeStatus: HTMLElement | null;
@@ -71,12 +72,12 @@ export class MarketOverlay {
     parent: HTMLElement,
     private readonly ctx: EngineContext
   ) {
-    const training = (this.training = ctx.config.mode === 'training');
+    const free = (this.free = SESSION_MODE_POLICY[ctx.config.mode].freeMarket);
     this.market = ctx.get('market');
 
     this.root = el('dialog', 'ow-market ow-dialog', parent);
     this.root.setAttribute('aria-labelledby', 'ow-market-title');
-    if (training) {
+    if (free) {
       this.root.oncancel = (event): void => {
         event.preventDefault(); // Keep the modal until mouse capture succeeds.
         this.skip();
@@ -92,8 +93,8 @@ export class MarketOverlay {
     const panel = el('div', 'ow-market-panel', this.root);
 
     const head = el('div', 'ow-market-head', panel);
-    this.waveLabel = training ? null : el('div', 'ow-market-wave', head);
-    const title = el('div', 'ow-market-title', head, training ? 'RANGE STATION' : 'SUPPLY MARKET');
+    this.waveLabel = free ? null : el('div', 'ow-market-wave', head);
+    const title = el('div', 'ow-market-title', head, free ? 'RANGE STATION' : 'SUPPLY MARKET');
     title.id = 'ow-market-title';
     // Start focus on the title: focusing the first card would preview it.
     title.tabIndex = -1;
@@ -151,12 +152,7 @@ export class MarketOverlay {
     this.buildStatus = el('p', 'ow-market-inspect-help', this.buildPanel);
     this.buildStatus.setAttribute('role', 'status');
     const actions = el('div', 'ow-market-build-actions', this.buildPanel);
-    this.confirm = el(
-      'button',
-      'ow-market-buy',
-      actions,
-      training ? 'APPLY & RESUME' : 'BUY BUILD'
-    );
+    this.confirm = el('button', 'ow-market-buy', actions, free ? 'APPLY & RESUME' : 'BUY BUILD');
     this.confirm.type = 'button';
     this.confirm.onclick = (): void =>
       this.run('confirmBuild', (): void => {
@@ -166,7 +162,7 @@ export class MarketOverlay {
           this.ctx.peek('ui')?.sfx('market_deny', 0.75);
           return;
         }
-        if (training) this.requestResume();
+        if (free) this.requestResume();
         else {
           this._pulse = 1;
           this.ctx.peek('ui')?.sfx('market_buy', 0.9);
@@ -187,7 +183,7 @@ export class MarketOverlay {
           this.cards.find((row): boolean => row.card.dataset.item === id)?.card.focus();
         }
       });
-    if (training) {
+    if (free) {
       this.buildPanel.append(this.stats.root); // Keep status and actions visible above the stats.
       const reset = el('button', 'ow-market-skip', catalog, 'Reset Targets');
       reset.type = 'button';
@@ -216,16 +212,16 @@ export class MarketOverlay {
     }
 
     const foot = el('div', 'ow-market-foot', panel);
-    this.leave = el('button', 'ow-market-skip', foot, training ? 'RESUME' : 'SKIP ▸');
+    this.leave = el('button', 'ow-market-skip', foot, free ? 'RESUME' : 'SKIP ▸');
     this.leave.type = 'button';
     this.leave.onclick = (): void => this.skip();
-    this.rangeStatus = training ? el('div', 'ow-market-hint', foot) : null;
+    this.rangeStatus = free ? el('div', 'ow-market-hint', foot) : null;
     this.rangeStatus?.setAttribute('role', 'status');
     el(
       'div',
       'ow-market-hint',
       foot,
-      training
+      free
         ? 'ESC RESUME · UNLIMITED TRAINING CREDIT'
         : 'ESC SKIP · SELECT A WEAPON TO CUSTOMIZE · CONFIRM TO APPLY'
     );
@@ -325,9 +321,9 @@ export class MarketOverlay {
   show(wave = 0): void {
     if (this.active || this.disposed) return;
     const { engine, input, events } = this.ctx;
-    const training = this.training;
+    const free = this.free;
     if (
-      training &&
+      free &&
       (engine.error ||
         engine.gameplaySuspended ||
         !input.enabled ||
@@ -346,20 +342,20 @@ export class MarketOverlay {
     this.inspection.controls.enabled = false;
     setStyle(this.root, 'display', ''); // Initial focus needs a rendered dialog.
     this.root.showModal();
-    if (training) {
+    if (free) {
       // Retain the weapon pose, reload and live grenades while the range is open.
       engine.setGameplaySuspended(true);
       input.enabled = false;
       input.clear();
       events.emit('ui:pause', { paused: true });
     }
-    if (!training || document.pointerLockElement === this.ctx.canvas) document.exitPointerLock();
+    if (!free || document.pointerLockElement === this.ctx.canvas) document.exitPointerLock();
   }
 
   hide(): void {
     this.active = false;
     this.root.close();
-    if (this.training) {
+    if (this.free) {
       this.market.closeShop();
       this.shown = 0;
       setStyle(this.root, 'display', 'none'); // Terminal errors stop the UI update hook too.
@@ -413,13 +409,13 @@ export class MarketOverlay {
     setText(discardWarning, discarded ? `On confirm, discard ${discarded}. No refund.` : '');
     discardWarning.hidden = !discarded;
     setText(total, `${build.total} CREDITS`);
-    if (!this.training) setText(this.confirm, build.owned ? 'APPLY CHANGES' : 'BUY BUILD');
+    if (!this.free) setText(this.confirm, build.owned ? 'APPLY CHANGES' : 'BUY BUILD');
     this.confirm.disabled = this.body.inert || !build.canConfirm;
     setText(
       this.buildStatus,
       !build.available
         ? 'This build is unavailable: weapon or attachment failed to load.'
-        : this.training
+        : this.free
           ? build.equipBlocked
             ? 'Resume to finish cycling before changing weapons.'
             : 'Try this build for free.'
@@ -433,7 +429,7 @@ export class MarketOverlay {
 
   skip(): void {
     this.run('resume', (): void => {
-      if (this.training) this.requestResume();
+      if (this.free) this.requestResume();
       else this.market.closeShop(); // emits market:close -> ui hides this overlay
     });
   }
@@ -541,7 +537,7 @@ export class MarketOverlay {
     this.root.removeEventListener('mouseover', this._onOver);
     this.root.removeEventListener('focusin', this._onFocus);
     this.disposed = true;
-    if (this.training) {
+    if (this.free) {
       document.removeEventListener('pointerlockchange', this.lockChanged);
       document.removeEventListener('pointerlockerror', this.lockDenied);
       this.market.closeShop();

@@ -194,7 +194,8 @@ try {
   };
   const meta = {
     version: 2,
-    mapId: undefined as string | undefined,
+    mapId: 'courtyard',
+    mode: 'survival',
     assets,
     sourceHash: 'fixture',
     transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
@@ -212,7 +213,7 @@ try {
     },
     { preconnect: fetch.preconnect }
   );
-  await assert.rejects(models._prefetchWorld(), /HTTP 503/, 'legacy Survival still loads nav');
+  await assert.rejects(models._prefetchWorld(), /HTTP 503/, 'Survival loads nav');
   meta.mapId = 'other-courtyard';
   await assert.rejects(models._prefetchWorld(), /unexpected world manifest map ID or mode/);
   const other = new ModelSystem({
@@ -226,7 +227,7 @@ try {
     'models/world/other/level.json',
     'models/world/other/nav.gz',
   ]);
-  meta.mapId = undefined;
+  meta.mapId = 'courtyard';
   delete assets.nav;
   await assert.rejects(models._prefetchWorld(), /missing navigation asset/);
 } finally {

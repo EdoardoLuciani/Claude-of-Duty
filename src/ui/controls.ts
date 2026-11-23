@@ -1,6 +1,7 @@
 import { bindingLabels } from '../core/bindings.ts';
 import type { ActionId } from '../core/bindings.ts';
 import type { RuntimeConfig } from '../core/config.ts';
+import { SESSION_MODE_POLICY } from '../core/playable-maps.ts';
 
 interface ControlReference {
   keys: readonly string[];
@@ -20,7 +21,7 @@ function quick(actions: readonly ActionId[], description: string): ControlRefere
 }
 
 export function controlSections(mode: RuntimeConfig['mode']): ControlSection[] {
-  const range = mode === 'training';
+  const counter = SESSION_MODE_POLICY[mode].freeMarket;
   return [
     {
       title: 'Movement & look',
@@ -57,7 +58,7 @@ export function controlSections(mode: RuntimeConfig['mode']): ControlSection[] {
       controls: [
         quick(
           ['use'],
-          range
+          counter
             ? 'Open the loadout counter (press nearby)'
             : 'Interact (hold): ammo 0.45s / aimed intel 4s'
         ),
@@ -76,7 +77,7 @@ export function controlSections(mode: RuntimeConfig['mode']): ControlSection[] {
       controls: [
         quick(
           ['pause'],
-          range
+          counter
             ? 'Pause / resume · at counter: close loadout'
             : 'Pause / resume · in shop: close shop'
         ),

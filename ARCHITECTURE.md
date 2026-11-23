@@ -65,8 +65,10 @@ from their implementations, not handwritten consumer APIs. `Engine.add()` and
 `registry.add(id, instance)` check the ID/instance pairing against that map.
 
 The Start menu selects a map from `src/core/playable-maps.ts` before the engine
-initializes. The entry's session mode sets `config.mode` and the session-mode policy
-controls system registration and runtime asset requirements. Each entry creates an
+initializes. The entry's session mode sets `config.mode`; read mode differences from
+`SESSION_MODE_POLICY` (Survival systems, free issue counter, fixed clock), never from
+the mode name. Map-specific behavior follows the loaded manifest's markers. The
+manifest records its map ID and mode, and the loader rejects a mismatched bundle. Each entry creates an
 independent session; returning from Pause tears down its engine, input, renderer
 and HUD, releases its browser input locks and exits session-requested fullscreen before exposing the map choices again. Look sensitivity, field of view, invert Y,
 and firing shake carry across map changes in the same document, independent of gameplay state.

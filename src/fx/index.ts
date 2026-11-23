@@ -555,7 +555,6 @@ export class FxSystem {
     // Use the ordinary projected impact (not a second ray from the camera).
     // Keep the primary mark readable downrange until reset or budget eviction.
     if (
-      this.ctx.config.mode === 'training' &&
       opts.opacity === undefined &&
       this.ctx.peek('world')?.queries.rangeTargetAt(point, normal)
     ) {

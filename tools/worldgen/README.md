@@ -43,7 +43,7 @@ last-bit rounding must not reroll dressing (`smoke-world-seed-stability.ts`).
 ## Add a playable map
 
 1. Author geometry and metadata (bounds, spawns, lights, and any query/marker data)
-   with `Assembler`. Survival-mode maps need `query.street`.
+   with `Assembler`.
 2. Add an entry to [`src/core/playable-maps.ts`](../../src/core/playable-maps.ts)
    with a stable unique ID, menu label, unique bundle directory relative to
    `public/models/world/`, and an existing session mode. The root bundle stays
@@ -52,9 +52,10 @@ last-bit rounding must not reroll dressing (`smoke-world-seed-stability.ts`).
    `playable-builds.ts`. The chooser, session boot, and exporter use the catalog;
    maps can share a mode without sharing a bundle or adding startup branches.
 
-Range metadata is optional: emit world-space `WORLD.MARKERS.RANGE_STATION` (XZ)
-for the loadout interaction and `WORLD.MARKERS.RANGE_TARGETS` (XYZ centres and
-positive width/height of +Z faces) for retained impact marks. Keep those records
+Range metadata is optional in any mode: emit world-space `WORLD.MARKERS.RANGE_STATION`
+(XZ) for the free-counter loadout interaction, `WORLD.MARKERS.RANGE_TARGETS` (XYZ centres and
+positive width/height of +Z faces) for retained impact marks, and `WORLD.MARKERS.COURSE`
+gates for a tracked parkour circuit. Keep those records
 aligned with the same source data that creates the corresponding geometry.
 
 `tools/export-world.ts` iterates the catalog and builds and validates each bundle's

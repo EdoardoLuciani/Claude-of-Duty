@@ -25,7 +25,9 @@ export function worldMetadata(
   A: Assembler,
   buildings: BuildingInfo[],
   sourceHash: string
-): Omit<WorldManifest, 'assets' | 'navigation' | 'stats'> & { coordinateSystem: string } {
+): Omit<WorldManifest, 'assets' | 'navigation' | 'stats' | 'mapId' | 'mode'> & {
+  coordinateSystem: string;
+} {
   const matrix = A.xform.clone();
   const bounds = new THREE.Box3(
     new THREE.Vector3(-62, -2, -62),

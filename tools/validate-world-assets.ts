@@ -361,7 +361,6 @@ if (meta) {
   for (let i = 0; i < 3; i++) {
     if (bounds.min[i] > bounds.max[i]) fail(`manifest bounds are inverted on axis ${i}`);
   }
-  const training = meta.mode === 'training';
   const intel = WORLD?.MARKERS?.INTEL ?? [];
   if (expected && intel.length !== expected.intel)
     fail(
@@ -389,7 +388,6 @@ if (meta) {
       fail(`manifest.lights[${index}] has invalid kind`);
   });
   if (!volumes) fail('manifest.volumes must be an array');
-  if (!training && !query?.street) fail('manifest.query.street is invalid');
   if (!query?.alleys) fail('manifest.query.alleys must be an array');
 }
 

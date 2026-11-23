@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import type { SystemId, EngineContext, EngineSystems } from '../core/context.ts';
 import { hasOwn } from '../core/guards.ts';
 import type { WorldManifest } from '../core/model-metadata.ts';
+import { SESSION_MODE_POLICY } from '../core/playable-maps.ts';
 import type { Rng } from '../core/rng.ts';
 import { parseSurfaceName } from '../physics/surfaces.ts';
 import { tickStreetlightOutage } from './lighting.ts';
@@ -225,7 +226,7 @@ export class WorldSystem {
 
     const sky = this._sky ?? (this._sky = ctx.peek('sky'));
     if (
-      ctx.config.mode === 'survival' &&
+      SESSION_MODE_POLICY[ctx.config.mode].survivalSystems &&
       !ctx.config.deterministic &&
       dt > 0 &&
       !ctx.peek('player')?.dead
