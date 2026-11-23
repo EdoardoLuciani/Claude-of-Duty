@@ -202,7 +202,6 @@ export class FxSystem {
 
     this.ambience = new Ambience(this, {
       motes: mote,
-      shimmer: budget >= 4000,
     });
 
     // lighting inputs (follow the renderer's active sun)
@@ -816,7 +815,7 @@ export class FxSystem {
     // the sun, so smoke is lit by the same key as the world.
     // Render-owned light proxies synchronize at draw time. FX updates earlier:
     // read the authored key now, not the previous draw's intensity (which would
-    // change emitted mote/shimmer data during clock changes and capture setup).
+    // change emitted mote data during clock changes and capture setup).
     const sun = ctx.peek('sky')?.keyLight ?? r?.activeSun;
     if (r?.sunDir) {
       this._sunView.copy(r.sunDir).transformDirection(cam.matrixWorldInverse).normalize();

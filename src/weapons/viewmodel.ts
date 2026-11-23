@@ -111,6 +111,8 @@ const RADIO_HOLD = {
   back: [0.2314, -0.5146, -0.8256],
   drop: 0.3,
   raiseTime: 0.24,
+  sway: 0.007,
+  tilt: 0.028,
   lhand: [-0.2, -0.36, -0.1],
   lfinger: [0.35, 0.55, -0.76],
   lback: [-0.4, 0.55, 0.73],
@@ -561,6 +563,7 @@ export class Viewmodel {
       muzzleGroup: new THREE.Group(),
       baseMuzzleSocket: muzzleSocket,
       muzzleSocket,
+      ejectionSocket: requiredNode(model.root, 'SOCKET_ejection'),
       laserEmitter: null,
       mountedOptic: null,
       def,
@@ -1233,10 +1236,21 @@ export class Viewmodel {
       this.rig.position.set(0, -0.35 * (1 - present + stow), 0);
       this.rig.quaternion.identity();
     } else if (this._radioState) {
-      // A fixed close-up keeps the LCD readable: no sway, bob or recoil.
+      // A little drift and turn lag, independent of weapon recoil and bob.
       this._radioRaise = clamp01(this._radioRaise + dt / RADIO_HOLD.raiseTime);
-      this.rig.position.set(0, -RADIO_HOLD.drop * (1 - smootherstep(0, 1, this._radioRaise)), 0);
-      this.rig.quaternion.identity();
+      const drop = RADIO_HOLD.drop * (1 - smootherstep(0, 1, this._radioRaise));
+      this.rig.position.set(
+        swayX * RADIO_HOLD.sway + this.lag.x * 0.22,
+        (swayY + breath * 0.5) * RADIO_HOLD.sway + this.lag.y * 0.16 - drop,
+        0
+      );
+      _e.set(
+        swayY * RADIO_HOLD.tilt + this.lagRot.x * 0.25,
+        swayX * RADIO_HOLD.tilt + this.lagRot.y * 0.25,
+        swayZ * RADIO_HOLD.tilt + this.lagRot.z * 0.16,
+        'XYZ'
+      );
+      this.rig.quaternion.setFromEuler(_e);
     }
     this.rig.updateMatrix();
     this.rig.updateMatrixWorld(true);
@@ -1427,20 +1441,13 @@ export class Viewmodel {
     return w.muzzleSocket.getWorldPosition(out);
   }
 
-  ejectWorld(out: THREE.Vector3): THREE.Vector3 {
+  /** Put world-rendered brass on the screen-space first-person port. */
+  ejectCase(position: THREE.Vector3, direction: THREE.Vector3): void {
     const w = this.active;
-    if (!w) return out.set(0, 0, 0);
-    w.group.updateMatrixWorld();
-    return requiredNode(w.model.root, 'SOCKET_ejection').getWorldPosition(out);
-  }
-
-  ejectVelocity(out: THREE.Vector3, speed = 2.6): THREE.Vector3 {
-    const w = this.active;
-    if (!w) return out.set(0, 0, 0);
-    out.copy(w.ejectDir);
-    out.applyQuaternion(w.animation.poseQ);
-    out.transformDirection(w.group.matrixWorld).multiplyScalar(speed);
-    return out;
+    if (!w) return;
+    w.ejectionSocket.getWorldPosition(position);
+    direction.copy(w.ejectDir).transformDirection(w.model.root.matrixWorld);
+    viewRayToWorld(this.ctx.camera, this.ctx.viewCamera, direction, position);
   }
 
   /** Bore direction in world space. */

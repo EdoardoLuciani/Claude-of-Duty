@@ -41,6 +41,7 @@ const HUD_DEFAULTS = {
   reserve: 210,
   magSize: 30,
   reloading: false,
+  magazineOut: false,
   reloadProgress: 0,
   weaponName: 'M4A1',
   fireMode: 'auto' as const,
@@ -471,6 +472,7 @@ export class UiSystem {
       s.reserve = ws.reserve;
       s.magSize = ws.magSize;
       s.reloading = ws.reloading;
+      s.magazineOut = ws.magazineOut;
       s.reloadProgress = ws.reloadProgress;
       s.ads = ws.ads;
       s.baseSpread = 4 + ws.spread * 40;

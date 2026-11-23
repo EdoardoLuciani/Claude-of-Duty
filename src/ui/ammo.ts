@@ -1,7 +1,5 @@
 import type { WeaponMode } from '../weapons/defs.ts';
 
-export const MAX_PIPS = 30;
-
 export interface AmmoState {
   ammo: number;
   magSize: number;
@@ -9,6 +7,7 @@ export interface AmmoState {
   weaponName?: string;
   fireMode?: WeaponMode;
   reloading?: boolean;
+  magazineOut?: boolean;
   reloadProgress?: number;
   time?: number;
   bandages?: number;
@@ -16,22 +15,6 @@ export interface AmmoState {
   lethalCount?: number;
   cooking?: boolean;
   grenadeEquipped?: boolean;
-}
-export function filledMagazinePips(
-  ammo: number,
-  magSize: number,
-  reserve: number,
-  reloading: boolean,
-  progress: number
-): number {
-  let count = ammo;
-  if (reloading) {
-    const after = Math.min(magSize, ammo + Math.max(0, reserve | 0));
-    count = progress < 0.45 ? ammo * (1 - progress / 0.45) : after * ((progress - 0.45) / 0.55);
-  }
-  return count <= 0.001
-    ? 0
-    : Math.max(1, Math.round((count / magSize) * Math.min(MAX_PIPS, magSize)));
 }
 
 export interface EquipmentSlot {

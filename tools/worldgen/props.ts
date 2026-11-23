@@ -383,7 +383,9 @@ function tyre(stagger: number, r = 0.33, visualOnly = false): THREE.BufferGeomet
     [0.505, 0.18],
     [0.52, 0.45],
   ].map(([pr, py]): THREE.Vector2 => new THREE.Vector2(pr * r, py * HW));
-  const g = new THREE.LatheGeometry(prof, radial);
+  // Lathe expects a bottom-to-top profile for outward-facing triangles.
+  // Correct the rendered derivative without changing the canonical cook.
+  const g = new THREE.LatheGeometry(visualOnly ? prof.reverse() : prof, radial);
   const pa = g.getAttribute('position');
   for (let i = 0; i < pa.count; i++) {
     const x = pa.getX(i);

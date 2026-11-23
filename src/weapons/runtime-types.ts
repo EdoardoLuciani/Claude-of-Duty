@@ -47,6 +47,7 @@ export interface WeaponEntry {
   readonly baseMuzzleSocket: THREE.Object3D;
   /** Active bore exit: a mounted can's endcap, else `baseMuzzleSocket`. */
   muzzleSocket: THREE.Object3D;
+  readonly ejectionSocket: THREE.Object3D;
   laserEmitter: THREE.Object3D | null;
   /** Mounted optic: live parent, mount-local sight datum and catalog presentation. */
   mountedOptic: { mount: THREE.Object3D; sight: THREE.Vector3; optic: OpticData } | null;

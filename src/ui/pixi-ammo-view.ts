@@ -1,7 +1,6 @@
 import { Container, Graphics, Text } from 'pixi.js';
 
 import { clamp01 } from '../core/math.ts';
-import { filledMagazinePips, MAX_PIPS } from './ammo.ts';
 import type { AmmoState } from './ammo.ts';
 import { HUD_TYPE, hudText, writeHudText } from './pixi-type.ts';
 
@@ -82,9 +81,7 @@ export class PixiAmmoView {
     }
     const reloading = !!s.reloading,
       progress = clamp01(s.reloadProgress ?? 0);
-    const count = Math.min(MAX_PIPS, mag);
-    const filled = filledMagazinePips(ammo, mag, reserve, reloading, progress);
-    const fraction = clamp01(filled / count);
+    const fraction = s.magazineOut ? 0 : clamp01(ammo / mag);
     if (this.magFill.scale.x !== fraction || this.magFill.tint !== color) {
       this.magFill.scale.x = fraction;
       this.magFill.tint = color;

@@ -14,6 +14,7 @@ export const RADIO_PARTS = {
   radio_open: ['radio-click', 'radio-static'],
   radio_strike: ['radio-click', 'radio-static'],
   intel_call: ['radio-static'],
+  fire_selector: ['radio-click'],
 } as const;
 export const RADIO_MIX = { click: 0.45, static: 0.35, staticDelay: 0.02 } as const;
 export function radioCue(
