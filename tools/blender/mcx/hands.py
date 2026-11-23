@@ -144,8 +144,8 @@ def author_hands(root,asset,parts,clips):
         begin(name)
         if name.startswith('Reload'):
             empty = name=='Reload_Empty'
-            # Reach the magazine, ride it out and the spare in, then release.
-            pose('left',.1)
+            # Drop the wrist clear of the laser bracket before reaching back to the magazine.
+            pose('left',.1,lowered(rest,.008))
             follow(mag,magazine,*MAG_OUT)
             follow(spare,magazine,*SPARE_IN)
             if empty:
@@ -168,7 +168,7 @@ def author_hands(root,asset,parts,clips):
             pose('left',.18,rest+offset*.85,p=opened)
             pose('left',.4,rest+offset,p=opened)
         finish(name,(0,) if name=='Draw' else ())
-    author_review_hands(root,rig,hands,parts+controls,clips,basis=C,label='MCX',frame_step=.5)
+    author_review_hands(root,rig,hands,parts+controls,clips,basis=C,label='MCX',frame_step=1)
     return controls
 
 

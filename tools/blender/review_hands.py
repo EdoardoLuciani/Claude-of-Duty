@@ -63,7 +63,10 @@ def author_review_hands(root,rig,hand_controls,all_parts,clips,*,basis,label,fra
             for name,start,end in [('upper',shoulder,elbow),('fore',elbow,hand)]:
                 z=(start-end).normalized();y=Vector((0,1,0));y=(y-z*y.dot(z)).normalized();x=y.cross(z);out[name]=mat(start,Matrix((x,y,z)).transposed().to_quaternion())
         return out
-    bind={s:game_matrices(s,True) for s in arms};cm=C.to_4x4();cmi=source_basis.inverted().to_4x4()
+    inverse_bind={side:{name:m.inverted() for name,m in game_matrices(side,True).items()} for side in arms}
+    scale={side:Matrix.Diagonal((-1,1,1,1) if side=='right' else (.97,.97,.97,1)) for side in arms}
+    inverse_transform={side:(orientation.to_4x4()@s).inverted() for side,s in scale.items()}
+    cm=C.to_4x4();cmi=source_basis.inverted().to_4x4()
     for name,info in clips.items():
         for o in all_parts:
             for track in o.animation_data.nla_tracks:track.mute=track.name!=name
@@ -77,8 +80,8 @@ def author_review_hands(root,rig,hand_controls,all_parts,clips,*,basis,label,fra
         for f in frames:
             scene.frame_set(math.floor(f),subframe=f%1)
             for side,arm in arms.items():
-                current=game_matrices(side);s=Matrix.Diagonal((-1,1,1,1) if side=='right' else (.97,.97,.97,1));transform=orientation.to_4x4()@s;desired={}
-                for pb in arm.pose.bones:desired[pb.name]=transform.inverted()@(cm@current[pb.name]@bind[side][pb.name].inverted()@cmi)@s@pb.bone.matrix_local
+                current=game_matrices(side);desired={}
+                for pb in arm.pose.bones:desired[pb.name]=inverse_transform[side]@(cm@current[pb.name]@inverse_bind[side][pb.name]@cmi)@scale[side]@pb.bone.matrix_local
                 for pb in arm.pose.bones:
                     pb.rotation_mode='QUATERNION';basis=pb.bone.matrix_local.inverted()
                     if pb.parent:basis=basis@pb.parent.bone.matrix_local@desired[pb.parent.name].inverted()
