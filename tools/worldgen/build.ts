@@ -14,12 +14,25 @@ import type { ClearanceBox } from './placement.ts';
 import { clearDoorwayClutter, clearVolumeClutter, placeBaked } from './placement.ts';
 import { registerProps } from './props.ts';
 
+// Low-triangle groups measured on Survival; keep larger and distance-LOD props separate.
+const BATCHED_PROPS = new Set([
+  'barrel_blue',
+  'block_big',
+  'block_small',
+  'cabinet',
+  'fan',
+  'lamp_post',
+  'mattress',
+  'sign_board',
+  'sign_hang',
+]);
+
 /**
  * Populate an Assembler with the complete authored level. Each element draws
  * from its own `keyedRng` stream; there is no level-wide random sequence.
  */
 export function buildWorld(A: Assembler): BuildingInfo[] {
-  registerProps(A);
+  registerProps(A, BATCHED_PROPS);
   registerDressingProps(A);
   buildGround(A);
 

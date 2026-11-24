@@ -13,6 +13,7 @@ import {
   If,
   Loop,
   abs,
+  attribute,
   cameraPosition,
   cameraViewMatrix,
   clamp,
@@ -49,6 +50,7 @@ import { Color, MeshPhysicalNodeMaterial, MeshStandardNodeMaterial } from 'three
 import type { Node, Texture } from 'three/webgpu';
 import type { ConstNode, JoinNode, NormalMapNode, VarNode, VertexColorNode } from 'three/webgpu';
 
+import { WORLD_BATCH_TINT } from '../core/model-metadata.ts';
 import { hash11 } from './noise-tsl.ts';
 
 // Three adds shader-node fields to its base parameters; the surface system owns those inputs.
@@ -659,11 +661,15 @@ export function createSurfaceNodeMaterial(
   // Three samples colorNode.a for shadow overrides. This RGB graph's implicit
   // alpha is one; don't pull its surface textures/uniforms into the caster.
   // Cutout coverage still comes from the independent maskShadowNode below.
-  mat.colorNode = Fn(({ material }): Node<'vec3'> =>
-    'isShadowPassMaterial' in material && material.isShadowPassMaterial === true
-      ? vec3(1)
-      : channels.color
-  )();
+  mat.colorNode = Fn((builder: NodeBuilder): Node<'vec3'> => {
+    const { material } = builder;
+    if ('isShadowPassMaterial' in material && material.isShadowPassMaterial === true)
+      return vec3(1);
+    // Match Three's instanceColor multiply without altering the authored PBR masks.
+    return builder.hasGeometryAttribute(WORLD_BATCH_TINT)
+      ? channels.color.mul(attribute(WORLD_BATCH_TINT, 'vec3'))
+      : channels.color;
+  })();
   if (p.alphaMask) {
     mat.opacityNode = channels.opacity;
     // Shadow passes replace the material; keep the cutout instead of the whole card.

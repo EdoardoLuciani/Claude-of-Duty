@@ -7,6 +7,10 @@ import { buildWorld } from '#worldgen/build';
 import { Assembler } from '#worldgen/builder';
 import type { BuildingInfo } from '#worldgen/buildings';
 import { BUILDINGS } from '#worldgen/level/layout';
+import { fillMasks } from '#worldgen/util';
+
+import { WORLD_BATCH_TINT } from '../../src/core/model-metadata.ts';
+import { isMesh } from '../../src/core/three-guards.ts';
 
 const box = new THREE.Box3();
 const identity = new THREE.Matrix4();
@@ -108,3 +112,26 @@ for (const k of new Set([...before.keys(), ...after.keys()])) {
 }
 assert.ok(local > 0, 'the edit changes W2 itself');
 assert.deepEqual(leaked.slice(0, 5), [], `${leaked.length} pieces changed outside W2`);
+
+// Keep the instance's diffuse multiplier distinct from the PBR mask colors.
+const material = new THREE.MeshStandardMaterial();
+const assembler = new Assembler({ materials: { get: (): THREE.Material => material } });
+const geometry = fillMasks(new THREE.BoxGeometry(), 0.5, 0.5, 0.5);
+assembler.add('metal_blue', geometry);
+assembler.proto('folded', { key: 'metal_blue', geo: geometry, batchVisual: true });
+assembler.put('folded', 2, 0, 0, 0, 1, [1, 1.25, 0.75]);
+const visual = new THREE.Group();
+const canonical = new THREE.Group();
+assembler.finalize(visual, canonical);
+const mesh = visual.children[0];
+assert(visual.children.length === 1 && isMesh(mesh));
+const masks = mesh.geometry.getAttribute('color');
+const tint = mesh.geometry.getAttribute(WORLD_BATCH_TINT);
+assert.deepEqual(Array.from(new Set(masks.array)), [0.5]);
+assert.deepEqual(Array.from(tint.array.slice(0, 3)), [1, 1, 1]);
+assert.deepEqual(Array.from(tint.array.slice(-3)), [1, 1.25, 0.75]);
+const collider = canonical.getObjectByName('prop_folded');
+assert(isMesh(collider) && !collider.geometry.hasAttribute(WORLD_BATCH_TINT));
+assert(collider instanceof THREE.InstancedMesh && collider.count === 1);
+assembler.dispose();
+material.dispose();

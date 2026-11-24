@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
+import { WORLD_BATCH_TINT } from '../../src/core/model-metadata.ts';
 import type { MaterialOptions } from '../../src/materials/index.ts';
 import type { SurfaceName } from '../../src/physics/surfaces.ts';
 import { PALETTE as WORLD_PALETTE } from './palette.ts';
@@ -44,6 +45,12 @@ export interface Prototype {
 }
 export interface AssemblyMaterials {
   get(name: string, opts: MaterialOptions): THREE.Material;
+}
+
+interface VisualBatch {
+  mesh: THREE.Mesh;
+  acc: Accum;
+  tints: { start: number; end: number; rgb: InstanceMasks }[];
 }
 
 const PALETTE: Partial<
@@ -332,7 +339,7 @@ export class Assembler {
    * Collision/nav must not change when visual-only draw organization changes.
    * Both outputs borrow this assembler's geometry/materials until disposal. */
   finalize(root: THREE.Object3D, collisionSource: THREE.Object3D | null = null): this {
-    const visualBatches = new Map<string, { mesh: THREE.Mesh; acc: Accum }>();
+    const visualBatches = new Map<string, VisualBatch>();
     // --- merged static geometry ---
     for (const [key, acc] of this._static) {
       if (acc.empty) continue;
@@ -506,13 +513,19 @@ export class Assembler {
       p.masks.length = 0;
     }
 
-    for (const { mesh, acc } of visualBatches.values()) {
+    for (const { mesh, acc, tints } of visualBatches.values()) {
       const source = mesh.geometry;
       this.stats.staticTris += acc.tris - source.index!.count / 3;
       // The canonical collision mesh may still borrow this geometry or its attributes.
       if (collisionSource) this.collisionGeometries.push(source);
       else source.dispose();
       mesh.geometry = acc.build();
+      if (tints.length) {
+        const colors = new Float32Array(acc.verts * 3).fill(1);
+        for (const { start, end, rgb } of tints)
+          for (let i = start; i < end; i++) colors.set(rgb, i * 3);
+        mesh.geometry.setAttribute(WORLD_BATCH_TINT, new THREE.BufferAttribute(colors, 3));
+      }
     }
 
     return this;
@@ -521,20 +534,22 @@ export class Assembler {
   private foldVisualProp(
     p: Prototype,
     geometry: THREE.BufferGeometry,
-    batches: Map<string, { mesh: THREE.Mesh; acc: Accum }>
+    batches: Map<string, VisualBatch>
   ): void {
     let batch = batches.get(p.key);
     const name = `world_${p.key}`;
     const mesh = batch?.mesh ?? this.meshes.find((m): boolean => m.name === name);
-    const opts = PALETTE[p.key]?.opts;
+    const palette = PALETTE[p.key];
+    const opts = palette?.opts;
     if (
       !mesh ||
       !p.castShadow ||
       !p.receiveShadow ||
       p.noPrepass ||
       p.maxDist ||
-      p.masks.some(Boolean) ||
+      palette?.surface === 'glass' ||
       opts?.localSpace ||
+      opts?.alphaMask ||
       opts?.three?.transparent ||
       opts?.three?.alphaTest ||
       Object.keys(geometry.morphAttributes).length ||
@@ -545,13 +560,17 @@ export class Assembler {
       throw new Error(`[world] ${p.id} is incompatible with the static visual batch for ${p.key}`);
 
     if (!batch) {
-      batch = { mesh, acc: new Accum(mesh.name).add(mesh.geometry) };
+      batch = { mesh, acc: new Accum(mesh.name).add(mesh.geometry), tints: [] };
       batches.set(p.key, batch);
     }
-    for (const transform of p.matrices) {
+    for (const [i, transform] of p.matrices.entries()) {
       if (transform.determinant() <= 0)
         throw new Error(`[world] ${p.id} needs a positive transform for static visual batching`);
+      const start = batch.acc.verts;
       batch.acc.add(geometry, transform);
+      const rgb = p.masks[i];
+      if (rgb && (rgb[0] !== 1 || rgb[1] !== 1 || rgb[2] !== 1))
+        batch.tints.push({ start, end: batch.acc.verts, rgb });
     }
   }
 
