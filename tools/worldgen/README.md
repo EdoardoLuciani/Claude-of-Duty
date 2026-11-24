@@ -17,8 +17,9 @@ Runtime behavior belongs to `src/world/`.
 - `level/room-fixtures.ts`: room dressing by building, floor and room ID.
   Counter footprints and their goods share a record. Shelf, counter and bench
   goods use offsets from their support. Ceiling joists are a count spread across
-  the room; ruin rubble is a seeded mound. Shelves, conduits and leaning sheets
-  fail the bake when their wall or clearance is gone.
+  the room; ruin rubble is a seeded mound. Wall conduits turn through a mitered
+  elbow into an endpoint drop. Shelves, conduits and leaning sheets fail the bake
+  when their wall or clearance is gone.
 - `level/roof-fixtures.ts`: aerials and laundry relative to the roof footprint;
   garments hang evenly spaced along the authored cable.
 - `level/config.ts`: transform/spawns; `level/intel.ts`: intel drop sites.
