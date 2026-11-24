@@ -170,7 +170,6 @@ export class StartGate {
   };
 
   private queueActivation = (): void => {
-    cancelAnimationFrame(this.frame);
     // Never resume inside retained UI dispatch: earlier pose hooks must run on
     // the first active frame, before revealing the separate first-person scene.
     this.frame = requestAnimationFrame((): void => {
