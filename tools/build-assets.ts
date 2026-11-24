@@ -295,7 +295,7 @@ const stage = (file: string, ...args: string[]): Promise<number> =>
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const force = FORCE ? ['--force'] : [];
   // The Bun world build is independent of Blender assets; run it alongside.
-  const stages = [stage('export-world.ts', ...force), stage('export-menu-map.ts', ...force)];
+  const stages = [stage('export-world.ts', ...force)];
   if (!process.env.OW_SKIP_ASSETS) {
     mkdirSync(CACHE, { recursive: true });
     // Weapons load the arms blend, so they wait for it and hash its inputs.
