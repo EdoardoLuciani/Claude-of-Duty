@@ -527,8 +527,8 @@ export class FxSystem {
     explode(this, e);
   }
 
-  /** Clear the range's projected impact feedback without touching weapon state. */
-  resetPracticeMarks(): void {
+  /** Clear every projected impact decal; weapon state is untouched. */
+  clearDecals(): void {
     this.decals.clear();
   }
 

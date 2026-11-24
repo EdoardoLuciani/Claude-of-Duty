@@ -26,7 +26,7 @@ In the Training briefing, choose **Day** or **Night** to preview the range befor
 
 At the Training Grounds firing line, press **T** to open the Supply Market at the
 issue counter. Unlimited training credits buy builds and supplies at normal market prices; you can also clear the
-target marks. Use **R** to reload. The marked firing lanes run straight ahead from the pavilion. In the yard on the left, vault the start hurdle to begin a circuit. Climb the ladder and hit **A** from the lookout. Jump left onto the high walk and crouch through the covered catwalk. Drop right onto **TURN**, face back toward the pavilion, and mantle both striped ledges. Hit **B** from the summit, then turn back toward the pavilion and mantle through the open window. Sprint along the runway, jump at the yellow stripe, and keep jump held to catch the finish ledge in midair. Missed a move? Retry that checkpoint, or vault the start hurdle to begin again. The grenade bay is on the right; equip a grenade with **G**, then hold and release the left
+target marks. Use **R** to reload. The marked firing lanes run straight ahead from the pavilion. In the yard on the left, vault the start hurdle to begin a parkour circuit; an on-screen prompt shows each next move, and vaulting the hurdle again restarts it. The grenade bay is on the right; equip a grenade with **G**, then hold and release the left
 button for a long throw or the right for a short one. Press **X** to equip the field radio and
 **Enter** to request the selected strike. Buy more strike charges at the issue counter.
 Grenades and bombing runs can wound or kill you here just as in Survival. Hold **H** to bandage a wound; after a lethal hit, choose **New Game** to return to the firing line.

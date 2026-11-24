@@ -68,7 +68,7 @@ The Start menu selects a map from `src/core/playable-maps.ts` before the engine
 initializes. The entry's session mode sets `config.mode`; read mode differences from
 `SESSION_MODE_POLICY` (Survival systems, starting credits, fixed clock), never from
 the mode name. Map-specific behavior follows the loaded manifest's markers. The
-manifest records its map ID and mode, and the loader rejects a mismatched bundle. Each entry creates an
+manifest records its map ID, and the loader rejects a mismatched bundle. Each entry creates an
 independent session; returning from Pause tears down its engine, input, renderer
 and HUD, releases its browser input locks and exits session-requested fullscreen before exposing the map choices again. Look sensitivity, field of view, invert Y,
 and firing shake carry across map changes in the same document, independent of gameplay state.

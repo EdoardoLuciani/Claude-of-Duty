@@ -1,9 +1,7 @@
 import type { BufferGeometry } from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-import type { RuntimeConfig } from './config.ts';
 import { isRecord } from './guards.ts';
-import { isSessionMode } from './playable-maps.ts';
 
 // Parsed optional metadata may be present as undefined; it is not a state patch.
 export type ModelVec3 = [number, number, number];
@@ -116,7 +114,6 @@ interface WorldQueryData {
 export interface WorldManifest {
   version: 2;
   mapId: string;
-  mode: RuntimeConfig['mode'];
   sourceHash: string;
   assets: { visual: string; collision: string; nav?: string | undefined };
   navigation?:
@@ -298,13 +295,10 @@ export function parseWorldManifest(value: unknown): WorldManifest {
     stats = object(source.stats);
   const transform = array(source.transform, number);
   if (transform.length !== 16) throw new Error('[models] expected world transform matrix');
-  const mode = source.mode;
-  if (!isSessionMode(mode)) throw new Error('[models] unsupported world manifest mode');
   return {
     ...source,
     version: 2,
     mapId: string(source.mapId),
-    mode,
     sourceHash: string(source.sourceHash),
     navigation: optional(source.navigation, (value): NonNullable<WorldManifest['navigation']> => {
       const navigation = object(value);

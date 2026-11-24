@@ -241,14 +241,6 @@ export class AiSystem {
     this.root.name = 'ai';
     ctx.scene.add(this.root);
 
-    // Start the soldier downloads before the material bake; they are awaited below.
-    const models = ctx.get('models');
-    const variantNames = Object.keys(VARIANTS);
-    const soldiers = Promise.all(
-      variantNames.map((name): Promise<SoldierRecord> => models.getSoldier(name))
-    );
-    soldiers.catch((): void => {}); // Reported by the await below, not as unhandled.
-
     const t0 = performance.now();
     const matOpts = { anisotropy: ctx.config.q.anisotropy };
     this.rng.fork(); // Reserve the offline texture stream; keep actor RNG unchanged.
@@ -272,7 +264,11 @@ export class AiSystem {
     // and material groups before caching: agents bind their own skeletons by index,
     // so incompatible or stale assets must fail boot rather than break later spawns.
     this._loadedVariants = new Map();
-    const loaded = await soldiers;
+    const models = ctx.get('models');
+    const variantNames = Object.keys(VARIANTS);
+    const loaded = await Promise.all(
+      variantNames.map((name): Promise<SoldierRecord> => models.getSoldier(name))
+    );
     for (let i = 0; i < variantNames.length; i++) {
       const name = variantNames[i];
       const rec = loaded[i];

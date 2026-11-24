@@ -27,7 +27,7 @@ Runtime behavior belongs to `src/world/`.
   `level/training-markings.ts` adds paint without a second physical layer.
 - `level/placements/`: data-only prop transforms, one `PlacementRow` per line, grouped by area.
 - `props.ts`/`dressing.ts`: props; `buildings.ts`/`kit.ts`: construction.
-- `industrial-props.ts`: reusable barrier and platform with [Blender-authored meshes](../blender/industrial_props/README.md).
+- `industrial-props.ts`: reusable barrier with a [Blender-authored mesh](../blender/industrial_props/README.md).
 - `interiors.ts`: attached details; `ground.ts`/`dressing.ts`: ground/cables.
 - [Runtime palette](../../src/world/palette.ts): surface appearance.
 

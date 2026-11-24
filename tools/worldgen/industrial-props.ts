@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 import type { Assembler } from './builder.ts';
-import { barrierMesh, platformMesh } from './industrial-props-meshes.ts';
+import { barrierMesh } from './industrial-props-meshes.ts';
 import { paintMasks } from './util.ts';
 
 function authoredGeometry({
@@ -24,7 +24,7 @@ function authoredGeometry({
   indexed.dispose();
   geometry.computeVertexNormals();
   // The Blender recipe exports triangles only. Give each flat face a non-degenerate
-  // UV basis for the material's normal map and brushed-steel tangent direction.
+  // UV basis for the material's normal map.
   const pos = geometry.getAttribute('position');
   const normal = geometry.getAttribute('normal');
   const uv = new THREE.BufferAttribute(new Float32Array(pos.count * 2), 2);
@@ -49,12 +49,5 @@ function authoredGeometry({
 export function placeBarrier(A: Assembler, x: number, y: number, z: number, yaw = 0): void {
   const id = 'industrial_barrier';
   if (!A.has(id)) A.proto(id, { geo: authoredGeometry(barrierMesh), key: 'concrete_prop' });
-  A.put(id, x, y, z, yaw);
-}
-
-/** Place a stacking platform by its base centre in level space; yaw is in radians. */
-export function placePlatform(A: Assembler, x: number, y: number, z: number, yaw = 0): void {
-  const id = 'industrial_platform';
-  if (!A.has(id)) A.proto(id, { geo: authoredGeometry(platformMesh), key: 'metal_dark' });
   A.put(id, x, y, z, yaw);
 }

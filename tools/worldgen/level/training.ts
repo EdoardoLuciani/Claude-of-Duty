@@ -4,6 +4,7 @@ import type { WorldManifest } from '../../../src/core/model-metadata.ts';
 import type { Assembler } from '../builder.ts';
 import { placeBarrier } from '../industrial-props.ts';
 import { BOX_THIN, ladderRun } from '../kit.ts';
+import type { BuildMetadata } from '../metadata.ts';
 import { fbm3, keyedRng, paintMasks, plainBox, rockGeometry, trs } from '../util.ts';
 import { dressTraining } from './training-dressing.ts';
 import {
@@ -225,7 +226,7 @@ function ridge(
     const v = z / depth + 0.5;
     const i = Math.min(peaks.length - 2, Math.floor(u * (peaks.length - 1)));
     const t = u * (peaks.length - 1) - i;
-    const p = THREE.MathUtils.lerp(peaks[i], peaks[i + 1], t * t * (3 - 2 * t));
+    const p = THREE.MathUtils.lerp(peaks[i], peaks[i + 1], THREE.MathUtils.smoothstep(t, 0, 1));
     const edge = Math.min(1, u * 8, (1 - u) * 8);
     const roll = Math.sin(Math.PI * v) ** 1.24;
     return -0.45 + edge * roll * (p + (fbm3(x / 10, cx + cz, z / 9) - 0.5) * p * 0.45);
@@ -621,12 +622,7 @@ export function buildTraining(A: Assembler): void {
   workLights(A);
 }
 
-export function trainingMetadata(
-  A: Assembler,
-  sourceHash: string
-): Omit<WorldManifest, 'assets' | 'navigation' | 'stats' | 'mapId' | 'mode'> & {
-  coordinateSystem: string;
-} {
+export function trainingMetadata(A: Assembler, sourceHash: string): BuildMetadata {
   const spawns: Array<WorldManifest['spawns'][number] & { id: string }> = [
     {
       id: 'firing_line',

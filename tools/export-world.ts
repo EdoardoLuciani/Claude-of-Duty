@@ -23,7 +23,7 @@ import { bakeNav } from '#worldgen/nav-bake';
 
 import { NAV_VERSION } from '../src/ai/nav-format.ts';
 import { isRecord } from '../src/core/guards.ts';
-import { matchesWorldMap, PLAYABLE_MAPS, SESSION_MODE_POLICY } from '../src/core/playable-maps.ts';
+import { PLAYABLE_MAPS, SESSION_MODE_POLICY } from '../src/core/playable-maps.ts';
 import type { PlayableMap } from '../src/core/playable-maps.ts';
 import type { MaterialOptions } from '../src/materials/index.ts';
 import { exportGlb } from './lib/export-glb.ts';
@@ -119,18 +119,14 @@ function cacheReady(out: string, map: PlayableMap, sourceHash: string): boolean 
     if (
       !isRecord(manifest) ||
       manifest.sourceHash !== sourceHash ||
-      !matchesWorldMap(manifest, map) ||
+      manifest.mapId !== map.id ||
       !isRecord(manifest.assets)
     )
       return false;
-    const assets = manifest.assets;
-    const required = SESSION_MODE_POLICY[map.mode].survivalSystems
-      ? ['visual', 'collision', 'nav']
-      : ['visual', 'collision'];
-    return required.every((kind): boolean => {
-      const file = assets[kind];
-      return typeof file === 'string' && existsSync(join(out, file));
-    });
+    // The compiler decides which assets a map has; the validator below checks that set.
+    return Object.values(manifest.assets).every(
+      (file): boolean => typeof file === 'string' && existsSync(join(out, file))
+    );
   } catch {
     return false;
   }
@@ -195,7 +191,6 @@ async function compileWorld(
         {
           ...metadata,
           mapId: map.id,
-          mode: map.mode,
           assets: { visual: visualFile, collision: collisionFile, nav: navFile },
           navigation: nav && {
             version: NAV_VERSION,
@@ -252,10 +247,14 @@ await withLock(async (): Promise<void> => {
     const out = join(OUT, map.bundleDirectory);
     if (cacheReady(out, map, sourceHash)) console.log(`[world] up to date: ${map.label}`);
     else await compileWorld(out, map, sourceHash);
-    await run(process.execPath, [
-      resolve(ROOT, 'tools/validate-world-assets.ts'),
-      `--manifest=${join(out, 'level.json')}`,
-      `--map=${map.id}`,
-    ]);
   }
+  await Promise.all(
+    PLAYABLE_MAPS.map((map): Promise<void> =>
+      run(process.execPath, [
+        resolve(ROOT, 'tools/validate-world-assets.ts'),
+        `--manifest=${join(OUT, map.bundleDirectory, 'level.json')}`,
+        `--map=${map.id}`,
+      ])
+    )
+  );
 });

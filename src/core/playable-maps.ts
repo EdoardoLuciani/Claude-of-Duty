@@ -41,14 +41,3 @@ export const SESSION_MODE_POLICY = {
   survival: { survivalSystems: true, startingCredits: 0, fixedClock: false },
   training: { survivalSystems: false, startingCredits: Infinity, fixedClock: true },
 } as const satisfies Record<RuntimeConfig['mode'], SessionModePolicy>;
-
-export function isSessionMode(value: unknown): value is RuntimeConfig['mode'] {
-  return typeof value === 'string' && Object.hasOwn(SESSION_MODE_POLICY, value);
-}
-
-export function matchesWorldMap(
-  manifest: { mapId?: unknown; mode?: unknown },
-  map: PlayableMap
-): boolean {
-  return manifest.mapId === map.id && manifest.mode === map.mode;
-}

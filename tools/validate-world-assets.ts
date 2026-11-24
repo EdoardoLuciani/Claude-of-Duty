@@ -14,7 +14,6 @@ import { parseWorldManifest } from '../src/core/model-metadata.ts';
 import type { WorldLadder, WorldManifest } from '../src/core/model-metadata.ts';
 import {
   DEFAULT_PLAYABLE_MAP,
-  matchesWorldMap,
   PLAYABLE_MAPS,
   SESSION_MODE_POLICY,
 } from '../src/core/playable-maps.ts';
@@ -355,7 +354,7 @@ const mapId = args.map ?? meta?.mapId ?? DEFAULT_PLAYABLE_MAP.id;
 const map = PLAYABLE_MAPS.find((entry): boolean => entry.id === mapId);
 if (meta) {
   if (!map) fail(`unknown playable map ID ${describe(mapId)}`);
-  else if (!matchesWorldMap(meta, map)) fail(`manifest map ID or mode does not match ${map.id}`);
+  else if (meta.mapId !== map.id) fail(`manifest map ID does not match ${map.id}`);
   const expected = map && authoredCounts[map.id];
   const { bounds, WORLD, spawns, lights, volumes, query } = meta;
   for (let i = 0; i < 3; i++) {

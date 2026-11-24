@@ -174,7 +174,7 @@ for (const pz of [-23.1, -25, -26.9]) {
   assert(!player.checkCapsule(-15.5, deck + 0.01, pz, UNITS.playerHeight));
 }
 assert(physics.raycast(33, 0.45, -4, 0, 0, -1, 5).hit, 'bay divider participates in world physics');
-// The tank used to serve as a step up and over the eastern perimeter.
+// The eastern perimeter offers no step up and over.
 assert(player.checkCapsule(38.48, 0.03, -11.3, UNITS.playerHeight));
 player.setPosition(38.94, 0, -11.3);
 assert.equal(new LedgeProbe(physics).probe(player, 1, 0, UNITS.playerHeight), LEDGE_NONE);

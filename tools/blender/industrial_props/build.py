@@ -57,20 +57,6 @@ def barrier():
     return obj
 
 
-def platform():
-    obj = shell('Steel transfer platform', [
-        (0.000, 1.433, 0.933, 0.025),
-        (0.012, 1.445, 0.945, 0.025),
-        (0.175, 1.445, 0.945, 0.025),
-        (0.190, 1.425, 0.925, 0.022),
-        (0.340, 1.425, 0.925, 0.022),
-        (0.367, 1.500, 1.000, 0.027),
-        (0.450, 1.500, 1.000, 0.027),
-    ])
-    fork_slots(obj, 0.62, 0.29, 0.135)
-    return obj
-
-
 def bake(name, obj):
     mesh = obj.data
     bm = bmesh.new()
@@ -100,7 +86,7 @@ def main():
     bpy.ops.wm.read_factory_settings(use_empty=True)
     args.output.write_text(
         '// Baked by tools/blender/industrial_props/build.py. Do not edit by hand.\n\n'
-        + bake('barrierMesh', barrier()) + '\n' + bake('platformMesh', platform()),
+        + bake('barrierMesh', barrier()),
         encoding='utf-8', newline='\n',
     )
 

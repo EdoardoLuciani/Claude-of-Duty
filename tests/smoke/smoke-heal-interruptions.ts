@@ -147,7 +147,7 @@ for (const ending of ['release', 'complete', 'grenade'])
     ui._collectBlips = noop;
     ui.menu = partialFixture<UiSystem['menu']>({ open: false, update: noop });
     ui.gameOver = partialFixture<UiSystem['gameOver']>({ update: noop });
-    ui.shop = partialFixture<NonNullable<UiSystem['shop']>>({ update: noop });
+    ui.shop = partialFixture<UiSystem['shop']>({ update: noop });
     ui.crosshair = new Crosshair();
     ui.hit = new Hitmarkers();
     ui.arcs = new DamageArcs();

@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 
-import { bindingLabel } from '../../src/core/bindings.ts';
 import { DEFAULT_PLAYABLE_MAP, PLAYABLE_MAPS } from '../../src/core/playable-maps.ts';
 import type { PlayableMap } from '../../src/core/playable-maps.ts';
 import { PlayerSystem } from '../../src/player/index.ts';
@@ -60,14 +59,6 @@ function createElement(tag: string): HTMLElement {
     case 'button':
       node = fixture<HTMLButtonElement>(members);
       break;
-    case 'input':
-      node = fixture<HTMLInputElement>(members);
-      break;
-    case 'fieldset':
-    case 'legend':
-    case 'label':
-      node = fixture<HTMLElement>(members);
-      break;
     case 'p':
       node = fixture<HTMLParagraphElement>(members);
       break;
@@ -102,10 +93,7 @@ function dispatch(type: string): void {
   if (typeof listener === 'function') listener(event);
   else listener.handleEvent(event);
 }
-function createStartFixture(
-  visible = true,
-  map: PlayableMap = DEFAULT_PLAYABLE_MAP
-): {
+function createStartFixture(visible = true): {
   engine: ReturnType<typeof createCoreFixture>['engine'];
   gate: StartGate;
   click: () => void;
@@ -136,7 +124,7 @@ function createStartFixture(
     assert.equal(engine.viewScene.visible, false);
     order.push('reset');
   });
-  const gate = new StartGate(engine, map);
+  const gate = new StartGate(engine, DEFAULT_PLAYABLE_MAP);
   gate.ready();
   const button = [...elements]
     .reverse()
@@ -168,18 +156,6 @@ for (const map of PLAYABLE_MAPS) {
 }
 assert.deepEqual(selected, PLAYABLE_MAPS);
 menu.dispose();
-
-const training = selected.find((map): boolean => map.id === 'training-grounds');
-assert(training);
-const trainingGate = createStartFixture(true, training).gate;
-assert(
-  elements.some(
-    (node): boolean =>
-      node.textContent?.includes(`with ${bindingLabel('use')}. Targets ahead`) === true
-  ),
-  'the selected range shows orientation with the canonical use binding'
-);
-trainingGate.dispose();
 
 let f = createStartFixture();
 assert.equal(f.engine.viewScene.visible, false);
@@ -250,5 +226,5 @@ flush();
 assert.equal(f.engine.gameplaySuspended, true, 'stopped/disposal loop cannot activate');
 f.gate.dispose();
 console.log(
-  'smoke-start-gate: ok (map chooser, orientation, intent, actual lock, retry, reset, pose, terminal, teardown)'
+  'smoke-start-gate: ok (map chooser, intent, actual lock, retry, reset, pose, terminal, teardown)'
 );

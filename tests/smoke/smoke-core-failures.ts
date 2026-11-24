@@ -195,7 +195,6 @@ try {
   const meta = {
     version: 2,
     mapId: 'courtyard',
-    mode: 'survival',
     assets,
     sourceHash: 'fixture',
     transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
@@ -215,7 +214,7 @@ try {
   );
   await assert.rejects(models._prefetchWorld(), /HTTP 503/, 'Survival loads nav');
   meta.mapId = 'other-courtyard';
-  await assert.rejects(models._prefetchWorld(), /unexpected world manifest map ID or mode/);
+  await assert.rejects(models._prefetchWorld(), /unexpected world manifest map ID/);
   const other = new ModelSystem({
     ...DEFAULT_PLAYABLE_MAP,
     id: meta.mapId,

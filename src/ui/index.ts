@@ -125,7 +125,7 @@ export class UiSystem {
   startGate: StartGate | null = null;
   pixiHud: PixiHud | null = null;
   gameOver!: GameOverScreen;
-  shop?: MarketOverlay;
+  shop!: MarketOverlay;
   marketCountdown!: MarketCountdown;
   _fpsSince: number | null = null;
   _fpsFrames = 0;
@@ -176,10 +176,9 @@ export class UiSystem {
         ctx.input.requestPointerLock();
       }
     });
-    const market = ctx.peek('market');
-    if (market) this.shop = new MarketOverlay(this.root, ctx);
+    this.shop = new MarketOverlay(this.root, ctx);
     this.scoreBar.visible = ctx.has('game');
-    this.marketCountdown = new MarketCountdown(market?.delay ?? 0);
+    this.marketCountdown = new MarketCountdown(ctx.get('market').delay);
 
     this.hudTarget = 1;
     this._lastRaw = ctx.time.raw;
@@ -256,12 +255,12 @@ export class UiSystem {
     });
 
     on('engine:error', (): void => {
-      this.shop?.hide();
+      this.shop.hide();
       this.pixiHud?.setVisible(false);
     });
     // The overlay closes the market itself, after mouse capture has resumed gameplay.
     on('market:open', (e): void => {
-      this.shop?.show(e.wave);
+      this.shop.show(e.wave);
       this.sfx('market_open', 0.85);
     });
     on('market:close', (): void => this.sfx('market_close', 0.7));
@@ -442,7 +441,7 @@ export class UiSystem {
 
   /** Prepare the market state for integration checks. */
   debugState(name: string): { state: string } {
-    if (name !== 'market' || !this.shop) throw new Error('Unknown UI debug state');
+    if (name !== 'market') throw new Error('Unknown UI debug state');
     this.menu.close();
     this.killfeed.clear();
     this.clearPrompt();
@@ -501,27 +500,25 @@ export class UiSystem {
     }
     this.menu.update(rawDt);
     this.gameOver.update(rawDt);
-    this.shop?.update(rawDt);
+    this.shop.update(rawDt);
     if (this.courseStep && !playerDead && !ctx.engine.gameplaySuspended) {
       const player = ctx.get('player');
       if (player.state === 'climb' || player.stance === 'crouch')
         this.courseAction(player.state === 'climb' ? 'climb' : 'crouch');
     }
+    const canPrompt =
+      !playerDead && !this.menu.open && !marketOpen && ctx.input.enabled && !ctx.input.ads;
     let near = false;
     const station = this.station;
-    if (station && this.shop) {
+    if (station) {
       const feet = ctx.get('player').feetPosition;
       near = Math.hypot(feet.x - station.x, feet.z - station.z) <= STATION_RADIUS;
       if (
         near &&
-        !playerDead &&
-        !this.menu.open &&
-        !marketOpen &&
-        ctx.input.enabled &&
+        canPrompt &&
         !ctx.input.frozen &&
         !ctx.engine.gameplaySuspended &&
-        !ctx.get('weapons').grenadeEquipped &&
-        !ctx.input.ads
+        !ctx.get('weapons').grenadeEquipped
       ) {
         if (!this.prompt.active || this._promptOwner !== this.shop)
           this.setPrompt(STATION_PROMPT, this.shop);
@@ -535,11 +532,7 @@ export class UiSystem {
       next &&
       feet &&
       !near &&
-      !this.menu.open &&
-      !marketOpen &&
-      !playerDead &&
-      ctx.input.enabled &&
-      !ctx.input.ads &&
+      canPrompt &&
       Math.abs(feet.x - next.position[0]) < 10 &&
       Math.abs(feet.z - next.position[2]) < 30 &&
       (!this.prompt.active || this._promptOwner === gates)
@@ -735,7 +728,7 @@ export class UiSystem {
       this.minimap?.dispose();
       this.menu.dispose();
       this.gameOver.dispose();
-      this.shop?.dispose();
+      this.shop.dispose();
       this.root.remove();
       removeStyles();
     }

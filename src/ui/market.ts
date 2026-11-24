@@ -116,8 +116,7 @@ export class MarketOverlay {
       const cost = el('span', 'ow-market-build-cost', row);
       this.buildControls.push({ select, options, cost });
       select.onchange = (): void =>
-        this.run('selectAttachment', (): void => {
-          if (this.body.inert) return;
+        this.edit('selectAttachment', (): void => {
           const build = this.market.getHudState().build;
           if (!build) return;
           if (this.market.setBuild({ ...build.config, [slot]: select.value || null }))
@@ -144,8 +143,7 @@ export class MarketOverlay {
     this.confirm = el('button', 'ow-market-buy', actions, 'BUY BUILD');
     this.confirm.type = 'button';
     this.confirm.onclick = (): void =>
-      this.run('confirmBuild', (): void => {
-        if (this.body.inert) return;
+      this.edit('confirmBuild', (): void => {
         if (!this.market.confirmBuild()) {
           this.setStatus('This build could not be equipped.');
           this.ctx.peek('ui')?.sfx('market_deny', 0.75);
@@ -158,8 +156,7 @@ export class MarketOverlay {
     const cancel = el('button', 'ow-market-build-cancel', actions, 'CANCEL');
     cancel.type = 'button';
     cancel.onclick = (): void =>
-      this.run('cancelBuild', (): void => {
-        if (this.body.inert) return;
+      this.edit('cancelBuild', (): void => {
         const id = this._selectedId;
         this.market.cancelBuild();
         this._selectedId = null;
@@ -174,9 +171,8 @@ export class MarketOverlay {
       const reset = el('button', 'ow-market-skip', catalog, 'Reset Targets');
       reset.type = 'button';
       reset.onclick = (): void =>
-        this.run('resetTargets', (): void => {
-          if (this.body.inert) return;
-          this.ctx.get('fx').resetPracticeMarks();
+        this.edit('resetTargets', (): void => {
+          this.ctx.get('fx').clearDecals();
           this.setStatus('Target marks cleared.');
         });
     }
@@ -211,9 +207,9 @@ export class MarketOverlay {
     );
 
     this._onClick = (e: MouseEvent): void =>
-      this.run('selectItem', (): void => {
+      this.edit('selectItem', (): void => {
         const card = targetCard(e.target);
-        if (!card || this.body.inert) return;
+        if (!card) return;
         const item = this.market
           .getHudState()
           .items.find((it): boolean => it.id === card.dataset.item);
@@ -407,6 +403,13 @@ export class MarketOverlay {
     } catch (error) {
       this.ctx.engine.fail('ui', action, error);
     }
+  }
+
+  /** Catalog and build edits are ignored while a resume is pending. */
+  private edit(action: string, call: () => void): void {
+    this.run(action, (): void => {
+      if (!this.body.inert) call();
+    });
   }
 
   private requestResume(): void {
