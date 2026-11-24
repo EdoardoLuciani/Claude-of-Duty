@@ -156,7 +156,9 @@ export class Input {
     if (this._ownsFullscreen) {
       this._ownsFullscreen = false;
       navigator.keyboard?.unlock();
-      if (document.fullscreenElement === document.documentElement) await document.exitFullscreen();
+      // Leaving fullscreen is cosmetic; a rejected exit must not fail session teardown.
+      if (document.fullscreenElement === document.documentElement)
+        await document.exitFullscreen().catch((): void => {});
     }
   }
 

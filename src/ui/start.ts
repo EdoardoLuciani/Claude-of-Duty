@@ -15,6 +15,8 @@ function startDialog(id: string, heading: string): HTMLDialogElement {
   title.textContent = heading;
   title.style.cssText = 'font-size:1.5rem;font-weight:600;letter-spacing:.12em';
   panel.setAttribute('aria-labelledby', title.id);
+  // Esc must not dismiss the only way into (or back into) a session.
+  panel.setAttribute('closedby', 'none');
   panel.oncancel = (event): void => event.preventDefault();
   panel.onkeydown = (event): void => {
     event.stopPropagation();

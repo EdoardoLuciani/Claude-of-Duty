@@ -78,6 +78,12 @@ export class MarketOverlay {
       event.preventDefault(); // Keep the modal until mouse capture succeeds.
       this.skip();
     };
+    // Without fresh user activation, browsers ignore preventDefault and close anyway.
+    this.root.onclose = (): void => {
+      if (!this.active || this.root.open) return;
+      this.root.showModal();
+      if (!this.body.inert) this.skip();
+    };
     this.capture = new MouseCapture(ctx.engine, this.resumeGameplay, (): void =>
       this.setStatus('Mouse capture unavailable. Select Retry Resume to try again.')
     );

@@ -381,6 +381,7 @@ if (meta) {
       fail(`manifest.lights[${index}] has invalid kind`);
   });
   if (!volumes) fail('manifest.volumes must be an array');
+  if (survival && !query?.street) fail('manifest.query.street is invalid');
   if (!query?.alleys) fail('manifest.query.alleys must be an array');
 }
 
