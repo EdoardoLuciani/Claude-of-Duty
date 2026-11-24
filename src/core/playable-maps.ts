@@ -7,6 +7,8 @@ export interface PlayableMap {
   readonly bundleDirectory: string;
   readonly mode: RuntimeConfig['mode'];
   readonly startIntro?: string;
+  /** Opt into a Day/Night choice at Start with this local solar hour for Night. */
+  readonly nightHour?: number;
 }
 
 export const DEFAULT_PLAYABLE_MAP = {
@@ -23,6 +25,7 @@ export const PLAYABLE_MAPS = [
     label: 'Training Grounds',
     bundleDirectory: 'training',
     mode: 'training',
+    nightHour: 19.75,
     startIntro: `Try a loadout at the counter with ${bindingLabel('use')}. Targets ahead, parkour yard left, grenade bay right.`,
   },
 ] as const satisfies readonly PlayableMap[];

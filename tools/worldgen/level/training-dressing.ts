@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 import type { Assembler } from '../builder.ts';
-import { awning, BOX_FINE, BOX_THIN, mergeSimple } from '../kit.ts';
+import { awning, BOX_FINE, BOX_THIN, mergeSimple, worldOf } from '../kit.ts';
 import type { PALETTE } from '../palette.ts';
 import { registerProps } from '../props.ts';
 import { chamferBox, clothGeometry, fillMasks, trs } from '../util.ts';
@@ -39,10 +39,8 @@ function issueCounter(A: Assembler): void {
   const { x, z } = TRAINING_STATION;
   // The public side looks toward spawn; the chair sits on the far side of the counter.
   const yaw = (105 * Math.PI) / 180;
-  const c = Math.cos(yaw);
-  const s = Math.sin(yaw);
-  const wx = (u: number, v: number): number => x + c * u + s * v;
-  const wz = (u: number, v: number): number => z - s * u + c * v;
+  const frame = trs(new THREE.Matrix4(), x, 0, z, yaw);
+  const at = (u: number, y: number, v: number): [number, number, number] => worldOf(frame, u, y, v);
   const part = (
     key: Finish,
     u: number,
@@ -52,7 +50,7 @@ function issueCounter(A: Assembler): void {
     h: number,
     d: number
   ): void => {
-    A.addBox(key, BOX_FINE(A), wx(u, v), y, wz(u, v), yaw, w, h, d);
+    A.addBox(key, BOX_FINE(A), ...at(u, y, v), yaw, w, h, d);
   };
   part('wood_prop', 0, 1.04, 0, 1.92, 0.075, 0.72);
   part('metal_dark', 0, 0.966, 0, 1.84, 0.06, 0.65);
@@ -70,20 +68,10 @@ function issueCounter(A: Assembler): void {
     part('metal_blue', 0.52, y, -0.285, 0.484, 0.107, 0.016);
     part('steel', 0.52, y + 0.014, -0.306, 0.132, 0.018, 0.025);
   }
-  paintText(
-    A,
-    'training_letter',
-    'ISSUE COUNTER',
-    wx(-0.12, 0.312),
-    0.67,
-    wz(-0.12, 0.312),
-    0.105,
-    false,
-    yaw
-  );
+  paintText(A, 'training_letter', 'ISSUE COUNTER', ...at(-0.12, 0.67, 0.312), 0.105, false, yaw);
   // The fascia's clipboard pictogram repeats the sign-out sheet on the counter.
   for (const u of [-0.7, -0.49, -0.28])
-    paintPlane(A, 'training_yellow', wx(u, 0.31), 0.83, wz(u, 0.31), 0.16, 0.045, false, yaw);
+    paintPlane(A, 'training_yellow', ...at(u, 0.83, 0.31), 0.16, 0.045, false, yaw);
   for (const [key, depth, y, w, h] of [
     ['training_ink', 0.311, 0.667, 0.278, 0.31],
     ['training_white', 0.312, 0.662, 0.137, 0.184],
@@ -92,21 +80,21 @@ function issueCounter(A: Assembler): void {
     ['training_ink', 0.313, 0.645, 0.09, 0.01],
     ['training_ink', 0.313, 0.611, 0.09, 0.01],
   ] as const)
-    paintPlane(A, key, wx(0.59, depth), y, wz(0.59, depth), w, h, false, yaw);
+    paintPlane(A, key, ...at(0.59, y, depth), w, h, false, yaw);
   part('wood_prop_dark', -0.3, 1.084, 0.084, 0.254, 0.013, 0.329);
-  paintPlane(A, 'training_white', wx(-0.3, 0.084), 1.092, wz(-0.3, 0.084), 0.225, 0.288, true, yaw);
+  paintPlane(A, 'training_white', ...at(-0.3, 1.092, 0.084), 0.225, 0.288, true, yaw);
   for (let i = 0; i < 6; i++) {
     const v = -0.002 + i * 0.033;
-    paintPlane(A, 'training_ink', wx(-0.3, v), 1.093, wz(-0.3, v), 0.175, 0.004, true, yaw);
+    paintPlane(A, 'training_ink', ...at(-0.3, 1.093, v), 0.175, 0.004, true, yaw);
   }
   part('steel', -0.3, 1.1, -0.052, 0.105, 0.013, 0.031);
   part('metal_blue', -0.11, 1.089, 0.133, 0.012, 0.013, 0.145);
   const bell = A.cache('training:counter-bell', (): THREE.BufferGeometry =>
     cylinder(0.04, 0.063, 0.043)
   );
-  A.add('steel', bell, trs(matrix, wx(0.61, 0.17), 1.099, wz(0.61, 0.17)));
+  A.add('steel', bell, trs(matrix, ...at(0.61, 1.099, 0.17)));
   part('metal_dark', 0.61, 1.129, 0.17, 0.025, 0.017, 0.025);
-  A.putS('chair', wx(0.07, -0.72), 0, wz(0.07, -0.72), yaw - 0.26, 1, 1, 1);
+  A.putS('chair', ...at(0.07, 0, -0.72), yaw - 0.26, 1, 1, 1);
 }
 
 function repairBench(A: Assembler): void {
@@ -233,15 +221,15 @@ function tote(A: Assembler, x: number, y: number, z: number, yaw: number, scale 
 
 function supplyLanding(A: Assembler): void {
   // Palletized returns and spare cord: one tidy load, not isolated cover props.
+  const frame = new THREE.Matrix4();
   for (const { x, z, yaw, stacks } of [
     { x: 13.04 + BAY_SHIFT, z: 14.61, yaw: -0.12, stacks: [2, 1] },
     { x: 14.31 + BAY_SHIFT, z: 14.72, yaw: 0.04, stacks: [2, 2] },
   ]) {
     A.putS('pallet', x, 0.017, z, yaw, 1, 1, 1);
+    trs(frame, x, 0, z, yaw);
     for (const [i, count] of stacks.entries()) {
-      const dx = (i * 2 - 1) * 0.285;
-      const loadX = x + Math.cos(yaw) * dx;
-      const loadZ = z - Math.sin(yaw) * dx;
+      const [loadX, , loadZ] = worldOf(frame, (i * 2 - 1) * 0.285, 0, 0);
       for (let row = 0; row < count; row++)
         tote(A, loadX, 0.114 + row * 0.288, loadZ, BACKWARD + yaw);
     }
@@ -258,13 +246,12 @@ function supplyLanding(A: Assembler): void {
     A.put('training_reel_flange', x, 0.758 * scale, z, yaw, scale);
     A.put('training_reel_cord', x, 0.4085 * scale, z, yaw, scale);
     A.put('training_reel_hub', x, 0.826 * scale, z, yaw, scale);
+    trs(frame, x, 0, z, yaw);
     for (const offset of [-0.21, 0.17]) {
       paintPlane(
         A,
         'training_ink',
-        x + Math.sin(yaw) * offset * scale,
-        0.818 * scale,
-        z + Math.cos(yaw) * offset * scale,
+        ...worldOf(frame, 0, 0.818 * scale, offset * scale),
         2 * Math.sqrt(0.54 ** 2 - offset ** 2) * scale,
         0.006 * scale,
         true,
@@ -273,11 +260,11 @@ function supplyLanding(A: Assembler): void {
     }
     for (let i = 0; i < 4; i++) {
       const angle = (i * Math.PI) / 2 + yaw;
+      // Positions circle the hub toward +Z; the fastener itself keeps its authored yaw.
+      trs(frame, x, 0, z, -angle);
       A.put(
         'training_reel_fastener',
-        x + Math.cos(angle) * 0.19 * scale,
-        0.822 * scale,
-        z + Math.sin(angle) * 0.19 * scale,
+        ...worldOf(frame, 0.19 * scale, 0.822 * scale, 0),
         angle,
         scale
       );
@@ -290,12 +277,10 @@ function markerPocket(A: Assembler, x: number, z: number, side: -1 | 1): void {
   A.put('training_flag_ferrule', x, 0.222, z);
   A.put('training_flag_pole', x, 0.941, z);
   const yaw = side < 0 ? 0.36 : BACKWARD - 0.36;
-  const flagReach = 0.318;
+  const frame = trs(matrix, x, 0, z, yaw);
   A.put(
     side < 0 ? 'training_yard_flag' : 'training_bay_flag',
-    x + Math.cos(yaw) * flagReach,
-    1.455,
-    z - Math.sin(yaw) * flagReach,
+    ...worldOf(frame, 0.318, 1.455, 0),
     yaw
   );
   for (const y of [1.311, 1.606]) A.put('training_flag_sleeve', x, y, z);

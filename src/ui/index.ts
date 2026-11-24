@@ -4,7 +4,6 @@ import { bindingLabel } from '../core/bindings.ts';
 import type { SystemId, EngineContext } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName } from '../core/events.ts';
 import { clamp, clamp01, damp } from '../core/math.ts';
-import type { CourseGate, WorldRangeStation } from '../core/model-metadata.ts';
 import { SESSION_MODE_POLICY } from '../core/playable-maps.ts';
 import type { PlayableMap } from '../core/playable-maps.ts';
 import type { WeaponMode } from '../weapons/defs.ts';
@@ -26,8 +25,6 @@ import { installStyles, removeStyles } from './style.ts';
 import { el, setStyle } from './util.ts';
 
 const MAX_BLIPS = 48;
-const STATION_RADIUS = 3;
-const STATION_PROMPT = { text: 'Supply market', sub: 'Loadout · Resupply · Reset targets' };
 const HEAL_KEY = bindingLabel('heal');
 
 const HUD_DEFAULTS = {
@@ -88,11 +85,6 @@ interface MinimapFrame {
   pulseTime?: number;
   playerY?: number;
 }
-function matchesGate(gate: CourseGate | undefined, action: string, p: THREE.Vector3Like): boolean {
-  if (gate?.action !== action) return false;
-  const [x, y, z] = gate.position;
-  return (p.x - x) ** 2 + (p.y - y) ** 2 + (p.z - z) ** 2 <= gate.radius ** 2;
-}
 type UiContext = EngineContext;
 
 /** Shared-device Pixi HUD with native menus; lateUpdate follows the final camera pose.
@@ -102,7 +94,7 @@ type UiContext = EngineContext;
  */
 export class UiSystem {
   static readonly id = 'ui';
-  static readonly deps: SystemId[] = ['render', 'game', 'market'];
+  static readonly deps: SystemId[] = ['render', 'market', 'fx'];
   ctx!: UiContext;
   rng!: import('../core/rng.ts').Rng;
   root!: HTMLElement;
@@ -118,9 +110,6 @@ export class UiSystem {
   ammo: AmmoPanel = new AmmoPanel();
   prompt: Prompt = new Prompt();
   banner: Banner = new Banner();
-  private courseStep = 0;
-  private course: readonly CourseGate[] = [];
-  private station: Readonly<WorldRangeStation> | undefined;
   menu!: PauseMenu;
   startGate: StartGate | null = null;
   pixiHud: PixiHud | null = null;
@@ -188,17 +177,6 @@ export class UiSystem {
       fn: (event: EngineEventMap[K]) => void
     ): number => this._unsubs.push(ctx.events.on(type, fn));
 
-    const { course, rangeStation } = ctx.get('world').queries;
-    this.course = course;
-    this.station = rangeStation;
-    if (this.course.length) {
-      on('player:mantle', (e): void => this.courseAction(e.kind));
-      on('bullet:impact', (e): void => {
-        if (!this.courseStep || e.exit || !this._isPlayerTarget(e.shooter)) return;
-        const label = ctx.get('world').queries.rangeTargetAt(e.point, e.normal)?.label;
-        if (label) this.courseAction(label);
-      });
-    }
     on('weapon:fire', (e): void => {
       if (!this._isPlayerTarget(e.actor)) return;
       const recoil = 'recoil' in e && typeof e.recoil === 'number' ? e.recoil : 1;
@@ -327,7 +305,6 @@ export class UiSystem {
     });
 
     on('game:restart', (): void => {
-      this.courseStep = 0;
       this.banner.clear();
       this.killfeed.clear();
       this.arcs.clear();
@@ -349,20 +326,6 @@ export class UiSystem {
   }
 
   /* ------------------------------------------------------------- helpers -- */
-
-  /** Free practice stays open. Only actions inside the next marked station count for a run. */
-  private courseAction(action: string): void {
-    const gates = this.course;
-    const p = this.ctx.get('player').feetPosition;
-    let index = this.courseStep;
-    if (matchesGate(gates.at(0), action, p)) index = 0;
-    else if (!index || !matchesGate(gates.at(index), action, p)) return;
-    const next = gates.at(index + 1);
-    this.clearPrompt(gates);
-    this.courseStep = next ? index + 1 : 0;
-    if (!next) this.banner.show('Circuit complete', 'Vault the start hurdle to run again', 4);
-    this.sfx('objective', 0.55);
-  }
 
   /** True when an actor handle identifies the local player. */
   _isPlayerTarget(t: unknown): boolean {
@@ -501,53 +464,6 @@ export class UiSystem {
     this.menu.update(rawDt);
     this.gameOver.update(rawDt);
     this.shop.update(rawDt);
-    if (this.courseStep && !playerDead && !ctx.engine.gameplaySuspended) {
-      const player = ctx.get('player');
-      if (player.state === 'climb' || player.stance === 'crouch')
-        this.courseAction(player.state === 'climb' ? 'climb' : 'crouch');
-    }
-    const canPrompt =
-      !playerDead && !this.menu.open && !marketOpen && ctx.input.enabled && !ctx.input.ads;
-    let near = false;
-    const station = this.station;
-    if (station) {
-      const feet = ctx.get('player').feetPosition;
-      near = Math.hypot(feet.x - station.x, feet.z - station.z) <= STATION_RADIUS;
-      if (
-        near &&
-        canPrompt &&
-        !ctx.input.frozen &&
-        !ctx.engine.gameplaySuspended &&
-        !ctx.get('weapons').grenadeEquipped
-      ) {
-        if (!this.prompt.active || this._promptOwner !== this.shop)
-          this.setPrompt(STATION_PROMPT, this.shop);
-        if (ctx.input.actionPressed('use')) ctx.get('market').openShop();
-      } else this.clearPrompt(this.shop);
-    }
-    const gates = this.course;
-    const next = this.courseStep ? gates[this.courseStep] : undefined;
-    const feet = next && ctx.get('player').feetPosition;
-    if (
-      next &&
-      feet &&
-      !near &&
-      canPrompt &&
-      Math.abs(feet.x - next.position[0]) < 10 &&
-      Math.abs(feet.z - next.position[2]) < 30 &&
-      (!this.prompt.active || this._promptOwner === gates)
-    ) {
-      if (!this.prompt.active)
-        this.setPrompt(
-          {
-            key: `${this.courseStep + 1}/${gates.length}`,
-            text: 'Parkour circuit',
-            sub: next.hint,
-          },
-          gates
-        );
-    } else this.clearPrompt(gates);
-
     // ---- external state --------------------------------------------------
     const ws = ctx.peek('weapons')?.getHudState();
     if (ws) {
@@ -733,9 +649,4 @@ export class UiSystem {
       removeStyles();
     }
   }
-}
-
-/** Practice uses the free market editor without a Survival director. */
-export class TrainingUiSystem extends UiSystem {
-  static override readonly deps: SystemId[] = ['render', 'market', 'fx'];
 }

@@ -1,7 +1,8 @@
 import type { Engine } from '../core/engine.ts';
-import { PLAYABLE_MAPS, SESSION_MODE_POLICY } from '../core/playable-maps.ts';
+import { PLAYABLE_MAPS } from '../core/playable-maps.ts';
 import type { PlayableMap } from '../core/playable-maps.ts';
 import { CLOCK } from '../sky/tuning.ts';
+import { MouseCapture } from './mouse-capture.ts';
 
 function startDialog(id: string, heading: string): HTMLDialogElement {
   const panel = document.createElement('dialog');
@@ -68,9 +69,8 @@ export class StartGate {
   private status = document.createElement('p');
   private button = startButton('Start', (): void => this.requestControl());
   private waiting = true;
-  private intent = false;
   private ended = false;
-  private generation = 0;
+  private capture: MouseCapture;
   private frame = 0;
   private hiddenView = false;
   private viewVisible = true;
@@ -88,15 +88,14 @@ export class StartGate {
     this.status.setAttribute('aria-live', 'polite');
     this.status.style.cssText = 'margin:1.25rem 0;color:#aabdc3';
     this.panel.append(this.status);
-    if (SESSION_MODE_POLICY[map.mode].fixedClock) this.addTimeChoice();
+    if (map.nightHour !== undefined) this.addTimeChoice(map.nightHour);
     this.panel.append(this.button);
-    document.addEventListener('pointerlockchange', this.lockChanged);
-    document.addEventListener('pointerlockerror', this.lockDenied);
+    this.capture = new MouseCapture(engine, this.queueActivation, this.lockDenied);
     this.offError = engine.events.on('engine:error', (): void => this.end());
     this.suspend();
   }
 
-  private addTimeChoice(): void {
+  private addTimeChoice(nightHour: number): void {
     const group = document.createElement('fieldset');
     group.className = 'range-time';
     const legend = document.createElement('legend');
@@ -104,13 +103,13 @@ export class StartGate {
     group.append(legend);
     for (const [label, hour] of [
       ['Day', CLOCK.startHour],
-      ['Night', CLOCK.trainingNightHour],
+      ['Night', nightHour],
     ] as const) {
       const choice = document.createElement('label');
       const radio = document.createElement('input');
       radio.type = 'radio';
       radio.name = 'range-time';
-      radio.checked = hour === CLOCK.startHour;
+      radio.checked = label === 'Day';
       radio.onchange = (): void => {
         if (!radio.checked || this.ended) return;
         const sky = this.engine.ctx.get('sky').setTimeOfDay(hour);
@@ -124,10 +123,9 @@ export class StartGate {
   }
 
   private suspend(): void {
-    this.generation++;
+    this.capture.cancel();
     cancelAnimationFrame(this.frame);
     this.waiting = true;
-    this.intent = false;
     this.engine.setGameplaySuspended(true);
     this.engine.input.enabled = false;
     this.engine.ctx.get('player').setControlEnabled(false);
@@ -161,31 +159,17 @@ export class StartGate {
 
   private requestControl(): void {
     if (this.ended || this.engine.error || !this.waiting) return;
-    this.intent = true;
-    const generation = ++this.generation;
+    cancelAnimationFrame(this.frame);
     this.status.textContent = 'Waiting for mouse capture. Retry if needed.';
     this.button.textContent = 'Retry Start';
-    if (document.pointerLockElement === this.engine.canvas) {
-      this.queueActivation(); // New Game can begin with the lock already held.
-    } else {
-      this.engine.input.requestPointerLock((requested): void => {
-        if (!requested && generation === this.generation) this.lockDenied();
-      });
-    }
-    this.engine.input.requestFullscreen();
+    this.capture.request();
   }
 
   private lockDenied = (): void => {
-    if (this.ended || this.engine.error || !this.waiting) return;
     this.status.textContent = 'Mouse capture unavailable. Select Retry Start to try again.';
   };
 
-  private lockChanged = (): void => {
-    if (document.pointerLockElement === this.engine.canvas) this.queueActivation();
-  };
-
-  private queueActivation(): void {
-    const generation = this.generation;
+  private queueActivation = (): void => {
     cancelAnimationFrame(this.frame);
     // Never resume inside retained UI dispatch: earlier pose hooks must run on
     // the first active frame, before revealing the separate first-person scene.
@@ -195,9 +179,7 @@ export class StartGate {
         this.engine.error ||
         !this.engine.running ||
         !this.waiting ||
-        !this.intent ||
-        generation !== this.generation ||
-        document.pointerLockElement !== this.engine.canvas
+        !this.capture.locked
       )
         return;
       this.engine.setGameplaySuspended(false); // Flush all queued/held input.
@@ -206,7 +188,7 @@ export class StartGate {
       this.waiting = false;
       this.panel.close();
     });
-  }
+  };
 
   /** UI depends on market → weapons: normal weapon pose hooks have now run. */
   afterPose(): boolean {
@@ -220,7 +202,7 @@ export class StartGate {
 
   private end(): void {
     this.ended = true;
-    this.generation++;
+    this.capture.dispose();
     cancelAnimationFrame(this.frame);
     this.panel.close();
   }
@@ -228,8 +210,6 @@ export class StartGate {
   dispose(): void {
     this.end();
     this.offError();
-    document.removeEventListener('pointerlockchange', this.lockChanged);
-    document.removeEventListener('pointerlockerror', this.lockDenied);
     this.panel.remove();
     if (this.hiddenView) this.engine.viewScene.visible = this.viewVisible;
   }

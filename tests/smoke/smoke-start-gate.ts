@@ -78,6 +78,9 @@ globalThis.document = fixture<Document>({
   },
   createElement,
   fullscreenEnabled: false,
+  exitPointerLock(): void {
+    pointerLockElement = null;
+  },
   body: fixture<HTMLElement>({ append(): void {} }),
   addEventListener(type: string, fn: EventListenerOrEventListenerObject | null): void {
     if (fn) listeners.set(type, fn);
@@ -225,6 +228,16 @@ f.engine._running = false;
 flush();
 assert.equal(f.engine.gameplaySuspended, true, 'stopped/disposal loop cannot activate');
 f.gate.dispose();
+f = createStartFixture();
+const lateRequest = Promise.withResolvers<void>();
+f.engine.canvas.requestPointerLock = (): Promise<void> => lateRequest.promise;
+f.click();
+f.gate.dispose();
+pointerLockElement = f.engine.canvas;
+lateRequest.resolve();
+await lateRequest.promise;
+assert.equal(pointerLockElement, null, 'release a lock acquired after Start was disposed');
+assert.equal(f.engine.gameplaySuspended, true);
 console.log(
   'smoke-start-gate: ok (map chooser, intent, actual lock, retry, reset, pose, terminal, teardown)'
 );

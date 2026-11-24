@@ -11,6 +11,7 @@ import type { MaterialSystemNode } from '../materials/index.ts';
 import type { PhysicsSystem } from '../physics/index.ts';
 import type { PlayerSystem } from '../player/index.ts';
 import type { RadioSystem } from '../radio/index.ts';
+import type { RangeSystem } from '../range/index.ts';
 import type { RenderSystem } from '../render/index-webgpu.ts';
 import type { SkySystem } from '../sky/index.ts';
 import type { UiSystem } from '../ui/index.ts';
@@ -39,6 +40,7 @@ export interface EngineSystems {
   market: MarketSystem;
   intel: IntelSystem;
   radio: RadioSystem;
+  range: RangeSystem;
   ui: UiSystem;
   audio: AudioSystem;
   telemetry: TelemetrySystem;
