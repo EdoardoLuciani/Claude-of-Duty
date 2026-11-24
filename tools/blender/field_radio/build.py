@@ -3,12 +3,11 @@ import argparse
 import math
 from pathlib import Path
 import random
-import struct
 import sys
 import tempfile
-import zlib
 
 import bpy
+import imbuf
 
 OUT = Path(__file__).resolve().parents[3] / '.cache/blender/props/field-radio'
 SIZE = 512
@@ -46,11 +45,15 @@ def front_uv(x, y):
 
 
 def png(path, size, data):
-    def chunk(kind, value):
-        return struct.pack('>I', len(value)) + kind + value + struct.pack('>I', zlib.crc32(kind + value))
-    rows = b''.join(b'\0' + data[y * size * 3:(y + 1) * size * 3] for y in reversed(range(size)))
-    path.write_bytes(b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', size, size, 8, 2, 0, 0, 0))
-                     + chunk(b'IDAT', zlib.compress(rows, 9)) + chunk(b'IEND', b''))
+    image = imbuf.new((size, size), planes=24)
+    image.file_type = 'PNG'
+    # The RGB file uses an RGBA byte buffer; its rows are already bottom-up.
+    rgb = memoryview(data)
+    with image.with_buffer(write=True) as pixels, pixels.cast('B') as rgba:
+        for channel in range(3):
+            rgba[channel::4] = rgb[channel::3]
+        rgba[3::4] = b'\xff' * (size * size)
+    imbuf.write(image, filepath=str(path))
 
 
 def atlases(out):

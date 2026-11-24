@@ -3,6 +3,7 @@ blender -b --threads 2 --python-exit-code 1 --python tools/blender/mpx/build.py 
 Original reference-informed game art; never manufacturing geometry.
 """
 import argparse
+from itertools import pairwise
 import json
 import math
 from pathlib import Path
@@ -752,7 +753,7 @@ def build(output, render=False, quick=False):
             times=struct.unpack_from('<'+'f'*acc['count'],raw,offset)
             endpoint=struct.unpack('<f',struct.pack('<f',duration))[0]
             assert times[0]==0 and times[-1]==endpoint, (animation['name'], times[-1], endpoint)
-            assert all(a<b for a,b in zip(times,times[1:])), animation['name']
+            assert all(a<b for a,b in pairwise(times)), animation['name']
         for channel in animation['channels']:
             sampler=animation['samplers'][channel['sampler']]
             # One-key curves are always baked with our LINEAR fallback; one key cannot interpolate.
