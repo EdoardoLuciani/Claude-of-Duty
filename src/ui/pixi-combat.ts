@@ -7,8 +7,7 @@ import type { DamageArcs } from './damage.ts';
 import { KINDS, R_IN, R_OUT } from './hitmarkers.ts';
 import type { Hitmarkers, HitmarkerKind } from './hitmarkers.ts';
 import { accessoryIcon } from './pixi-accessory-icons.ts';
-import { hudText } from './pixi-glyphs.ts';
-import { HUD_TYPE, poseHudNode, writeHudText } from './pixi-type.ts';
+import { HUD_TYPE, hudText, poseHudNode, writeHudText } from './pixi-type.ts';
 
 export interface CombatModels {
   hit: Hitmarkers;

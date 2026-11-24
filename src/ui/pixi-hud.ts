@@ -1,4 +1,4 @@
-import { Container, Graphics, WebGPURenderer } from 'pixi.js';
+import { Container, Graphics, WebGPURenderer, type BitmapFont } from 'pixi.js';
 import type { Renderer } from 'three/webgpu';
 
 import { clamp01 } from '../core/math.ts';
@@ -13,10 +13,15 @@ import { PixiCompass } from './pixi-compass.ts';
 import { initPixiRenderer, restrictPixiCanvases } from './pixi-device.ts';
 import { PixiFeedback } from './pixi-feedback.ts';
 import type { FeedbackModels } from './pixi-feedback.ts';
-import { hudText as text, prepareHudGlyphs } from './pixi-glyphs.ts';
 import { PixiInjury } from './pixi-injury.ts';
 import { PixiMinimap } from './pixi-minimap.ts';
-import { HUD_TYPE, setHudTextResolution, writeHudText } from './pixi-type.ts';
+import {
+  HUD_TYPE,
+  hudText as text,
+  prepareHudGlyphs,
+  setHudTextResolution,
+  writeHudText,
+} from './pixi-type.ts';
 import { setStyle } from './util.ts';
 
 /** Gameplay HUD presentation on one passive, borrowed-device WebGPU canvas. */
@@ -45,7 +50,7 @@ export class PixiHud {
     .fill(0xffffff)
     .stroke({ color: 0x080c10, width: 1 });
   private restoreAdapter: () => void = (): void => {};
-  private disposeGlyphs: (() => void) | null = null;
+  private readonly glyphs: BitmapFont[] = [];
   private disposed = false;
   private dirty = true;
   private enabled = false;
@@ -70,7 +75,7 @@ export class PixiHud {
         parent.clientWidth || innerWidth,
         parent.clientHeight || innerHeight
       );
-      hud.disposeGlyphs = prepareHudGlyphs(hud.renderer);
+      prepareHudGlyphs(hud.renderer, hud.glyphs);
       parent.insertBefore(hud.canvas, before);
       return hud;
     } catch (error) {
@@ -279,7 +284,7 @@ export class PixiHud {
         try {
           this.stage.destroy({ children: true, texture: true, textureSource: true });
         } finally {
-          this.disposeGlyphs?.();
+          for (const font of this.glyphs) font.destroy();
         }
       }
     } finally {

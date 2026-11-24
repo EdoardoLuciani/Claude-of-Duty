@@ -47,6 +47,6 @@ The market's 3D weapon preview uses its own Three WebGPU renderer.
 error preservation, adapter restoration, failure-isolated/idempotent teardown and
 passive-message state/timing contracts. `smoke-hud-redraw.ts` checks active/paused
 redraw suppression and invalidation for vitals, reticle, injury, reload and feedback.
-Run `bun tests/e2e/hud-text.ts` on a WebGPU-capable Chromium setup to verify that
-changing ammo, reload, FPS and banner text does not upload new canvas textures.
+`bun tests/e2e/world-smoke.ts` (WebGPU-capable Chromium) also verifies that changing
+ammo, reload, FPS and banner text does not upload new canvas textures.
 Run typecheck, lint and build as usual.

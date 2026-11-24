@@ -5,8 +5,7 @@ import type { ScoreBar } from './compass.ts';
 import { KILLFEED_CAPACITY } from './killfeed.ts';
 import type { Killfeed } from './killfeed.ts';
 import type { MarketCountdown } from './market.ts';
-import { hudText } from './pixi-glyphs.ts';
-import { HUD_TYPE, fitHudText, writeHudText, poseHudNode } from './pixi-type.ts';
+import { HUD_TYPE, hudText, fitHudText, writeHudText, poseHudNode } from './pixi-type.ts';
 import type { Prompt, Banner } from './prompts.ts';
 
 export interface FeedbackModels {
