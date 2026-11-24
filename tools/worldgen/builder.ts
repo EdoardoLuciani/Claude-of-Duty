@@ -421,10 +421,11 @@ export class Assembler {
         buckets.set(0, [...Array(n).keys()]);
       }
 
+      // Opted-in props draw inside their palette's static batch; collision keeps the buckets.
+      if (p.batchVisual) this.foldVisualProp(p, p.visualGeo ?? p.geo, visualBatches);
       // The fixed grid can split a compact cloud across cell boundaries. Join
       // whole visual buckets within a bounded X/Z span to trade culling for fewer draws.
       // Distance-LOD clouds keep their original bounds and visibility decisions.
-      if (p.batchVisual) this.foldVisualProp(p, p.visualGeo ?? p.geo, visualBatches);
       const chunks = p.batchVisual
         ? []
         : Array.from(buckets.values(), (list): number[] => list.slice());
@@ -512,7 +513,6 @@ export class Assembler {
       if (collisionSource) this.collisionGeometries.push(source);
       else source.dispose();
       mesh.geometry = acc.build();
-      root.add(mesh);
     }
 
     return this;
