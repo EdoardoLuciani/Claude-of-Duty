@@ -1,11 +1,15 @@
-import { existsSync, statSync, writeFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 
 import { PNG } from 'pngjs';
 
+import { hashFiles, sourceClosure } from './lib/source-hash.ts';
+
 // An engraved relief chart: fine contour intervals, heavier index contours,
 // a survey grid and a little paper grain. No imagery or runtime GPU required.
-const output = fileURLToPath(new URL('../public/images/briefing-map.png', import.meta.url));
+const root = resolve(import.meta.dir, '..');
+const output = join(root, 'public', 'images', 'briefing-map.png');
+const stamp = join(root, '.cache', 'assets', 'briefing-map.sha256');
 const width = 1536,
   height = 864;
 function elevation(x: number, y: number): number {
@@ -40,9 +44,15 @@ function render(): Buffer {
     }
   return PNG.sync.write(png, { colorType: 2 });
 }
+const hash = hashFiles(root, sourceClosure(root, ['tools/export-menu-map.ts']));
 if (
   process.argv.includes('--force') ||
   !existsSync(output) ||
-  statSync(output).mtimeMs < statSync(import.meta.path).mtimeMs
-)
+  !existsSync(stamp) ||
+  readFileSync(stamp, 'utf8').trim() !== hash
+) {
+  rmSync(stamp, { force: true });
   writeFileSync(output, render());
+  mkdirSync(dirname(stamp), { recursive: true });
+  writeFileSync(stamp, hash + '\n');
+}

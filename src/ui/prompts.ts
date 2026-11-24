@@ -21,11 +21,22 @@ export class Prompt {
   active = false;
   alpha = 0;
   y = 7;
+  private rawText = this.text;
+  private rawSub = this.sub;
+
   set(p: PromptData): void {
     this.active = true;
     this.key = p.key ?? USE_KEY;
-    this.text = (p.text ?? 'INTERACT').toUpperCase();
-    this.sub = (p.sub ?? '').toUpperCase();
+    const text = p.text ?? 'INTERACT';
+    const sub = p.sub ?? '';
+    if (text !== this.rawText) {
+      this.rawText = text;
+      this.text = text.toUpperCase();
+    }
+    if (sub !== this.rawSub) {
+      this.rawSub = sub;
+      this.sub = sub.toUpperCase();
+    }
     this.progress = p.progress ?? 0;
     this.hasProgress = p.progress !== undefined;
   }

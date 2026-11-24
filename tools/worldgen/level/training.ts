@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import type { WorldManifest } from '../../../src/core/model-metadata.ts';
 import type { Assembler } from '../builder.ts';
 import { placeBarrier } from '../industrial-props.ts';
-import { BOX_THIN, ladderRun } from '../kit.ts';
+import { BOX_THIN, ladderRun, worldOf } from '../kit.ts';
 import type { BuildMetadata } from '../metadata.ts';
 import { fbm3, keyedRng, paintMasks, plainBox, rockGeometry, trs } from '../util.ts';
 import { dressTraining } from './training-dressing.ts';
@@ -242,7 +242,8 @@ function ridge(
     out[2] = mottling * 0.28;
   });
   // All scenery is outside the physical boundary; it need not enter the BVH.
-  A.addOnce(key, land, trs(matrix, cx, 0, cz, yaw), { visualOnly: true });
+  const frame = trs(new THREE.Matrix4(), cx, 0, cz, yaw);
+  A.addOnce(key, land, frame, { visualOnly: true });
 
   if (key !== 'training_earth_bank') return;
   for (let i = 0; i < 144; i++) {
@@ -251,8 +252,7 @@ function ridge(
     const z = rng.range(-depth * 0.32, depth * 0.41);
     const shrub = i % 5 !== 0;
     const size = shrub ? rng.range(0.21, 0.73) : rng.range(0.48, 1.8);
-    const wx = cx + x * Math.cos(yaw) + z * Math.sin(yaw);
-    const wz = cz + z * Math.cos(yaw) - x * Math.sin(yaw);
+    const [wx, , wz] = worldOf(frame, x, 0, z);
     const scatter = A.cache(`training:bank-scatter:${shrub}:${i % 4}`, (): THREE.BufferGeometry =>
       rockGeometry(keyedRng('training-bank-shape', i % 4), 1, shrub ? 0 : 1, shrub ? 1 : 0.7)
     );

@@ -42,6 +42,7 @@ A leading `_` marks a member internal to its subsystem: files in the same direct
 | `game`                                             | Survival state, score/rewards, HUD threat cues              |
 | `market`                                           | Loadout catalog, between-wave shop/economy                  |
 | `intel`                                            | Cache spawning, interaction and credits                     |
+| `range`                                            | Practice counter and parkour circuit                        |
 | `radio`                                            | Strike, bomber, bombs, blast chain                          |
 | `ui`                                               | HUD, menus, overlays                                        |
 | `audio`                                            | Recordings/synthesis, spatialization, occlusion             |
@@ -49,7 +50,12 @@ A leading `_` marks a member internal to its subsystem: files in the same direct
 Training Grounds loads a separate authored world. Its session registers the same player, physics,
 weapons, FX, radio and market systems, without the Survival director or intel. The firing-line
 counter opens the same Supply Market with an unlimited session balance. In both modes the
-market overlay suspends gameplay and waits for pointer lock before resuming it. Target marks use the resolved world-impact decals. Grenades and radio strikes use the shared blast damage, cover, armour and healing rules in both modes. The optional yard circuit uses ordered action zones from the loaded manifest; UI tracks movement and player bullet impacts on labeled faces, independently of free practice and Survival scoring.
+market overlay suspends gameplay and waits for pointer lock before resuming it.
+Target marks use the resolved world-impact decals. Grenades and radio strikes use the
+shared blast damage, cover, armour and healing rules in both modes. The range system
+owns the manifest-authored counter and the optional yard circuit. It tracks movement
+and player bullet impacts on labeled faces and publishes interaction prompts to the HUD,
+independently of free practice and Survival scoring.
 
 Each system declares `static id`, `static deps`, and implements needed hooks:
 `async init(ctx)`, `fixedUpdate(h, ctx)` (120 Hz), `update(dt, ctx)`,
@@ -73,7 +79,9 @@ independent session; returning from Pause tears down its engine, input, renderer
 and HUD, releases its browser input locks and exits session-requested fullscreen before exposing the map choices again. Look sensitivity, field of view, invert Y,
 and firing shake carry across map changes in the same document, independent of gameplay state.
 The selected map's Start handoff
-can show a short orientation. Training offers a fixed Day or Night preview: the briefing sets the sky and refreshes the manifest practicals while gameplay is suspended. The handoff waits for a rendered frame and an explicit
+can show a short orientation. Maps with a catalog night hour offer a Day or Night preview:
+the briefing sets the sky and refreshes the manifest practicals while gameplay is suspended.
+The clock advances only if the session mode allows it. The handoff waits for a rendered frame and an explicit
 pointer-lock gesture before unfreezing gameplay. Capture bypasses the menu and
 handoff and defaults to Survival.
 
@@ -190,7 +198,7 @@ for each playable map. Survival keeps the root `public/models/world/` bundle and
 Training Grounds uses `public/models/world/training/`. `ModelSystem` loads the selected
 bundle and verifies map identity before loading its assets. Survival-mode bundles bake
 navigation, and `ModelSystem` loads it when the manifest lists it. Optional world-space range station and target-face markers
-come from the loaded manifest via `WorldQueries`; runtime UI and FX do not import
+come from the loaded manifest via `WorldQueries`; runtime range and FX code do not import
 authoring coordinates. Preserve instancing/masks; never author separate collision
 geometry. Validate with `bun tools/export-world.ts --check`, world/physics tests and screenshots.
 

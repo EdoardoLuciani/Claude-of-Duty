@@ -17,9 +17,10 @@ import { MaterialSystem } from './materials/index.ts';
 import { PhysicsSystem } from './physics/index.ts';
 import { PlayerSystem } from './player/index.ts';
 import { RadioSystem } from './radio/index.ts';
+import { RangeSystem } from './range/index.ts';
 import { RenderSystem } from './render/index-webgpu.ts';
 import { SkySystem } from './sky/index.ts';
-import { TrainingUiSystem, UiSystem } from './ui/index.ts';
+import { UiSystem } from './ui/index.ts';
 import { StartMenu } from './ui/start.ts';
 import { WeaponSystem } from './weapons/index.ts';
 import { WorldSystem } from './world/index.ts';
@@ -107,7 +108,7 @@ async function bootSession(map: PlayableMap): Promise<void> {
     showFailure(`ENGINE FAILURE — ${system}.${method}\n${message}`);
   });
 
-  // Registration order is irrelevant — Registry topo-sorts on static deps.
+  // Registry topo-sorts on static deps, preserving insertion order where possible.
   engine
     .add(ModelSystem, map)
     .add(RenderSystem)
@@ -120,15 +121,10 @@ async function bootSession(map: PlayableMap): Promise<void> {
     .add(FxSystem)
     .add(MarketSystem)
     .add(RadioSystem);
-  if (survivalSystems) {
-    engine
-      .add(AiSystem)
-      .add(GameSystem)
-      .add(UiSystem, capture ? undefined : returnToStartMenu)
-      .add(IntelSystem);
-  } else {
-    engine.add(TrainingUiSystem, returnToStartMenu);
-  }
+  if (survivalSystems) engine.add(AiSystem).add(GameSystem);
+  engine.add(UiSystem, capture ? undefined : returnToStartMenu);
+  if (survivalSystems) engine.add(IntelSystem);
+  else engine.add(RangeSystem);
   engine.add(AudioSystem);
 
   if (survivalSystems && params.get('telemetry') === '1') {

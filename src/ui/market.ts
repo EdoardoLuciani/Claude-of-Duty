@@ -6,6 +6,7 @@ import { isWeaponId } from '../weapons/defs.ts';
 import { marketIcon } from './market-icons.ts';
 import { MarketInspection } from './market-inspection.ts';
 import { MarketStats } from './market-stats.ts';
+import { MouseCapture } from './mouse-capture.ts';
 import { el, setText, setStyle, setClass } from './util.ts';
 
 type MarketItem = ReturnType<MarketSystem['getHudState']>['items'][number];
@@ -42,7 +43,7 @@ export class MarketOverlay {
   private readonly body: HTMLElement;
   private readonly leave: HTMLButtonElement;
   private readonly status: HTMLElement;
-  private attempt = 0;
+  private readonly capture: MouseCapture;
   private disposed = false;
   private readonly waveLabel: HTMLElement;
   private readonly creditsLabel: HTMLElement;
@@ -77,8 +78,9 @@ export class MarketOverlay {
       event.preventDefault(); // Keep the modal until mouse capture succeeds.
       this.skip();
     };
-    document.addEventListener('pointerlockchange', this.lockChanged);
-    document.addEventListener('pointerlockerror', this.lockDenied);
+    this.capture = new MouseCapture(ctx.engine, this.resumeGameplay, (): void =>
+      this.setStatus('Mouse capture unavailable. Select Retry Resume to try again.')
+    );
     const panel = el('div', 'ow-market-panel', this.root);
 
     const head = el('div', 'ow-market-head', panel);
@@ -320,6 +322,7 @@ export class MarketOverlay {
   }
 
   hide(): void {
+    this.capture.cancel();
     this.active = false;
     this.root.close();
     this.market.closeShop();
@@ -417,28 +420,11 @@ export class MarketOverlay {
     setText(this.leave, 'RETRY RESUME');
     this.leave.focus();
     this.setStatus('Waiting for mouse capture. Retry if needed.');
-    const attempt = ++this.attempt;
-    const { canvas, input, engine } = this.ctx;
-    if (document.pointerLockElement === canvas) this.lockChanged();
-    else
-      input.requestPointerLock((requested): void => {
-        if (!requested) {
-          if (attempt === this.attempt) this.lockDenied();
-        } else if ((this.disposed || engine.error) && document.pointerLockElement === canvas) {
-          document.exitPointerLock();
-        }
-      });
-    input.requestFullscreen();
+    this.capture.request();
   }
 
-  private lockDenied = (): void => {
-    if (this.body.inert)
-      this.setStatus('Mouse capture unavailable. Select Retry Resume to try again.');
-  };
-
-  private lockChanged = (): void => {
-    const { canvas, engine, input } = this.ctx;
-    if (!this.body.inert || document.pointerLockElement !== canvas || !engine.running) return;
+  private resumeGameplay = (): void => {
+    const { engine, input } = this.ctx;
     this.run('resume', (): void => {
       this.hide();
       engine.setGameplaySuspended(false); // Clears pending inputs and pointer-lock loss.
@@ -501,8 +487,7 @@ export class MarketOverlay {
     this.root.removeEventListener('mouseover', this._onOver);
     this.root.removeEventListener('focusin', this._onFocus);
     this.disposed = true;
-    document.removeEventListener('pointerlockchange', this.lockChanged);
-    document.removeEventListener('pointerlockerror', this.lockDenied);
+    this.capture.dispose();
     this.market.closeShop();
     removeEventListener('keydown', this._onKey);
     try {
