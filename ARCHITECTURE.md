@@ -199,8 +199,11 @@ use canonical `geo`, topology and RNG/instance inputs. Paint-only batches do not
 collision. Map builders return authored metadata; the exporter adds the common manifest
 header and validates the content-hashed products for each playable map. Survival keeps the
 root `public/models/world/` bundle and Training Grounds uses `public/models/world/training/`.
-`ModelSystem` verifies map identity before loading bundle assets. Survival-mode bundles bake
-navigation, and `ModelSystem` includes it in the prefetched world when the manifest lists it.
+`ModelSystem` verifies map identity before loading bundle assets. Every map bakes a north-up
+minimap PNG from the cooked collision BVH. The manifest supplies its world-space rectangle and
+any building labels. `ModelSystem` prefetches the image; Pixi draws the labels and dynamic
+markers over it. Survival-mode bundles also bake navigation from the same BVH, and `ModelSystem`
+includes it in the prefetched world when the manifest lists it.
 Optional world-space range station and target-face markers come from the loaded manifest via
 `WorldQueries`; runtime range and FX code do not import
 authoring coordinates. Preserve instancing/masks; never author separate collision

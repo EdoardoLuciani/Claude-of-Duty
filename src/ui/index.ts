@@ -17,8 +17,8 @@ import { Hitmarkers } from './hitmarkers.ts';
 import { Killfeed } from './killfeed.ts';
 import { MarketOverlay, MarketCountdown } from './market.ts';
 import { PauseMenu } from './menu.ts';
-import { Minimap } from './minimap.ts';
 import type { PixiHud } from './pixi-hud.ts';
+import type { MapBlip, MinimapState } from './pixi-minimap.ts';
 import { Prompt, Banner } from './prompts.ts';
 import { StartGate } from './start.ts';
 import { installStyles, removeStyles } from './style.ts';
@@ -68,23 +68,6 @@ type HudState = Omit<typeof HUD_DEFAULTS, 'fireMode'> & {
   cooking?: boolean;
   grenadeEquipped?: boolean;
 };
-interface Blip {
-  x: number;
-  z: number;
-  kind: 'enemy' | 'friend';
-  heading: number;
-  fade?: number;
-}
-interface MinimapFrame {
-  x: number;
-  z: number;
-  heading: number;
-  fov: number;
-  blips: Blip[] | null;
-  pulses?: { x: number; z: number; y?: number; radius?: number }[] | null;
-  pulseTime?: number;
-  playerY?: number;
-}
 type UiContext = EngineContext;
 
 /** Shared-device Pixi HUD with native menus; lateUpdate follows the final camera pose.
@@ -94,16 +77,14 @@ type UiContext = EngineContext;
  */
 export class UiSystem {
   static readonly id = 'ui';
-  static readonly deps: SystemId[] = ['render', 'market', 'fx'];
+  static readonly deps: SystemId[] = ['render', 'market', 'fx', 'models'];
   ctx!: UiContext;
-  rng!: import('../core/rng.ts').Rng;
   root!: HTMLElement;
   centreLayer!: HTMLElement;
   health: HealthFx = new HealthFx();
   arcs: DamageArcs = new DamageArcs();
   crosshair: Crosshair = new Crosshair();
   hit: Hitmarkers = new Hitmarkers();
-  minimap?: Minimap;
   compass: Compass = new Compass();
   scoreBar: ScoreBar = new ScoreBar();
   killfeed: Killfeed = new Killfeed();
@@ -127,13 +108,12 @@ export class UiSystem {
   hudTarget!: number;
   _lastRaw!: number;
   _healPrompt: boolean = false;
-  _bakeFrame: number = 0;
   _pos: THREE.Vector3 = new THREE.Vector3();
   _tmp: THREE.Vector3 = new THREE.Vector3();
-  _blips: Blip[] = [];
+  _blips: MapBlip[] = [];
   _blipCount: number = 0;
-  _blipView: Blip[] = [];
-  _mmState?: MinimapFrame;
+  _blipView: MapBlip[] = [];
+  _mmState: MinimapState = {};
   _promptOwner?: unknown;
   _unsubs: (() => void)[] = [];
 
@@ -141,7 +121,6 @@ export class UiSystem {
 
   async init(ctx: UiContext): Promise<void> {
     this.ctx = ctx;
-    this.rng = ctx.rng.fork();
     installStyles();
 
     const host = document.getElementById('ui') ?? document.body;
@@ -150,13 +129,8 @@ export class UiSystem {
     // Stacking order: hurt overlays sit under the HUD, the menu over everything.
     this.centreLayer = el('div', 'ow-layer', this.root);
 
-    this.rng.fork(); // Keep the minimap's noise stream unchanged after removing damage popups.
     const { survivalSystems } = SESSION_MODE_POLICY[ctx.config.mode];
-    if (survivalSystems) {
-      this.minimap = new Minimap(this.rng.fork());
-      for (let i = 0; i < MAX_BLIPS; i++)
-        this._blips.push({ x: 0, z: 0, kind: 'enemy', heading: 0 });
-    }
+    for (let i = 0; i < MAX_BLIPS; i++) this._blips.push({ x: 0, z: 0, kind: 'enemy', heading: 0 });
     this.menu = new PauseMenu(this.root, ctx, this.returnToStartMenu);
     this.gameOver = new GameOverScreen(this.root, (): void => {
       if (this.startGate) this.startGate.restart();
@@ -316,12 +290,9 @@ export class UiSystem {
     // A HUD failure is a boot failure: main.ts keeps its native reload/error dialog.
     // Never start gameplay with an invisible HUD or a retired HTML fallback.
     const { PixiHud } = await import('./pixi-hud.ts');
-    this.pixiHud = await PixiHud.create(
-      this.root,
-      this.centreLayer,
-      ctx.get('render').renderer,
-      survivalSystems
-    );
+    const { meta, minimapPng } = await ctx.get('models').worldPrefetch;
+    this.pixiHud = await PixiHud.create(this.root, this.centreLayer, ctx.get('render').renderer);
+    await this.pixiHud.minimap.setTerrain(minimapPng, meta.minimap);
     this.pixiHud.resize(this.vw, this.vh, this.k);
   }
 
@@ -565,20 +536,11 @@ export class UiSystem {
     this.compass.update(heading, dt);
 
     // ---- minimap ---------------------------------------------------------
-    if (this.minimap) {
-      if (!this.minimap.bakeDone && ++this._bakeFrame > 6 && this._bakeFrame % 20 === 0)
-        this.minimap.tryBake(ctx);
+    if (this.pixiHud) {
       const pos = this._playerPos();
       this._collectBlips();
       this._blipView.length = this._blipCount;
       for (let i = 0; i < this._blipCount; i++) this._blipView[i] = this._blips[i];
-      this._mmState = this._mmState ?? {
-        x: 0,
-        z: 0,
-        heading: 0,
-        fov: 80,
-        blips: null,
-      };
       this._mmState.x = pos.x;
       this._mmState.z = pos.z;
       this._mmState.heading = heading;
@@ -589,19 +551,8 @@ export class UiSystem {
       this._mmState.pulses = intelHud?.pulses ?? null;
       this._mmState.pulseTime = intelHud?.pulseTime ?? 0;
       this._mmState.playerY = ctx.peek('player')?.feetPosition.y ?? 0;
-    }
-    if (this.pixiHud) {
       this.pixiHud.setVisible(!ctx.engine.error);
-      this.pixiHud.update(
-        dt,
-        s,
-        this.health,
-        this.crosshair,
-        this.minimap,
-        this._mmState,
-        this.hudVisible,
-        this
-      );
+      this.pixiHud.update(dt, s, this.health, this.crosshair, this._mmState, this.hudVisible, this);
     }
   }
 
@@ -645,7 +596,6 @@ export class UiSystem {
       this.startGate?.dispose();
       for (const off of this._unsubs) off();
       this._unsubs.length = 0;
-      this.minimap?.dispose();
       this.menu.dispose();
       this.gameOver.dispose();
       this.shop.dispose();

@@ -60,7 +60,8 @@ gates for a tracked parkour circuit. Keep those records
 aligned with the same source data that creates the corresponding geometry.
 
 `tools/export-world.ts` iterates the catalog and builds and validates each bundle's
-visual GLB, `pack.ts` collision, and manifest. Survival-mode bundles also require
+visual GLB, `pack.ts` collision, minimap PNG, and manifest. The minimap uses the map bounds
+and cooked collision, with no separate authoring. Survival-mode bundles also require
 `nav-bake.ts` navigation and cover; Training bundles do not bake or ship either. The assembler
 owns geometry lifetime; support/collision/navigation use canonical geometry even
 when visuals have derivatives. Never author separate collision meshes or hand-edit

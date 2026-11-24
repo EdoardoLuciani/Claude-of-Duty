@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { Container, DOMAdapter, Text, ViewSystem, WebGPURenderer } from 'pixi.js';
 import * as THREE from 'three/webgpu';
 
-import { Rng } from '../../src/core/rng.ts';
 import { ScoreBar } from '../../src/ui/compass.ts';
 import { Crosshair } from '../../src/ui/crosshair.ts';
 import type { GameOverScreen } from '../../src/ui/gameover.ts';
@@ -13,7 +12,6 @@ import { Killfeed } from '../../src/ui/killfeed.ts';
 import { MarketCountdown } from '../../src/ui/market.ts';
 import type { MarketOverlay } from '../../src/ui/market.ts';
 import type { PauseMenu } from '../../src/ui/menu.ts';
-import { Minimap } from '../../src/ui/minimap.ts';
 import { PixiAmmoView, AMMO_HEIGHT } from '../../src/ui/pixi-ammo-view.ts';
 import { initPixiRenderer } from '../../src/ui/pixi-device.ts';
 import { PixiHud } from '../../src/ui/pixi-hud.ts';
@@ -181,10 +179,9 @@ for (const failure of [null, 'injury', 'stage', 'renderer']) {
     { ammo: 0, magSize: 0, reserve: 0 },
     new HealthFx(),
     new Crosshair(),
-    new Minimap(new Rng(1)),
     {},
     0,
-    fixture<Parameters<PixiHud['update']>[7]>({})
+    fixture<Parameters<PixiHud['update']>[6]>({})
   );
   assert.equal(renderers, 1, 'disposed HUD cannot draw or destroy twice');
 }
@@ -204,11 +201,7 @@ ui._unsubs = [
     cleaned.push('events');
   },
 ];
-const widgets = ['minimap', 'menu', 'gameOver', 'shop'];
-ui.minimap = new Minimap(new Rng(1));
-ui.minimap.dispose = (): void => {
-  cleaned.push('minimap');
-};
+const widgets = ['menu', 'gameOver', 'shop'];
 ui.menu = fixture<PauseMenu>({
   dispose(): void {
     cleaned.push('menu');
@@ -267,10 +260,9 @@ const hiddenFrame = (): void =>
     { ammo: 0, magSize: 0, reserve: 0 },
     new HealthFx(),
     new Crosshair(),
-    new Minimap(new Rng(1)),
     {},
     0,
-    fixture<Parameters<PixiHud['update']>[7]>({})
+    fixture<Parameters<PixiHud['update']>[6]>({})
   );
 try {
   Object.defineProperty(globalThis, 'devicePixelRatio', { value: 1, configurable: true });
@@ -313,9 +305,8 @@ textProbe.onViewUpdate = (): void => {
 };
 setHudTextResolution(textStage, mapView.textResolution);
 assert.equal(textUpdates, 0, 'unchanged density does not invalidate text');
-const mapData = new Minimap(new Rng(1)),
-  mapState = { pulses: [{ x: 0, z: 0, y: 5 }] };
-mapView.update(mapData, mapState);
+const mapState = { pulses: [{ x: 0, z: 0, y: 5 }] };
+mapView.update(mapState);
 assert.equal(mapView['pulses'][0].text.resolution, 8 / 3, 'late labels inherit HUD density');
 mapView.textResolution = 2;
 setHudTextResolution(textStage, 2);
@@ -325,7 +316,7 @@ assert.equal(
   2,
   'existing late labels follow density changes'
 );
-mapView.update(mapData, { pulses: [...mapState.pulses, { x: 1, z: 1, y: -5 }] });
+mapView.update({ pulses: [...mapState.pulses, { x: 1, z: 1, y: -5 }] });
 assert.equal(mapView['pulses'][1].text.resolution, 2);
 textProbe.onViewUpdate = viewUpdate;
 textStage.destroy({ children: true });

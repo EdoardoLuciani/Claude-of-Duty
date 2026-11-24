@@ -19,10 +19,8 @@ import {
 } from '../../src/ai/nav-format.ts';
 import { SurfaceNav, navigationComponents } from '../../src/ai/nav.ts';
 import type { WorldLadder } from '../../src/core/model-metadata.ts';
-import { isMesh } from '../../src/core/three-guards.ts';
 import { CharacterController } from '../../src/physics/character.ts';
-import { PhysicsSystem } from '../../src/physics/index.ts';
-import { surfaceIndex } from '../../src/physics/surfaces.ts';
+import type { PhysicsSystem } from '../../src/physics/index.ts';
 
 export interface NavBakeResult {
   buffer: Uint8Array;
@@ -118,26 +116,7 @@ function bakeCover(nav: SurfaceNav, phys: PhysicsSystem): (BakedCoverPoint & { s
   return points;
 }
 
-/** Bake only offline, from the exact cooked collision registered by physics. */
-export async function bakeNav(
-  collisionScene: THREE.Object3D,
-  bounds: THREE.Box3,
-  provenance: Partial<NavMetadata> = {},
-  volumes: WorldLadder[] = []
-): Promise<NavBakeResult> {
-  const phys = new PhysicsSystem();
-  collisionScene.updateWorldMatrix(true, true);
-  collisionScene.traverse((object): void => {
-    const surface: unknown = object.userData.surface;
-    if (isMesh(object) && surface) phys.addStatic(object, surfaceIndex(surface));
-  });
-  const start = performance.now();
-  phys.rebuildStatic();
-  const bvhMs = performance.now() - start;
-  return bakePhysicsNav(phys, bounds, provenance, bvhMs, volumes);
-}
-
-// Also used by controller-backed smoke fixtures, with the same generator/profile.
+// Bake from the cooked collision BVH; controller-backed smoke fixtures use the same profile.
 export async function bakePhysicsNav(
   phys: PhysicsSystem,
   bounds: THREE.Box3,

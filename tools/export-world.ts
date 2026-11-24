@@ -19,13 +19,17 @@ import { gzipSync } from 'node:zlib';
 import * as THREE from 'three';
 
 import { Assembler } from '#worldgen/builder';
-import { bakeNav } from '#worldgen/nav-bake';
+import { bakeMinimap } from '#worldgen/minimap-bake';
+import { bakePhysicsNav } from '#worldgen/nav-bake';
 
 import { NAV_VERSION } from '../src/ai/nav-format.ts';
 import { isRecord } from '../src/core/guards.ts';
 import { PLAYABLE_MAPS, SESSION_MODE_POLICY } from '../src/core/playable-maps.ts';
 import type { PlayableMap } from '../src/core/playable-maps.ts';
+import { isMesh } from '../src/core/three-guards.ts';
 import type { MaterialOptions } from '../src/materials/index.ts';
+import { PhysicsSystem } from '../src/physics/index.ts';
+import { surfaceIndex } from '../src/physics/surfaces.ts';
 import { exportGlb } from './lib/export-glb.ts';
 import { buildCollision } from './worldgen/pack.ts';
 import { PLAYABLE_MAP_BUILDERS } from './worldgen/playable-builds.ts';
@@ -120,7 +124,8 @@ function cacheReady(out: string, map: PlayableMap, sourceHash: string): boolean 
       !isRecord(manifest) ||
       manifest.sourceHash !== sourceHash ||
       manifest.mapId !== map.id ||
-      !isRecord(manifest.assets)
+      !isRecord(manifest.assets) ||
+      typeof manifest.assets.minimap !== 'string'
     )
       return false;
     // The compiler decides which assets a map has; the validator below checks that set.
@@ -173,14 +178,27 @@ async function compileWorld(
     const visualFile = assetName('visual', visualGzip);
     const collisionFile = assetName('collision', collisionGzip);
     const stats = { ...A.stats, collideTris: collision.collideTris };
+    const phys = new PhysicsSystem();
+    collision.scene.updateWorldMatrix(true, true);
+    collision.scene.traverse((object): void => {
+      const surface: unknown = object.userData.surface;
+      if (isMesh(object) && surface) phys.addStatic(object, surfaceIndex(surface));
+    });
+    const bvhStarted = performance.now();
+    phys.rebuildStatic();
+    const bvhMs = performance.now() - bvhStarted;
+    const bounds = new THREE.Box3(
+      new THREE.Vector3().fromArray(metadata.bounds.min),
+      new THREE.Vector3().fromArray(metadata.bounds.max)
+    );
+    const minimap = bakeMinimap(phys.staticWorld, bounds, metadata);
+    const minimapFile = assetName('minimap', minimap.png, 'png');
     const nav = SESSION_MODE_POLICY[map.mode].survivalSystems
-      ? await bakeNav(
-          collision.scene,
-          new THREE.Box3(
-            new THREE.Vector3().fromArray(metadata.bounds.min),
-            new THREE.Vector3().fromArray(metadata.bounds.max)
-          ),
+      ? await bakePhysicsNav(
+          phys,
+          bounds,
           { sourceHash, collisionAsset: collisionFile },
+          bvhMs,
           metadata.volumes
         )
       : undefined;
@@ -194,7 +212,13 @@ async function compileWorld(
           sourceHash,
           ...metadata,
           mapId: map.id,
-          assets: { visual: visualFile, collision: collisionFile, nav: navFile },
+          assets: {
+            visual: visualFile,
+            collision: collisionFile,
+            minimap: minimapFile,
+            nav: navFile,
+          },
+          minimap: minimap.metadata,
           navigation: nav && {
             version: NAV_VERSION,
             sha256: createHash('sha256').update(nav.buffer).digest('hex'),
@@ -211,6 +235,7 @@ async function compileWorld(
     const products = new Map<string, Buffer>([
       [visualFile, visualGzip],
       [collisionFile, collisionGzip],
+      [minimapFile, minimap.png],
     ]);
     if (navFile && navGzip) products.set(navFile, navGzip);
     // Publish the manifest last, once all its content-addressed assets exist.
@@ -223,7 +248,7 @@ async function compileWorld(
     }
     if (!args.check) {
       for (const file of readdirSync(out)) {
-        if (/^level-(visual|collision|nav)\./.test(file) && !products.has(file))
+        if (/^level-(visual|collision|minimap|nav)\./.test(file) && !products.has(file))
           rmSync(join(out, file));
       }
     }

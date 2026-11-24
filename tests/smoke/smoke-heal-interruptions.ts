@@ -19,7 +19,6 @@ import { Hitmarkers } from '../../src/ui/hitmarkers.ts';
 import { UiSystem } from '../../src/ui/index.ts';
 import { Killfeed } from '../../src/ui/killfeed.ts';
 import { MarketCountdown } from '../../src/ui/market.ts';
-import { Minimap } from '../../src/ui/minimap.ts';
 import { Prompt, Banner } from '../../src/ui/prompts.ts';
 import type { WeaponId } from '../../src/weapons/defs.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
@@ -173,8 +172,6 @@ for (const ending of ['release', 'complete', 'grenade'])
       _ows: new Map(),
       style: partialFixture<CSSStyleDeclaration>({ setProperty: noop }),
     });
-    ui.minimap = new Minimap(ctx.rng);
-    ui.minimap.bakeDone = true;
     const prompt = new RecordingPrompt();
     ui.prompt = prompt;
     weapons.ui = ui;

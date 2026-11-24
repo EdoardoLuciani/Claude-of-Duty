@@ -41,6 +41,7 @@ assert.deepEqual(
     'models/world/training/level.json',
     `models/world/training/${meta.assets.visual}`,
     `models/world/training/${meta.assets.collision}`,
+    `models/world/training/${meta.assets.minimap}`,
   ].sort()
 );
 

@@ -32,7 +32,7 @@ export const PLAYABLE_MAPS = [
 
 /** Everything a session does differently by mode; map content comes from the manifest. */
 export interface SessionModePolicy {
-  /** Enemies, waves, intel, telemetry, navigation and the minimap. */
+  /** Enemies, waves, intel, telemetry and navigation. */
   readonly survivalSystems: boolean;
   /** Market credits at session start and restart. */
   readonly startingCredits: number;

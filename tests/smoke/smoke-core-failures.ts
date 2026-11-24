@@ -187,9 +187,10 @@ try {
       JSON.stringify({ asset: { version: '2.0' }, scenes: [{ nodes: [] }], scene: 0 }),
       ''
     );
-  const assets: { visual: string; collision: string; nav?: string } = {
+  const assets = {
     visual: 'visual',
     collision: 'collision',
+    minimap: 'minimap.png',
     nav: 'nav.gz',
   };
   const meta = {
@@ -199,6 +200,7 @@ try {
     sourceHash: 'fixture',
     transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
     bounds: { min: [-1, -1, -1], max: [1, 1, 1] },
+    minimap: { minX: -1, minZ: -1, maxX: 1, maxZ: 1, labels: [] },
     spawns: [],
     lights: [],
     stats: { staticTris: 0, instTris: 0, instances: 0, drawCalls: 0, collideTris: 0 },
@@ -208,7 +210,9 @@ try {
     async (input: Parameters<typeof fetch>[0]): Promise<Response> => {
       const url = input instanceof Request ? input.url : String(input);
       requests.push(url);
-      return url.endsWith('level.json') ? Response.json(meta) : new Response(null, { status: 503 });
+      if (url.endsWith('level.json')) return Response.json(meta);
+      if (url.endsWith('/minimap.png')) return new Response(new Blob());
+      return new Response(null, { status: 503 });
     },
     { preconnect: fetch.preconnect }
   );
@@ -222,9 +226,10 @@ try {
   });
   other._loadWorldGLB = models._loadWorldGLB.bind(models);
   await assert.rejects(other._prefetchWorld(), /HTTP 503/, 'same mode, different map bundle');
-  assert.deepEqual(requests.slice(-2), [
+  assert.deepEqual(requests.slice(-3), [
     'models/world/other/level.json',
     'models/world/other/nav.gz',
+    'models/world/other/minimap.png',
   ]);
 } finally {
   globalThis.fetch = fetch;

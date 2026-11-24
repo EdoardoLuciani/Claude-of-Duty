@@ -15,8 +15,8 @@ import { ALLEYS, STREET } from './level/layout.ts';
 /** Manifest fields a map builder authors; the exporter adds the bundle header and products. */
 export type BuildMetadata = Omit<
   WorldManifest,
-  'version' | 'sourceHash' | 'assets' | 'navigation' | 'stats' | 'mapId'
->;
+  'version' | 'sourceHash' | 'assets' | 'minimap' | 'navigation' | 'stats' | 'mapId' | 'buildings'
+> & { buildings?: Pick<BuildingInfo, 'spec' | 'floorY' | 'roofY' | 'top' | 'traversable'>[] };
 
 const point = new THREE.Vector3();
 
