@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-import type { Assembler } from './builder.ts';
+import type { Assembler, AssemblyOptions } from './builder.ts';
 import type { BuildingInfo } from './buildings.ts';
 import { BOX, BOX_FINE, BOX_THIN, IDENT, LL, mergeSimple, rubbleMound } from './kit.ts';
 import type { CounterFootprint, RoomProp } from './level/room-fixtures.ts';
@@ -219,6 +219,7 @@ function setProp(
 
 const CONDUIT_RADIUS = 0.016;
 const CONDUIT_SIDES = 6;
+const CONDUIT_FINISH: AssemblyOptions = { masks: [0.35, 0.5, 0.1] };
 
 /** A +X run into a -Y drop, joined on the x = y miter plane at the origin. */
 function miteredConduit(run: number, drop: number): THREE.BufferGeometry {
@@ -226,11 +227,11 @@ function miteredConduit(run: number, drop: number): THREE.BufferGeometry {
     const leg = new THREE.CylinderGeometry(CONDUIT_RADIUS, CONDUIT_RADIUS, 1, CONDUIT_SIDES);
     // Keep the free-end cap only. Both rings use (x, x, z) at the elbow,
     // stretching the profile along the bisector like Curve to Mesh's Miter Scale.
-    const { start, count } = leg.groups[horizontal ? 2 : 1];
-    const indices = leg.index!.array.filter((_, i): boolean => i < start || i >= start + count);
-    leg.setIndex(new THREE.BufferAttribute(indices, 1));
     const pos = leg.getAttribute('position');
     const normal = leg.getAttribute('normal');
+    const elbowCapNormalY = horizontal ? -1 : 1;
+    const indices = leg.index!.array.filter((i): boolean => normal.getY(i) !== elbowCapNormalY);
+    leg.setIndex(new THREE.BufferAttribute(indices, 1));
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i);
       if (horizontal) {
@@ -329,21 +330,14 @@ export function furnishRoom(A: Assembler, id: string, r: RoomSpec): void {
         };
         const [rx, rz] = point(side, (from + to) / 2, 0.045);
         const [dx, dz] = point(side, drop, 0.045);
+        const run = Math.abs(to - from);
         if (
           inVoid(r, rx, rz) ||
-          !backed(
-            side,
-            rx,
-            rz,
-            Math.abs(to - from) / 2 + 0.03,
-            y + height - 0.03,
-            y + height + 0.03
-          ) ||
+          !backed(side, rx, rz, run / 2 + 0.03, y + height - 0.03, y + height + 0.03) ||
           !backed(side, dx, dz, 0.11, y + boxHeight - 0.38, y + height + 0.03)
         )
           throw new Error(`[world] ${id} conduit on side ${side} has lost its wall`);
         const { tx, tz, yaw } = sides[side];
-        const run = Math.abs(to - from);
         const rise = height - boxHeight;
         if ((drop !== from && drop !== to) || Math.min(run, rise) <= CONDUIT_RADIUS)
           throw new Error(`[world] ${id} conduit needs an endpoint drop and room for its miter`);
@@ -352,7 +346,7 @@ export function furnishRoom(A: Assembler, id: string, r: RoomSpec): void {
           'metal_dark',
           miteredConduit(run, rise),
           LL(IDENT, dx, y + height, dz, Math.atan2(-tz * direction, tx * direction)),
-          { masks: [0.35, 0.5, 0.1] }
+          CONDUIT_FINISH
         );
         A.add(
           'metal_dark',
@@ -372,7 +366,7 @@ export function furnishRoom(A: Assembler, id: string, r: RoomSpec): void {
             'metal_dark',
             pipe,
             LL(IDENT, ...at(drop + 0.06, 0.05, boxHeight - 0.28), 0, 0.4, 0.34, 0.4),
-            { masks: [0.35, 0.5, 0.1] }
+            CONDUIT_FINISH
           );
         }
         break;
