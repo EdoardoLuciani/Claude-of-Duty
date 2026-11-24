@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-import type { Assembler } from '../builder.ts';
+import type { Assembler, PrototypeSpec } from '../builder.ts';
 import { awning, BOX_FINE, BOX_THIN, mergeSimple, worldOf } from '../kit.ts';
 import type { PALETTE } from '../palette.ts';
 import { registerProps } from '../props.ts';
@@ -322,28 +322,31 @@ function reelCord(): THREE.BufferGeometry {
 
 export function dressTraining(A: Assembler): void {
   if (!A.has('pallet')) registerProps(A);
-  A.proto('training_tote_body', {
+  const batchProp = (id: string, spec: PrototypeSpec): void => {
+    A.proto(id, { ...spec, batchVisual: true });
+  };
+  batchProp('training_tote_body', {
     key: 'metal_blue',
     geo: chamferBox(0.5, 0.259, 0.37, 0.026).translate(0, 0.1295, 0),
   });
-  A.proto('training_tote_lid', {
+  batchProp('training_tote_lid', {
     key: 'metal_dark',
     geo: chamferBox(0.53, 0.034, 0.39, 0.01).translate(0, 0.271, 0),
   });
-  A.proto('training_tote_handle', { key: 'steel', geo: toteHandle() });
-  A.proto('training_reel_flange', { key: 'wood_prop', geo: cylinder(0.544, 0.544, 0.118, 20) });
-  A.proto('training_reel_cord', { key: 'rubber', geo: reelCord() });
-  A.proto('training_reel_hub', { key: 'steel', geo: cylinder(0.082, 0.082, 0.025, 12) });
-  A.proto('training_reel_fastener', { key: 'steel', geo: cylinder(0.025, 0.025, 0.015, 6) });
-  A.proto('training_flag_ballast', { key: 'concrete_prop', geo: cylinder(0.21, 0.26, 0.218) });
-  A.proto('training_flag_ferrule', { key: 'steel', geo: cylinder(0.051, 0.051, 0.077, 12) });
-  A.proto('training_flag_pole', { key: 'metal_dark', geo: cylinder(0.02, 0.02, 1.44, 12) });
-  A.proto('training_flag_sleeve', { key: 'steel', geo: cylinder(0.026, 0.026, 0.025, 12) });
+  batchProp('training_tote_handle', { key: 'steel', geo: toteHandle() });
+  batchProp('training_reel_flange', { key: 'wood_prop', geo: cylinder(0.544, 0.544, 0.118, 20) });
+  batchProp('training_reel_cord', { key: 'rubber', geo: reelCord() });
+  batchProp('training_reel_hub', { key: 'steel', geo: cylinder(0.082, 0.082, 0.025, 12) });
+  batchProp('training_reel_fastener', { key: 'steel', geo: cylinder(0.025, 0.025, 0.015, 6) });
+  batchProp('training_flag_ballast', { key: 'concrete_prop', geo: cylinder(0.21, 0.26, 0.218) });
+  batchProp('training_flag_ferrule', { key: 'steel', geo: cylinder(0.051, 0.051, 0.077, 12) });
+  batchProp('training_flag_pole', { key: 'metal_dark', geo: cylinder(0.02, 0.02, 1.44, 12) });
+  batchProp('training_flag_sleeve', { key: 'steel', geo: cylinder(0.026, 0.026, 0.025, 12) });
   for (const [id, key, seed] of [
     ['training_yard_flag', 'fabric_teal', 3],
     ['training_bay_flag', 'fabric_red', 11],
   ] as const)
-    A.proto(id, {
+    batchProp(id, {
       key,
       geo: clothGeometry(0.67, 0.33, {
         segX: 10,
@@ -354,8 +357,8 @@ export function dressTraining(A: Assembler): void {
         seed,
       }),
     });
-  A.proto('training_cone_base', { key: 'rubber', geo: chamferBox(0.315, 0.042, 0.315, 0.022) });
-  A.proto('training_cone_shell', {
+  batchProp('training_cone_base', { key: 'rubber', geo: chamferBox(0.315, 0.042, 0.315, 0.022) });
+  batchProp('training_cone_shell', {
     key: 'training_red',
     ballisticSurface: 'rubber',
     geo: cylinder(0.04, 0.146, 0.414),

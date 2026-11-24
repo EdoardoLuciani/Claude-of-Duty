@@ -21,6 +21,8 @@ export interface PrototypeSpec {
   chunk?: boolean;
   maxDist?: number;
   noPrepass?: boolean;
+  /** Fold only the visual instances into the existing static batch of the same palette. */
+  batchVisual?: boolean;
 }
 export interface Prototype {
   id: string;
@@ -36,6 +38,7 @@ export interface Prototype {
   chunk: boolean;
   maxDist: number;
   noPrepass: boolean;
+  batchVisual: boolean;
   matrices: THREE.Matrix4[];
   masks: Array<InstanceMasks | null>;
 }
@@ -261,6 +264,7 @@ export class Assembler {
       matrices: [],
       masks: [],
       noPrepass: !!spec.noPrepass,
+      batchVisual: spec.batchVisual ?? false,
     });
     return id;
   }
@@ -328,6 +332,7 @@ export class Assembler {
    * Collision/nav must not change when visual-only draw organization changes.
    * Both outputs borrow this assembler's geometry/materials until disposal. */
   finalize(root: THREE.Object3D, collisionSource: THREE.Object3D | null = null): this {
+    const visualBatches = new Map<string, { mesh: THREE.Mesh; acc: Accum }>();
     // --- merged static geometry ---
     for (const [key, acc] of this._static) {
       if (acc.empty) continue;
@@ -419,7 +424,10 @@ export class Assembler {
       // The fixed grid can split a compact cloud across cell boundaries. Join
       // whole visual buckets within a bounded X/Z span to trade culling for fewer draws.
       // Distance-LOD clouds keep their original bounds and visibility decisions.
-      const chunks = [...buckets.values()].map((list): number[] => list.slice());
+      if (p.batchVisual) this.foldVisualProp(p, p.visualGeo ?? p.geo, visualBatches);
+      const chunks = p.batchVisual
+        ? []
+        : Array.from(buckets.values(), (list): number[] => list.slice());
       if (p.chunk && p.maxDist === 0 && chunks.length > 1) {
         const bounds = chunks.map((list): THREE.Box3 => {
           const box = new THREE.Box3();
@@ -497,7 +505,54 @@ export class Assembler {
       p.masks.length = 0;
     }
 
+    for (const { mesh, acc } of visualBatches.values()) {
+      const source = mesh.geometry;
+      this.stats.staticTris += acc.tris - source.index!.count / 3;
+      // The canonical collision mesh may still borrow this geometry or its attributes.
+      if (collisionSource) this.collisionGeometries.push(source);
+      else source.dispose();
+      mesh.geometry = acc.build();
+      root.add(mesh);
+    }
+
     return this;
+  }
+
+  private foldVisualProp(
+    p: Prototype,
+    geometry: THREE.BufferGeometry,
+    batches: Map<string, { mesh: THREE.Mesh; acc: Accum }>
+  ): void {
+    let batch = batches.get(p.key);
+    const name = `world_${p.key}`;
+    const mesh = batch?.mesh ?? this.meshes.find((m): boolean => m.name === name);
+    const opts = PALETTE[p.key]?.opts;
+    if (
+      !mesh ||
+      !p.castShadow ||
+      !p.receiveShadow ||
+      p.noPrepass ||
+      p.maxDist ||
+      p.masks.some(Boolean) ||
+      opts?.localSpace ||
+      opts?.three?.transparent ||
+      opts?.three?.alphaTest ||
+      Object.keys(geometry.morphAttributes).length ||
+      Object.keys(geometry.attributes).some(
+        (name): boolean => !['position', 'normal', 'uv', 'color', '_solid'].includes(name)
+      )
+    )
+      throw new Error(`[world] ${p.id} is incompatible with the static visual batch for ${p.key}`);
+
+    if (!batch) {
+      batch = { mesh, acc: new Accum(mesh.name).add(mesh.geometry) };
+      batches.set(p.key, batch);
+    }
+    for (const transform of p.matrices) {
+      if (transform.determinant() <= 0)
+        throw new Error(`[world] ${p.id} needs a positive transform for static visual batching`);
+      batch.acc.add(geometry, transform);
+    }
   }
 
   dispose(): void {

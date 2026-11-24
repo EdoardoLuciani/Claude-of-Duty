@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import { Box3, Vector3 } from 'three';
+import { Box3, InstancedMesh, Vector3 } from 'three';
 
 import { DEFAULT_BINDINGS } from '../../src/core/bindings.ts';
 import { UNITS } from '../../src/core/config.ts';
@@ -32,7 +32,7 @@ const map = PLAYABLE_MAPS.find((entry): boolean => entry.id === 'training-ground
 assert(map);
 const models = new ModelSystem(map);
 await models.init();
-const { meta, collision } = await models.worldPrefetch;
+const { meta, visual, collision } = await models.worldPrefetch;
 assert.deepEqual(
   requests.sort(),
   [
@@ -40,6 +40,16 @@ assert.deepEqual(
     `models/world/training/${meta.assets.visual}`,
     `models/world/training/${meta.assets.collision}`,
   ].sort()
+);
+
+assert(!visual.scene.getObjectByName('prop_training_tote_body'), 'dressing is visually batched');
+assert(
+  collision.scene.getObjectByName('collide_prop_training_tote_body') instanceof InstancedMesh,
+  'visual batching leaves the canonical prop collider instanced'
+);
+assert(
+  visual.scene.getObjectByName('prop_training_target_face') instanceof InstancedMesh,
+  'targets stay separately culled from the dressing batches'
 );
 
 const physics: PhysicsSystem = physicsFor(collision.scene);

@@ -188,7 +188,8 @@ shelves, counters, and workbenches use offsets from their support. See the
 [world editing map](tools/worldgen/README.md). `bun tools/export-world.ts` builds meshes
 and cooks collision with meshoptimizer from canonical instance buckets. Visual-only
 coalescing may join whole non-distance-LOD buckets within a bounded X/Z span
-independent of the canonical grid. It never changes collision or navigation inputs.
+independent of the canonical grid. Authored prop prototypes can also opt into
+their palette's static visual batch. Both leave collision and navigation inputs unchanged.
 Pieces marked visual-only at assembly do not enter the collision or navigation bake,
 including when they share a material batch with solid pieces.
 A prototype's optional `visualGeo` is visual only; support, collision and navigation
