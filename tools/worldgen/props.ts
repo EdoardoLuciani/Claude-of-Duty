@@ -1251,13 +1251,13 @@ export function burntCar(): THREE.BufferGeometry {
  * Register every instanced prototype. Called once, before the level is built.
  * Prototype ids are the vocabulary dressing.ts and interiors.ts draw from.
  */
-export function registerProps(A: Assembler): Assembler {
+export function registerProps(A: Assembler, batchVisual?: ReadonlySet<string>): Assembler {
   const P = (
     id: string,
     key: string,
     geo: THREE.BufferGeometry,
     opts: Omit<PrototypeSpec, 'geo' | 'key'> = {}
-  ): string => A.proto(id, { geo, key, ...opts });
+  ): string => A.proto(id, { geo, key, batchVisual: batchVisual?.has(id) ?? false, ...opts });
   // Each prototype owns its stream: adding or editing one never reshapes another.
   const R = (id: string): Rng => keyedRng('prop', id);
 

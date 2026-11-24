@@ -3,6 +3,9 @@ import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 import { isRecord } from './guards.ts';
 
+/** Optional RGB multiplier in static world meshes, separate from COLOR_0 surface masks. */
+export const WORLD_BATCH_TINT = '_batchtint';
+
 // Parsed optional metadata may be present as undefined; it is not a state patch.
 export type ModelVec3 = [number, number, number];
 export interface SoldierWeapon {
