@@ -379,6 +379,10 @@ export class UiSystem {
     this.prompt.set(p);
   }
 
+  /** Owner passed to the visible prompt's setPrompt, or null. */
+  get promptOwner(): unknown {
+    return this._promptOwner ?? null;
+  }
   clearPrompt(owner: unknown = null): void {
     if (owner !== null && this._promptOwner !== owner) return;
     this._promptOwner = null;

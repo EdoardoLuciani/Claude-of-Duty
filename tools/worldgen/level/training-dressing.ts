@@ -260,11 +260,11 @@ function supplyLanding(A: Assembler): void {
     }
     for (let i = 0; i < 4; i++) {
       const angle = (i * Math.PI) / 2 + yaw;
-      // Positions circle the hub toward +Z; the fastener itself keeps its authored yaw.
-      trs(frame, x, 0, z, -angle);
       A.put(
         'training_reel_fastener',
-        ...worldOf(frame, 0.19 * scale, 0.822 * scale, 0),
+        x + Math.cos(angle) * 0.19 * scale,
+        0.822 * scale,
+        z + Math.sin(angle) * 0.19 * scale,
         angle,
         scale
       );

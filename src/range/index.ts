@@ -22,8 +22,7 @@ export class RangeSystem {
   private off: (() => void)[] = [];
 
   init(ctx: EngineContext): void {
-    const { course, rangeStation } = ctx.get('world').queries;
-    const ui = ctx.get('ui');
+    const { course } = ctx.get('world').queries;
     if (course.length) {
       const player = ctx.get('player');
       for (const [index, gate] of course.entries()) {
@@ -42,14 +41,6 @@ export class RangeSystem {
         }),
         ctx.events.on('game:restart', (): void => {
           this.step = 0;
-        })
-      );
-    }
-    if (course.length || rangeStation) {
-      this.off.push(
-        ctx.events.on('market:open', (): void => ui.clearPrompt(PROMPT_OWNER)),
-        ctx.events.on('ui:pause', ({ paused }): void => {
-          if (paused) ui.clearPrompt(PROMPT_OWNER);
         })
       );
     }
@@ -76,8 +67,11 @@ export class RangeSystem {
         rangeStation &&
         (feet.x - rangeStation.x) ** 2 + (feet.z - rangeStation.z) ** 2 <= STATION_RADIUS ** 2;
       if (near && !ctx.get('weapons').grenadeEquipped) {
-        ui.setPrompt(STATION_PROMPT, PROMPT_OWNER);
-        if (input.actionPressed('use')) ctx.get('market').openShop();
+        if (input.actionPressed('use')) {
+          // The open market suspends gameplay, so update() cannot clear this later.
+          ui.clearPrompt(PROMPT_OWNER);
+          ctx.get('market').openShop();
+        } else ui.setPrompt(STATION_PROMPT, PROMPT_OWNER);
         return;
       }
       const next = this.step ? course.at(this.step) : undefined;
@@ -89,7 +83,8 @@ export class RangeSystem {
         Math.abs(feet.x - next.position[0]) < 10 &&
         Math.abs(feet.z - next.position[2]) < 30
       ) {
-        ui.setPrompt(hint, PROMPT_OWNER);
+        // The circuit hint yields to grenade, radio and bandage messages.
+        if (!ui.prompt.active || ui.promptOwner === PROMPT_OWNER) ui.setPrompt(hint, PROMPT_OWNER);
         return;
       }
     }
