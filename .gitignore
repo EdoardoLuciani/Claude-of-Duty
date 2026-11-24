@@ -26,9 +26,6 @@ revcrops/
 # Generated models, including the world (tools/build-assets.ts).
 public/models/
 
-# Generated briefing-map backdrop (tools/export-menu-map.ts).
-public/images/briefing-map.png
-
 # Build caches and Blender products (tools/build-assets.ts).
 .cache/
 
