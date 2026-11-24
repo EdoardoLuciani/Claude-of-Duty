@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import { Container, Text } from 'pixi.js';
+import { BitmapText, Container } from 'pixi.js';
 
 import { Rng } from '../../src/core/rng.ts';
 import { AmmoPanel } from '../../src/ui/ammo.ts';
@@ -30,7 +30,7 @@ try {
   Object.defineProperty(hud.renderer, 'resolution', { value: 1 });
   hud.renderer.render = (): void => {};
   const measure = (node: Container): void => {
-    if (node instanceof Text)
+    if (node instanceof BitmapText)
       Object.defineProperty(node, 'width', {
         get: (): number => node.text.length * 8 * node.scale.x,
       });

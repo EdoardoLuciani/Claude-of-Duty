@@ -224,6 +224,38 @@ try {
     };
   });
 
+  // Changing gameplay HUD text must reuse the startup glyph atlases, not upload canvases.
+  const hudText = await page.evaluate(async (): Promise<{ draws: number; uploads: number }> => {
+    const engine = window.__ENGINE__,
+      pump = window.__PUMP__;
+    if (!engine || !pump) throw Error('capture not ready');
+    const ui = engine.ctx.get('ui'),
+      weapons = engine.ctx.get('weapons');
+    const hud = ui.pixiHud,
+      state = weapons.state;
+    if (!hud || !state) throw Error('gameplay HUD or weapon state unavailable');
+    await pump(30);
+    const before = hud.draws;
+    const queue = hud.renderer.gpu.device.queue,
+      copy = queue.copyExternalImageToTexture.bind(queue);
+    let uploads = 0;
+    queue.copyExternalImageToTexture = function (source, destination, size): void {
+      if (source.source instanceof HTMLCanvasElement || source.source instanceof OffscreenCanvas)
+        uploads++;
+      Reflect.apply(copy, queue, [source, destination, size]);
+    };
+    try {
+      state.mag -= 3;
+      if (!weapons.reload()) throw Error('reload did not start');
+      ui.fpsText = '179 FPS';
+      ui.banner.show('Wave 1 Cleared', '+100 · WAVE BONUS');
+      await pump(10);
+      return { draws: hud.draws - before, uploads };
+    } finally {
+      queue.copyExternalImageToTexture = copy;
+    }
+  });
+
   const failures = [...errors];
   // Keep an exact budget so unrelated placement/batching changes still fail.
   if (result.stats.drawCalls !== 139 || result.stats.instances !== 7853)
@@ -252,7 +284,11 @@ try {
         `${opening.name} physical attachment was ${opening.walkable}, expected ${opening.expected}`
       );
   }
-  console.log(JSON.stringify({ ok: failures.length === 0, ...result, errors: failures }, null, 2));
+  if (!hudText.draws) failures.push('changed HUD text did not redraw');
+  if (hudText.uploads) failures.push(`changed HUD text uploaded ${hudText.uploads} canvases`);
+  console.log(
+    JSON.stringify({ ok: failures.length === 0, ...result, hudText, errors: failures }, null, 2)
+  );
   if (failures.length) process.exitCode = 1;
 } finally {
   await browser.close();

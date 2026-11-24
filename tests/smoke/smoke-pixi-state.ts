@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import { Container, Text } from 'pixi.js';
+import { BitmapText, Container } from 'pixi.js';
 
 import type { AmmoState } from '../../src/ui/ammo.ts';
 import { AmmoPanel } from '../../src/ui/ammo.ts';
@@ -119,7 +119,7 @@ node.destroy();
 
 // Model text measurement without a browser canvas; fitting must reset the old scale first.
 let measurements = 0;
-const label = new Text({ text: '' });
+const label = new BitmapText({ text: '' });
 Object.defineProperty(label, 'width', {
   get: (): number => {
     measurements++;

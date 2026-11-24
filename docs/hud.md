@@ -20,9 +20,11 @@ The market's 3D weapon preview uses its own Three WebGPU renderer.
   when their displayed integer changes.
 - Injury fades independently of readouts. Inventory pulses use unscaled UI time;
   FPS samples every 500 ms. HUD canvas DPR is capped independently at 2.
-- Text bitmap density includes HUD enlargement on resize; smaller layouts keep
-  renderer-density text. Late minimap labels inherit the current density. Animated
-  transforms do not change text resolution or trigger per-frame rasterization.
+- Ammo/reload, vitals, inventory, FPS, score and feedback use Pixi bitmap text
+  backed by two shared glyph atlases: one for small labels and one for large
+  values. The HUD uploads the game's glyphs at startup and keeps the atlases
+  resident; changing these labels reuses the glyphs without making a text texture. Compass and minimap labels use canvas text at the current
+  layout density. Animated transforms do not change text resolution.
 - Passive messages use `pixi-feedback.ts`; controllers retain prompt ownership,
   progress, banner timing, six pooled killfeed rows and status priority. The supply
   countdown uses raw time and its own anchor, independent of interaction prompts.
@@ -45,4 +47,6 @@ The market's 3D weapon preview uses its own Three WebGPU renderer.
 error preservation, adapter restoration, failure-isolated/idempotent teardown and
 passive-message state/timing contracts. `smoke-hud-redraw.ts` checks active/paused
 redraw suppression and invalidation for vitals, reticle, injury, reload and feedback.
+`bun tests/e2e/world-smoke.ts` (WebGPU-capable Chromium) also verifies that changing
+ammo, reload, FPS and banner text does not upload new canvas textures.
 Run typecheck, lint and build as usual.
