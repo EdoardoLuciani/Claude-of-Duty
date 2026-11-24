@@ -228,8 +228,8 @@ try {
   await assert.rejects(other._prefetchWorld(), /HTTP 503/, 'same mode, different map bundle');
   assert.deepEqual(requests.slice(-3), [
     'models/world/other/level.json',
-    'models/world/other/nav.gz',
     'models/world/other/minimap.png',
+    'models/world/other/nav.gz',
   ]);
 } finally {
   globalThis.fetch = fetch;

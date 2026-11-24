@@ -201,9 +201,10 @@ header and validates the content-hashed products for each playable map. Survival
 root `public/models/world/` bundle and Training Grounds uses `public/models/world/training/`.
 `ModelSystem` verifies map identity before loading bundle assets. Every map bakes a north-up
 minimap PNG from the cooked collision BVH. The manifest supplies its world-space rectangle and
-any building labels. `ModelSystem` prefetches the image; Pixi draws the labels and dynamic
-markers over it. Survival-mode bundles also bake navigation from the same BVH, and `ModelSystem`
-includes it in the prefetched world when the manifest lists it.
+any building labels. `ModelSystem` starts the download alongside the other world assets; only the
+HUD awaits it. Pixi draws the labels and dynamic markers over the image. Survival-mode bundles
+also bake navigation from the same BVH, and `ModelSystem` includes it in the prefetched world
+when the manifest lists it.
 Optional world-space range station and target-face markers come from the loaded manifest via
 `WorldQueries`; runtime range and FX code do not import
 authoring coordinates. Preserve instancing/masks; never author separate collision

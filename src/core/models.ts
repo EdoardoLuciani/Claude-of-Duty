@@ -49,11 +49,11 @@ export class ModelSystem {
     if (meta.mapId !== this.map.id)
       throw new Error(`[models] unexpected world manifest map ID at ${base}/level.json`);
     const { visual, collision, minimap, nav } = meta.assets;
-    const [visualGlb, collisionGlb, navBytes, minimapPng] = await Promise.all([
+    const minimapPng = watch(this._loadMinimapPng(`${base}/${minimap}`));
+    const [visualGlb, collisionGlb, navBytes] = await Promise.all([
       this._loadWorldGLB(`${base}/${visual}`),
       this._loadWorldGLB(`${base}/${collision}`),
       nav ? this._loadWorldBytes(`${base}/${nav}`) : undefined,
-      this._loadMinimapPng(`${base}/${minimap}`),
     ]);
     return { meta, visual: visualGlb, collision: collisionGlb, navBytes, minimapPng };
   }

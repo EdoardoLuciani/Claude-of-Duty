@@ -184,9 +184,7 @@ async function compileWorld(
       const surface: unknown = object.userData.surface;
       if (isMesh(object) && surface) phys.addStatic(object, surfaceIndex(surface));
     });
-    const bvhStarted = performance.now();
     phys.rebuildStatic();
-    const bvhMs = performance.now() - bvhStarted;
     const bounds = new THREE.Box3(
       new THREE.Vector3().fromArray(metadata.bounds.min),
       new THREE.Vector3().fromArray(metadata.bounds.max)
@@ -198,7 +196,6 @@ async function compileWorld(
           phys,
           bounds,
           { sourceHash, collisionAsset: collisionFile },
-          bvhMs,
           metadata.volumes
         )
       : undefined;

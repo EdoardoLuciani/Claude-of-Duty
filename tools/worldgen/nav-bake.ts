@@ -24,7 +24,6 @@ import type { PhysicsSystem } from '../../src/physics/index.ts';
 
 export interface NavBakeResult {
   buffer: Uint8Array;
-  bvhMs: number;
   polygons: number;
   coverCount: number;
   components: number;
@@ -121,7 +120,6 @@ export async function bakePhysicsNav(
   phys: PhysicsSystem,
   bounds: THREE.Box3,
   provenance: Partial<NavMetadata> = {},
-  bvhMs = 0,
   volumes: WorldLadder[] = []
 ): Promise<NavBakeResult> {
   await init();
@@ -186,7 +184,6 @@ export async function bakePhysicsNav(
     const buffer = await packNav(metadata, exportNavMesh(generated.navMesh), components, points);
     return {
       buffer,
-      bvhMs,
       polygons: components.size,
       coverCount: points.length,
       components: new Set(components.values()).size,

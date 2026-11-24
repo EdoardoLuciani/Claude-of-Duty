@@ -167,7 +167,7 @@ export interface WorldPrefetch {
   visual: GLTF;
   collision: GLTF;
   navBytes: ArrayBuffer | undefined;
-  minimapPng: Blob;
+  minimapPng: Promise<Blob>;
 }
 
 /** JSON is unknown until each field consumed by runtime has been checked. */

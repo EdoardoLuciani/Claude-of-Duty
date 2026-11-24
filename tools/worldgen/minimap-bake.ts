@@ -47,7 +47,8 @@ export function bakeMinimap(
   const heights = new Float32Array(width * height).fill(-Infinity);
   const stepX = (maxX - minX) / width,
     stepZ = (maxZ - minZ) / height;
-  const groundY = Math.min(...map.spawns.map((spawn): number => spawn.position[1]));
+  const matrix = new Matrix4().fromArray(map.transform);
+  const groundY = matrix.elements[13]; // World Y of the level origin.
   const top = Math.max(bounds.max.y, world.aabb.maxy) + 1;
   const depth = top - bounds.min.y + 1;
   const hit = makeHitRecord();
@@ -90,8 +91,7 @@ export function bakeMinimap(
     }
   }
 
-  const matrix = new Matrix4().fromArray(map.transform),
-    point = new Vector3();
+  const point = new Vector3();
   for (const { spec } of map.buildings ?? []) {
     point.set(spec.x, 0, spec.z).applyMatrix4(matrix);
     const kind = spec.ruin ? 'ruin' : spec.rooms?.[0]?.furnish?.[0]?.id;

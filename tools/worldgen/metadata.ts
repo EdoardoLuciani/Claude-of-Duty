@@ -86,7 +86,7 @@ export function worldMetadata(A: Assembler, buildings: BuildingInfo[]): BuildMet
         roofY,
         top,
         traversable,
-      }): Pick<BuildingInfo, 'spec' | 'floorY' | 'roofY' | 'top' | 'traversable'> => ({
+      }): NonNullable<BuildMetadata['buildings']>[number] => ({
         spec,
         floorY,
         roofY,
