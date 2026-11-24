@@ -1,8 +1,12 @@
 import type { BitmapText, Container } from 'pixi.js';
-import { Text } from 'pixi.js';
+import { Graphics, Text } from 'pixi.js';
 
 /** Bottom-HUD hierarchy: primary counts, secondary counts, supporting labels. */
 export const HUD_TYPE = { value: 32, secondary: 16, label: 12 } as const;
+
+export function hudPanel(width: number, height: number): Graphics {
+  return new Graphics().roundRect(0, 0, width, height, 4).fill({ color: 0x080c10, alpha: 0.68 });
+}
 
 /** Match canvas-rasterized static labels to the layout scale. */
 export function setHudTextResolution(node: Container, resolution: number): void {

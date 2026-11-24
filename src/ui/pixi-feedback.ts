@@ -6,7 +6,7 @@ import { KILLFEED_CAPACITY } from './killfeed.ts';
 import type { Killfeed } from './killfeed.ts';
 import type { MarketCountdown } from './market.ts';
 import { hudText } from './pixi-glyphs.ts';
-import { HUD_TYPE, fitHudText, writeHudText, poseHudNode } from './pixi-type.ts';
+import { HUD_TYPE, fitHudText, hudPanel, writeHudText, poseHudNode } from './pixi-type.ts';
 import type { Prompt, Banner } from './prompts.ts';
 
 export interface FeedbackModels {
@@ -27,6 +27,7 @@ interface FeedView {
   sequence: number;
   width: number;
 }
+const SCORE_WIDTH = 496;
 const INK = 0xe7f2ef,
   MUTED = 0xa9bac5,
   AMBER = 0xffb02a;
@@ -76,10 +77,10 @@ export class PixiFeedback {
   private countLabel = label('SUPPLY MARKET IN');
   private countTrack = rect(0xffffff, 0.16);
   private countFill = rect(AMBER);
-  private scoreValue = label('', HUD_TYPE.secondary, AMBER, 50, 0);
-  private waveValue = label('', HUD_TYPE.secondary, INK, 174, 0);
-  private creditValue = label('', HUD_TYPE.secondary, INK, 276, 0);
-  private status = label('', HUD_TYPE.label, MUTED, 368, 4);
+  private scoreValue = label('', HUD_TYPE.secondary, AMBER, 16, 19);
+  private waveValue = label('', HUD_TYPE.secondary, INK, 141, 19);
+  private creditValue = label('', HUD_TYPE.secondary, INK, 222, 19);
+  private status = label('', HUD_TYPE.label, MUTED, SCORE_WIDTH - 16, 14);
   readonly rows = Array.from({ length: KILLFEED_CAPACITY }, (): FeedView => {
     const node = new Container(),
       back = rect(0xffffff),
@@ -123,16 +124,18 @@ export class PixiFeedback {
     this.countTrack.scale.set(150, 2);
     this.countFill.scale.y = 2;
     this.countdown.pivot.x = 76;
+    this.status.anchor.x = 1;
     this.score.addChild(
-      label('SCORE', HUD_TYPE.label, MUTED, 0, 4),
+      hudPanel(SCORE_WIDTH, 42),
+      label('SCORE', HUD_TYPE.label, MUTED, this.scoreValue.x, 4),
       this.scoreValue,
-      label('WAVE', HUD_TYPE.label, MUTED, 128, 4),
+      label('WAVE', HUD_TYPE.label, MUTED, this.waveValue.x, 4),
       this.waveValue,
-      label('CREDITS', HUD_TYPE.label, MUTED, 212, 4),
+      label('CREDITS', HUD_TYPE.label, MUTED, this.creditValue.x, 4),
       this.creditValue,
       this.status
     );
-    this.score.pivot.x = 264;
+    this.score.pivot.x = SCORE_WIDTH / 2;
   }
   resize(w: number, h: number, k: number): void {
     this.width = w / k;
@@ -140,6 +143,8 @@ export class PixiFeedback {
     this.feedTop = Math.max(24 / k, 34);
     this.cssPixel = 1 / k;
     this.layoutDirty = true;
+    this.score.position.set(this.width / 2, 60);
+    this.score.scale.set(Math.min(1, Math.max(1, this.width - 52) / SCORE_WIDTH));
     const width = Math.max(1, Math.min(480, this.width - 52));
     this.bannerBack.position.set(-width / 2, -42);
     this.bannerBack.scale.set(width, 90);
@@ -204,21 +209,12 @@ export class PixiFeedback {
         c.shown >= 0.005,
         Number(c.shown.toFixed(3)),
         this.width / 2,
-        92.2
+        112
       ) || dirty;
-    dirty = writeHudText(this.scoreValue, s.score, 74) || dirty;
-    dirty = writeHudText(this.waveValue, s.wave, 24) || dirty;
-    dirty = writeHudText(this.creditValue, s.credits, 74) || dirty;
-    dirty = writeHudText(this.status, s.status, 160) || dirty;
-    dirty =
-      poseHudNode(
-        this.score,
-        true,
-        1,
-        this.width / 2,
-        63.2,
-        Math.min(1, Math.max(1, this.width - 52) / 528)
-      ) || dirty;
+    dirty = writeHudText(this.scoreValue, s.score) || dirty;
+    dirty = writeHudText(this.waveValue, s.wave) || dirty;
+    dirty = writeHudText(this.creditValue, s.credits) || dirty;
+    dirty = writeHudText(this.status, s.status) || dirty;
 
     const feed = models.killfeed;
     for (let i = 0; i < this.rows.length; i++) {

@@ -3,12 +3,11 @@ import { Container, Graphics, type BitmapText } from 'pixi.js';
 import { clamp01 } from '../core/math.ts';
 import type { AmmoState } from './ammo.ts';
 import { hudText } from './pixi-glyphs.ts';
-import { HUD_TYPE, writeHudText } from './pixi-type.ts';
+import { HUD_TYPE, hudPanel, writeHudText } from './pixi-type.ts';
 
 export const AMMO_WIDTH = 248;
 // Align the magazine bar with the health widget's lower (armour) bar.
 export const AMMO_HEIGHT = 110;
-const WIDTH = AMMO_WIDTH;
 const INK = 0xe7f2ef,
   MUTED = 0xa9bac5,
   AMBER = 0xffb02a,
@@ -17,11 +16,11 @@ const INK = 0xe7f2ef,
 /** Retained read-only ammo graphics; the owner decides when/where to render. */
 export class PixiAmmoView {
   readonly stage = new Container();
-  private current: BitmapText;
-  private reserve: BitmapText;
-  private name: BitmapText;
-  private mode: BitmapText;
-  private prompt: BitmapText;
+  private current = hudText('30', 119, 96, HUD_TYPE.value, 0xffffff);
+  private reserve = hudText('/ 210', 131, 96, HUD_TYPE.secondary, MUTED);
+  private name = hudText('M4A1', AMMO_WIDTH - 16, 40, HUD_TYPE.label);
+  private mode = hudText('AUTO', 16, 40, HUD_TYPE.label, MUTED);
+  private prompt = hudText('', AMMO_WIDTH / 2, 4, HUD_TYPE.label, AMBER);
   private magFill = new Graphics().rect(0, 0, 216, 4).fill(0xffffff);
   private bar = new Graphics()
     .rect(0, 0, 216, 3)
@@ -36,32 +35,29 @@ export class PixiAmmoView {
   constructor() {
     this.stage.eventMode = 'none';
     this.stage.interactiveChildren = false;
-    this.mode = this.text('AUTO', 14, 40, HUD_TYPE.label, MUTED);
-    this.name = this.text('M4A1', WIDTH - 14, 40, HUD_TYPE.label);
     this.name.anchor.x = 1;
-    this.current = this.text('30', 119, 96, HUD_TYPE.value, 0xffffff);
     this.current.anchor.set(1, 1);
-    this.reserve = this.text('/ 210', 131, 96, HUD_TYPE.secondary, MUTED);
     this.reserve.anchor.y = 1;
-    // Warnings/reload feedback live above the readout, not below the bottom bar.
-    this.prompt = this.text('', WIDTH / 2, 4, HUD_TYPE.label, AMBER);
     this.prompt.anchor.x = 0.5;
-    this.stage.addChild(new Graphics().rect(16, 102, 216, 4).fill(0x35434c));
     this.magFill.position.set(16, 102);
-    this.stage.addChild(this.magFill);
     this.bar.position.set(16, 22);
     this.fill.position.copyFrom(this.bar.position);
-    this.stage.addChild(this.bar, this.fill);
+    this.stage.addChild(
+      hudPanel(AMMO_WIDTH, AMMO_HEIGHT),
+      this.mode,
+      this.name,
+      this.current,
+      this.reserve,
+      this.prompt,
+      new Graphics().rect(16, 102, 216, 4).fill(0x35434c),
+      this.magFill,
+      this.bar,
+      this.fill
+    );
   }
 
-  private text(value: string, x: number, y: number, fontSize: number, fill = INK): BitmapText {
-    const text = hudText(value, x, y, fontSize, fill);
-    this.stage.addChild(text);
-    return text;
-  }
-
-  private label(text: BitmapText, value: string, width = 0): void {
-    this.dirty = writeHudText(text, value, width) || this.dirty;
+  private label(text: BitmapText, value: string): void {
+    this.dirty = writeHudText(text, value) || this.dirty;
   }
 
   update(_dt: number, s: AmmoState): void {
@@ -72,7 +68,7 @@ export class PixiAmmoView {
     // Build per-frame label strings only when their source value changes.
     if (ammo !== this.lastAmmo) this.label(this.current, String((this.lastAmmo = ammo)));
     if (reserve !== this.lastReserve) this.label(this.reserve, `/ ${(this.lastReserve = reserve)}`);
-    this.label(this.name, s.weaponName ?? 'M4A1', 166);
+    this.label(this.name, s.weaponName ?? 'M4A1');
     if (mode !== this.lastMode) this.label(this.mode, (this.lastMode = mode).toUpperCase());
     const color = ammo === 0 ? RED : ammo / mag <= 0.34 ? AMBER : INK;
     if (this.current.tint !== color) {
@@ -88,17 +84,8 @@ export class PixiAmmoView {
       this.dirty = true;
     }
     this.label(this.prompt, reloading ? 'RELOADING' : ammo === 0 ? 'PRESS R TO RELOAD' : '');
-    const alpha =
-      !reloading && ammo === 0
-        ? Math.round((0.55 + 0.45 * Math.abs(Math.sin((s.time ?? 0) * 3.8))) * 1000) / 1000
-        : 1;
     const fill = Math.round(progress * 1000) / 1000;
-    if (
-      this.prompt.alpha !== alpha ||
-      this.bar.visible !== reloading ||
-      this.fill.scale.x !== fill
-    ) {
-      this.prompt.alpha = alpha;
+    if (this.bar.visible !== reloading || this.fill.scale.x !== fill) {
       this.bar.visible = this.fill.visible = reloading;
       this.fill.scale.x = fill;
       this.dirty = true;

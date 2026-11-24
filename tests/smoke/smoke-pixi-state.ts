@@ -153,9 +153,6 @@ ammoView.stage.destroy({ children: true });
 
 const combat = new PixiCombat(),
   ammo = new AmmoPanel();
-// Equipment layout is independent of glyph rasterization, which needs a browser canvas.
-for (const slot of combat.slots)
-  Object.defineProperty(slot.node, 'width', { get: (): number => 20 });
 const models = { hit, arcs, compass, ammo, fpsText: '60 FPS' };
 assert.equal(combat.update(models), true);
 assert.equal(combat.update(models), false);

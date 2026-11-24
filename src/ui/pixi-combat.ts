@@ -91,7 +91,7 @@ export class PixiCombat {
     this.slots = Array.from({ length: 2 }, (_, i): EquipmentView => {
       const label = hudText('', 26, 0, HUD_TYPE.secondary, 0xffffff);
       const symbol = accessoryIcon(i),
-        node = new Container();
+        node = new Container({ x: -96 + i * 56 });
       node.addChild(symbol, label);
       this.equipment.addChild(node);
       return { node, label, symbol, count: -1 };
@@ -120,14 +120,13 @@ export class PixiCombat {
         alive = models.arcs.pool.items[i].alive;
       dirty = poseHudNode(node, alive, v.alpha, node.x, node.y, v.scale, v.rotation) || dirty;
     }
-    let layout = false;
     for (let i = 0; i < this.slots.length; i++) {
       const slot = this.slots[i],
         v = models.ammo.equipment[i];
       if (slot.count !== v.count) {
         slot.count = v.count;
         slot.label.text = String(v.count);
-        layout = dirty = true;
+        dirty = true;
       }
       const tint = v.active ? 0xffb02a : 0xa9bac5;
       const iconTint = v.active ? 0xffb02a : 0xffffff;
@@ -136,14 +135,6 @@ export class PixiCombat {
       slot.node.alpha = v.alpha;
       slot.label.tint = tint;
       slot.symbol.tint = iconTint;
-    }
-    if (layout) {
-      let right = 0;
-      for (let i = this.slots.length - 1; i >= 0; i--) {
-        const node = this.slots[i].node;
-        node.x = right - node.width;
-        right = node.x - 16;
-      }
     }
     return writeHudText(this.fps, models.fpsText) || dirty;
   }

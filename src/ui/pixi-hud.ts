@@ -16,7 +16,7 @@ import type { FeedbackModels } from './pixi-feedback.ts';
 import { hudText as text, prepareHudGlyphs } from './pixi-glyphs.ts';
 import { PixiInjury } from './pixi-injury.ts';
 import { PixiMinimap } from './pixi-minimap.ts';
-import { HUD_TYPE, setHudTextResolution, writeHudText } from './pixi-type.ts';
+import { HUD_TYPE, hudPanel, setHudTextResolution, writeHudText } from './pixi-type.ts';
 import { setStyle } from './util.ts';
 
 /** Gameplay HUD presentation on one passive, borrowed-device WebGPU canvas. */
@@ -33,8 +33,8 @@ export class PixiHud {
   readonly minimap = new PixiMinimap();
   readonly vitals = new Container();
   readonly reticle = new Container();
-  private hp = text('100', 14, 62, HUD_TYPE.value);
-  private maxHp = text('/100', 102, 62, HUD_TYPE.secondary, 0xa9bac5);
+  private hp = text('100', 105, 62, HUD_TYPE.value);
+  private maxHp = text('/100', 112, 62, HUD_TYPE.secondary, 0xa9bac5);
   private hpFill = new Graphics().rect(0, 0, 168, 4).fill(0xffffff);
   private armour = new Container();
   private armourFill = new Graphics().rect(0, 0, 168, 4).fill(0x79d2ff);
@@ -109,8 +109,14 @@ export class PixiHud {
       this.combat.fps,
       this.feedback.stage
     );
-    this.hp.anchor.y = this.maxHp.anchor.y = 1;
-    this.vitals.addChild(text('HEALTH', 14, 6, HUD_TYPE.label, 0xa9bac5), this.hp, this.maxHp);
+    this.hp.anchor.set(1, 1);
+    this.maxHp.anchor.y = 1;
+    this.vitals.addChild(
+      hudPanel(196, 112),
+      text('HEALTH', 14, 6, HUD_TYPE.label, 0xa9bac5),
+      this.hp,
+      this.maxHp
+    );
     this.vitals.addChild(
       new Graphics().rect(14, 68, 168, 4).fill(0x35434c).stroke({ color: 0x080c10, width: 2 })
     );
@@ -198,7 +204,7 @@ export class PixiHud {
       hp = Math.round(Math.max(0, Math.min(max, s.health ?? max)));
     if (hp !== this.lastHp) {
       this.lastHp = hp;
-      this.dirty = writeHudText(this.hp, String(hp), 80) || this.dirty;
+      this.dirty = writeHudText(this.hp, String(hp)) || this.dirty;
     }
     const maxHp = Math.round(max);
     if (maxHp !== this.lastMaxHp) {

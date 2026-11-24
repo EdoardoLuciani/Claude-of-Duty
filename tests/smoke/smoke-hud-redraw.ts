@@ -37,8 +37,6 @@ try {
     for (const child of node.children) measure(child);
   };
   measure(hud.stage);
-  for (const slot of hud.combat.slots)
-    Object.defineProperty(slot.node, 'width', { get: (): number => 40 });
   hud.setVisible(true);
   const health = new HealthFx(),
     crosshair = new Crosshair();
@@ -215,9 +213,8 @@ try {
   frame();
   const empty = hud.draws;
   frame(0.1);
-  assert.equal(hud.draws, empty + 1, 'empty-ammo prompt still pulses');
-  frame(0);
-  assert.equal(hud.draws, empty + 1, 'paused prompt is static');
+  assert.equal(hud.ammo['prompt'].text, 'PRESS R TO RELOAD');
+  assert.equal(hud.draws, empty, 'a static empty-ammo warning does not force a redraw');
   state.ammo = 30;
   frame();
   const beforeFade = hud.draws;
