@@ -91,6 +91,7 @@ export async function loadMap(): Promise<MapFixture> {
   );
   const physics = physicsFor(gltf.scene);
   const bounds = new THREE.Box3(vec(meta.bounds.min), vec(meta.bounds.max)).expandByScalar(2);
+  if (!meta.assets.nav) throw new Error('missing navigation asset for AI fixture');
   const surfaceRaw = gunzipSync(readFileSync(new URL(meta.assets.nav, dir)));
   const cases: NavigationCase[] = RECORDED.flatMap(([id, p, outcomes]): NavigationCase[] =>
     meta.spawns.map((s, i): NavigationCase => ({

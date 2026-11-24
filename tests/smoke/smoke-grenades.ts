@@ -639,6 +639,7 @@ assert(
 // The bomber flies the street axis derived from the spawn yaw — the map's
 // north street (0.554, 0, 0.832), not the diagonal fallback.
 const flightDir = radio.active[0].dir;
+const firstStart = radio.active[0].start.clone();
 assert(
   Math.abs(flightDir.x - 0.554) < 1e-3 && Math.abs(flightDir.z - 0.832) < 1e-3,
   `the bomber flies the street axis from spawn yaw (got ${flightDir.x.toFixed(3)}, ${flightDir.z.toFixed(3)})`
@@ -679,5 +680,12 @@ assert(
   `blasts cover the street extent in z (${Math.min(...zs).toFixed(0)}..${Math.max(...zs).toFixed(0)})`
 );
 assert.equal(radio.active.length, 0, 'the strike clears when the run is over');
+
+// Translating the playable bounds must translate the flight line by the same amount.
+const offset = new THREE.Vector3(40, 0, -30);
+world.bounds.translate(offset);
+assert(radio.callStrike());
+assert(radio.active[0].start.distanceTo(firstStart.add(offset)) < 1e-8);
+radio.clearStrike();
 
 console.log('Grenade + radio smoke checks passed');

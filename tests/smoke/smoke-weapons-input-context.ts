@@ -319,6 +319,12 @@ for (const [primary, first, second] of [
   wp._completeReload(true);
   assert(wp.state.chambered && wp.state.mag === wp.current.magSize - 1);
 }
+{
+  const { wp } = makeHarness();
+  assert(wp.applyBuild('sniper', BASE_ATTACHMENTS) && wp.tryFire() && wp.cycling);
+  assert(wp.applyBuild('pistol', BASE_ATTACHMENTS) && wp.setWeaponImmediate('sniper'));
+  assert(wp.state.chambered, 'a market swap finishes the interrupted bolt cycle');
+}
 
 // A market swap selects the new gun without drawing it over a cooking grenade.
 {

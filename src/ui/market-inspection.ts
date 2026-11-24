@@ -383,7 +383,10 @@ export class MarketInspection {
     this.abort.abort();
     this.controls.dispose();
     this.environment?.dispose();
-    void this.renderer?.dispose();
+    if (this.renderer) {
+      this.renderer.onDeviceLost = (): void => {};
+      void this.renderer.dispose();
+    }
     this.root.remove();
   }
 }

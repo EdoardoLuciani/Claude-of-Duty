@@ -35,7 +35,7 @@ export class PixiHud {
   readonly feedback = new PixiFeedback();
   readonly compass = new PixiCompass();
   readonly ammo = new PixiAmmoView();
-  readonly minimap = new PixiMinimap();
+  readonly minimap: PixiMinimap | null;
   readonly vitals = new Container();
   readonly reticle = new Container();
   private hp = text('100', 14, 62, HUD_TYPE.value);
@@ -60,13 +60,18 @@ export class PixiHud {
   private lastMaxHp = -1;
   draws = 0;
 
-  static async create(parent: HTMLElement, before: HTMLElement, game: Renderer): Promise<PixiHud> {
+  static async create(
+    parent: HTMLElement,
+    before: HTMLElement,
+    game: Renderer,
+    showMinimap = true
+  ): Promise<PixiHud> {
     const restore = restrictPixiCanvases();
     let hud: PixiHud | null = null;
     try {
       // Construct only after recording the restoration boundary: even field
       // initializer / text / graphics failures must restore the global adapter.
-      hud = new PixiHud();
+      hud = new PixiHud(showMinimap);
       hud.restoreAdapter = restore;
       await initPixiRenderer(
         hud.renderer,
@@ -90,7 +95,8 @@ export class PixiHud {
     }
   }
 
-  private constructor() {
+  private constructor(showMinimap = true) {
+    this.minimap = showMinimap ? new PixiMinimap() : null;
     this.canvas.className = 'ow-pixi-hud';
     this.canvas.setAttribute('role', 'img');
     this.canvas.setAttribute(
@@ -102,10 +108,9 @@ export class PixiHud {
     this.stage.interactiveChildren = false;
     this.injury.mesh.visible = false;
     this.stage.addChild(this.injury.mesh, this.chrome);
+    this.chrome.addChild(this.ammo.stage, this.vitals);
+    if (this.minimap) this.chrome.addChild(this.minimap.stage);
     this.chrome.addChild(
-      this.ammo.stage,
-      this.vitals,
-      this.minimap.stage,
       this.combat.arcs,
       this.reticle,
       this.combat.hits,
@@ -147,12 +152,12 @@ export class PixiHud {
     this.stage.scale.set(k);
     const textResolution = this.renderer.resolution * Math.max(1, k);
     setHudTextResolution(this.stage, textResolution);
-    this.minimap.textResolution = textResolution;
+    if (this.minimap) this.minimap.textResolution = textResolution;
     this.injury.resize(w, h, k);
     this.feedback.resize(w, h, k);
     this.ammo.stage.position.set(w / k - 26 - AMMO_WIDTH, h / k - 26 - AMMO_HEIGHT);
     this.vitals.position.set(26, h / k - 26 - 112);
-    this.minimap.stage.position.set(26, 26 * 0.8);
+    this.minimap?.stage.position.set(26, 26 * 0.8);
     this.reticle.position.set(w / k / 2, h / k / 2);
     this.combat.hits.position.copyFrom(this.reticle.position);
     this.combat.arcs.position.copyFrom(this.reticle.position);
@@ -175,8 +180,8 @@ export class PixiHud {
     s: AmmoState & HealthState,
     health: HealthFx,
     crosshair: Crosshair,
-    map: Minimap,
-    mapState: MinimapState,
+    map: Minimap | undefined,
+    mapState: MinimapState | undefined,
     opacity: number,
     models: CombatModels & FeedbackModels
   ): void {
@@ -264,7 +269,8 @@ export class PixiHud {
       this.dot.scale.set(dotScale);
       this.dot.alpha = dotAlpha;
     }
-    this.dirty = this.minimap.update(map, mapState) || this.ammo.dirty || this.dirty;
+    this.dirty =
+      (map && mapState && this.minimap?.update(map, mapState)) || this.ammo.dirty || this.dirty;
     // Controllers still advance every frame. Draw only when their presentation
     // changes, including during gameplay; time alone is not a visual change.
     if (!this.dirty) return;

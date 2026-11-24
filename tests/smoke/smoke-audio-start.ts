@@ -47,6 +47,33 @@ try {
     deleteProperty(name);
   }
 }
+// Leaving a session while the worklet loads must not build a late audio graph.
+try {
+  const worklet = Promise.withResolvers<void>();
+  const ctx = createAudioContext();
+  Object.defineProperty(ctx, 'audioWorklet', {
+    value: { addModule: (): Promise<void> => worklet.promise },
+  });
+  Object.defineProperty(globalThis, 'AudioContext', {
+    configurable: true,
+    value: class {
+      constructor() {
+        return ctx;
+      }
+    },
+  });
+  const audio = new AudioSystem();
+  const starting = audio.start();
+  audio.dispose();
+  assert.equal(ctx.state, 'closed');
+  worklet.resolve();
+  assert.equal(await starting, false);
+  assert.equal(audio.failed, false, 'deliberate teardown is not an audio startup failure');
+  assert.equal(audio.running, false);
+  assert.equal(await audio.start(), false, 'a disposed session cannot start a new graph');
+} finally {
+  deleteProperty('AudioContext');
+}
 // Shop close/disposal can precede the first offline render's completion.
 try {
   for (const action of ['stop', 'dispose'] as const) {
@@ -83,7 +110,7 @@ try {
 } finally {
   deleteProperty('OfflineAudioContext');
 }
-console.log('Audio API fallback and deferred shop-radio cancellation/restart passed');
+console.log('Audio API fallback, pending session startup and deferred shop-radio cleanup passed');
 
 function deleteProperty(name: string): void {
   Reflect.deleteProperty(globalThis, name);

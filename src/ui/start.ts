@@ -1,14 +1,79 @@
 import type { Engine } from '../core/engine.ts';
+import { PLAYABLE_MAPS } from '../core/playable-maps.ts';
+import type { PlayableMap } from '../core/playable-maps.ts';
+import { CLOCK } from '../sky/tuning.ts';
+import { MouseCapture } from './mouse-capture.ts';
+import { el } from './util.ts';
+
+function startDialog(id: string, heading: string): HTMLDialogElement {
+  const panel = document.createElement('dialog');
+  panel.id = id;
+  panel.style.cssText =
+    'margin:auto;width:min(28rem,calc(100vw - 3rem));padding:2.5rem;text-align:center;color:#dce4e7;background:#080d10f2;border:1px solid #42645e;font:16px/1.6 Inter,Arial,sans-serif';
+  const title = document.createElement('h1');
+  title.id = `${id}-title`;
+  title.textContent = heading;
+  title.style.cssText = 'font-size:1.5rem;font-weight:600;letter-spacing:.12em';
+  panel.setAttribute('aria-labelledby', title.id);
+  // Esc must not dismiss the only way into (or back into) a session.
+  panel.setAttribute('closedby', 'none');
+  panel.oncancel = (event): void => event.preventDefault();
+  panel.onkeydown = (event): void => {
+    event.stopPropagation();
+    // A held selection/restart key must not activate a newly focused button.
+    if (event.repeat && (event.key === 'Enter' || event.key === ' ')) event.preventDefault();
+  };
+  panel.onkeyup = (event): void => event.stopPropagation();
+  panel.append(title);
+  document.body.append(panel);
+  return panel;
+}
+
+function startButton(label: string, action: () => void): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.textContent = label;
+  button.style.cssText =
+    'display:block;width:100%;margin-top:.75rem;padding:.8rem;border:1px solid #65b9ab;background:#13231f;color:#e2eee9;font:inherit;letter-spacing:.12em;cursor:pointer';
+  button.onclick = action;
+  return button;
+}
+
+/** Map selection lives outside the game session so it needs no world or GPU device. */
+export class StartMenu {
+  private panel = startDialog('start-menu', 'Claude of Duty');
+  private firstChoice: HTMLButtonElement;
+
+  constructor(select: (map: PlayableMap) => void) {
+    const [firstChoice, ...otherChoices] = PLAYABLE_MAPS.map((map): HTMLButtonElement =>
+      startButton(map.label, (): void => select(map))
+    );
+    this.firstChoice = firstChoice;
+    this.panel.append(firstChoice, ...otherChoices);
+  }
+
+  show(): void {
+    this.panel.showModal();
+    this.firstChoice.focus();
+  }
+
+  hide(): void {
+    this.panel.close();
+  }
+
+  dispose(): void {
+    this.panel.remove();
+  }
+}
 
 /** Normal-play handoff only; capture pumps deliberately do not install this gate. */
 export class StartGate {
-  private panel = document.createElement('dialog');
+  private panel: HTMLDialogElement;
   private status = document.createElement('p');
-  private button = document.createElement('button');
+  private button = startButton('Start', (): void => this.requestControl());
   private waiting = true;
-  private intent = false;
   private ended = false;
-  private generation = 0;
+  private capture: MouseCapture;
   private frame = 0;
   private hiddenView = false;
   private viewVisible = true;
@@ -16,43 +81,49 @@ export class StartGate {
 
   private engine: Engine;
 
-  constructor(engine: Engine) {
+  constructor(
+    engine: Engine,
+    private readonly map: PlayableMap
+  ) {
     this.engine = engine;
-    this.panel.id = 'run-start';
-    this.panel.setAttribute('aria-labelledby', 'run-start-title');
-    this.panel.style.cssText =
-      'margin:auto;width:min(28rem,calc(100vw - 3rem));padding:2.5rem;text-align:center;color:#dce4e7;background:#080d10f2;border:1px solid #42645e;font:16px/1.6 Inter,Arial,sans-serif';
-    const title = document.createElement('h1');
-    title.id = 'run-start-title';
-    title.textContent = 'Claude of Duty';
-    title.style.cssText = 'font-size:1.5rem;font-weight:600;letter-spacing:.12em';
+    this.panel = startDialog('run-start', map.label);
     this.status.setAttribute('role', 'status');
     this.status.setAttribute('aria-live', 'polite');
     this.status.style.cssText = 'margin:1.25rem 0;color:#aabdc3';
-    this.button.type = 'button';
-    this.button.style.cssText =
-      'padding:.8rem 2.5rem;border:1px solid #65b9ab;background:#13231f;color:#e2eee9;font:inherit;letter-spacing:.12em;cursor:pointer';
-    this.button.onclick = (): void => this.requestControl();
-    this.panel.oncancel = (event): void => event.preventDefault();
-    this.panel.onkeydown = (event): void => {
-      event.stopPropagation();
-      // A held New Game key must not activate the newly focused Start button.
-      if (event.repeat && (event.key === 'Enter' || event.key === ' ')) event.preventDefault();
-    };
-    this.panel.onkeyup = (event): void => event.stopPropagation();
-    this.panel.append(title, this.status, this.button);
-    document.body.append(this.panel);
-    document.addEventListener('pointerlockchange', this.lockChanged);
-    document.addEventListener('pointerlockerror', this.lockDenied);
+    this.panel.append(this.status);
+    if (map.nightHour !== undefined) this.addTimeChoice(map.nightHour);
+    this.panel.append(this.button);
+    this.capture = new MouseCapture(engine, this.queueActivation, this.lockDenied);
     this.offError = engine.events.on('engine:error', (): void => this.end());
     this.suspend();
   }
 
+  private addTimeChoice(nightHour: number): void {
+    const group = el('fieldset', 'range-time', this.panel);
+    el('legend', null, group, 'Time of day');
+    for (const [label, hour] of [
+      ['Day', CLOCK.startHour],
+      ['Night', nightHour],
+    ] as const) {
+      const choice = el('label', null, group);
+      const radio = el('input', null, choice);
+      radio.type = 'radio';
+      radio.name = 'range-time';
+      radio.checked = label === 'Day';
+      radio.onchange = (): void => {
+        if (!radio.checked || this.ended) return;
+        const sky = this.engine.ctx.get('sky').setTimeOfDay(hour);
+        // The briefing renders, but gameplay (including world.update) is suspended.
+        this.engine.ctx.get('world').updatePracticalLights(sky.sunAltitude);
+      };
+      choice.append(label);
+    }
+  }
+
   private suspend(): void {
-    this.generation++;
+    this.capture.cancel();
     cancelAnimationFrame(this.frame);
     this.waiting = true;
-    this.intent = false;
     this.engine.setGameplaySuspended(true);
     this.engine.input.enabled = false;
     this.engine.ctx.get('player').setControlEnabled(false);
@@ -65,8 +136,8 @@ export class StartGate {
 
   ready(): void {
     if (this.ended || this.engine.error) return;
-    this.status.textContent = 'Ready when you are.';
-    this.button.textContent = 'START';
+    this.status.textContent = this.map.startIntro ?? 'Ready when you are.';
+    this.button.textContent = 'Start';
     if (!this.panel.open) this.panel.showModal();
     this.button.focus();
   }
@@ -86,37 +157,17 @@ export class StartGate {
 
   private requestControl(): void {
     if (this.ended || this.engine.error || !this.waiting) return;
-    this.intent = true;
-    const generation = ++this.generation;
+    cancelAnimationFrame(this.frame);
     this.status.textContent = 'Waiting for mouse capture. Retry if needed.';
-    this.button.textContent = 'RETRY START';
-    if (document.pointerLockElement === this.engine.canvas) {
-      this.queueActivation(); // New Game can begin with the lock already held.
-    } else {
-      try {
-        const request = this.engine.canvas.requestPointerLock();
-        request.catch((): void => {
-          if (generation === this.generation) this.lockDenied();
-        });
-      } catch {
-        this.lockDenied();
-      }
-    }
-    this.engine.input.requestFullscreen();
+    this.button.textContent = 'Retry Start';
+    this.capture.request();
   }
 
   private lockDenied = (): void => {
-    if (this.ended || this.engine.error || !this.waiting) return;
     this.status.textContent = 'Mouse capture unavailable. Select Retry Start to try again.';
   };
 
-  private lockChanged = (): void => {
-    if (document.pointerLockElement === this.engine.canvas) this.queueActivation();
-  };
-
-  private queueActivation(): void {
-    const generation = this.generation;
-    cancelAnimationFrame(this.frame);
+  private queueActivation = (): void => {
     // Never resume inside retained UI dispatch: earlier pose hooks must run on
     // the first active frame, before revealing the separate first-person scene.
     this.frame = requestAnimationFrame((): void => {
@@ -125,9 +176,7 @@ export class StartGate {
         this.engine.error ||
         !this.engine.running ||
         !this.waiting ||
-        !this.intent ||
-        generation !== this.generation ||
-        document.pointerLockElement !== this.engine.canvas
+        !this.capture.locked
       )
         return;
       this.engine.setGameplaySuspended(false); // Flush all queued/held input.
@@ -136,7 +185,7 @@ export class StartGate {
       this.waiting = false;
       this.panel.close();
     });
-  }
+  };
 
   /** UI depends on market → weapons: normal weapon pose hooks have now run. */
   afterPose(): boolean {
@@ -150,7 +199,7 @@ export class StartGate {
 
   private end(): void {
     this.ended = true;
-    this.generation++;
+    this.capture.dispose();
     cancelAnimationFrame(this.frame);
     this.panel.close();
   }
@@ -158,8 +207,6 @@ export class StartGate {
   dispose(): void {
     this.end();
     this.offError();
-    document.removeEventListener('pointerlockchange', this.lockChanged);
-    document.removeEventListener('pointerlockerror', this.lockDenied);
     this.panel.remove();
     if (this.hiddenView) this.engine.viewScene.visible = this.viewVisible;
   }

@@ -59,7 +59,8 @@ export class DecalSystem {
   vertsPerDecal: number = 36;
   cursor: number = 0;
   highWater: number = 0;
-  expireAt: number = -1;
+  expireAt: number = -Infinity;
+  private readonly slotExpiry: Float64Array;
   count: number = 0;
   // scratch (allocated once)
   _polyA: Float32Array = new Float32Array(MAX_POLY * 3);
@@ -71,6 +72,7 @@ export class DecalSystem {
   /** Capacity comes from config.q.decalBudget; cols counts atlas columns. */
   constructor(o: DecalSystemOptions) {
     this.capacity = Math.max(8, o.capacity | 0);
+    this.slotExpiry = new Float64Array(this.capacity);
     this.cols = o.cols;
     this.maxVerts = this.capacity * this.vertsPerDecal;
 
@@ -381,7 +383,15 @@ export class DecalSystem {
     if (slot < this._dirtyLo) this._dirtyLo = slot;
     if (slot > this._dirtyHi) this._dirtyHi = slot;
     if (slot + 1 > this.highWater) this.highWater = slot + 1;
-    if (birth + life > this.expireAt) this.expireAt = birth + life;
+    const previous = this.slotExpiry[slot];
+    const expires = (this.slotExpiry[slot] = birth + life);
+    if (expires >= this.expireAt) this.expireAt = expires;
+    else if (previous === this.expireAt) {
+      // Evicting the longest-lived slot can make the batch finite again.
+      this.expireAt = expires;
+      for (let i = 0; i < this.highWater; i++)
+        this.expireAt = Math.max(this.expireAt, this.slotExpiry[i]);
+    }
     this.count++;
     return wrote > 0;
   }
@@ -395,6 +405,15 @@ export class DecalSystem {
     if (flip) u = 1 - u;
     this.uvs[w * 2] = (u + tx) / cols;
     this.uvs[w * 2 + 1] = (v + ty) / cols;
+  }
+
+  clear(): void {
+    this.cursor = this.highWater = this.count = 0;
+    this._wrapped = false;
+    this._dirtyLo = Infinity;
+    this._dirtyHi = this.expireAt = -Infinity;
+    this.geometry.setDrawRange(0, 0);
+    this.mesh.visible = false;
   }
 
   flush(now: number): void {

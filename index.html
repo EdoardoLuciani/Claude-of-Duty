@@ -25,6 +25,17 @@
       #startup-detail { max-width: 40rem; margin-top: 1rem; color: #b6c3c9; overflow-wrap: anywhere; white-space: pre-wrap; font-size: .85rem; line-height: 1.5; }
       #startup-reload { margin-top: 1.5rem; padding: .7rem 1.2rem; border: 1px solid #65b9ab; background: #13231f; color: #e2eee9; font: inherit; cursor: pointer; }
       #startup-reload:focus-visible { outline: 2px solid #e2eee9; outline-offset: 4px; }
+      /* The mode chooser has no live world or GPU session behind it. */
+      #start-menu::backdrop, #startup { background: #080d10 url('images/last-light.webp') center / cover; }
+      #start-menu { box-shadow: 0 14px 80px #02080799; }
+      #start-menu::before { content: 'OPERATIONS'; color: #b7ac7e; font: 600 .65rem/1.5 monospace; letter-spacing: .22em; }
+      #start-menu button { text-align: left; }
+      #start-menu button::after { content: ''; float: right; width: .45em; height: .45em; margin: .5em .3em; border: solid #8bb4a7; border-width: 1px 1px 0 0; transform: rotate(45deg); }
+      .range-time { margin: 1.2rem auto; padding: 0; border: 0; }
+      .range-time legend { margin: 0 auto .45rem; color: #aabdc3; font-size: .8rem; letter-spacing: .09em; }
+      .range-time label { display: inline-flex; align-items: center; gap: .4rem; padding: .35rem .9rem; border: 1px solid #42645e; cursor: pointer; }
+      .range-time label:has(:checked) { background: #203e35; border-color: #65b9ab; }
+      .range-time input { margin: 0; accent-color: #65b9ab; }
       #game { display: block; width: 100vw; height: 100vh; touch-action: none; cursor: none; }
     </style>
   </head>
@@ -50,10 +61,13 @@
         const status = document.getElementById('startup-status');
         const detail = document.getElementById('startup-detail');
         const reload = document.getElementById('startup-reload');
-        const game = document.getElementById('game');
         const ui = document.getElementById('ui');
-        let active = true, failed = false;
-        game.inert = ui.inert = true;
+        let active = false, failed = false;
+        const setInert = value => {
+          const game = document.getElementById('game');
+          if (game) game.inert = value;
+          ui.inert = value;
+        };
         const block = event => {
           if (active && !panel.contains(event.target)) {
             event.preventDefault();
@@ -61,11 +75,20 @@
           }
         };
         const inputs = ['keydown', 'keyup', 'mousedown', 'mouseup', 'click', 'wheel', 'touchstart'];
-        for (const type of inputs) window.addEventListener(type, block, { capture: true, passive: false });
+        const stage = text => {
+          if (failed) return;
+          if (!active) {
+            active = true;
+            panel.hidden = false;
+            setInert(true);
+            for (const type of inputs) window.addEventListener(type, block, { capture: true, passive: false });
+          }
+          status.textContent = text;
+        };
         const dismiss = () => {
           active = false;
           panel.hidden = true;
-          game.inert = ui.inert = false;
+          setInert(false);
           for (const type of inputs) window.removeEventListener(type, block, true);
           document.removeEventListener('error', entryError, true);
         };
@@ -88,8 +111,9 @@
         panel.addEventListener('keydown', event => event.stopPropagation());
         panel.addEventListener('keyup', event => event.stopPropagation());
         reload.onclick = () => location.reload();
+        stage('Initializing…');
         window.__STARTUP__ = {
-          stage: text => { if (active && !failed) status.textContent = text; },
+          stage,
           complete: () => { if (!failed) dismiss(); },
           terminal: dismiss,
           fail,

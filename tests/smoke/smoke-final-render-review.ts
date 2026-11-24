@@ -33,7 +33,7 @@ try {
     dispose: captureMethod(Engine.prototype, 'dispose'),
     stop(): void {},
     _onResize(): void {},
-    input: fixture<Engine['input']>({ detach(): void {} }),
+    input: fixture<Engine['input']>({ async detach(): Promise<void> {} }),
     events: fixture<Engine['events']>({
       clear(): void {
         order.push('events');

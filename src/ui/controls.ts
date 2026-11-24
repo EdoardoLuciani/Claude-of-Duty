@@ -49,7 +49,7 @@ export const CONTROL_SECTIONS: ControlSection[] = [
   {
     title: 'Equipment & interaction',
     controls: [
-      quick(['use'], 'Interact (hold): ammo 0.45s / aimed intel 4s'),
+      quick(['use'], 'Interact (hold): ammo 0.45s / aimed intel 4s · market counter (press)'),
       quick(['flashlight'], 'Flashlight (toggle)'),
       quick(['laser'], 'Mounted weapon laser (toggle; weapon out)'),
       quick(['heal'], 'Bandage (hold 3s)'),

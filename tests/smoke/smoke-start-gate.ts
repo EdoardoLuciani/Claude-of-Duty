@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 
+import { DEFAULT_PLAYABLE_MAP, PLAYABLE_MAPS } from '../../src/core/playable-maps.ts';
+import type { PlayableMap } from '../../src/core/playable-maps.ts';
 import { PlayerSystem } from '../../src/player/index.ts';
-import { StartGate } from '../../src/ui/start.ts';
+import { StartGate, StartMenu } from '../../src/ui/start.ts';
 import { createTestContext } from '../lib/context.ts';
 import { createCoreFixture } from '../lib/core-fixture.ts';
 import { fixture } from '../lib/fixture.ts';
@@ -31,6 +33,7 @@ function createElement(tag: string): HTMLElement;
 function createElement(tag: string): HTMLElement {
   const members = {
     style: fixture<CSSStyleDeclaration>({}),
+    textContent: '',
     onclick: null,
     setAttribute(): void {},
     append(): void {},
@@ -75,6 +78,9 @@ globalThis.document = fixture<Document>({
   },
   createElement,
   fullscreenEnabled: false,
+  exitPointerLock(): void {
+    pointerLockElement = null;
+  },
   body: fixture<HTMLElement>({ append(): void {} }),
   addEventListener(type: string, fn: EventListenerOrEventListenerObject | null): void {
     if (fn) listeners.set(type, fn);
@@ -121,7 +127,7 @@ function createStartFixture(visible = true): {
     assert.equal(engine.viewScene.visible, false);
     order.push('reset');
   });
-  const gate = new StartGate(engine);
+  const gate = new StartGate(engine, DEFAULT_PLAYABLE_MAP);
   gate.ready();
   const button = [...elements]
     .reverse()
@@ -141,6 +147,19 @@ function createStartFixture(visible = true): {
   };
   return { engine, gate, click, lock, fail, order };
 }
+const selected: PlayableMap[] = [];
+const menu = new StartMenu((map): void => {
+  selected.push(map);
+});
+menu.show();
+for (const map of PLAYABLE_MAPS) {
+  const button = elements.find((node): boolean => node.textContent === map.label);
+  assert(button?.onclick);
+  button.onclick(fixture<PointerEvent>({}));
+}
+assert.deepEqual(selected, PLAYABLE_MAPS);
+menu.dispose();
+
 let f = createStartFixture();
 assert.equal(f.engine.viewScene.visible, false);
 assert.equal(f.gate.afterPose(), false);
@@ -209,6 +228,16 @@ f.engine._running = false;
 flush();
 assert.equal(f.engine.gameplaySuspended, true, 'stopped/disposal loop cannot activate');
 f.gate.dispose();
+f = createStartFixture();
+const lateRequest = Promise.withResolvers<void>();
+f.engine.canvas.requestPointerLock = (): Promise<void> => lateRequest.promise;
+f.click();
+f.gate.dispose();
+pointerLockElement = f.engine.canvas;
+lateRequest.resolve();
+await lateRequest.promise;
+assert.equal(pointerLockElement, null, 'release a lock acquired after Start was disposed');
+assert.equal(f.engine.gameplaySuspended, true);
 console.log(
-  'smoke-start-gate: ok (intent, actual lock, retry, frame boundary, reset, pose, terminal, teardown)'
+  'smoke-start-gate: ok (map chooser, intent, actual lock, retry, reset, pose, terminal, teardown)'
 );

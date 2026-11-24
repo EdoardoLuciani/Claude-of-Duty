@@ -1,11 +1,13 @@
-/** Between-wave credits and shop sessions.
+/** Market credits and shop sessions.
  * Score deltas fund credits 1:1; intel credits are independent. Purchases do not alter score.
- * A wave clear starts the looting grace period, then one shop session freezes scaled time.
+ * The session mode sets starting credits. A wave clear starts the looting grace period,
+ * then opens one shop session; the market overlay owns the gameplay pause.
  * HUD snapshots are pooled; copy rather than retain them.
  */
 
 import type { SystemId, EngineContext } from '../core/context.ts';
 import type { EngineEventMap } from '../core/events.ts';
+import { SESSION_MODE_POLICY } from '../core/playable-maps.ts';
 import type { Health } from '../player/health.ts';
 import type { PlayerSystem } from '../player/index.ts';
 import {
@@ -228,15 +230,13 @@ export class MarketSystem {
     })),
   };
   _off: Array<() => void> = [];
-  declare _prevScale: number;
-  declare _prevControl: boolean;
 
   async init(ctx: EngineContext): Promise<void> {
     this.ctx = ctx;
     this.weapons = ctx.get('weapons');
     this.player = ctx.get('player');
     this.health = this.player.health;
-    this.credits = 0;
+    this.credits = SESSION_MODE_POLICY[ctx.config.mode].startingCredits;
     /** When the shop should open (ctx.time.elapsed), 0 when not pending. */
     this._marketAt = 0;
     this._pendingWave = 0;
@@ -268,7 +268,7 @@ export class MarketSystem {
     if (itemId === 'grenade') return this.weapons.grenades;
     if (itemId === 'armour') return this.health.armour;
     if (itemId === 'bandage') return this.player.bandages;
-    if (itemId === 'ammo') return Math.round(this.weapons.ammoFraction() * 100);
+    if (itemId === 'ammo') return Math.floor(this.weapons.ammoFraction() * 100);
     if (itemId === 'carpet') return this.weapons.carpetBombs;
     return this.weapons.owns(itemId) ? 1 : 0;
   }
@@ -285,24 +285,18 @@ export class MarketSystem {
     }
   }
 
-  /** Freeze the run and open the shop. `wave` is the wave just cleared. */
+  /** Open a shop session; `wave` is the wave just cleared, 0 at a counter. */
   openShop(wave = 0): void {
     if (this.open) return;
     this.open = true;
-    this._prevScale = this.ctx.time.scale;
-    this._prevControl = this.player.controlEnabled;
-    this.ctx.time.scale = 0;
-    this.player.setControlEnabled(false);
     this.ctx.events.emit('market:open', { wave });
   }
 
-  /** Resume the run. The wave countdown continues where it froze. */
+  /** End the session. The wave countdown continues where the pause froze it. */
   closeShop(): void {
     this.cancelBuild();
     if (!this.open) return;
     this.open = false;
-    this.ctx.time.scale = this._prevScale;
-    this.player.setControlEnabled(this._prevControl);
     this.ctx.events.emit('market:close', {});
   }
 
@@ -329,7 +323,7 @@ export class MarketSystem {
     return true;
   }
 
-  setBuild(config: AttachmentConfig): boolean {
+  setBuild(config: unknown): boolean {
     if (!this.open || !this._pending || !isAttachmentConfig(config, this._pending.id)) return false;
     this._pending.config = Object.freeze({ ...config });
     return true;
@@ -414,10 +408,10 @@ export class MarketSystem {
   }
 
   reset(): void {
-    this.credits = 0;
+    this.credits = SESSION_MODE_POLICY[this.ctx.config.mode].startingCredits;
     this._marketAt = 0;
     this._pendingWave = 0;
-    this.closeShop(); // restores time.scale even if a session was open
+    this.closeShop();
   }
 
   dispose(): void {

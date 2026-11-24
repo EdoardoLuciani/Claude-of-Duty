@@ -40,11 +40,22 @@ A leading `_` marks a member internal to its subsystem: files in the same direct
 | `fx`                                               | Particles, impacts, decals, tracers, blood, shells          |
 | `ai`                                               | Soldiers, squads, navigation, perception, waves             |
 | `game`                                             | Survival state, score/rewards, HUD threat cues              |
-| `market`                                           | Between-wave shop/economy                                   |
+| `market`                                           | Loadout catalog, between-wave shop/economy                  |
 | `intel`                                            | Cache spawning, interaction and credits                     |
+| `range`                                            | Practice counter and parkour circuit                        |
 | `radio`                                            | Strike, bomber, bombs, blast chain                          |
 | `ui`                                               | HUD, menus, overlays                                        |
 | `audio`                                            | Recordings/synthesis, spatialization, occlusion             |
+
+Training Grounds loads a separate authored world. Its session registers the same player, physics,
+weapons, FX, radio and market systems, without the Survival director or intel. The firing-line
+counter opens the same Supply Market with an unlimited session balance. In both modes the
+market overlay suspends gameplay and waits for pointer lock before resuming it.
+Target marks keep the primary resolved world-impact decals. Grenades and radio strikes use the
+shared blast damage, cover, armour and healing rules in both modes. The range system enables
+counter and circuit interactions in any session mode when the manifest includes those markers.
+It tracks movement and player bullet impacts on labeled faces and publishes prompts to the HUD,
+independently of free practice and Survival scoring.
 
 Each system declares `static id`, `static deps`, and implements needed hooks:
 `async init(ctx)`, `fixedUpdate(h, ctx)` (120 Hz), `update(dt, ctx)`,
@@ -58,6 +69,21 @@ failure-isolated.
 `src/core/context.ts` owns the provider-keyed `EngineContext`; subsystem types come
 from their implementations, not handwritten consumer APIs. `Engine.add()` and
 `registry.add(id, instance)` check the ID/instance pairing against that map.
+
+The Start menu selects a map from `src/core/playable-maps.ts` before the engine
+initializes. The entry's session mode sets `config.mode`; read mode differences from
+`SESSION_MODE_POLICY` (Survival systems, starting credits, fixed clock), never from
+the mode name. Map-specific behavior follows the loaded manifest's markers. The
+manifest records its map ID, and the loader rejects a mismatched bundle. Each entry creates an
+independent session; returning from Pause tears down its engine, input, renderer
+and HUD, releases its browser input locks and exits session-requested fullscreen before exposing the map choices again. Look sensitivity, field of view, invert Y,
+and firing shake carry across map changes in the same document, independent of gameplay state.
+The selected map's Start handoff
+can show a short orientation. Maps with a catalog night hour offer a Day or Night preview:
+the briefing sets the sky and refreshes the manifest practicals while gameplay is suspended.
+The clock advances only if the session mode allows it. The handoff waits for a rendered frame and an explicit
+pointer-lock gesture before unfreezing gameplay. Capture bypasses the menu and
+handoff and defaults to Survival.
 
 `src/core/bindings.ts` owns default bindings, action IDs and labels. Input snapshots
 actions; gameplay consumers own their state machines. `src/ui/controls.ts` builds the
@@ -92,7 +118,7 @@ correlated name/payload tuple. Semantics the types don't capture:
 - Each new run starts with a scaled-time countdown to wave 1. Waiting at Start
   and pausing freeze it. The opening countdown does not emit `wave:complete`.
 - A wave clear starts an ammo-looting grace period. The shop opens halfway through
-  the wave countdown and freezes scaled time until dismissed; the remaining countdown
+  the wave countdown and suspends gameplay until dismissed; the remaining countdown
   gives players time to prepare for the next wave.
 - `ai:footstep` is one boot per animated stride plant; cull by distance.
   `ai:bark` requests contact on visual acquisition, reload on reload start, or a
@@ -162,12 +188,20 @@ shelves, counters, and workbenches use offsets from their support. See the
 [world editing map](tools/worldgen/README.md). `bun tools/export-world.ts` builds meshes
 and cooks collision with meshoptimizer from canonical instance buckets. Visual-only
 coalescing may join whole non-distance-LOD buckets within a bounded X/Z span
-independent of the canonical grid. It never changes collision or navigation inputs.
+independent of the canonical grid. Authored prop prototypes can also opt into
+their palette's static visual batch. Both leave collision and navigation inputs unchanged.
 Pieces marked visual-only at assembly do not enter the collision or navigation bake,
 including when they share a material batch with solid pieces.
 A prototype's optional `visualGeo` is visual only; support, collision and navigation
-use canonical `geo`, topology and RNG/instance inputs. Manifest v2 and content-hashed GLBs are generated into ignored
-`public/models/world/`. Preserve instancing/masks; never author separate collision
+use canonical `geo`, topology and RNG/instance inputs. Paint-only batches do not contribute
+collision. Map builders return authored metadata; the exporter adds the common manifest
+header and validates the content-hashed products for each playable map. Survival keeps the
+root `public/models/world/` bundle and Training Grounds uses `public/models/world/training/`.
+`ModelSystem` verifies map identity before loading bundle assets. Survival-mode bundles bake
+navigation, and `ModelSystem` includes it in the prefetched world when the manifest lists it.
+Optional world-space range station and target-face markers come from the loaded manifest via
+`WorldQueries`; runtime range and FX code do not import
+authoring coordinates. Preserve instancing/masks; never author separate collision
 geometry. Validate with `bun tools/export-world.ts --check`, world/physics tests and screenshots.
 
 ## AI physical planning
@@ -233,9 +267,9 @@ Zero intensity is not zero shader work. Stable sky proxies carry sun/moon values
 without changing shader IDs/CSM ownership; source lights are hidden.
 Sky is required: render borrows its pre-init direction and renders only after sky
 initialization; a zero-intensity sky stays dark. Borrow `sky.keyDirection` for
-lighting. The clock (`src/sky/tuning.ts`) freezes in deterministic captures, on
+lighting. The clock (`src/sky/tuning.ts`) freezes in Training, in deterministic captures, on
 death and with paused time; `sky.setTimeOfDay()` sets it. Sun/moon changes
-invalidate environment bakes. The one-off streetlight outage (`src/world/lighting.ts`)
+invalidate environment bakes. The Survival-only streetlight outage (`src/world/lighting.ts`)
 spares interiors and resets on restart; deterministic captures use
 `world.setStreetlightPower()`.
 
@@ -354,8 +388,8 @@ resolution without importing weapon loading or mounting. `src/weapons/attachment
 owns asset loading and the shared gameplay/inspection mount solver.
 `src/market/attachments.ts` owns prices, not compatibility. Market holds one
 unconfirmed build; selecting, inspecting or editing never changes gameplay or credits.
-Confirmation rechecks credits, shop state and asset readiness, then calls
-`weapons.applyBuild()` before charging. New weapons are configured before replacing
+Confirmation rechecks credits, shop state and asset readiness, applies
+`weapons.applyBuild()` and charges the quoted total only after the build succeeds. New weapons are configured before replacing
 ownership, so a rejected build never drops the old gun.
 
 `WeaponDef.fits` is a per-slot partial record keyed by attachment ID: each entry
@@ -429,8 +463,10 @@ with slot groups. Bone order must match `RIG.createSkeleton()`; mismatches fail 
 AI owns the soldier texture arrays and finish lookup textures.
 
 FX atlases (`tools/lib/fx-atlas.ts`) and recorded audio are required: missing
-atlases reject FX init, and recording failures disable the audio graph. Gameplay
-sound (firearms, impacts, foley, explosions, aircraft, callouts) is recorded;
+atlases reject FX init, and failures loading a session's required recordings disable its audio graph.
+Enemy callout recordings are loaded only when the session enables enemy AI. The same shop
+music plays at practice counters and between waves. Gameplay sound (firearms, impacts, foley,
+explosions, aircraft, callouts) is recorded;
 synthesis is only UI/electronic feedback, healing cues, tinnitus and shop music.
 Requests without a matching recording stay silent. Explosions carry optional
 `kind: 'grenade' | 'bomb'` (default grenade). Radio owns aircraft lifetime; audio

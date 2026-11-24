@@ -83,6 +83,7 @@ const DEFAULTS = {
   // 'high' balances GPU cost; 'ultra' retains an extra shadow cascade and
   // larger particle/decal budgets, one click away.
   quality: 'high' as const,
+  mode: 'survival' as const,
   fov: 80, // horizontal-ish vertical FOV, CoD default feel
   // ADS magnification: hip 80 deg -> 49.6 deg while aiming = 1.61x, in line
   // with what a modern CoD shows behind the sight (its ADS lands near 48 deg).
@@ -100,8 +101,9 @@ const DEFAULTS = {
 
 type QualityName = keyof typeof QUALITY_PRESETS;
 type QualityPreset = (typeof QUALITY_PRESETS)[QualityName];
-export interface RuntimeConfig extends Omit<typeof DEFAULTS, 'quality'> {
+export interface RuntimeConfig extends Omit<typeof DEFAULTS, 'quality' | 'mode'> {
   quality: QualityName;
+  mode: 'survival' | 'training';
   q: QualityPreset;
 }
 

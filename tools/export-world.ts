@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-/** Compile the authoritative JS world and cook meshoptimizer collision. */
+/** Compile the authored worlds and cook meshoptimizer collision. */
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
@@ -18,17 +18,17 @@ import { gzipSync } from 'node:zlib';
 
 import * as THREE from 'three';
 
-import { buildWorld } from '#worldgen/build';
 import { Assembler } from '#worldgen/builder';
-import { worldMetadata } from '#worldgen/metadata';
 import { bakeNav } from '#worldgen/nav-bake';
 
 import { NAV_VERSION } from '../src/ai/nav-format.ts';
 import { isRecord } from '../src/core/guards.ts';
+import { PLAYABLE_MAPS, SESSION_MODE_POLICY } from '../src/core/playable-maps.ts';
+import type { PlayableMap } from '../src/core/playable-maps.ts';
 import type { MaterialOptions } from '../src/materials/index.ts';
 import { exportGlb } from './lib/export-glb.ts';
-import { LEVEL_TX, LEVEL_TZ, LEVEL_YAW } from './worldgen/level/config.ts';
 import { buildCollision } from './worldgen/pack.ts';
+import { PLAYABLE_MAP_BUILDERS } from './worldgen/playable-builds.ts';
 import { worldSourceHash } from './worldgen/source-hash.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -112,27 +112,31 @@ function assetName(kind: string, data: Uint8Array, ext = 'glb.gz'): string {
   return `level-${kind}.${hash}.${ext}`;
 }
 
-function cacheReady(): boolean {
+function cacheReady(out: string, map: PlayableMap, sourceHash: string): boolean {
   if (args.force || args.check) return false;
   try {
-    const manifest: unknown = JSON.parse(readFileSync(join(OUT, 'level.json'), 'utf8'));
+    const manifest: unknown = JSON.parse(readFileSync(join(out, 'level.json'), 'utf8'));
     if (
       !isRecord(manifest) ||
-      manifest.sourceHash !== worldSourceHash(ROOT) ||
+      manifest.sourceHash !== sourceHash ||
+      manifest.mapId !== map.id ||
       !isRecord(manifest.assets)
     )
       return false;
-    const assets = manifest.assets;
-    return ['visual', 'collision', 'nav'].every((kind): boolean => {
-      const file = assets[kind];
-      return typeof file === 'string' && existsSync(join(OUT, file));
-    });
+    // The compiler decides which assets a map has; the validator below checks that set.
+    return Object.values(manifest.assets).every(
+      (file): boolean => typeof file === 'string' && existsSync(join(out, file))
+    );
   } catch {
     return false;
   }
 }
 
-async function compileWorld(): Promise<void> {
+async function compileWorld(
+  out: string,
+  map: (typeof PLAYABLE_MAPS)[number],
+  sourceHash: string
+): Promise<void> {
   const started = performance.now();
   const materialCache = new Map<string, THREE.MeshStandardMaterial>();
   const materials = {
@@ -149,8 +153,7 @@ async function compileWorld(): Promise<void> {
   const A = new Assembler({ materials });
 
   try {
-    A.setTransform(LEVEL_YAW, LEVEL_TX, LEVEL_TZ);
-    const buildings = buildWorld(A);
+    const metadata = PLAYABLE_MAP_BUILDERS[map.id](A);
     const visualRoot = new THREE.Group();
     visualRoot.name = 'world';
     // Keep collision/nav on the canonical buckets, independent of visual compaction.
@@ -170,25 +173,29 @@ async function compileWorld(): Promise<void> {
     const visualFile = assetName('visual', visualGzip);
     const collisionFile = assetName('collision', collisionGzip);
     const stats = { ...A.stats, collideTris: collision.collideTris };
-    const metadata = worldMetadata(A, buildings, worldSourceHash(ROOT));
-    const navBounds = new THREE.Box3(
-      new THREE.Vector3().fromArray(metadata.bounds.min),
-      new THREE.Vector3().fromArray(metadata.bounds.max)
-    );
-    const nav = await bakeNav(
-      collision.scene,
-      navBounds,
-      { sourceHash: metadata.sourceHash, collisionAsset: collisionFile },
-      metadata.volumes
-    );
-    const navGzip = gzipSync(Buffer.from(nav.buffer), { level: 9 });
-    const navFile = assetName('nav', navGzip, 'bin.gz');
+    const nav = SESSION_MODE_POLICY[map.mode].survivalSystems
+      ? await bakeNav(
+          collision.scene,
+          new THREE.Box3(
+            new THREE.Vector3().fromArray(metadata.bounds.min),
+            new THREE.Vector3().fromArray(metadata.bounds.max)
+          ),
+          { sourceHash, collisionAsset: collisionFile },
+          metadata.volumes
+        )
+      : undefined;
+    const navGzip = nav && gzipSync(Buffer.from(nav.buffer), { level: 9 });
+    const navFile = navGzip && assetName('nav', navGzip, 'bin.gz');
     const manifestData =
       JSON.stringify(
         {
+          version: 2,
+          coordinateSystem: 'three-y-up-metres',
+          sourceHash,
           ...metadata,
+          mapId: map.id,
           assets: { visual: visualFile, collision: collisionFile, nav: navFile },
-          navigation: {
+          navigation: nav && {
             version: NAV_VERSION,
             sha256: createHash('sha256').update(nav.buffer).digest('hex'),
             polygons: nav.polygons,
@@ -201,43 +208,35 @@ async function compileWorld(): Promise<void> {
         2
       ) + '\n';
 
-    if (args.check) {
-      const expected: Array<[string, Buffer]> = [
-        [join(OUT, visualFile), visualGzip],
-        [join(OUT, collisionFile), collisionGzip],
-        [join(OUT, navFile), navGzip],
-        [join(OUT, 'level.json'), Buffer.from(manifestData)],
-      ];
-      for (const [file, data] of expected) {
-        if (!existsSync(file) || !readFileSync(file).equals(data)) {
-          throw new Error(`[world] generated asset is stale: ${file}`);
-        }
-      }
-    } else {
-      mkdirSync(OUT, { recursive: true });
-      writeAtomic(join(OUT, visualFile), visualGzip);
-      writeAtomic(join(OUT, collisionFile), collisionGzip);
-      writeAtomic(join(OUT, navFile), navGzip);
-      writeAtomic(join(OUT, 'level.json'), manifestData);
-      for (const file of readdirSync(OUT)) {
-        if (
-          /^level-(visual|collision)\./.test(file) &&
-          file !== visualFile &&
-          file !== collisionFile
-        ) {
-          rmSync(join(OUT, file));
-        }
-        if (file.startsWith('level-nav.') && file !== navFile) rmSync(join(OUT, file));
+    const products = new Map<string, Buffer>([
+      [visualFile, visualGzip],
+      [collisionFile, collisionGzip],
+    ]);
+    if (navFile && navGzip) products.set(navFile, navGzip);
+    // Publish the manifest last, once all its content-addressed assets exist.
+    products.set('level.json', Buffer.from(manifestData));
+    for (const [name, bytes] of products) {
+      const file = join(out, name);
+      if (!args.check) writeAtomic(file, bytes);
+      else if (!existsSync(file) || !readFileSync(file).equals(bytes))
+        throw new Error(`[world] generated asset is stale: ${file}`);
+    }
+    if (!args.check) {
+      for (const file of readdirSync(out)) {
+        if (/^level-(visual|collision|nav)\./.test(file) && !products.has(file))
+          rmSync(join(out, file));
       }
     }
 
     console.log(
-      `[world] ${args.check ? 'verified' : 'exported'} ${stats.drawCalls} draws / ${stats.instances} instances, ` +
+      `[world] ${args.check ? 'verified' : 'exported'} ${map.label}: ` +
+        `${stats.drawCalls} draws / ${stats.instances} instances, ` +
         `${stats.collideTris} collision tris, ${(visualGzip.length / 1048576).toFixed(1)} + ` +
-        `${(collisionGzip.length / 1048576).toFixed(1)} MiB, nav ${nav.polygons} polygons / ` +
-        `${nav.components} components / ${nav.coverCount} cover (bvh ${nav.bvhMs.toFixed(0)}ms + ` +
-        `bake ${nav.bakeMs.toFixed(0)}ms) in ` +
-        `${(performance.now() - started).toFixed(0)}ms`
+        `${(collisionGzip.length / 1048576).toFixed(1)} MiB` +
+        (nav
+          ? `, nav ${nav.polygons} polygons / ${nav.components} components / ${nav.coverCount} cover`
+          : '') +
+        ` in ${(performance.now() - started).toFixed(0)}ms`
     );
   } finally {
     A.dispose();
@@ -246,10 +245,19 @@ async function compileWorld(): Promise<void> {
 }
 
 await withLock(async (): Promise<void> => {
-  if (cacheReady()) console.log('[world] up to date');
-  else await compileWorld();
-  await run(process.execPath, [
-    resolve(ROOT, 'tools/validate-world-assets.ts'),
-    `--manifest=${join(OUT, 'level.json')}`,
-  ]);
+  const sourceHash = worldSourceHash(ROOT);
+  for (const map of PLAYABLE_MAPS) {
+    const out = join(OUT, map.bundleDirectory);
+    if (cacheReady(out, map, sourceHash)) console.log(`[world] up to date: ${map.label}`);
+    else await compileWorld(out, map, sourceHash);
+  }
+  await Promise.all(
+    PLAYABLE_MAPS.map((map): Promise<void> =>
+      run(process.execPath, [
+        resolve(ROOT, 'tools/validate-world-assets.ts'),
+        `--manifest=${join(OUT, map.bundleDirectory, 'level.json')}`,
+        `--map=${map.id}`,
+      ])
+    )
+  );
 });

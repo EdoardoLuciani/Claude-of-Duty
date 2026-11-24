@@ -6,7 +6,7 @@
 
 Claude of Duty is a first-person survival shooter. Scout the market district before the first
 wave, then hold out against increasingly tough squads. Spend the credits you earn between waves
-on supplies, new weapons, and attachments. No download. Just open the game and hit **Start**.
+on supplies, new weapons, and attachments. Or choose **Training Grounds** to try a build for free.
 
 ![First-person view of the player firing a rifle down a sunlit market street](docs/screenshots/market-firefight.webp)
 
@@ -17,9 +17,21 @@ on supplies, new weapons, and attachments. No download. Just open the game and h
 ## How to play
 
 Use a desktop browser and device with **WebGPU** support. No installation is needed.
-Open the game, let it load, and click **Start** to capture your mouse. If capture is denied,
-click **Retry Start**. The **Start** and **Resume** buttons also request fullscreen with keyboard
-lock where supported; fullscreen is not required to play.
+Choose **Survival** or **Training Grounds** from the Start menu. Once the level loads, click
+**Start** to capture your mouse. If capture is denied, click **Retry Start**. The **Start** and
+**Resume** buttons also request fullscreen with keyboard lock where supported; fullscreen is not
+required to play.
+
+In the Training briefing, choose **Day** or **Night** to preview the range before starting. The selected time stays fixed. At night the firing line and ladder have work lights; the distant targets are unlit. Press **F** for your flashlight.
+
+At the Training Grounds firing line, press **T** to open the Supply Market at the
+issue counter. Unlimited training credits buy builds and supplies at normal market prices; you can also clear the
+target marks. Use **R** to reload. The marked firing lanes run straight ahead from the pavilion. In the yard on the left, vault the start hurdle to begin a parkour circuit; an on-screen prompt shows each next move, and vaulting the hurdle again restarts it. The grenade bay is on the right; equip a grenade with **G**, then hold and release the left
+button for a long throw or the right for a short one. Press **X** to equip the field radio and
+**Enter** to request the selected strike. Buy more strike charges at the issue counter.
+Grenades and bombing runs can wound or kill you here just as in Survival. Hold **H** to bandage a wound; after a lethal hit, choose **New Game** to return to the firing line.
+Range builds and charges never carry over to Survival.
+Use **Esc → Return to Start Menu** to choose another session without reloading. Look sensitivity, field of view, invert Y, and firing shake carry over.
 
 | Controls                  | Action                                  |
 | ------------------------- | --------------------------------------- |

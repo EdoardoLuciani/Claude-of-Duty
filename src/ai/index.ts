@@ -596,14 +596,15 @@ export class AiSystem {
   async _buildNav(): Promise<void> {
     const phys = this.phys,
       models = this.ctx.peek('models');
-    if (!models?.worldNav) throw new Error('[ai] missing cooked collision/navigation');
+    if (!models) throw new Error('[ai] missing cooked collision/navigation');
+    const { meta, navBytes } = await models.worldPrefetch;
+    if (!navBytes) throw new Error('[ai] missing cooked collision/navigation');
     if (phys.staticWorld.dirty) phys.rebuildStatic();
     if (phys.triangleCount <= 0) throw new Error('[ai] no collision for navigation');
-    const { meta } = await models.worldPrefetch;
     if (meta.navigation?.version !== NAV_VERSION || !/^[a-f0-9]{64}$/.test(meta.navigation.sha256))
       throw new Error('[ai] missing navigation binding');
     const t0 = performance.now();
-    const nav = await SurfaceNav.load(models.worldNav, phys, {
+    const nav = await SurfaceNav.load(navBytes, phys, {
       ladders: createLadderDescriptors(meta.volumes ?? []),
       sha256: meta.navigation.sha256,
       sourceHash: meta.sourceHash,

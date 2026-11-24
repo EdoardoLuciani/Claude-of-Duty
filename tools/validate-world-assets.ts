@@ -12,6 +12,11 @@ import { unpackNav, NAV_VERSION } from '../src/ai/nav-format.ts';
 import { isRecord } from '../src/core/guards.ts';
 import { parseWorldManifest } from '../src/core/model-metadata.ts';
 import type { WorldLadder, WorldManifest } from '../src/core/model-metadata.ts';
+import {
+  DEFAULT_PLAYABLE_MAP,
+  PLAYABLE_MAPS,
+  SESSION_MODE_POLICY,
+} from '../src/core/playable-maps.ts';
 import { SURFACE_NAMES } from '../src/physics/surfaces.ts';
 import { PALETTE } from '../src/world/palette.ts';
 import { worldSourceHash } from './worldgen/source-hash.ts';
@@ -341,14 +346,21 @@ function requireUnique(ids: unknown[], label: string): void {
   });
 }
 
+const mapId = args.map ?? meta?.mapId ?? DEFAULT_PLAYABLE_MAP.id;
+const map = PLAYABLE_MAPS.find((entry): boolean => entry.id === mapId);
+const survival = !!map && SESSION_MODE_POLICY[map.mode].survivalSystems;
 if (meta) {
+  if (!map) fail(`unknown playable map ID ${describe(mapId)}`);
+  else if (meta.mapId !== map.id) fail(`manifest map ID does not match ${map.id}`);
   const { bounds, WORLD, spawns, lights, volumes, query } = meta;
   for (let i = 0; i < 3; i++) {
     if (bounds.min[i] > bounds.max[i]) fail(`manifest bounds are inverted on axis ${i}`);
   }
   const intel = WORLD?.MARKERS?.INTEL ?? [];
-  if (intel.length !== 14)
-    fail(`WORLD.MARKERS.INTEL must contain 14 authored points, found ${intel.length}`);
+  // Intel exists only alongside the survival systems that consume it.
+  const intelCount = survival ? 14 : 0;
+  if (map && intel.length !== intelCount)
+    fail(`WORLD.MARKERS.INTEL must contain ${intelCount} authored points, found ${intel.length}`);
   requireUnique(
     intel.map((marker): string => marker.id),
     'intel marker'
@@ -369,7 +381,7 @@ if (meta) {
       fail(`manifest.lights[${index}] has invalid kind`);
   });
   if (!volumes) fail('manifest.volumes must be an array');
-  if (!query?.street) fail('manifest.query.street is invalid');
+  if (survival && !query?.street) fail('manifest.query.street is invalid');
   if (!query?.alleys) fail('manifest.query.alleys must be an array');
 }
 
@@ -453,7 +465,7 @@ async function parseNavGzip(
 
 const visualAsset = parseGlbGzip(resolveAsset('visual'), 'visual');
 const collisionAsset = parseGlbGzip(resolveAsset('collision'), 'collision');
-const navAsset = await parseNavGzip(resolveAsset('nav'));
+const navAsset = survival ? await parseNavGzip(resolveAsset('nav')) : null;
 const visual = inspectVisual(visualAsset);
 const collision = inspectCollision(collisionAsset);
 const actual = visual && collision ? { ...visual, collideTris: collision.collideTris } : null;

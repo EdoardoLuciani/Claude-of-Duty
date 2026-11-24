@@ -147,8 +147,8 @@ export const BOX_SOFT = (A: GeometrySink): THREE.BufferGeometry =>
 /** 12-tri box for thin members (see util.plainBox). */
 export const BOX_THIN = (A: GeometrySink): THREE.BufferGeometry =>
   A.cache('box:plain', (): THREE.BufferGeometry => plainBox());
-/** Single quad for glass panes. */
-const PANE = (A: GeometrySink): THREE.BufferGeometry =>
+/** Single unit quad for glass panes and painted markings. */
+export const PANE = (A: GeometrySink): THREE.BufferGeometry =>
   A.cache('pane', (): THREE.BufferGeometry => quad(1, 1));
 /**
  * Centimetre-rounded size for cache keys. Cached shapes are built from the

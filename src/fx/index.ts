@@ -45,6 +45,7 @@ export type FxDecalOptions = Partial<
   Omit<DecalOptions, 'point' | 'normal' | 'world' | 'now' | 'mask'>
 > & {
   noFallback?: boolean;
+  primaryImpact?: boolean;
 };
 interface FxTargetFrame {
   point: THREE.Vector3;
@@ -527,6 +528,11 @@ export class FxSystem {
     explode(this, e);
   }
 
+  /** Clear every projected impact decal; weapon state is untouched. */
+  clearDecals(): void {
+    this.decals.clear();
+  }
+
   /** Eject a casing or spent shotgun hull as a pooled physics body. */
   spawnShell(position: THREE.Vector3, velocity: THREE.Vector3, opts: ShellOptions = {}): void {
     this.now = this.ctx.time.elapsed;
@@ -547,6 +553,12 @@ export class FxSystem {
     o.tile = opts.tile ?? 0;
     o.roll = opts.roll ?? this.rng.float() * Math.PI * 2;
     o.life = opts.life ?? 60;
+    // Use the ordinary projected impact (not a second ray from the camera).
+    // Keep the primary mark readable downrange until reset or budget eviction.
+    if (opts.primaryImpact && this.ctx.peek('world')?.queries.rangeTargetAt(point, normal)) {
+      o.life = Infinity;
+      o.size = Math.max(o.size, 0.18);
+    }
     o.fade = opts.fade ?? 0.72;
     o.opacity = opts.opacity ?? 1;
     o.maxAngle = opts.maxAngle ?? 62;

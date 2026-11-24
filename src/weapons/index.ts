@@ -1088,8 +1088,15 @@ export class WeaponSystem {
     }
   }
 
-  _onClipEvent(name: string, clipName: string): void {
+  private chamberFromMagazine(onlyWhileCycling = false): void {
     const s = this.state;
+    if (s && !s.chambered && s.mag > 0 && (!onlyWhileCycling || this.cycling)) {
+      s.mag--;
+      s.chambered = true;
+    }
+  }
+
+  _onClipEvent(name: string, clipName: string): void {
     const isReload = clipName === 'reloadTac' || clipName === 'reloadEmpty';
     switch (name) {
       case 'start':
@@ -1129,10 +1136,7 @@ export class WeaponSystem {
         this._queueShell(0);
         break;
       case 'chamber':
-        if (s && !s.chambered && s.mag > 0) {
-          s.mag--;
-          s.chambered = true;
-        }
+        this.chamberFromMagazine();
         break;
       case 'grenade:release':
         this._releaseGrenade();
@@ -1872,10 +1876,12 @@ export class WeaponSystem {
     return kind;
   }
 
-  /** Swap without the draw animation (harness + debug only). */
+  /** Swap without the draw animation: market purchases, harness and debug. */
   setWeaponImmediate(id: string): boolean {
     if (!isWeaponId(id) || !this.states.has(id)) return false;
     if (!this._hasMesh(id)) return false;
+    // Finish a bolt cycle cut short by the swap; stopClip() below drops its chamber event.
+    this.chamberFromMagazine(true);
     this._switchTo = null;
     this.activeId = id;
     // A forced swap can skip the release beat, but not a committed throw.

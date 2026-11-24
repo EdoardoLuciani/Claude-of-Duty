@@ -39,9 +39,10 @@ export class Engine {
   /** Called before each system's `init`, in dependency order. */
   onSystemInit: ((id: string) => void) | null = null;
   _onResize: () => void;
+  private _frame: number | null = null;
   _loop = (now: number): void => {
     if (!this._running) return;
-    requestAnimationFrame(this._loop);
+    this._frame = requestAnimationFrame(this._loop);
     this.step(now);
   };
 
@@ -151,11 +152,13 @@ export class Engine {
     if (this._running || this.error) return;
     this._running = true;
     this._last = performance.now();
-    requestAnimationFrame(this._loop);
+    this._frame = requestAnimationFrame(this._loop);
   }
 
   stop(): void {
     this._running = false;
+    if (this._frame !== null) cancelAnimationFrame(this._frame);
+    this._frame = null;
   }
 
   get running(): boolean {
@@ -262,8 +265,12 @@ export class Engine {
   async dispose(): Promise<void> {
     this.stop();
     removeEventListener('resize', this._onResize);
-    this.input.detach();
     const errors = [];
+    try {
+      await this.input.detach();
+    } catch (error) {
+      errors.push(error);
+    }
     try {
       for (const sys of [...this.registry.ordered].reverse()) {
         try {

@@ -2,11 +2,12 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-import type { SystemId, EngineContext } from './context.ts';
+import type { SystemId } from './context.ts';
 import { validateTriangleGeometry } from './geometry-validation.ts';
-import { parseSoldierMetadata, parseWorldManifest, parseWorldAssets } from './model-metadata.ts';
+import { parseSoldierMetadata, parseWorldManifest } from './model-metadata.ts';
 import type { SoldierRecord, WorldPrefetch } from './model-metadata.ts';
-/** Loads cached soldier GLBs/metadata and the cooked world; player weapons own their adapters. */
+import { DEFAULT_PLAYABLE_MAP, SESSION_MODE_POLICY } from './playable-maps.ts';
+import type { PlayableMap } from './playable-maps.ts';
 import { isSkinnedMesh } from './three-guards.ts';
 export type { SoldierRecord, WorldPrefetch } from './model-metadata.ts';
 
@@ -18,41 +19,42 @@ function watch<T>(promise: Promise<T>): Promise<T> {
   return promise;
 }
 
+/** Loads cached soldier GLBs/metadata and the cooked world; player weapons own their adapters. */
 export class ModelSystem {
-  declare ctx: EngineContext;
   declare loader: GLTFLoader;
   declare _soldiers: Map<string, Promise<SoldierRecord>>;
   declare worldPrefetch: Promise<WorldPrefetch>;
-  declare worldNav: ArrayBuffer;
 
   static readonly id = 'models';
   static readonly deps: SystemId[] = [];
 
-  async init(ctx: EngineContext): Promise<void> {
-    this.ctx = ctx;
+  constructor(private readonly map: PlayableMap = DEFAULT_PLAYABLE_MAP) {}
+
+  async init(): Promise<void> {
     this.loader = new GLTFLoader();
     this._soldiers = new Map();
     this.worldPrefetch = watch(this._prefetchWorld());
-    // All player weapons are weapon-owned, committed Blender assets.
-    for (const name of ['vanguard', 'irregular', 'breacher']) void watch(this.getSoldier(name));
+    // Start the soldier downloads alongside the other systems' setup; AI awaits them.
+    if (SESSION_MODE_POLICY[this.map.mode].survivalSystems)
+      for (const name of ['vanguard', 'irregular', 'breacher']) void watch(this.getSoldier(name));
   }
 
   async _prefetchWorld(): Promise<WorldPrefetch> {
-    const base = `${BASE}/world`;
+    const base = [BASE, 'world', this.map.bundleDirectory].filter(Boolean).join('/');
     const manifestResponse = await fetch(`${base}/level.json`, { cache: 'no-cache' });
     if (!manifestResponse.ok) {
       throw new Error(`[models] failed to load world manifest: HTTP ${manifestResponse.status}`);
     }
-    const metadata: unknown = await manifestResponse.json();
-    const assets = parseWorldAssets(metadata);
-    const [visual, collision, nav] = await Promise.all([
-      this._loadWorldGLB(`${base}/${assets.visual}`),
-      this._loadWorldGLB(`${base}/${assets.collision}`),
-      this._loadWorldBytes(`${base}/${assets.nav}`),
+    const meta = parseWorldManifest(await manifestResponse.json());
+    if (meta.mapId !== this.map.id)
+      throw new Error(`[models] unexpected world manifest map ID at ${base}/level.json`);
+    const { visual, collision, nav } = meta.assets;
+    const [visualGlb, collisionGlb, navBytes] = await Promise.all([
+      this._loadWorldGLB(`${base}/${visual}`),
+      this._loadWorldGLB(`${base}/${collision}`),
+      nav ? this._loadWorldBytes(`${base}/${nav}`) : undefined,
     ]);
-    const meta = parseWorldManifest(metadata);
-    this.worldNav = nav;
-    return { meta, visual, collision };
+    return { meta, visual: visualGlb, collision: collisionGlb, navBytes };
   }
 
   async _loadWorldBytes(url: string): Promise<ArrayBuffer> {

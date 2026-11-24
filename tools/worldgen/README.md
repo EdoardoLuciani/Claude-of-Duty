@@ -22,8 +22,12 @@ Runtime behavior belongs to `src/world/`.
 - `level/roof-fixtures.ts`: aerials and laundry relative to the roof footprint;
   garments hang evenly spaced along the authored cable.
 - `level/config.ts`: transform/spawns; `level/intel.ts`: intel drop sites.
+- `level/training.ts`: Training Grounds geometry and metadata. `level/training-layout.ts`
+  defines the target faces and station for geometry and manifest generation;
+  `level/training-markings.ts` adds paint without a second physical layer.
 - `level/placements/`: data-only prop transforms, one `PlacementRow` per line, grouped by area.
 - `props.ts`/`dressing.ts`: props; `buildings.ts`/`kit.ts`: construction.
+- `industrial-props.ts`: reusable barrier with a [Blender-authored mesh](../blender/industrial_props/README.md).
 - `interiors.ts`: attached details; `ground.ts`/`dressing.ts`: ground/cables.
 - [Runtime palette](../../src/world/palette.ts): surface appearance.
 
@@ -36,15 +40,33 @@ pass one stream across elements or add draws to keep another element stable.
 Seed with authored identities, not coordinates derived from trigonometry: engine-specific
 last-bit rounding must not reroll dressing (`smoke-world-seed-stability.ts`).
 
-`build.ts` → `Assembler`/`builder.ts` → `tools/export-world.ts` →
-visual GLB, `pack.ts` collision and `nav-bake.ts` navigation →
-manifest/content-hashed products → runtime model loader.
-The assembler owns geometry lifetime; support/collision/navigation use canonical
-geometry even when visuals have derivatives. Never author separate collision
-meshes or hand-edit products. Mark visual-only pieces at assembly so collision
+## Add a playable map
+
+1. Author geometry and metadata (bounds, spawns, lights, and any query/marker data)
+   with `Assembler`.
+2. Add an entry to [`src/core/playable-maps.ts`](../../src/core/playable-maps.ts)
+   with a stable unique ID, menu label, unique bundle directory relative to
+   `public/models/world/`, and an existing session mode. The root bundle stays
+   reserved for Survival. An optional `startIntro` orients players in the Start gate.
+3. Register its geometry-and-metadata builder under the same ID in
+   `playable-builds.ts`. The chooser, session boot, and exporter use the catalog;
+   maps can share a mode without sharing a bundle or adding startup branches.
+
+Range metadata is optional in any mode: emit world-space `WORLD.MARKERS.RANGE_STATION`
+(XZ) for a market counter, `WORLD.MARKERS.RANGE_TARGETS` (XYZ centres and
+positive width/height of +Z faces) for retained impact marks, and `WORLD.MARKERS.COURSE`
+gates for a tracked parkour circuit. Keep those records
+aligned with the same source data that creates the corresponding geometry.
+
+`tools/export-world.ts` iterates the catalog and builds and validates each bundle's
+visual GLB, `pack.ts` collision, and manifest. Survival-mode bundles also require
+`nav-bake.ts` navigation and cover; Training bundles do not bake or ship either. The assembler
+owns geometry lifetime; support/collision/navigation use canonical geometry even
+when visuals have derivatives. Never author separate collision meshes or hand-edit
+products. Navigation shares runtime controller algorithms.
+Mark visual-only pieces at assembly so collision
 and navigation never include them, even if they share a palette with solids.
 Cable, stain and spall generators mark their own geometry.
-Navigation shares runtime controller algorithms.
 
 Run from the repository root after `bun ci`:
 
@@ -63,8 +85,12 @@ exit status. This is a review aid: it does not test hanging cloth, mounts, or
 whether a stack with contact is stable.
 
 Use `bun tools/export-world.ts --out=/tmp/world-review` for isolated output.
-Commit source only, not generated assets. `--force` rebuilds unchanged inputs and
-`--check` verifies a fresh rebuild against the local outputs. Paths/source bytes affect provenance;
-compare physical payloads separately from expected hash changes. `source-hash.ts`
-hashes every first-party module the exporter imports (including workers). Other model families retain their own
-pipelines. See [ARCHITECTURE.md](../../ARCHITECTURE.md) for runtime contracts.
+Commit no binaries. The exporter reads checked-in text inputs, including the
+[Blender-authored industrial mesh tables](../blender/industrial_props/README.md);
+its generated world bundles stay local. `--force` rebuilds unchanged inputs and
+`--check` verifies a fresh rebuild against the local outputs. A cached run validates
+all bundles without rewriting them. `source-hash.ts` hashes the exporter and its
+first-party imports (including workers); changing this shared hash rebuilds all
+bundles. Compare physical payloads separately from expected hash changes. Other
+model families retain their own pipelines. See [ARCHITECTURE.md](../../ARCHITECTURE.md)
+for runtime contracts.

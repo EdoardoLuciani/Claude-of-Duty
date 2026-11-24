@@ -4,6 +4,8 @@ import { bindingLabel } from '../core/bindings.ts';
 import type { SystemId, EngineContext } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName } from '../core/events.ts';
 import { clamp, clamp01, damp } from '../core/math.ts';
+import { SESSION_MODE_POLICY } from '../core/playable-maps.ts';
+import type { PlayableMap } from '../core/playable-maps.ts';
 import type { WeaponMode } from '../weapons/defs.ts';
 import { AmmoPanel } from './ammo.ts';
 import { Compass, ScoreBar } from './compass.ts';
@@ -92,7 +94,7 @@ type UiContext = EngineContext;
  */
 export class UiSystem {
   static readonly id = 'ui';
-  static readonly deps: SystemId[] = ['render', 'game', 'market'];
+  static readonly deps: SystemId[] = ['render', 'market', 'fx'];
   ctx!: UiContext;
   rng!: import('../core/rng.ts').Rng;
   root!: HTMLElement;
@@ -101,7 +103,7 @@ export class UiSystem {
   arcs: DamageArcs = new DamageArcs();
   crosshair: Crosshair = new Crosshair();
   hit: Hitmarkers = new Hitmarkers();
-  minimap!: Minimap;
+  minimap?: Minimap;
   compass: Compass = new Compass();
   scoreBar: ScoreBar = new ScoreBar();
   killfeed: Killfeed = new Killfeed();
@@ -124,17 +126,18 @@ export class UiSystem {
   hudVisible: number = 1;
   hudTarget!: number;
   _lastRaw!: number;
-  _marketJustClosed!: boolean;
   _healPrompt: boolean = false;
   _bakeFrame: number = 0;
   _pos: THREE.Vector3 = new THREE.Vector3();
   _tmp: THREE.Vector3 = new THREE.Vector3();
-  _blips: Blip[] = new Array<Blip>(MAX_BLIPS);
+  _blips: Blip[] = [];
   _blipCount: number = 0;
   _blipView: Blip[] = [];
   _mmState?: MinimapFrame;
   _promptOwner?: unknown;
   _unsubs: (() => void)[] = [];
+
+  constructor(private readonly returnToStartMenu?: () => void) {}
 
   async init(ctx: UiContext): Promise<void> {
     this.ctx = ctx;
@@ -148,9 +151,14 @@ export class UiSystem {
     this.centreLayer = el('div', 'ow-layer', this.root);
 
     this.rng.fork(); // Keep the minimap's noise stream unchanged after removing damage popups.
-    this.minimap = new Minimap(this.rng.fork());
-    this.menu = new PauseMenu(this.root, ctx);
-    this.gameOver = new GameOverScreen(this.root, ctx, (): void => {
+    const { survivalSystems } = SESSION_MODE_POLICY[ctx.config.mode];
+    if (survivalSystems) {
+      this.minimap = new Minimap(this.rng.fork());
+      for (let i = 0; i < MAX_BLIPS; i++)
+        this._blips.push({ x: 0, z: 0, kind: 'enemy', heading: 0 });
+    }
+    this.menu = new PauseMenu(this.root, ctx, this.returnToStartMenu);
+    this.gameOver = new GameOverScreen(this.root, (): void => {
       if (this.startGate) this.startGate.restart();
       else {
         ctx.events.emit('game:restart', { source: 'game-over' });
@@ -158,13 +166,11 @@ export class UiSystem {
       }
     });
     this.shop = new MarketOverlay(this.root, ctx);
+    this.scoreBar.visible = survivalSystems;
     this.marketCountdown = new MarketCountdown(ctx.get('market').delay);
 
     this.hudTarget = 1;
     this._lastRaw = ctx.time.raw;
-    this._marketJustClosed = false; // one frame after the shop closes
-
-    for (let i = 0; i < MAX_BLIPS; i++) this._blips[i] = { x: 0, z: 0, kind: 'enemy', heading: 0 };
 
     const on = <K extends EngineEventName>(
       type: K,
@@ -230,18 +236,12 @@ export class UiSystem {
       this.shop.hide();
       this.pixiHud?.setVisible(false);
     });
+    // The overlay closes the market itself, after mouse capture has resumed gameplay.
     on('market:open', (e): void => {
       this.shop.show(e.wave);
       this.sfx('market_open', 0.85);
     });
-    on('market:close', (): void => {
-      this.shop.hide();
-      this.sfx('market_close', 0.7);
-      // The shop released the pointer and possibly consumed the Escape that
-      // closed it — keep the pause machinery out of this frame entirely.
-      this._marketJustClosed = true;
-      this.ctx.input.requestPointerLock();
-    });
+    on('market:close', (): void => this.sfx('market_close', 0.7));
 
     on('explosion', (e): void => {
       this._tmp.copy(e.position).sub(this._playerPos());
@@ -272,7 +272,7 @@ export class UiSystem {
     // shot; leaving ammo, crosshair and minimap over it defeats the cinematic.
     on('player:death', (): void => {
       this.hudTarget = 0;
-      const run = ctx.peek('game')?.getHudState() ?? this.state;
+      const run = ctx.peek('game')?.getHudState();
       this.gameOver.show(run, ctx.peek('market')?.credits ?? 0);
     });
     on('player:respawn', (): void => {
@@ -316,7 +316,12 @@ export class UiSystem {
     // A HUD failure is a boot failure: main.ts keeps its native reload/error dialog.
     // Never start gameplay with an invisible HUD or a retired HTML fallback.
     const { PixiHud } = await import('./pixi-hud.ts');
-    this.pixiHud = await PixiHud.create(this.root, this.centreLayer, ctx.get('render').renderer);
+    this.pixiHud = await PixiHud.create(
+      this.root,
+      this.centreLayer,
+      ctx.get('render').renderer,
+      survivalSystems
+    );
     this.pixiHud.resize(this.vw, this.vh, this.k);
   }
 
@@ -374,6 +379,10 @@ export class UiSystem {
     this.prompt.set(p);
   }
 
+  /** Owner passed to the visible prompt's setPrompt, or null. */
+  get promptOwner(): unknown {
+    return this._promptOwner ?? null;
+  }
   clearPrompt(owner: unknown = null): void {
     if (owner !== null && this._promptOwner !== owner) return;
     this._promptOwner = null;
@@ -381,8 +390,8 @@ export class UiSystem {
     this.prompt.clear();
   }
 
-  installStartGate(): void {
-    this.startGate = new StartGate(this.ctx.engine);
+  installStartGate(map: PlayableMap): void {
+    this.startGate = new StartGate(this.ctx.engine, map);
   }
 
   pause(): void {
@@ -449,12 +458,9 @@ export class UiSystem {
     // ---- pause -----------------------------------------------------------
     const playerDead = ctx.peek('player')?.dead === true;
     const marketOpen = ctx.peek('market')?.open === true;
-    // The shop owns the pointer and the Escape key while it is open; letting
-    // the pause machinery see either would open the menu under the shop or
-    // double-toggle on the same Esc that skipped it.
-    if (this._marketJustClosed) {
-      this._marketJustClosed = false;
-    } else if (ctx.input.enabled && !ctx.input.frozen && !playerDead && !marketOpen) {
+    // The shop owns the pointer and the Escape key while it is open; resuming from it
+    // clears pending input, so its Esc cannot also toggle this menu.
+    if (ctx.input.enabled && !ctx.input.frozen && !playerDead && !marketOpen) {
       if (ctx.input.actionPressed('pause')) this.menu.toggle();
       // Losing pointer lock mid-match is the same intent as pressing Escape.
       else if (ctx.input.lockLost) this.menu.show();
@@ -462,7 +468,6 @@ export class UiSystem {
     this.menu.update(rawDt);
     this.gameOver.update(rawDt);
     this.shop.update(rawDt);
-
     // ---- external state --------------------------------------------------
     const ws = ctx.peek('weapons')?.getHudState();
     if (ws) {
@@ -515,11 +520,6 @@ export class UiSystem {
       s.airborne = ps.airborne;
     }
 
-    const pos = this._playerPos();
-
-    // ---- ai blips --------------------------------------------------------
-    this._collectBlips();
-
     // ---- camera basis ----------------------------------------------------
     const m = ctx.camera.matrixWorld.elements;
     let rx = m[0];
@@ -546,7 +546,7 @@ export class UiSystem {
     this.health.update(dt, s);
     this.ammo.update(s, rawElapsed);
     this.killfeed.update(dt);
-    this.scoreBar.update(s);
+    if (this.scoreBar.visible) this.scoreBar.update(s);
     if (s.healing) {
       this.setPrompt({
         key: HEAL_KEY,
@@ -565,28 +565,31 @@ export class UiSystem {
     this.compass.update(heading, dt);
 
     // ---- minimap ---------------------------------------------------------
-    if (!this.minimap.bakeDone && ++this._bakeFrame > 6 && this._bakeFrame % 20 === 0) {
-      this.minimap.tryBake(ctx);
+    if (this.minimap) {
+      if (!this.minimap.bakeDone && ++this._bakeFrame > 6 && this._bakeFrame % 20 === 0)
+        this.minimap.tryBake(ctx);
+      const pos = this._playerPos();
+      this._collectBlips();
+      this._blipView.length = this._blipCount;
+      for (let i = 0; i < this._blipCount; i++) this._blipView[i] = this._blips[i];
+      this._mmState = this._mmState ?? {
+        x: 0,
+        z: 0,
+        heading: 0,
+        fov: 80,
+        blips: null,
+      };
+      this._mmState.x = pos.x;
+      this._mmState.z = pos.z;
+      this._mmState.heading = heading;
+      this._mmState.fov = ctx.camera.fov;
+      this._mmState.blips = this._blipView;
+      const intel = this.ctx.peek('intel');
+      const intelHud = intel?.getHudState();
+      this._mmState.pulses = intelHud?.pulses ?? null;
+      this._mmState.pulseTime = intelHud?.pulseTime ?? 0;
+      this._mmState.playerY = ctx.peek('player')?.feetPosition.y ?? 0;
     }
-    this._blipView.length = this._blipCount;
-    for (let i = 0; i < this._blipCount; i++) this._blipView[i] = this._blips[i];
-    this._mmState = this._mmState ?? {
-      x: 0,
-      z: 0,
-      heading: 0,
-      fov: 80,
-      blips: null,
-    };
-    this._mmState.x = pos.x;
-    this._mmState.z = pos.z;
-    this._mmState.heading = heading;
-    this._mmState.fov = ctx.camera.fov;
-    this._mmState.blips = this._blipView;
-    const intel = this.ctx.peek('intel');
-    const intelHud = intel?.getHudState();
-    this._mmState.pulses = intelHud?.pulses ?? null;
-    this._mmState.pulseTime = intelHud?.pulseTime ?? 0;
-    this._mmState.playerY = ctx.peek('player')?.feetPosition.y ?? 0;
     if (this.pixiHud) {
       this.pixiHud.setVisible(!ctx.engine.error);
       this.pixiHud.update(
@@ -642,7 +645,7 @@ export class UiSystem {
       this.startGate?.dispose();
       for (const off of this._unsubs) off();
       this._unsubs.length = 0;
-      this.minimap.dispose();
+      this.minimap?.dispose();
       this.menu.dispose();
       this.gameOver.dispose();
       this.shop.dispose();

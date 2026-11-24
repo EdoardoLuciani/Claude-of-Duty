@@ -57,7 +57,7 @@ export class PauseMenu {
   open: boolean = false;
   shown: number = 0;
 
-  constructor(parent: HTMLElement, ctx: MenuContext) {
+  constructor(parent: HTMLElement, ctx: MenuContext, returnToStartMenu?: () => void) {
     this.ctx = ctx;
     this.root = el('dialog', 'ow-menu ow-dialog', parent);
     this.root.setAttribute('aria-labelledby', 'ow-menu-title');
@@ -104,6 +104,16 @@ export class PauseMenu {
     this.resumeBtn.autofocus = true;
     this.resumeBtn.addEventListener('click', (): void => this.close());
     el('div', 'hint', rail, `${bindingLabel('pause').toUpperCase()} RESUME`);
+    if (returnToStartMenu) {
+      const back = el('button', 'ow-btn', rail, 'Return to Start Menu');
+      back.type = 'button';
+      back.addEventListener('click', (): void => {
+        // Leaving a run must not resume its time or reacquire its pointer lock.
+        this.root.close();
+        this.open = false;
+        returnToStartMenu();
+      });
+    }
 
     // ---- gameplay ----------------------------------------------------------
     const game = this._page('Gameplay', (): void => {
