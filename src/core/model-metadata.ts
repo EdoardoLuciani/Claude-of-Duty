@@ -85,9 +85,11 @@ export interface CourseGate {
   radius: number;
   hint: string;
 }
-export interface WorldRangeTarget extends WorldRangeStation {
+export interface WorldRangeTarget {
   label?: string | undefined;
+  x: number;
   y: number;
+  z: number;
   width: number;
   height: number;
 }

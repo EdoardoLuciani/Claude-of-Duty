@@ -1,6 +1,6 @@
 import type { Vector3Like } from 'three';
 
-import type { EngineContext, SystemId } from '../core/context.ts';
+import type { EngineContext, EngineSystems, SystemId } from '../core/context.ts';
 import type { CourseGate } from '../core/model-metadata.ts';
 
 const STATION_RADIUS = 3;
@@ -20,37 +20,41 @@ export class RangeSystem {
   private step = 0;
   private hints: { key: string; text: string; sub: string }[] = [];
   private off: (() => void)[] = [];
+  private queries!: EngineSystems['world']['queries'];
+  private player!: EngineSystems['player'];
+  private ui!: EngineSystems['ui'];
 
   init(ctx: EngineContext): void {
-    const { course } = ctx.get('world').queries;
-    if (course.length) {
-      const player = ctx.get('player');
-      for (const [index, gate] of course.entries()) {
-        this.hints.push({
-          key: `${index + 1}/${course.length}`,
-          text: 'Parkour circuit',
-          sub: gate.hint,
-        });
-      }
-      this.off.push(
-        ctx.events.on('player:mantle', ({ kind }): void => this.advance(ctx, kind)),
-        ctx.events.on('bullet:impact', (e): void => {
-          if (!this.step || e.exit || (e.shooter !== player && e.shooter !== 'player')) return;
-          const label = ctx.get('world').queries.rangeTargetAt(e.point, e.normal)?.label;
-          if (label) this.advance(ctx, label);
-        }),
-        ctx.events.on('game:restart', (): void => {
-          this.step = 0;
-        })
-      );
+    this.queries = ctx.get('world').queries;
+    this.player = ctx.get('player');
+    this.ui = ctx.get('ui');
+    const { course } = this.queries;
+    if (!course.length) return;
+    for (const [index, gate] of course.entries()) {
+      this.hints.push({
+        key: `${index + 1}/${course.length}`,
+        text: 'Parkour circuit',
+        sub: gate.hint,
+      });
     }
+    const player = this.player;
+    this.off.push(
+      ctx.events.on('player:mantle', ({ kind }): void => this.advance(kind)),
+      ctx.events.on('bullet:impact', (e): void => {
+        if (!this.step || e.exit || (e.shooter !== player && e.shooter !== 'player')) return;
+        const label = this.queries.rangeTargetAt(e.point, e.normal)?.label;
+        if (label) this.advance(label);
+      }),
+      ctx.events.on('game:restart', (): void => {
+        this.step = 0;
+      })
+    );
   }
 
   update(_dt: number, ctx: EngineContext): void {
-    const { course, rangeStation } = ctx.get('world').queries;
+    const { course, rangeStation } = this.queries;
     const { input } = ctx;
-    const ui = ctx.get('ui');
-    const player = ctx.get('player');
+    const { ui, player } = this;
     // PauseMenu uses the time scale. Its lateUpdate has not seen this frame's input yet.
     if (player.dead || !player.controlEnabled || input.lockLost || input.actionPressed('pause')) {
       ui.clearPrompt(PROMPT_OWNER);
@@ -59,7 +63,7 @@ export class RangeSystem {
 
     // A player can enter the gate already crouched or climbing.
     if (this.step && (player.state === 'climb' || player.stance === 'crouch'))
-      this.advance(ctx, player.state === 'climb' ? 'climb' : 'crouch');
+      this.advance(player.state === 'climb' ? 'climb' : 'crouch');
 
     if (input.enabled && !input.frozen && !input.ads) {
       const feet = player.feetPosition;
@@ -75,30 +79,29 @@ export class RangeSystem {
         return;
       }
       const next = this.step ? course.at(this.step) : undefined;
-      const hint = this.hints.at(this.step);
       if (
         !near &&
         next &&
-        hint &&
         Math.abs(feet.x - next.position[0]) < 10 &&
         Math.abs(feet.z - next.position[2]) < 30
       ) {
         // The circuit hint yields to grenade, radio and bandage messages.
-        if (!ui.prompt.active || ui.promptOwner === PROMPT_OWNER) ui.setPrompt(hint, PROMPT_OWNER);
+        if (!ui.prompt.active || ui.promptOwner === PROMPT_OWNER)
+          ui.setPrompt(this.hints[this.step], PROMPT_OWNER);
         return;
       }
     }
     ui.clearPrompt(PROMPT_OWNER);
   }
 
-  private advance(ctx: EngineContext, action: string): void {
-    const { course } = ctx.get('world').queries;
-    const feet = ctx.get('player').feetPosition;
+  private advance(action: string): void {
+    const { course } = this.queries;
+    const feet = this.player.feetPosition;
     let index = this.step;
     if (matchesGate(course.at(0), action, feet)) index = 0;
     else if (!index || !matchesGate(course.at(index), action, feet)) return;
     this.step = index + 1 < course.length ? index + 1 : 0;
-    const ui = ctx.get('ui');
+    const { ui } = this;
     ui.clearPrompt(PROMPT_OWNER);
     if (!this.step) ui.banner.show('Circuit complete', 'Vault the start hurdle to run again', 4);
     ui.sfx('objective', 0.55);

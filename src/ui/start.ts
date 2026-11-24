@@ -3,6 +3,7 @@ import { PLAYABLE_MAPS } from '../core/playable-maps.ts';
 import type { PlayableMap } from '../core/playable-maps.ts';
 import { CLOCK } from '../sky/tuning.ts';
 import { MouseCapture } from './mouse-capture.ts';
+import { el } from './util.ts';
 
 function startDialog(id: string, heading: string): HTMLDialogElement {
   const panel = document.createElement('dialog');
@@ -96,17 +97,14 @@ export class StartGate {
   }
 
   private addTimeChoice(nightHour: number): void {
-    const group = document.createElement('fieldset');
-    group.className = 'range-time';
-    const legend = document.createElement('legend');
-    legend.textContent = 'Time of day';
-    group.append(legend);
+    const group = el('fieldset', 'range-time', this.panel);
+    el('legend', null, group, 'Time of day');
     for (const [label, hour] of [
       ['Day', CLOCK.startHour],
       ['Night', nightHour],
     ] as const) {
-      const choice = document.createElement('label');
-      const radio = document.createElement('input');
+      const choice = el('label', null, group);
+      const radio = el('input', null, choice);
       radio.type = 'radio';
       radio.name = 'range-time';
       radio.checked = label === 'Day';
@@ -116,10 +114,8 @@ export class StartGate {
         // The briefing renders, but gameplay (including world.update) is suspended.
         this.engine.ctx.get('world').updatePracticalLights(sky.sunAltitude);
       };
-      choice.append(radio, label);
-      group.append(choice);
+      choice.append(label);
     }
-    this.panel.append(group);
   }
 
   private suspend(): void {

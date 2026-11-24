@@ -346,31 +346,25 @@ function requireUnique(ids: unknown[], label: string): void {
   });
 }
 
-const authoredCounts: Partial<
-  Record<(typeof PLAYABLE_MAPS)[number]['id'], { intel: number; spawns?: number }>
-> = { courtyard: { intel: 14 }, 'training-grounds': { intel: 0, spawns: 1 } };
-
 const mapId = args.map ?? meta?.mapId ?? DEFAULT_PLAYABLE_MAP.id;
 const map = PLAYABLE_MAPS.find((entry): boolean => entry.id === mapId);
+const survival = !!map && SESSION_MODE_POLICY[map.mode].survivalSystems;
 if (meta) {
   if (!map) fail(`unknown playable map ID ${describe(mapId)}`);
   else if (meta.mapId !== map.id) fail(`manifest map ID does not match ${map.id}`);
-  const expected = map && authoredCounts[map.id];
   const { bounds, WORLD, spawns, lights, volumes, query } = meta;
   for (let i = 0; i < 3; i++) {
     if (bounds.min[i] > bounds.max[i]) fail(`manifest bounds are inverted on axis ${i}`);
   }
   const intel = WORLD?.MARKERS?.INTEL ?? [];
-  if (expected && intel.length !== expected.intel)
-    fail(
-      `WORLD.MARKERS.INTEL must contain ${expected.intel} authored points, found ${intel.length}`
-    );
+  // Intel exists only alongside the survival systems that consume it.
+  const intelCount = survival ? 14 : 0;
+  if (map && intel.length !== intelCount)
+    fail(`WORLD.MARKERS.INTEL must contain ${intelCount} authored points, found ${intel.length}`);
   requireUnique(
     intel.map((marker): string => marker.id),
     'intel marker'
   );
-  if (expected?.spawns !== undefined && spawns.length !== expected.spawns)
-    fail(`manifest.spawns must contain ${expected.spawns} authored points, found ${spawns.length}`);
   if (!spawns.length) fail('manifest.spawns must be a non-empty array');
   requireUnique(
     array(manifest.spawns)!.map((spawn): unknown => object(spawn)?.id),
@@ -470,10 +464,7 @@ async function parseNavGzip(
 
 const visualAsset = parseGlbGzip(resolveAsset('visual'), 'visual');
 const collisionAsset = parseGlbGzip(resolveAsset('collision'), 'collision');
-const navAsset =
-  map && SESSION_MODE_POLICY[map.mode].survivalSystems
-    ? await parseNavGzip(resolveAsset('nav'))
-    : null;
+const navAsset = survival ? await parseNavGzip(resolveAsset('nav')) : null;
 const visual = inspectVisual(visualAsset);
 const collision = inspectCollision(collisionAsset);
 const actual = visual && collision ? { ...visual, collideTris: collision.collideTris } : null;

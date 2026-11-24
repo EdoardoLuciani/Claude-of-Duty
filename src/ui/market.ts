@@ -318,7 +318,7 @@ export class MarketOverlay {
     engine.setGameplaySuspended(true);
     input.enabled = false;
     input.clear();
-    if (document.pointerLockElement === this.ctx.canvas) document.exitPointerLock();
+    if (this.capture.locked) document.exitPointerLock();
   }
 
   hide(): void {

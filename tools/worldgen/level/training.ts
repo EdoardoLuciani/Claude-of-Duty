@@ -218,7 +218,8 @@ function ridge(
   origin: readonly [x: number, z: number, yaw: number],
   width: number,
   depth: number,
-  peaks: readonly number[]
+  peaks: readonly number[],
+  scatter = false
 ): void {
   const [cx, cz, yaw] = origin;
   const elevation = (x: number, z: number): number => {
@@ -245,7 +246,7 @@ function ridge(
   const frame = trs(new THREE.Matrix4(), cx, 0, cz, yaw);
   A.addOnce(key, land, frame, { visualOnly: true });
 
-  if (key !== 'training_earth_bank') return;
+  if (!scatter) return;
   for (let i = 0; i < 144; i++) {
     const rng = keyedRng('training-bank-scatter', cx, cz, i);
     const x = rng.range(-width * 0.43, width * 0.43);
@@ -283,16 +284,11 @@ function hills(A: Assembler): void {
   A.add('training_gravel', BOX_THIN(A), trs(matrix, 0, -0.6, -100, 0, 310, 0.2, 345), {
     visualOnly: true,
   });
-  ridge(A, 'training_earth_bank', [0, LONG_BACK - 12, 0], 76, 24, [5, 8.8, 6.8, 5.2, 7.2, 9.5, 7]);
-  ridge(A, 'training_earth_bank', [-33.5, -9, Math.PI / 2], 78, 24, [4.5, 7.2, 8.5, 5.4, 4.3, 2.8]);
-  ridge(
-    A,
-    'training_earth_bank',
-    [35.5 + BAY_SHIFT, -12, -Math.PI / 2],
-    86,
-    28,
-    [3.2, 5, 5.8, 6.4, 9.2, 7.2]
-  );
+  // Near banks carry scrub and rock scatter; the distant hills stay bare.
+  const bank = 'training_earth_bank';
+  ridge(A, bank, [0, LONG_BACK - 12, 0], 76, 24, [5, 8.8, 6.8, 5.2, 7.2, 9.5, 7], true);
+  ridge(A, bank, [-33.5, -9, Math.PI / 2], 78, 24, [4.5, 7.2, 8.5, 5.4, 4.3, 2.8], true);
+  ridge(A, bank, [35.5 + BAY_SHIFT, -12, -Math.PI / 2], 86, 28, [3.2, 5, 5.8, 6.4, 9.2, 7.2], true);
   ridge(A, 'training_foothill', [5, LONG_BACK - 44, 0], 195, 62, [8, 18, 20, 13, 10, 22, 25, 14]);
   ridge(
     A,

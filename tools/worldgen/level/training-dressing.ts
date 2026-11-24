@@ -6,12 +6,11 @@ import type { PALETTE } from '../palette.ts';
 import { registerProps } from '../props.ts';
 import { chamferBox, clothGeometry, fillMasks, trs } from '../util.ts';
 import { BAY_SHIFT, TRAINING_STATION } from './training-layout.ts';
-import { paintPlane, paintText } from './training-markings.ts';
+import { PAINT, paintPlane, paintText } from './training-markings.ts';
 
 type Finish = keyof typeof PALETTE;
 const matrix = new THREE.Matrix4();
 const BACKWARD = Math.PI;
-const PAINT = { visualOnly: true };
 
 function box(
   A: Assembler,
@@ -321,7 +320,7 @@ function reelCord(): THREE.BufferGeometry {
 }
 
 export function dressTraining(A: Assembler): void {
-  if (!A.has('pallet')) registerProps(A);
+  registerProps(A);
   const batchProp = (id: string, spec: PrototypeSpec): void => {
     A.proto(id, { ...spec, batchVisual: true });
   };

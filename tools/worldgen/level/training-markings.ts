@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { SVGLoader } from 'three/examples/jsm/loaders/SVGLoader.js';
 
 import type { Assembler } from '../builder.ts';
-import { Accum, quad, trs } from '../util.ts';
+import { PANE } from '../kit.ts';
+import { Accum, trs } from '../util.ts';
 
 export type TrainingPaint =
   | 'training_white'
@@ -10,7 +11,7 @@ export type TrainingPaint =
   | 'training_yellow'
   | 'training_red'
   | 'training_letter';
-const PAINT = { visualOnly: true };
+export const PAINT = { visualOnly: true };
 const matrix = new THREE.Matrix4();
 
 export function paintPlane(
@@ -24,8 +25,7 @@ export function paintPlane(
   flat = false,
   yaw = 0
 ): void {
-  const plane = A.cache('training:paint', quad);
-  A.add(key, plane, trs(matrix, x, y, z, yaw, w, h, 1, flat ? -Math.PI / 2 : 0), PAINT);
+  A.add(key, PANE(A), trs(matrix, x, y, z, yaw, w, h, 1, flat ? -Math.PI / 2 : 0), PAINT);
 }
 
 export function paintRing(

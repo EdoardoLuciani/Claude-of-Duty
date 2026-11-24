@@ -166,7 +166,7 @@ export class UiSystem {
       }
     });
     this.shop = new MarketOverlay(this.root, ctx);
-    this.scoreBar.visible = ctx.has('game');
+    this.scoreBar.visible = survivalSystems;
     this.marketCountdown = new MarketCountdown(ctx.get('market').delay);
 
     this.hudTarget = 1;
