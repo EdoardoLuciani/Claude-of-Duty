@@ -66,7 +66,7 @@ const check = (name: string, cond: boolean, extra = ''): void => {
   const recorder = new TelemetrySystem();
   const meta = fixture<WorldManifest>({
     sourceHash: 'loaded-A',
-    assets: { visual: 'visual-A', collision: 'collision-A', nav: 'nav-A' },
+    assets: { visual: 'visual-A', collision: 'collision-A', minimap: 'minimap-A', nav: 'nav-A' },
   });
   const models = new ModelSystem();
   models.worldPrefetch = new Promise((r): void => {

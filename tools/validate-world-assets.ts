@@ -6,6 +6,8 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
 
+import { PNG } from 'pngjs';
+
 import { createLadderDescriptors } from '../src/ai/ladder.ts';
 import type { ExpectedNav } from '../src/ai/nav-format.ts';
 import { unpackNav, NAV_VERSION } from '../src/ai/nav-format.ts';
@@ -19,6 +21,7 @@ import {
 } from '../src/core/playable-maps.ts';
 import { SURFACE_NAMES } from '../src/physics/surfaces.ts';
 import { PALETTE } from '../src/world/palette.ts';
+import { minimapSize } from './worldgen/minimap-bake.ts';
 import { worldSourceHash } from './worldgen/source-hash.ts';
 
 type JsonObject = Record<string, unknown>;
@@ -385,6 +388,30 @@ if (meta) {
   if (!query?.alleys) fail('manifest.query.alleys must be an array');
 }
 
+function validateMinimap(file: string | null, meta: WorldManifest | null): void {
+  if (!file || !meta) return;
+  const { minimap, bounds } = meta;
+  if (
+    minimap.minX !== bounds.min[0] ||
+    minimap.maxX !== bounds.max[0] ||
+    minimap.minZ !== bounds.min[2] ||
+    minimap.maxZ !== bounds.max[2]
+  )
+    fail('minimap rectangle disagrees with the world bounds');
+  try {
+    const bytes = readFileSync(file);
+    const hash = createHash('sha256').update(bytes).digest('hex').slice(0, 12);
+    if (basename(file) !== `level-minimap.${hash}.png`)
+      fail(`minimap filename does not match its content hash: ${basename(file)}`);
+    const image = PNG.sync.read(bytes);
+    const { width, height } = minimapSize(minimap);
+    if (image.width !== width || image.height !== height)
+      fail(`minimap PNG dimensions must be ${width}×${height}`);
+  } catch (error) {
+    fail(`minimap PNG is invalid: ${errorMessage(error)}`);
+  }
+}
+
 async function parseNavGzip(
   file: string | null
 ): Promise<{ compressedBytes: number; bake: Awaited<ReturnType<typeof unpackNav>> } | null> {
@@ -465,6 +492,7 @@ async function parseNavGzip(
 
 const visualAsset = parseGlbGzip(resolveAsset('visual'), 'visual');
 const collisionAsset = parseGlbGzip(resolveAsset('collision'), 'collision');
+validateMinimap(resolveAsset('minimap'), meta);
 const navAsset = survival ? await parseNavGzip(resolveAsset('nav')) : null;
 const visual = inspectVisual(visualAsset);
 const collision = inspectCollision(collisionAsset);

@@ -48,13 +48,20 @@ export class ModelSystem {
     const meta = parseWorldManifest(await manifestResponse.json());
     if (meta.mapId !== this.map.id)
       throw new Error(`[models] unexpected world manifest map ID at ${base}/level.json`);
-    const { visual, collision, nav } = meta.assets;
+    const { visual, collision, minimap, nav } = meta.assets;
+    const minimapPng = watch(this._loadMinimapPng(`${base}/${minimap}`));
     const [visualGlb, collisionGlb, navBytes] = await Promise.all([
       this._loadWorldGLB(`${base}/${visual}`),
       this._loadWorldGLB(`${base}/${collision}`),
       nav ? this._loadWorldBytes(`${base}/${nav}`) : undefined,
     ]);
-    return { meta, visual: visualGlb, collision: collisionGlb, navBytes };
+    return { meta, visual: visualGlb, collision: collisionGlb, navBytes, minimapPng };
+  }
+
+  async _loadMinimapPng(url: string): Promise<Blob> {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`[models] failed to load ${url}: HTTP ${response.status}`);
+    return response.blob();
   }
 
   async _loadWorldBytes(url: string): Promise<ArrayBuffer> {

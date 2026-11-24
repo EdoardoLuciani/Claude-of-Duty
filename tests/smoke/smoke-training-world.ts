@@ -18,11 +18,13 @@ import { physicsFor } from '../lib/nav240/fixtures.ts';
 
 const root = new URL('../../public/', import.meta.url);
 const requests: string[] = [];
+const releaseMinimap = Promise.withResolvers<void>();
 globalThis.fetch = Object.assign(
   async (request: Parameters<typeof fetch>[0]): Promise<Response> => {
     const path = typeof request === 'string' ? request : '';
     if (!path.startsWith('models/world/')) return new Response(null, { status: 404 });
     requests.push(path);
+    if (path.endsWith('.png')) await releaseMinimap.promise;
     const file = Bun.file(new URL(path, root));
     return (await file.exists()) ? new Response(file) : new Response(null, { status: 404 });
   },
@@ -33,7 +35,10 @@ const map = PLAYABLE_MAPS.find((entry): boolean => entry.id === 'training-ground
 assert(map);
 const models = new ModelSystem(map);
 await models.init();
-const { meta, visual, collision, navBytes } = await models.worldPrefetch;
+// Geometry must finish independently of the HUD image.
+const { meta, visual, collision, navBytes, minimapPng } = await models.worldPrefetch;
+releaseMinimap.resolve();
+assert((await minimapPng).size > 0);
 assert.equal(navBytes, undefined);
 assert.deepEqual(
   requests.sort(),
@@ -41,6 +46,7 @@ assert.deepEqual(
     'models/world/training/level.json',
     `models/world/training/${meta.assets.visual}`,
     `models/world/training/${meta.assets.collision}`,
+    `models/world/training/${meta.assets.minimap}`,
   ].sort()
 );
 

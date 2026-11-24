@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 
 import { BitmapText, Container } from 'pixi.js';
 
-import { Rng } from '../../src/core/rng.ts';
 import { AmmoPanel } from '../../src/ui/ammo.ts';
 import type { AmmoState } from '../../src/ui/ammo.ts';
 import { Compass, ScoreBar } from '../../src/ui/compass.ts';
@@ -13,7 +12,6 @@ import type { HealthState } from '../../src/ui/health.ts';
 import { Hitmarkers } from '../../src/ui/hitmarkers.ts';
 import { Killfeed } from '../../src/ui/killfeed.ts';
 import { MarketCountdown } from '../../src/ui/market.ts';
-import { Minimap } from '../../src/ui/minimap.ts';
 import type { PixiHud } from '../../src/ui/pixi-hud.ts';
 import { Banner, Prompt } from '../../src/ui/prompts.ts';
 import { createRetainedHud, installUiDocument, deleteGlobal } from '../lib/ui-fixture.ts';
@@ -51,8 +49,6 @@ try {
     magSize: 30,
     time: 0,
   };
-  const map = new Minimap(new Rng(1));
-  map.viewSpan = 60;
   const mapState = { x: 0, z: 0, heading: 0, fov: 80 };
   const models = {
     hit: new Hitmarkers(),
@@ -68,7 +64,7 @@ try {
   };
   const frame = (dt = 1 / 60, opacity = 1): void => {
     state.time += dt;
-    activeHud.update(dt, state, health, crosshair, map, mapState, opacity, models);
+    activeHud.update(dt, state, health, crosshair, mapState, opacity, models);
   };
   frame();
   const initial = hud.draws;

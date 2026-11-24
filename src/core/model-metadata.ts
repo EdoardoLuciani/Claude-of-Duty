@@ -116,11 +116,19 @@ interface WorldQueryData {
   street?: WorldStreet | undefined;
   alleys?: Array<{ rect: [number, number, number, number]; surface: string }> | undefined;
 }
+export interface WorldMinimap {
+  minX: number;
+  minZ: number;
+  maxX: number;
+  maxZ: number;
+  labels: { x: number; z: number; w: number; code: string; text: string | null }[];
+}
 export interface WorldManifest {
   version: 2;
   mapId: string;
   sourceHash: string;
-  assets: { visual: string; collision: string; nav?: string | undefined };
+  assets: { visual: string; collision: string; minimap: string; nav?: string | undefined };
+  minimap: WorldMinimap;
   navigation?:
     | {
         version: number;
@@ -159,6 +167,7 @@ export interface WorldPrefetch {
   visual: GLTF;
   collision: GLTF;
   navBytes: ArrayBuffer | undefined;
+  minimapPng: Promise<Blob>;
 }
 
 /** JSON is unknown until each field consumed by runtime has been checked. */
@@ -243,6 +252,7 @@ function parseWorldAssets(value: unknown): WorldManifest['assets'] {
     ...assets,
     visual: string(assets.visual),
     collision: string(assets.collision),
+    minimap: string(assets.minimap),
     nav: optional(assets.nav, string),
   };
 }
@@ -294,6 +304,30 @@ function parseWorldMarkers(value: unknown): WorldMarkers {
     ),
   };
 }
+function parseMinimap(value: unknown): WorldMinimap {
+  const source = object(value);
+  const minX = number(source.minX),
+    minZ = number(source.minZ),
+    maxX = number(source.maxX),
+    maxZ = number(source.maxZ);
+  if (minX >= maxX || minZ >= maxZ) throw new Error('[models] invalid minimap rectangle');
+  return {
+    minX,
+    minZ,
+    maxX,
+    maxZ,
+    labels: array(source.labels, (value): WorldMinimap['labels'][number] => {
+      const label = object(value);
+      return {
+        x: number(label.x),
+        z: number(label.z),
+        w: number(label.w),
+        code: string(label.code),
+        text: label.text === null ? null : string(label.text),
+      };
+    }),
+  };
+}
 export function parseWorldManifest(value: unknown): WorldManifest {
   const source = object(value),
     assets = parseWorldAssets(source);
@@ -318,6 +352,7 @@ export function parseWorldManifest(value: unknown): WorldManifest {
       };
     }),
     assets,
+    minimap: parseMinimap(source.minimap),
     transform,
     bounds: { ...bounds, min: vec3(bounds.min), max: vec3(bounds.max) },
     stats: {

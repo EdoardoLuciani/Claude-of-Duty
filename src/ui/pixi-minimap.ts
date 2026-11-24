@@ -1,10 +1,30 @@
 import { Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
 
 import { clamp01 } from '../core/math.ts';
-import type { Minimap, MinimapState } from './minimap.ts';
+import type { WorldMinimap } from '../core/model-metadata.ts';
+
+export interface MapBlip {
+  x: number;
+  z: number;
+  kind: 'friend' | 'enemy';
+  heading?: number;
+  fade?: number;
+}
+export interface MinimapState {
+  x?: number;
+  z?: number;
+  heading?: number;
+  fov?: number;
+  blips?: MapBlip[];
+  pulses?: { x: number; z: number; y?: number; radius?: number }[] | null;
+  pulseTime?: number;
+  playerY?: number;
+}
 
 const SIZE = 178,
-  HALF = SIZE / 2;
+  HALF = SIZE / 2,
+  VIEW_SPAN = 60,
+  ppm = SIZE / VIEW_SPAN;
 const INK = 0xe7f2ef;
 
 function move(node: Container, x: number, y: number): boolean {
@@ -13,7 +33,7 @@ function move(node: Container, x: number, y: number): boolean {
   return changed;
 }
 
-/** Retained authored terrain/contacts; no per-frame Canvas2D drawing/uploads. */
+/** Retained baked terrain and live contacts. */
 export class PixiMinimap {
   readonly stage = new Container();
   readonly viewport = new Container();
@@ -26,7 +46,7 @@ export class PixiMinimap {
     .poly([0, -7.44, 5.52, 6.24, 0, 2.88, -5.52, 6.24])
     .fill(0xf6fcff)
     .stroke({ color: 0x02060a, width: 1.6 });
-  private source: HTMLCanvasElement | null = null;
+  private terrainChanged = false;
   private labels: {
     node: Container;
     x: number;
@@ -39,7 +59,6 @@ export class PixiMinimap {
   private contacts: Graphics[] = [];
   private pulses: { node: Container; ring: Graphics; text: Text; radius: number }[] = [];
   private fov = -1;
-  uploads = 0;
   textResolution = 1;
 
   private label(value: string, size: number, color: number): Text {
@@ -78,26 +97,25 @@ export class PixiMinimap {
     );
     const north = this.label('N', 10, INK);
     north.position.set(HALF, 8);
-    const zone = this.label('ZONE 07     ·     60M', 9, 0xa9bac5);
+    const zone = this.label(`MAP     ·     ${VIEW_SPAN} M`, 9, 0xa9bac5);
     zone.position.set(HALF, SIZE + 12);
     this.stage.addChild(north, zone);
   }
 
-  private bake(map: Minimap): void {
-    if (!map.baked || map.baked === this.source) return;
-    this.source = map.baked;
-    const ppm = SIZE / map.viewSpan;
-    const sprite = new Sprite(Texture.from(map.baked));
-    sprite.width = sprite.height = map.span * ppm;
-    sprite.position.set((map.centre.x - map.span / 2) * ppm, (map.centre.y - map.span / 2) * ppm);
+  /** Install the session terrain once; the HUD owns the texture and its source. */
+  async setTerrain(png: Blob, map: WorldMinimap): Promise<void> {
+    const bitmap = await createImageBitmap(png);
+    const texture = Texture.from(bitmap, true);
+    texture.source.once('destroy', (): void => bitmap.close());
+    const sprite = new Sprite(texture);
+    sprite.width = (map.maxX - map.minX) * ppm;
+    sprite.height = (map.maxZ - map.minZ) * ppm;
+    sprite.position.set(map.minX * ppm, map.minZ * ppm);
     this.terrain.addChild(sprite);
     for (const l of map.labels) {
       const room = l.w * ppm + 2;
-      const node = this.label(
-        l.text ? `${l.text}\n${l.code}` : l.code,
-        8.5,
-        l.text ? 0x0c1319 : 0xc4d6e2
-      );
+      const node = this.label(l.text ? `${l.text}\n${l.code}` : l.code, 8.5, 0xc4d6e2);
+      if (l.text) node.style.stroke = { color: 0x0c1319, width: 1.5 };
       node.style.lineHeight = 10;
       if (node.width > room) node.style.fontSize = 6.8;
       node.position.set(l.x * ppm, l.z * ppm);
@@ -113,15 +131,12 @@ export class PixiMinimap {
         opacity: l.text ? 1 : 0.28,
       });
     }
-    this.uploads++;
+    this.terrainChanged = true;
   }
 
-  update(map: Minimap, s: MinimapState): boolean {
-    const uploads = this.uploads;
-    this.bake(map);
-    let changed = uploads !== this.uploads;
-    const ppm = SIZE / map.viewSpan,
-      x = s.x ?? 0,
+  update(s: MinimapState): boolean {
+    let changed = this.terrainChanged;
+    const x = s.x ?? 0,
       z = s.z ?? 0;
     const ox = HALF - x * ppm,
       oy = HALF - z * ppm;
@@ -139,7 +154,7 @@ export class PixiMinimap {
     if (this.player.rotation !== heading) changed = true;
     this.cone.rotation = this.player.rotation = heading;
     // Turning in place cannot change a north-up label's distance from the viewport edge.
-    if (panned || uploads !== this.uploads)
+    if (panned || this.terrainChanged)
       for (const l of this.labels) {
         const dx = l.x * ppm + ox,
           dy = l.z * ppm + oy;
@@ -149,6 +164,7 @@ export class PixiMinimap {
         l.node.alpha = alpha;
         l.node.visible = l.fits && l.node.alpha > 0.02;
       }
+    this.terrainChanged = false;
     const count = Math.min(s.blips?.length ?? 0, this.contacts.length);
     for (let i = 0; i < Math.max(count, this.contactCount); i++) {
       const node = this.contacts[i],
