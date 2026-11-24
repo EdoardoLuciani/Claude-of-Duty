@@ -1,8 +1,9 @@
-import { Container, Graphics, Text } from 'pixi.js';
+import { Container, Graphics, type BitmapText } from 'pixi.js';
 
 import { clamp01 } from '../core/math.ts';
 import type { AmmoState } from './ammo.ts';
-import { HUD_TYPE, hudText, writeHudText } from './pixi-type.ts';
+import { hudText } from './pixi-glyphs.ts';
+import { HUD_TYPE, writeHudText } from './pixi-type.ts';
 
 export const AMMO_WIDTH = 248;
 // Align the magazine bar with the health widget's lower (armour) bar.
@@ -16,11 +17,11 @@ const INK = 0xe7f2ef,
 /** Retained read-only ammo graphics; the owner decides when/where to render. */
 export class PixiAmmoView {
   readonly stage = new Container();
-  private current: Text;
-  private reserve: Text;
-  private name: Text;
-  private mode: Text;
-  private prompt: Text;
+  private current: BitmapText;
+  private reserve: BitmapText;
+  private name: BitmapText;
+  private mode: BitmapText;
+  private prompt: BitmapText;
   private magFill = new Graphics().rect(0, 0, 216, 4).fill(0xffffff);
   private bar = new Graphics()
     .rect(0, 0, 216, 3)
@@ -38,9 +39,8 @@ export class PixiAmmoView {
     this.mode = this.text('AUTO', 14, 40, HUD_TYPE.label, MUTED);
     this.name = this.text('M4A1', WIDTH - 14, 40, HUD_TYPE.label);
     this.name.anchor.x = 1;
-    this.current = this.text('30', 119, 96, HUD_TYPE.value);
+    this.current = this.text('30', 119, 96, HUD_TYPE.value, 0xffffff);
     this.current.anchor.set(1, 1);
-    this.current.style.fill = 0xffffff;
     this.reserve = this.text('/ 210', 131, 96, HUD_TYPE.secondary, MUTED);
     this.reserve.anchor.y = 1;
     // Warnings/reload feedback live above the readout, not below the bottom bar.
@@ -54,13 +54,13 @@ export class PixiAmmoView {
     this.stage.addChild(this.bar, this.fill);
   }
 
-  private text(value: string, x: number, y: number, fontSize: number, fill = INK): Text {
+  private text(value: string, x: number, y: number, fontSize: number, fill = INK): BitmapText {
     const text = hudText(value, x, y, fontSize, fill);
     this.stage.addChild(text);
     return text;
   }
 
-  private label(text: Text, value: string, width = 0): void {
+  private label(text: BitmapText, value: string, width = 0): void {
     this.dirty = writeHudText(text, value, width) || this.dirty;
   }
 

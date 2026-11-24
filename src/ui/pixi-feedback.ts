@@ -1,11 +1,12 @@
-import { Container, Graphics, Text } from 'pixi.js';
+import { Container, Graphics, type BitmapText } from 'pixi.js';
 
 import { clamp01 } from '../core/math.ts';
 import type { ScoreBar } from './compass.ts';
 import { KILLFEED_CAPACITY } from './killfeed.ts';
 import type { Killfeed } from './killfeed.ts';
 import type { MarketCountdown } from './market.ts';
-import { HUD_TYPE, hudText, fitHudText, writeHudText, poseHudNode } from './pixi-type.ts';
+import { hudText } from './pixi-glyphs.ts';
+import { HUD_TYPE, fitHudText, writeHudText, poseHudNode } from './pixi-type.ts';
 import type { Prompt, Banner } from './prompts.ts';
 
 export interface FeedbackModels {
@@ -19,8 +20,8 @@ interface FeedView {
   node: Container;
   back: Graphics;
   edge: Graphics;
-  attacker: Text;
-  victim: Text;
+  attacker: BitmapText;
+  victim: BitmapText;
   rifle: Graphics;
   skull: Graphics;
   sequence: number;
@@ -29,7 +30,7 @@ interface FeedView {
 const INK = 0xe7f2ef,
   MUTED = 0xa9bac5,
   AMBER = 0xffb02a;
-function label(value = '', size: number = HUD_TYPE.label, color = INK, x = 0, y = 0): Text {
+function label(value = '', size: number = HUD_TYPE.label, color = INK, x = 0, y = 0): BitmapText {
   return hudText(value, x, y, size, color);
 }
 function rect(color: number, alpha = 1): Graphics {
