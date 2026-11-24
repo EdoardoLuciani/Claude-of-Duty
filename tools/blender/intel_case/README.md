@@ -9,7 +9,7 @@ checklist and PCB screen print are authored inks, not runtime overlays.
 
 ## Author, check, cook
 
-Use Blender 5.2.2 and the repository's gltfpack 1.3. From the repo root:
+Use Blender 5.3.0 and the repository's gltfpack 1.3. From the repo root:
 
 ```sh
 OUT="$(mktemp -d)"

@@ -37,7 +37,7 @@ Open **Esc → Controls** for the full reference. If you die, choose **New Game*
 
 ## Run locally
 
-Install the Bun version in [`package.json`](package.json), **Blender 5.2.2** and
+Install the Bun version in [`package.json`](package.json), **Blender 5.3.0** and
 [**gltfpack 1.3 with BasisU support**](build/README.md). The first build generates assets
 and can take several minutes.
 

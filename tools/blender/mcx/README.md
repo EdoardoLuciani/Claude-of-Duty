@@ -14,7 +14,7 @@ Preserve STEP magazine visibility, attachment seating and reload/fold clearance.
 The opaque finish uses vertex pigments and a stable canonical UV1 scalar lookup,
 with original UV0 detail maps; no glass remains in the base weapon. Do not compensate with lighting.
 
-Run from the repository root with Blender 5.2.2 and gltfpack 1.3:
+Run from the repository root with Blender 5.3.0 and gltfpack 1.3:
 
 ```sh
 blender -b --python-exit-code 1 --python tools/blender/mcx/build.py

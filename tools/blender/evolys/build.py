@@ -1,4 +1,4 @@
-"""Source-first FN EVOLYS 7.62 game art. Blender 5.2.2; no old weapon inputs.
+"""Source-first FN EVOLYS 7.62 game art. Blender 5.3.0; no old weapon inputs.
 blender -b -t 2 --python-exit-code 1 --python tools/blender/evolys/build.py
 Optional: -- --output /absolute/directory --render --quick
 Reference/photo-inferred datums and regeneration caveats: asset README.md.

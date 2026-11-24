@@ -17,7 +17,7 @@ editable high bake sources, including the slide wordmark and SIGLITE insets.
 Preserve STEP magazines, sockets, events, hand contacts and runtime slide overrides.
 Shared arms and `hand-reference.json` are read-only; ordinary builds never refit.
 
-Run from the repository root with Blender 5.2.2 and gltfpack 1.3:
+Run from the repository root with Blender 5.3.0 and gltfpack 1.3:
 
 ```sh
 blender -b -t 8 --python-exit-code 1 --python tools/blender/p320/build.py

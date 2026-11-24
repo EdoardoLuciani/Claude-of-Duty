@@ -16,7 +16,7 @@ See the [attachment contract](../../../ARCHITECTURE.md#models) for supported com
 Runtime ADS uses 30 mm eye relief and 42° weapon FOV, a readability trade-off,
 not changed ballistics. Hand calibration and review-arm inputs are read-only.
 
-Run from the repository root with Blender 5.2.2 and gltfpack 1.3:
+Run from the repository root with Blender 5.3.0 and gltfpack 1.3:
 
 ```sh
 blender -b --threads 2 --python-exit-code 1 --python tools/blender/m4/build.py -- --quick

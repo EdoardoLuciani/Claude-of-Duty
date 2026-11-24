@@ -8,7 +8,7 @@ parts, internal surfaces, sockets, player arm inputs or extra shadow casters.
 
 ## Build and check
 
-From the repository root with Blender 5.2.2 and gltfpack 1.3:
+From the repository root with Blender 5.3.0 and gltfpack 1.3:
 
 ```sh
 review=$(mktemp -d)
