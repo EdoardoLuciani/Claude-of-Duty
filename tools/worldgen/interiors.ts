@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 import type { Assembler } from './builder.ts';
 import type { BuildingInfo } from './buildings.ts';
-import { BOX, BOX_FINE, BOX_THIN, IDENT, LL, rubbleMound } from './kit.ts';
+import { BOX, BOX_FINE, BOX_THIN, IDENT, LL, mergeSimple, rubbleMound } from './kit.ts';
 import type { CounterFootprint, RoomProp } from './level/room-fixtures.ts';
 import { ROOM_FIXTURES } from './level/room-fixtures.ts';
 import type { RectXZ } from './util.ts';
@@ -217,6 +217,36 @@ function setProp(
   A.put(name, x + dx, y + dy, z + dz, yaw, scale, [1, grime, 1]);
 }
 
+const CONDUIT_RADIUS = 0.016;
+const CONDUIT_SIDES = 6;
+
+/** A +X run into a -Y drop, joined on the x = y miter plane at the origin. */
+function miteredConduit(run: number, drop: number): THREE.BufferGeometry {
+  const legs = [true, false].map((horizontal): THREE.BufferGeometry => {
+    const leg = new THREE.CylinderGeometry(CONDUIT_RADIUS, CONDUIT_RADIUS, 1, CONDUIT_SIDES);
+    // Keep the free-end cap only. Both rings use (x, x, z) at the elbow,
+    // stretching the profile along the bisector like Curve to Mesh's Miter Scale.
+    const { start, count } = leg.groups[horizontal ? 2 : 1];
+    const indices = leg.index!.array.filter((_, i): boolean => i < start || i >= start + count);
+    leg.setIndex(new THREE.BufferAttribute(indices, 1));
+    const pos = leg.getAttribute('position');
+    const normal = leg.getAttribute('normal');
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      if (horizontal) {
+        pos.setXY(i, pos.getY(i) > 0 ? -run : x, x);
+        normal.setXY(i, -normal.getY(i), normal.getX(i));
+      } else {
+        pos.setY(i, pos.getY(i) > 0 ? x : -drop);
+      }
+    }
+    return leg;
+  });
+  const geometry = mergeSimple(legs);
+  for (const leg of legs) leg.dispose();
+  return geometry;
+}
+
 /** Build kit geometry from a room's authored fixtures. Goods follow the
  * surface they sit on; the furniture does not depend on any cosmetic draws. */
 export function furnishRoom(A: Assembler, id: string, r: RoomSpec): void {
@@ -312,20 +342,17 @@ export function furnishRoom(A: Assembler, id: string, r: RoomSpec): void {
           !backed(side, dx, dz, 0.11, y + boxHeight - 0.38, y + height + 0.03)
         )
           throw new Error(`[world] ${id} conduit on side ${side} has lost its wall`);
-        const { yaw } = sides[side];
-        const pipe = A.cache('conduit', (): THREE.BufferGeometry => {
-          const geometry = new THREE.CylinderGeometry(0.016, 0.016, 1, 6, 1);
-          return fillMasks(geometry, 0.35, 0.5, 0.1);
-        });
-        A.add(
+        const { tx, tz, yaw } = sides[side];
+        const run = Math.abs(to - from);
+        const rise = height - boxHeight;
+        if ((drop !== from && drop !== to) || Math.min(run, rise) <= CONDUIT_RADIUS)
+          throw new Error(`[world] ${id} conduit needs an endpoint drop and room for its miter`);
+        const direction = Math.sign(drop - (drop === from ? to : from));
+        A.addOnce(
           'metal_dark',
-          pipe,
-          LL(IDENT, rx, y + height, rz, yaw, 1, Math.abs(to - from), 1, 0, Math.PI / 2)
-        );
-        A.add(
-          'metal_dark',
-          pipe,
-          LL(IDENT, dx, y + (height + boxHeight) / 2, dz, 0, 1, height - boxHeight, 1)
+          miteredConduit(run, rise),
+          LL(IDENT, dx, y + height, dz, Math.atan2(-tz * direction, tx * direction)),
+          { masks: [0.35, 0.5, 0.1] }
         );
         A.add(
           'metal_dark',
@@ -335,12 +362,19 @@ export function furnishRoom(A: Assembler, id: string, r: RoomSpec): void {
             masks: [0.55, 0.5, 0.2],
           }
         );
-        if (flex)
+        if (flex) {
+          const pipe = A.cache(
+            'conduit-flex',
+            (): THREE.BufferGeometry =>
+              new THREE.CylinderGeometry(CONDUIT_RADIUS, CONDUIT_RADIUS, 1, CONDUIT_SIDES)
+          );
           A.add(
             'metal_dark',
             pipe,
-            LL(IDENT, ...at(drop + 0.06, 0.05, boxHeight - 0.28), 0, 0.4, 0.34, 0.4)
+            LL(IDENT, ...at(drop + 0.06, 0.05, boxHeight - 0.28), 0, 0.4, 0.34, 0.4),
+            { masks: [0.35, 0.5, 0.1] }
           );
+        }
         break;
       }
       case 'lean': {
