@@ -7,6 +7,7 @@ import { buildWorld } from '#worldgen/build';
 import { Assembler } from '#worldgen/builder';
 import type { BuildingInfo } from '#worldgen/buildings';
 import { BUILDINGS } from '#worldgen/level/layout';
+import { fillMasks } from '#worldgen/util';
 
 import { WORLD_BATCH_TINT } from '../../src/core/model-metadata.ts';
 import { isMesh } from '../../src/core/three-guards.ts';
@@ -115,12 +116,7 @@ assert.deepEqual(leaked.slice(0, 5), [], `${leaked.length} pieces changed outsid
 // Keep the instance's diffuse multiplier distinct from the PBR mask colors.
 const material = new THREE.MeshStandardMaterial();
 const assembler = new Assembler({ materials: { get: (): THREE.Material => material } });
-const geometry = new THREE.BoxGeometry();
-const vertexCount = geometry.getAttribute('position').count;
-geometry.setAttribute(
-  'color',
-  new THREE.Float32BufferAttribute(new Float32Array(vertexCount * 3).fill(0.5), 3)
-);
+const geometry = fillMasks(new THREE.BoxGeometry(), 0.5, 0.5, 0.5);
 assembler.add('metal_blue', geometry);
 assembler.proto('folded', { key: 'metal_blue', geo: geometry, batchVisual: true });
 assembler.put('folded', 2, 0, 0, 0, 1, [1, 1.25, 0.75]);

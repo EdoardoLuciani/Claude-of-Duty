@@ -1252,12 +1252,9 @@ export function burntCar(): THREE.BufferGeometry {
  * Prototype ids are the vocabulary dressing.ts and interiors.ts draw from.
  */
 export function registerProps(A: Assembler, batchVisual?: ReadonlySet<string>): Assembler {
-  const P = (
-    id: string,
-    key: string,
-    geo: THREE.BufferGeometry,
-    opts: Omit<PrototypeSpec, 'geo' | 'key'> = {}
-  ): string => A.proto(id, { geo, key, batchVisual: batchVisual?.has(id) ?? false, ...opts });
+  type Options = Omit<PrototypeSpec, 'geo' | 'key' | 'batchVisual'>;
+  const P = (id: string, key: string, geo: THREE.BufferGeometry, opts: Options = {}): string =>
+    A.proto(id, { geo, key, ...opts, batchVisual: batchVisual?.has(id) ?? false });
   // Each prototype owns its stream: adding or editing one never reshapes another.
   const R = (id: string): Rng => keyedRng('prop', id);
 
@@ -1296,7 +1293,7 @@ export function registerProps(A: Assembler, batchVisual?: ReadonlySet<string>): 
   P('block_small', 'concrete_dark', concreteBlock(R('block_small'), 0.55, 0.42, 0.4), {
     skirt: 0.31,
   });
-  const T = (id: string, r: number, opts: Omit<PrototypeSpec, 'geo' | 'key'> = {}): void => {
+  const T = (id: string, r: number, opts: Options = {}): void => {
     // Visual and canonical tyres share one stagger so collision matches.
     const stagger = R(id).float() * 6.28;
     P(id, 'rubber', tyre(stagger, r), { visualGeo: tyre(stagger, r, true), ...opts });
