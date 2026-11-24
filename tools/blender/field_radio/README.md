@@ -12,7 +12,7 @@ opaque dielectric cover with no baked UI, transparency, or transmission pass.
 
 Input: `tools/blender/field_radio/build.py` only. Its seeded paint and PBR atlases
 are generated and packed into the editable blend; no external fonts, textures,
-weapons, arm blends, or world files are required. Blender 5.2.2 exports the native
+weapons, arm blends, or world files are required. Blender 5.3.0 exports the native
 GLB using its stock exporter. The editable blend keeps the individual components;
 the export joins the housing into one draw and retains the LCD separately.
 

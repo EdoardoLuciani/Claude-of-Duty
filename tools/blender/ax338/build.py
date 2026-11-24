@@ -1,4 +1,4 @@
-"""Build original early AX338 game art from Python; Blender 5.2.2, metres.
+"""Build original early AX338 game art from Python; Blender 5.3.0, metres.
 blender -b -t 4 --python-exit-code 1 --python tools/blender/ax338/build.py
 Optional: -- --output /absolute/directory --render --quick
 Declared read-only calibration/review inputs and edit map: asset README.md.

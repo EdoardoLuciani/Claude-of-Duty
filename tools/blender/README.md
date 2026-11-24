@@ -16,8 +16,12 @@ explicitly refits calibration. MCX's `animations.py` authors its mechanisms and
 Committed manifests may retain source-path notes from an older export; use the
 current recipe README commands below rather than historical paths embedded in products.
 
-Use **Blender 5.2.2** and its bundled glTF exporter. Each recipe README owns its asset
-contract, build/check commands, declared inputs, references and acceptance limits:
+Use **Blender 5.3.0** and its bundled glTF exporter. The playable build uses the
+upstream Blender distribution with Python 3.13; keep recipes compatible with it
+when using a distro package that embeds a newer Python.
+
+Each recipe README owns its asset contract, build/check commands, declared inputs,
+references and acceptance limits:
 [M4](m4/README.md),
 [MCX](mcx/README.md),
 [P320](p320/README.md),

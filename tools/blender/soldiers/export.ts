@@ -46,7 +46,7 @@ interface SoldierProduct {
   meta: SoldierMetadata;
 }
 const NAMES = Object.keys(VARIANTS);
-export const BLENDER_VERSION = '5.2.2';
+export const BLENDER_VERSION = '5.3.0';
 const sha256 = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
 // Git may check text out with CRLF; unchanged source/JSON must not require Blender.
 export const canonicalText = (bytes: Buffer): Buffer =>
@@ -173,7 +173,7 @@ export async function exportSoldiers({
   try {
     const version = run(blender, ['--version']).split('\n')[0].trim();
     assert(
-      /^Blender 5\.2\.2(?:\s|$)/.test(version),
+      version.match(/^Blender (\S+)/)?.[1] === BLENDER_VERSION,
       `requires Blender ${BLENDER_VERSION}; got ${version}`
     );
     const inputHash = soldierInputHash();

@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Build every generated runtime asset, skipping steps whose inputs are unchanged.
- * Blender 5.2.2 and gltfpack 1.3 are needed only when a Blender step is stale.
+ * Blender and gltfpack are needed only when a Blender step is stale.
  * OW_SKIP_ASSETS=1 (`bun run build:ci`) skips Blender/model assets, but builds the world.
  *
  * Player arms run first, then the bandage, which re-saves player-arms.blend.
@@ -184,7 +184,9 @@ function listFiles(path: string): string[] {
 }
 
 function inputHash(step: AssetStep): string {
-  const hash = createHash('sha256').update([RECIPE, step.id, ...(step.salt ?? [])].join('\0'));
+  const hash = createHash('sha256').update(
+    [RECIPE, BLENDER_VERSION, step.id, ...(step.salt ?? [])].join('\0')
+  );
   for (const path of step.inputs.flatMap(listFiles)) {
     const bytes = readFileSync(join(ROOT, path));
     // Normalize text checkouts without decoding the binary Blender dependencies.

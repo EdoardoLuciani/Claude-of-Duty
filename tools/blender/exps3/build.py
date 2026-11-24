@@ -1,4 +1,4 @@
-"""Author the EXPS3-0 from factory-empty Blender 5.2.2; no CAD/scan or old blend inputs.
+"""Author the EXPS3-0 from factory-empty Blender 5.3.0; no CAD/scan or old blend inputs.
 
 blender -b -t 8 --python-exit-code 1 --python tools/blender/exps3/build.py -- --output /tmp/exps3 --render
 Coordinates: Blender X right, Y forward, Z up. Dimensions below are millimetres;

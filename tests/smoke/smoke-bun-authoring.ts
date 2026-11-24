@@ -12,8 +12,13 @@ import { BUN } from '../../tools/lib/browser-harness.ts';
 const fileReader = globalThis.FileReader;
 const cook: typeof import('../../tools/blender/soldiers/cook.ts') =
   await import('../../tools/blender/soldiers/cook.ts');
-const { exportSoldiers, loadCommittedSoldiers, soldierInputHash, soldierInputPaths } =
-  await import('../../tools/blender/soldiers/export.ts');
+const {
+  BLENDER_VERSION,
+  exportSoldiers,
+  loadCommittedSoldiers,
+  soldierInputHash,
+  soldierInputPaths,
+} = await import('../../tools/blender/soldiers/export.ts');
 assert.equal(globalThis.FileReader, fileReader, 'reader imports do not install an encoder adapter');
 const directory = mkdtempSync(join(tmpdir(), 'cod-bun-authoring-'));
 try {
@@ -81,7 +86,7 @@ try {
     `#!${BUN}
 import fs from 'node:fs';
 import path from 'node:path';
-if (process.argv.includes('--version')) { console.log('Blender 5.2.2'); process.exit(0); }
+if (process.argv.includes('--version')) { console.log('Blender ${BLENDER_VERSION}'); process.exit(0); }
 const arg = name => process.argv[process.argv.indexOf(name) + 1];
 const name = arg('--variant'), output = arg('--output');
 const data = ${JSON.stringify(payload)};

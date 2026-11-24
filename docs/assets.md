@@ -59,7 +59,7 @@ blender -b /tmp/m4-review/m4a1-block-ii.blend --python-exit-code 1 \
 bun build/models.ts m4 /tmp/m4-review
 ```
 
-Blender 5.2.2 and the pinned gltfpack encoder are needed by `bun run dev` /
+Blender 5.3.0 and the pinned gltfpack encoder are needed by `bun run dev` /
 `bun run build` whenever a Blender step is stale (see below). See the
 [shared authoring workflow](../tools/blender/README.md) and
 [cooking recipe](../build/README.md). Committed weapon manifests may name old tool

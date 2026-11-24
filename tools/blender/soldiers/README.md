@@ -1,7 +1,7 @@
 # Procedural soldiers
 
 Authoritative geometry: [`tools/blender/soldiers/build.py`](build.py).
-The recipe builds factory-empty with Blender **5.2.2** and supports all uint32
+The recipe builds factory-empty with Blender **5.3.0** and supports all uint32
 seeds. Native primitives, sewn cloth sections and modifiers replace the old
 TypeScript builder; visual differences are intentional, not a pixel-perfect port.
 
@@ -67,7 +67,7 @@ bun tools/blender/soldiers/export.ts --output /absolute/scratch/soldiers
 # Optional: --seed 0x5eed1234 --blender /absolute/path/to/blender
 ```
 
-This explicit command requires Blender **5.2.2**. The executable defaults to
+This explicit command requires Blender **5.3.0**. The executable defaults to
 `BLENDER` or `blender`; the seed defaults to uint32 `0x5eed1234`. It computes a
 reference in an owned temporary directory, factory-empty builds all registered
 variants, then encodes their new packed meshes with the existing Three

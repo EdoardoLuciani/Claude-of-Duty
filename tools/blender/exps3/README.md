@@ -9,7 +9,7 @@ GLB are generated products. References, rights and visual limitations live in
 
 ## Rebuild and validate
 
-Run from the repository root with Blender 5.2.2, compatible AgX and gltfpack 1.3:
+Run from the repository root with Blender 5.3.0, compatible AgX and gltfpack 1.3:
 
 ```sh
 bun tools/build-assets.ts

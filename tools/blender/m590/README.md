@@ -16,7 +16,7 @@ Native metres export −Z forward/+Y up without an adapter scale/basis correctio
 Manifest sockets/events/contact windows are authority, not a second schedule.
 Shared arms and hand calibration are read-only; ordinary builds never refit.
 
-Run from the repository root with Blender 5.2.2 and gltfpack 1.3:
+Run from the repository root with Blender 5.3.0 and gltfpack 1.3:
 
 ```sh
 blender -b -t 2 --python-exit-code 1 --python tools/blender/m590/build.py

@@ -12,7 +12,7 @@ stays closed. The amber recognition ring is separate and runtime-owned.
 Inputs are [`build.py`](build.py) (shape,
 part layout, normals and UVs) and [`finish.py`](finish.py)
 (deterministic atlas generation). No photograph, font, other asset or previous
-export is required. Blender 5.2.2 supplies NumPy and the native glTF exporter.
+export is required. Blender 5.3.0 supplies NumPy and the native glTF exporter.
 With gltfpack 1.3/BasisU on `PATH`, run from the repo root:
 
 ```sh

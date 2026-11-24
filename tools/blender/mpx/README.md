@@ -15,7 +15,7 @@ Preserve lockback, cancellation, chamber accounting, shared hand calibration and
 pooled ejection. One opaque material retains original finish colors and UV0 grain;
 UV1 keeps the original tile indices for the finishes used by the model.
 
-Run from the repository root with Blender 5.2.2 and gltfpack 1.3:
+Run from the repository root with Blender 5.3.0 and gltfpack 1.3:
 
 ```sh
 blender -b -t 2 --python-exit-code 1 --python tools/blender/mpx/build.py
