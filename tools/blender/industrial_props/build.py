@@ -1,6 +1,7 @@
 """Author and bake the canonical world meshes (see README.md)."""
 
 import argparse
+from itertools import batched
 from pathlib import Path
 import sys
 
@@ -70,8 +71,7 @@ def bake(name, obj):
     triangles = [i for tri in mesh.loop_triangles for i in tri.vertices]
 
     def rows(values):
-        return ''.join('    ' + ', '.join(map(str, values[i:i + 12])) + ',\n'
-                       for i in range(0, len(values), 12))
+        return ''.join('    ' + ', '.join(map(str, row)) + ',\n' for row in batched(values, 12))
 
     return (f'export const {name} = {{\n'
             f'  // oxfmt-ignore\n  positions: [\n{rows(positions)}  ],\n'
