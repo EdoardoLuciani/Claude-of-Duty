@@ -13,7 +13,7 @@ function matchesGate(gate: CourseGate | undefined, action: string, p: Vector3Lik
   return (p.x - x) ** 2 + (p.y - y) ** 2 + (p.z - z) ** 2 <= gate.radius ** 2;
 }
 
-/** Interactions authored by the practice world's manifest. */
+/** Optional range interactions authored by the loaded world manifest. */
 export class RangeSystem {
   static readonly id = 'range';
   static readonly deps: SystemId[] = ['world', 'player', 'weapons', 'market', 'ui'];
@@ -53,6 +53,7 @@ export class RangeSystem {
 
   update(_dt: number, ctx: EngineContext): void {
     const { course, rangeStation } = this.queries;
+    if (!rangeStation && !course.length) return;
     const { input } = ctx;
     const { ui, player } = this;
     // PauseMenu uses the time scale. Its lateUpdate has not seen this frame's input yet.

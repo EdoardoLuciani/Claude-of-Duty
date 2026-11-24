@@ -618,7 +618,7 @@ export function buildTraining(A: Assembler): void {
   workLights(A);
 }
 
-export function trainingMetadata(A: Assembler, sourceHash: string): BuildMetadata {
+export function trainingMetadata(A: Assembler): BuildMetadata {
   const spawns: Array<WorldManifest['spawns'][number] & { id: string }> = [
     {
       id: 'firing_line',
@@ -629,9 +629,6 @@ export function trainingMetadata(A: Assembler, sourceHash: string): BuildMetadat
     },
   ];
   return {
-    version: 2,
-    coordinateSystem: 'three-y-up-metres',
-    sourceHash,
     transform: A.xform.toArray(),
     bounds: {
       min: [-HALF_WIDTH - 0.5, -1, LONG_BACK - 0.5],

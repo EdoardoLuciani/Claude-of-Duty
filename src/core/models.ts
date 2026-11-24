@@ -24,7 +24,6 @@ export class ModelSystem {
   declare loader: GLTFLoader;
   declare _soldiers: Map<string, Promise<SoldierRecord>>;
   declare worldPrefetch: Promise<WorldPrefetch>;
-  declare worldNav: ArrayBuffer | undefined;
 
   static readonly id = 'models';
   static readonly deps: SystemId[] = [];
@@ -55,8 +54,7 @@ export class ModelSystem {
       this._loadWorldGLB(`${base}/${collision}`),
       nav ? this._loadWorldBytes(`${base}/${nav}`) : undefined,
     ]);
-    this.worldNav = navBytes;
-    return { meta, visual: visualGlb, collision: collisionGlb };
+    return { meta, visual: visualGlb, collision: collisionGlb, navBytes };
   }
 
   async _loadWorldBytes(url: string): Promise<ArrayBuffer> {

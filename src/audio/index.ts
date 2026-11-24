@@ -6,6 +6,7 @@
 import type { SystemId, EngineContext } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName, ReloadPhase } from '../core/events.ts';
 import { clamp } from '../core/math.ts';
+import { SESSION_MODE_POLICY } from '../core/playable-maps.ts';
 import type { Rng } from '../core/rng.ts';
 import type { SurfaceName } from '../physics/surfaces.ts';
 import { AircraftVoice, AIRCRAFT_MIX, type AircraftPosition } from './aircraft.ts';
@@ -85,7 +86,7 @@ interface AudioOptions {
   bus?: BusName | undefined;
   force?: boolean | undefined;
 }
-type AudioRuntimeContext = Pick<EngineContext, 'rng' | 'camera' | 'events' | 'peek'>;
+type AudioRuntimeContext = Pick<EngineContext, 'rng' | 'camera' | 'config' | 'events' | 'peek'>;
 interface SpaceMetrics {
   tight: number;
   room: number;
@@ -344,8 +345,9 @@ export class AudioSystem {
 
       // Preserve the shared deterministic noise used by finite synthesized events.
       this.bank = new NoiseBank(actx, this.rng.fork(), 9.6);
+      const { survivalSystems: enemyCallouts } = SESSION_MODE_POLICY[this.ctx.config.mode];
       const samples = (this.samples = new WeaponSampleBank(actx));
-      await samples.load();
+      await samples.load(enemyCallouts);
       if (this.actx !== actx) return false;
       const busVolumes: Partial<Record<BusName, number>> = {};
       for (const name of BUS_NAMES) busVolumes[name] = volumeGain(this.volumes[name]);
@@ -361,7 +363,9 @@ export class AudioSystem {
       };
       mixer.buildReverbs();
       this.field = new SpatialField(actx, mixer, this.ctx);
-      this._callouts = new CalloutPlayer(actx, this.field, samples, this.rng.fork());
+      // Keep the shared ambience and music RNG streams independent of callout availability.
+      const calloutRng = this.rng.fork();
+      if (enemyCallouts) this._callouts = new CalloutPlayer(actx, this.field, samples, calloutRng);
       const ambience = (this.ambience = new Ambience(this.rng.fork()));
       ambience.start();
       const tentRadio = (this.tentRadio = new TentRadio(actx, mixer, this.rng.fork()));

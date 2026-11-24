@@ -113,7 +113,7 @@ export class WeaponSampleBank {
     this.actx = actx;
   }
 
-  async load(): Promise<number> {
+  async load(enemyCallouts = true): Promise<number> {
     const jobs = this._loadBank(URLS, this.buffers, this.indices, 0);
     jobs.push(
       this._loadBuffer(HEARTBEAT_URL).then((buffer): void => {
@@ -125,7 +125,15 @@ export class WeaponSampleBank {
     AIRCRAFT_URLS.forEach((url, index): number =>
       jobs.push(this._loadInto(this.aircraftBuffers, index, url))
     );
-    jobs.push(...this._loadBank(CONTACT_URLS, this.hitBuffers, this.hitIndices, -1));
+    jobs.push(
+      ...this._loadBank(
+        CONTACT_URLS,
+        this.hitBuffers,
+        this.hitIndices,
+        -1,
+        enemyCallouts ? undefined : CALLOUT_URLS
+      )
+    );
     jobs.push(...this._loadBank(RELOAD_URLS, this.reloadBuffers, this.reloadIndices, -1));
     // Finish all decodes before start() tears down a failed bank.
     for (const result of await Promise.allSettled(jobs))
@@ -149,10 +157,12 @@ export class WeaponSampleBank {
     urls: Record<K, readonly string[]>,
     buffers: Partial<Record<K, AudioBuffer[]>>,
     indices: Partial<Record<K, number>>,
-    initialIndex: number
+    initialIndex: number,
+    exclude?: Readonly<Record<string, unknown>>
   ): Promise<void>[] {
     const jobs: Promise<void>[] = [];
     for (const kind of Object.keys(urls).filter((key): key is K => hasOwn(urls, key))) {
+      if (exclude && hasOwn(exclude, kind)) continue;
       const takes = (buffers[kind] = new Array<AudioBuffer>(urls[kind].length));
       indices[kind] = initialIndex;
       urls[kind].forEach((url, index): number => jobs.push(this._loadInto(takes, index, url)));

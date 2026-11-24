@@ -45,6 +45,7 @@ export type FxDecalOptions = Partial<
   Omit<DecalOptions, 'point' | 'normal' | 'world' | 'now' | 'mask'>
 > & {
   noFallback?: boolean;
+  primaryImpact?: boolean;
 };
 interface FxTargetFrame {
   point: THREE.Vector3;
@@ -554,10 +555,7 @@ export class FxSystem {
     o.life = opts.life ?? 60;
     // Use the ordinary projected impact (not a second ray from the camera).
     // Keep the primary mark readable downrange until reset or budget eviction.
-    if (
-      opts.opacity === undefined &&
-      this.ctx.peek('world')?.queries.rangeTargetAt(point, normal)
-    ) {
+    if (opts.primaryImpact && this.ctx.peek('world')?.queries.rangeTargetAt(point, normal)) {
       o.life = Infinity;
       o.size = Math.max(o.size, 0.18);
     }

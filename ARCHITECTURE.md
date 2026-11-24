@@ -51,10 +51,10 @@ Training Grounds loads a separate authored world. Its session registers the same
 weapons, FX, radio and market systems, without the Survival director or intel. The firing-line
 counter opens the same Supply Market with an unlimited session balance. In both modes the
 market overlay suspends gameplay and waits for pointer lock before resuming it.
-Target marks use the resolved world-impact decals. Grenades and radio strikes use the
-shared blast damage, cover, armour and healing rules in both modes. The range system
-owns the manifest-authored counter and the optional yard circuit. It tracks movement
-and player bullet impacts on labeled faces and publishes interaction prompts to the HUD,
+Target marks keep the primary resolved world-impact decals. Grenades and radio strikes use the
+shared blast damage, cover, armour and healing rules in both modes. The range system enables
+counter and circuit interactions in any session mode when the manifest includes those markers.
+It tracks movement and player bullet impacts on labeled faces and publishes prompts to the HUD,
 independently of free practice and Survival scoring.
 
 Each system declares `static id`, `static deps`, and implements needed hooks:
@@ -194,12 +194,13 @@ Pieces marked visual-only at assembly do not enter the collision or navigation b
 including when they share a material batch with solid pieces.
 A prototype's optional `visualGeo` is visual only; support, collision and navigation
 use canonical `geo`, topology and RNG/instance inputs. Paint-only batches do not contribute
-collision. The exporter builds and validates manifest v2 and content-hashed products
-for each playable map. Survival keeps the root `public/models/world/` bundle and
-Training Grounds uses `public/models/world/training/`. `ModelSystem` loads the selected
-bundle and verifies map identity before loading its assets. Survival-mode bundles bake
-navigation, and `ModelSystem` loads it when the manifest lists it. Optional world-space range station and target-face markers
-come from the loaded manifest via `WorldQueries`; runtime range and FX code do not import
+collision. Map builders return authored metadata; the exporter adds the common manifest
+header and validates the content-hashed products for each playable map. Survival keeps the
+root `public/models/world/` bundle and Training Grounds uses `public/models/world/training/`.
+`ModelSystem` verifies map identity before loading bundle assets. Survival-mode bundles bake
+navigation, and `ModelSystem` includes it in the prefetched world when the manifest lists it.
+Optional world-space range station and target-face markers come from the loaded manifest via
+`WorldQueries`; runtime range and FX code do not import
 authoring coordinates. Preserve instancing/masks; never author separate collision
 geometry. Validate with `bun tools/export-world.ts --check`, world/physics tests and screenshots.
 
@@ -463,8 +464,9 @@ AI owns the soldier texture arrays and finish lookup textures.
 
 FX atlases (`tools/lib/fx-atlas.ts`) and recorded audio are required: missing
 atlases reject FX init, and failures loading a session's required recordings disable its audio graph.
-Only Survival loads enemy callouts and initializes shop music. Gameplay
-sound (firearms, impacts, foley, explosions, aircraft, callouts) is recorded;
+Enemy callout recordings are loaded only when the session enables enemy AI. The same shop
+music plays at practice counters and between waves. Gameplay sound (firearms, impacts, foley,
+explosions, aircraft, callouts) is recorded;
 synthesis is only UI/electronic feedback, healing cues, tinnitus and shop music.
 Requests without a matching recording stay silent. Explosions carry optional
 `kind: 'grenade' | 'bomb'` (default grenade). Radio owns aircraft lifetime; audio

@@ -12,6 +12,7 @@ import { LedgeProbe, LEDGE_VAULT, LEDGE_NONE } from '../../src/player/mantle.ts'
 import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
 import { WorldSystem } from '../../src/world/index.ts';
 import { WorldQueries } from '../../src/world/queries.ts';
+import { RETURN_FLIGHT } from '../../tools/worldgen/level/training-layout.ts';
 import { createTestContext, createTestInput } from '../lib/context.ts';
 import { physicsFor } from '../lib/nav240/fixtures.ts';
 
@@ -32,7 +33,8 @@ const map = PLAYABLE_MAPS.find((entry): boolean => entry.id === 'training-ground
 assert(map);
 const models = new ModelSystem(map);
 await models.init();
-const { meta, visual, collision } = await models.worldPrefetch;
+const { meta, visual, collision, navBytes } = await models.worldPrefetch;
+assert.equal(navBytes, undefined);
 assert.deepEqual(
   requests.sort(),
   [
@@ -227,24 +229,26 @@ assert(
   ) < 0.02
 );
 // Same runway, same takeoff stripe: the finish needs both speed and a jump.
+const { x: runwayX, sill, edge } = RETURN_FLIGHT;
 for (const [sprint, jump] of [
   [false, true],
   [true, false],
   [true, true],
 ]) {
-  movement.teleport(-12.65, 7.21, -20.2);
+  movement.teleport(runwayX, sill + 0.01, edge - 3.2);
   movement.yaw = Math.PI;
   ctx.input.down.clear();
   ctx.input.down.add(DEFAULT_BINDINGS.forward[0]);
   if (sprint) ctx.input.down.add(DEFAULT_BINDINGS.sprint[0]);
   let airborneCatch = false;
   for (let i = 0; i < 240; i++) {
-    if (jump && movement.position.z >= -17.12) ctx.input.down.add(DEFAULT_BINDINGS.jump[0]);
+    if (jump && movement.position.z >= edge - 0.12) ctx.input.down.add(DEFAULT_BINDINGS.jump[0]);
     const airborne = !movement.grounded;
     movement.latchInput(++ctx.time.frame);
     movement.step(ctx.time.fixed);
     ctx.time.elapsed += ctx.time.fixed;
-    if (movement.mantleMotion.active && airborne && movement.position.y > 7.2) airborneCatch = true;
+    if (movement.mantleMotion.active && airborne && movement.position.y > sill)
+      airborneCatch = true;
     if (movement.position.y < 6 || (movement.grounded && movement.position.y > 9)) break;
   }
   assert.equal(airborneCatch && movement.grounded && movement.position.y > 9, sprint && jump);

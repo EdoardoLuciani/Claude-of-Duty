@@ -7,14 +7,14 @@ import { type BuildMetadata, worldMetadata } from './metadata.ts';
 
 export const PLAYABLE_MAP_BUILDERS: Record<
   (typeof PLAYABLE_MAPS)[number]['id'],
-  (assembler: Assembler, sourceHash: string) => BuildMetadata
+  (assembler: Assembler) => BuildMetadata
 > = {
-  courtyard(A, sourceHash): BuildMetadata {
+  courtyard(A): BuildMetadata {
     A.setTransform(LEVEL_YAW, LEVEL_TX, LEVEL_TZ);
-    return worldMetadata(A, buildWorld(A), sourceHash);
+    return worldMetadata(A, buildWorld(A));
   },
-  'training-grounds'(A, sourceHash): BuildMetadata {
+  'training-grounds'(A): BuildMetadata {
     buildTraining(A);
-    return trainingMetadata(A, sourceHash);
+    return trainingMetadata(A);
   },
 };

@@ -153,7 +153,7 @@ async function compileWorld(
   const A = new Assembler({ materials });
 
   try {
-    const metadata = PLAYABLE_MAP_BUILDERS[map.id](A, sourceHash);
+    const metadata = PLAYABLE_MAP_BUILDERS[map.id](A);
     const visualRoot = new THREE.Group();
     visualRoot.name = 'world';
     // Keep collision/nav on the canonical buckets, independent of visual compaction.
@@ -189,6 +189,9 @@ async function compileWorld(
     const manifestData =
       JSON.stringify(
         {
+          version: 2,
+          coordinateSystem: 'three-y-up-metres',
+          sourceHash,
           ...metadata,
           mapId: map.id,
           assets: { visual: visualFile, collision: collisionFile, nav: navFile },

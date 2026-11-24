@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 
+import { CALLOUT_URLS } from '../../src/audio/callouts.ts';
 import { AudioSystem } from '../../src/audio/index.ts';
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
 import type { AudioVoice } from '../../src/audio/types.ts';
@@ -49,6 +50,12 @@ try {
       failure !== null && failedUrls.includes(failure) ? total - 1 : total,
       'all jobs settle before failure teardown'
     );
+    if (failure === null) {
+      const shared = new WeaponSampleBank(actx);
+      assert.equal(await shared.load(false), total - Object.values(CALLOUT_URLS).flat().length);
+      for (const key of Object.keys(CALLOUT_URLS)) assert(!Object.hasOwn(shared.hitBuffers, key));
+      shared.dispose();
+    }
     bank.dispose();
     assert(Object.values(bank.buffers).every((buffers): boolean => buffers.length === 0));
     assert.equal(bank.heartbeatBuffer, null);
@@ -82,6 +89,4 @@ try {
 } finally {
   globalThis.fetch = fetch;
 }
-console.log(
-  'All recorded assets are required; HTTP/decode failures and missing takes never select substitutes'
-);
+console.log('Session recordings, including optional AI callouts, load without fallback takes');

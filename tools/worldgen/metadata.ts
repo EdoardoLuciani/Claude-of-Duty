@@ -12,10 +12,11 @@ import { SPAWNS } from './level/config.ts';
 import { INTEL_POINTS } from './level/intel.ts';
 import { ALLEYS, STREET } from './level/layout.ts';
 
-/** Manifest fields a map builder authors; the exporter adds assets, navigation, stats and identity. */
-export type BuildMetadata = Omit<WorldManifest, 'assets' | 'navigation' | 'stats' | 'mapId'> & {
-  coordinateSystem: string;
-};
+/** Manifest fields a map builder authors; the exporter adds the bundle header and products. */
+export type BuildMetadata = Omit<
+  WorldManifest,
+  'version' | 'sourceHash' | 'assets' | 'navigation' | 'stats' | 'mapId'
+>;
 
 const point = new THREE.Vector3();
 
@@ -26,11 +27,7 @@ function worldPosition(A: Assembler, value: THREE.Vector3Like, yOffset = 0): Mod
     .toArray();
 }
 
-export function worldMetadata(
-  A: Assembler,
-  buildings: BuildingInfo[],
-  sourceHash: string
-): BuildMetadata {
+export function worldMetadata(A: Assembler, buildings: BuildingInfo[]): BuildMetadata {
   const matrix = A.xform.clone();
   const bounds = new THREE.Box3(
     new THREE.Vector3(-62, -2, -62),
@@ -79,9 +76,6 @@ export function worldMetadata(
   );
 
   return {
-    version: 2,
-    coordinateSystem: 'three-y-up-metres',
-    sourceHash,
     transform: matrix.toArray(),
     bounds: { min: bounds.min.toArray(), max: bounds.max.toArray() },
     spawns,

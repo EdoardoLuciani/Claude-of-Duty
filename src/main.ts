@@ -124,8 +124,7 @@ async function bootSession(map: PlayableMap): Promise<void> {
   if (survivalSystems) engine.add(AiSystem).add(GameSystem);
   engine.add(UiSystem, capture ? undefined : returnToStartMenu);
   if (survivalSystems) engine.add(IntelSystem);
-  else engine.add(RangeSystem);
-  engine.add(AudioSystem);
+  engine.add(RangeSystem).add(AudioSystem);
 
   if (survivalSystems && params.get('telemetry') === '1') {
     const { TelemetrySystem } = await import('./dev/telemetry.ts');

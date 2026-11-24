@@ -155,6 +155,7 @@ export interface WorldPrefetch {
   meta: WorldManifest;
   visual: GLTF;
   collision: GLTF;
+  navBytes: ArrayBuffer | undefined;
 }
 
 /** JSON is unknown until each field consumed by runtime has been checked. */
