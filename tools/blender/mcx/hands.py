@@ -159,6 +159,38 @@ def author_hands(root,asset,parts,clips):
                 pose('left',3.25)
             else:
                 pose('left',2.35)
+        elif name=='Inspect':
+            # Fit the exposed firing hand to the MCX grip and trigger window.
+            pos = C @ (Vector((.03311,-.01305,.07878))-ORIGIN)
+            q = native(Quaternion((.754389,-.025206,-.031537,-.655185)))
+            fitted = {
+                'fingerSpread':[-.183,.012,-.090,-.250],
+                'fingers':[[-.285,1.477,.227],[.255,1.757,.818],[.465,1.685,.601],[.657,1.318,.550]],
+                'thumbBase':[-1.386,-.564,-2.898],
+                'thumb':[.015,1.280],
+            }
+            duration = clips[name]['duration']
+            for t in (.18,duration-.18): pose('right',t,pos,q,fitted)
+            # Unwrap the fingers outside the guard at the two grip transitions.
+            for t in (.045,.135,duration-.135,duration-.045):
+                key(hands['right']['wrist'],'location',pos+C @ Vector((.023,-.004,0)),t*FPS)
+            pose('left',.10,rest+C @ Vector((-.016,-.016,.005)))
+            pose('left',.19,rest+C @ Vector((-.054,-.047,.014)))
+            pose('left',.29,rest+C @ Vector((-.096,-.113,.022)),p=opened)
+            # Park relative to ready, not the rolling receiver.
+            for f,offset in [
+                (26,(-.135,-.249,.050)),
+                *((f,(-.142,-.299,.076)) for f in (34,45,121,151,171,185)),
+                (200,(-.142,-.233,.049)),
+            ]:
+                scene.frame_set(f)
+                ready_to_rig = rig.matrix_basis.inverted()
+                wrist('left',f/FPS,ready_to_rig @ (rest+C @ Vector(offset)),
+                      ready_to_rig.to_quaternion() @ held['left'][1])
+            wrist('left',3.58,rest+C @ Vector((-.108,-.080,.024)))
+            pose('left',3.75,rest+C @ Vector((-.064,-.043,.013)),p=opened)
+            pose('left',3.90,rest+C @ Vector((-.025,-.017,.004)))
+            pose('left',4.05)
         elif name=='Draw':
             pose('left',0,rest+C @ Vector((-.02,-.09,.06)))
             pose('left',.37)
