@@ -16,8 +16,8 @@ See the [attachment contract](../../../ARCHITECTURE.md#models) for supported com
 Runtime ADS uses 30 mm eye relief and 42° weapon FOV, a readability trade-off,
 not changed ballistics. Hand calibration and review-arm inputs are read-only.
 
-`Inspect` uses the [CS2 M4A4 viewmodel](https://www.youtube.com/watch?v=-7spynqkYTk&t=556s)
-as a motion reference only.
+`Inspect` uses the CS2 [M4A4](https://www.youtube.com/watch?v=-7spynqkYTk&t=556s)
+and [M4A1-S](https://www.youtube.com/watch?v=-7spynqkYTk&t=579s) viewmodels as motion references only.
 
 Run from the repository root with Blender 5.3.0 and gltfpack 1.3:
 

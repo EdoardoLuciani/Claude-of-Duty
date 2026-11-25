@@ -130,7 +130,7 @@ def author_actions(root,asset,rig,parts,mag,spare,bolt,head,handle,trigger,cover
         clips[name]['events']=[{'time':.02*d,'event':'start'},{'time':out*d,'event':'magout'},{'time':drop*d,'event':'magdrop'},{'time':insert*d,'event':'magin'}]
         clips[name]['events'] += ([{'time':.90*d,'event':'charge'},{'time':.917*d,'event':'boltrelease'}] if empty_reload else [{'time':.88*d,'event':'slap'}])
         clips[name]['events'].append({'time':.995*d,'event':'end'});finish(name)
-    # CS2 M4A4 motion reference: see the M4A1 authoring README.
+    # CS2 M4 motion references: see the M4A1 authoring README.
     inspect_end=6
     begin('Inspect',inspect_end)
     for t,loc,rot in [
@@ -141,10 +141,12 @@ def author_actions(root,asset,rig,parts,mag,spare,bolt,head,handle,trigger,cover
         (.92,(.047,.079,-.109),(7,55,6)),
         (2.85,(.023,.062,-.145),(6,64,7)),
         (3.65,(.007,.057,-.146),(6,68,11)),
-        (4.10,(-.012,.026,-.120),(14,59,22)),
-        (4.55,(-.015,.004,-.072),(20,44,38)),
-        (4.89,(.002,.031,-.061),(26,30,20)),
-        (5.16,(-.006,.016,-.029),(13,18,6)),
+        (4.10,(-.018,.038,-.112),(30,50,17)),
+        (4.30,(-.026,.048,-.104),(37,46,45)),
+        (4.51,(-.029,.055,-.119),(33,49,76)),
+        (4.76,(-.025,.054,-.111),(34,45,75)),
+        (4.98,(.001,.036,-.070),(32,31,33)),
+        (5.21,(.006,.016,-.029),(13,18,6)),
         (5.48,(.005,-.008,.006),(-3,2,-2)),
         (5.83,(0,0,0),(0,0,0)),
     ]:key(rig,t,loc,rot)
@@ -170,16 +172,16 @@ def author_actions(root,asset,rig,parts,mag,spare,bolt,head,handle,trigger,cover
     for t,pos in [
         (.40,(-.194,-.200,-.170)),
         *((t,(-.225,-.284,-.133)) for t in (.68,.92,2.85,3.65,3.95)),
-        (4.17,(-.222,-.217,-.155)),
+        (4.30,(-.222,-.217,-.155)),
     ]:
         f=round(t*FPS,6)
         scene.frame_set(math.floor(f),subframe=f%1)
         ready_to_rig=CI.to_4x4()@rig.matrix_basis.inverted()@C.to_4x4()
         pose('left',t,ready_to_rig@Vector(pos),ready_to_rig.to_quaternion()@lq,loose)
-    pose('left',4.38,(-.156,-.024,-.204),p=loose)
-    pose('left',4.61,(-.120,.006,-.204),p=loose)
-    pose('left',4.77,(-.089,.032,-.196))
-    pose('left',4.92)
+    pose('left',4.55,(-.156,-.024,-.204),p=loose)
+    pose('left',4.76,(-.120,.006,-.204),p=loose)
+    pose('left',4.92,(-.089,.032,-.196))
+    pose('left',5.08)
     clips['Inspect']['events']=[{'time':inspect_end-.025,'event':'end'}];finish('Inspect')
     for name,d,drawing in [('Draw',.62,True),('Holster',.4,False)]:
         begin(name,d)
