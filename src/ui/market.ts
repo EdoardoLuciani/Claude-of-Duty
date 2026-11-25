@@ -331,7 +331,6 @@ export class MarketOverlay {
     this.capture.cancel();
     this.active = false;
     this.root.close();
-    this.market.closeShop();
     this.shown = 0;
     setStyle(this.root, 'display', 'none'); // Terminal errors stop the UI update hook too.
     this.body.inert = false;
@@ -433,6 +432,7 @@ export class MarketOverlay {
     const { engine, input } = this.ctx;
     this.run('resume', (): void => {
       this.hide();
+      this.market.closeShop();
       engine.setGameplaySuspended(false); // Clears pending inputs and pointer-lock loss.
       input.enabled = true;
     });
