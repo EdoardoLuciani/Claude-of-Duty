@@ -399,7 +399,7 @@ assert(!market.confirmBuild());
 const rifle = weaponState('rifle');
 const rifleBase = buildDef('rifle', BASE_ATTACHMENTS);
 const { pitch, yaw } = rifleBase.recoil;
-const riflePattern = rifle.pattern;
+const riflePattern = rifle.pattern.slice();
 const rifleScene = entries.get('rifle')?.model.scene;
 const rifleMount = rifleScene?.getObjectByName('MOUNT_muzzle');
 const rifleStock = rifleScene?.getObjectByName('MUZZLE_device');
