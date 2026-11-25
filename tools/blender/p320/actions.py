@@ -191,14 +191,22 @@ def author_actions(root,asset,rig,parts,mag,spare,slide,barrel,trigger,catch,rou
         (366,(0,0,0),(0,0,0)),
     ]:key(rig,f,loc,rot)
 
-    offered=copy.deepcopy(ref['sides']['right']['grip'])
-    offered['fingers'][1:]=[[.48,.60,.36],[.53,.68,.40],[.61,.78,.45]]
-    # Lift the thumb behind the slide, rather than unfolding across its flank.
-    offered['thumbBase']=[-2.57,-1.35,1.56]
-    offered['thumb']=[.10,.15]
-    pose('right',12)
-    for f in (37,182):pose('right',f,p=offered)
-    pose('right',220)
+    # The single-hand presentation needs a grip fitted on the actual P320
+    # mesh: the index enters from the side and curls onto the blade, while
+    # the other fingers wrap the frontstrap. Keep that contact through the roll.
+    wrist=(.04138,-.04880,.10400)
+    wrist_rotation=Quaternion((.737402,.051369,.128339,-.661157))
+    grip={
+        'fingerSpread':[.361,.570,.459,.341],
+        'fingers':[[-.326,1.262,.275],[.068,1.830,.738],[.316,1.765,.677],[.547,1.602,.726]],
+        'thumbBase':[-.971,-.098,-2.955],
+        'thumb':[.047,.921],
+    }
+    # Peel the thumb back around the tang before lifting it. The fingers stay seated.
+    peel={**grip,'thumbBase':[-1.953,-.891,2.463],'thumb':[.07,.52]}
+    offered={**grip,'thumbBase':[1.775,-1.412,-.362],'thumb':[.10,.15]}
+    for f,p in [(9,grip),(20,peel),(37,offered),(182,offered),(208,peel),(220,grip),(364,grip)]:
+        pose('right',f,wrist,wrist_rotation,p)
 
     # Leave the grip outboard before the turn. While detached, key the wrist in
     # ready space so it drops below view instead of orbiting with the slide.
