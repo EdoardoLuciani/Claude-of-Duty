@@ -64,7 +64,7 @@ def build():
     steel=material('03 | coated steel',(.018,.021,.023),0,.52)
     bright=material('04 | exposed steel',(.17,.18,.18),1,.36)
     mark=material('09 | laser markings',(.60,.57,.47),0,.88)
-    glass=material('10 | RMR coated lens',(.03,.10,.12),0,.14)
+    glass=material('10 | PM II coated lens',(.03,.10,.12),0,.14)
     glass.surface_render_method='DITHERED';glass.node_tree.nodes.get('Principled BSDF').inputs['Alpha'].default_value=.13
     glass.node_tree.nodes.get('Principled BSDF').inputs['Transmission Weight'].default_value=0
 
