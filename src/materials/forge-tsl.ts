@@ -26,17 +26,54 @@ interface SurfaceBakeInput {
   surface: SurfaceNode;
 }
 
-/** Bake the shared, linear RGBA macro map on the initialized WebGPU renderer. */
-export function bakeMacro(renderer: Renderer, size = 256, seed = 2): RenderTarget {
-  const target = new RenderTarget(size, size, {
+const targetOptions = {
+  depthBuffer: false,
+  generateMipmaps: true,
+  minFilter: LinearMipmapLinearFilter,
+  magFilter: LinearFilter,
+  wrapS: RepeatWrapping,
+  wrapT: RepeatWrapping,
+  colorSpace: NoColorSpace,
+};
+
+function bakeWithHeight(
+  renderer: Renderer,
+  size: number,
+  outputs: readonly RenderTarget[],
+  draw: (height: RenderTarget, material: MeshBasicNodeMaterial, quad: QuadMesh) => void
+): void {
+  const height = new RenderTarget(size, size, {
     depthBuffer: false,
-    generateMipmaps: true,
-    minFilter: LinearMipmapLinearFilter,
+    type: HalfFloatType,
+    minFilter: LinearFilter,
     magFilter: LinearFilter,
     wrapS: RepeatWrapping,
     wrapT: RepeatWrapping,
-    colorSpace: NoColorSpace,
   });
+  const material = new MeshBasicNodeMaterial({
+    transparent: true,
+    blending: NoBlending,
+    depthTest: false,
+    depthWrite: false,
+    toneMapped: false,
+  });
+  const quad = new QuadMesh(material);
+  const previous = renderer.getRenderTarget();
+  try {
+    draw(height, material, quad);
+  } catch (error) {
+    for (const output of outputs) output.dispose();
+    throw error;
+  } finally {
+    renderer.setRenderTarget(previous);
+    height.dispose();
+    material.dispose();
+  }
+}
+
+/** Bake the shared, linear RGBA macro map on the initialized WebGPU renderer. */
+export function bakeMacro(renderer: Renderer, size = 256, seed = 2): RenderTarget {
+  const target = new RenderTarget(size, size, targetOptions);
   // This is data, not sRGB colour. The fine fbm band lives in alpha; blending
   // would premultiply the three other channels and corrupt the packed map.
   const material = new MeshBasicNodeMaterial({
@@ -73,36 +110,10 @@ export function bakeDetail(
   albedo: RenderTarget;
   normal: RenderTarget;
 } {
-  const options = {
-    depthBuffer: false,
-    generateMipmaps: true,
-    minFilter: LinearMipmapLinearFilter,
-    magFilter: LinearFilter,
-    wrapS: RepeatWrapping,
-    wrapT: RepeatWrapping,
-    colorSpace: NoColorSpace,
-  };
-  const albedo = new RenderTarget(size, size, options);
-  const normal = new RenderTarget(size, size, options);
-  const height = new RenderTarget(size, size, {
-    depthBuffer: false,
-    type: HalfFloatType,
-    minFilter: LinearFilter,
-    magFilter: LinearFilter,
-    wrapS: RepeatWrapping,
-    wrapT: RepeatWrapping,
-  });
-  const material = new MeshBasicNodeMaterial({
-    transparent: true,
-    blending: NoBlending,
-    depthTest: false,
-    depthWrite: false,
-    toneMapped: false,
-  });
+  const albedo = new RenderTarget(size, size, targetOptions);
+  const normal = new RenderTarget(size, size, targetOptions);
   const surface = detailSurface(uv(), float(seed));
-  const quad = new QuadMesh(material);
-  const previous = renderer.getRenderTarget();
-  try {
+  bakeWithHeight(renderer, size, [albedo, normal], (height, material, quad): void => {
     material.colorNode = vec3(surface.a);
     renderer.setRenderTarget(height);
     quad.render(renderer);
@@ -122,15 +133,7 @@ export function bakeDetail(
     material.needsUpdate = true;
     renderer.setRenderTarget(normal);
     quad.render(renderer);
-  } catch (error) {
-    albedo.dispose();
-    normal.dispose();
-    throw error;
-  } finally {
-    renderer.setRenderTarget(previous);
-    height.dispose();
-    material.dispose();
-  }
+  });
   return { albedo, normal }; // Caller owns both targets and their textures.
 }
 
@@ -143,35 +146,10 @@ export function bakeSurface(
   orm: RenderTarget;
   normal: RenderTarget;
 } {
-  const options = {
-    depthBuffer: false,
-    generateMipmaps: true,
-    minFilter: LinearMipmapLinearFilter,
-    magFilter: LinearFilter,
-    wrapS: RepeatWrapping,
-    wrapT: RepeatWrapping,
-  };
-  const albedo = new RenderTarget(size, size, { ...options, colorSpace: SRGBColorSpace });
-  const orm = new RenderTarget(size, size, { ...options, colorSpace: NoColorSpace });
-  const normal = new RenderTarget(size, size, { ...options, colorSpace: NoColorSpace });
-  const height = new RenderTarget(size, size, {
-    depthBuffer: false,
-    type: HalfFloatType,
-    minFilter: LinearFilter,
-    magFilter: LinearFilter,
-    wrapS: RepeatWrapping,
-    wrapT: RepeatWrapping,
-  });
-  const material = new MeshBasicNodeMaterial({
-    transparent: true,
-    blending: NoBlending,
-    depthTest: false,
-    depthWrite: false,
-    toneMapped: false,
-  });
-  const quad = new QuadMesh(material);
-  const previous = renderer.getRenderTarget();
-  try {
+  const albedo = new RenderTarget(size, size, { ...targetOptions, colorSpace: SRGBColorSpace });
+  const orm = new RenderTarget(size, size, targetOptions);
+  const normal = new RenderTarget(size, size, targetOptions);
+  bakeWithHeight(renderer, size, [albedo, orm, normal], (height, material, quad): void => {
     material.colorNode = vec3(surface.get('height').toFloat());
     renderer.setRenderTarget(height);
     quad.render(renderer);
@@ -200,15 +178,6 @@ export function bakeSurface(
     material.needsUpdate = true;
     renderer.setRenderTarget(normal);
     quad.render(renderer);
-  } catch (error) {
-    albedo.dispose();
-    orm.dispose();
-    normal.dispose();
-    throw error;
-  } finally {
-    renderer.setRenderTarget(previous);
-    height.dispose();
-    material.dispose();
-  }
+  });
   return { albedo, orm, normal }; // Caller owns the three targets.
 }
