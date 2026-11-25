@@ -332,7 +332,6 @@ export class AmmoPickups {
 
     if (this._hold < HOLD_TIME) return;
     const taken = this.owner.collectAmmoBox();
-    if (taken <= 0) return;
     const point = nearest.group.position.clone();
     this._remove(nearest);
     this._clearInteraction();

@@ -136,7 +136,6 @@ assert.equal(label.scale.x, 0.8, 'shorter replacement is fitted independently of
 
 const ammoView = new PixiAmmoView();
 const ammoState: AmmoState = {
-  empty: false,
   magSize: 30,
   loadedRounds: 30,
   spares: [30, 30],

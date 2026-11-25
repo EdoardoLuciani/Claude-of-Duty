@@ -78,8 +78,7 @@ export function initializeWeaponStates(
     const state = weapons._makeState(id);
     Object.assign(state.def, patch);
     state.pattern = buildRecoilPattern(state.def, Rng);
-    state.mag = state.def.magSize;
-    state.spares.fill(state.def.magSize);
+    weapons['resetWeaponAmmo'](state);
     state.mode = state.def.modes[0];
     weapons.states.set(id, state);
   }

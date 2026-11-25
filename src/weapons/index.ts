@@ -89,10 +89,10 @@ type WeaponPoseState = Required<ViewState>;
 interface WeaponHudState {
   name: string;
   mode: WeaponMode;
-  empty: boolean;
   spares: readonly number[];
+  /** Index of the spare the next reload draws from. */
+  nextSpare: number;
   loadedRounds: number;
-  tubeFed: boolean;
   magSize: number;
   reloading: boolean;
   magazineOut: boolean;
@@ -265,10 +265,9 @@ export class WeaponSystem {
   _hudState: WeaponHudState = {
     name: '',
     mode: 'auto',
-    empty: true,
     spares: [],
+    nextSpare: 0,
     loadedRounds: 0,
-    tubeFed: false,
     magSize: 0,
     reloading: false,
     magazineOut: false,
@@ -420,7 +419,7 @@ export class WeaponSystem {
     };
   }
 
-  private fillSpares(s: WeaponState, count: number): void {
+  fillSpares(s: WeaponState, count: number): void {
     s.spares.length = count;
     s.spares.fill(s.def.magSize);
   }
@@ -763,10 +762,11 @@ export class WeaponSystem {
     const vm = this._viewmodel;
     h.name = s.def.label;
     h.mode = s.mode;
-    h.empty = s.mag === 0 && !s.chambered;
     h.spares = s.spares;
-    h.loadedRounds = s.mag;
-    h.tubeFed = s.def.reloadStyle === 'tube';
+    // Tube reloads finish the open bundle; magazine swaps take the fullest spare.
+    h.nextSpare = s.def.reloadStyle === 'tube' ? s.spares.length - 1 : 0;
+    // A lone chambered round still shows as loaded.
+    h.loadedRounds = s.mag || (s.chambered ? 1 : 0);
     h.magSize = s.def.magSize;
     h.reloading = this.reloading;
     // Only detachable magazines (and belt pouches) have out/in beats.

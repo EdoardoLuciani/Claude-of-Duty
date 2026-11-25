@@ -44,7 +44,6 @@ try {
     health: 100,
     maxHealth: 100,
     armour: 0,
-    empty: false,
     loadedRounds: 30,
     spares: [30, 30],
     magSize: 30,
@@ -222,15 +221,11 @@ try {
   state.reloading = false;
   state.loadedRounds = 0;
   frame();
-  assert.equal(hud.ammo['lastLoadedLevel'], 1, 'a chambered round still shows a loaded icon');
-  state.empty = true;
-  frame();
   const empty = hud.draws;
   frame(0.1);
   assert.equal(hud.draws, empty + 1, 'empty-ammo prompt still pulses');
   frame(0);
   assert.equal(hud.draws, empty + 1, 'paused prompt is static');
-  state.empty = false;
   state.loadedRounds = 30;
   frame();
   const beforeFade = hud.draws;

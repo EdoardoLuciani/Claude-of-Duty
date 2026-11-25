@@ -176,7 +176,7 @@ for (const failure of [null, 'injury', 'stage', 'renderer']) {
   hud.dispose();
   hud.update(
     0,
-    { empty: true, magSize: 0, loadedRounds: 0, spares: [] },
+    { magSize: 0, loadedRounds: 0, spares: [] },
     new HealthFx(),
     new Crosshair(),
     {},
@@ -257,7 +257,7 @@ dprHud.setVisible(true);
 const hiddenFrame = (): void =>
   dprHud.update(
     0,
-    { empty: true, magSize: 0, loadedRounds: 0, spares: [] },
+    { magSize: 0, loadedRounds: 0, spares: [] },
     new HealthFx(),
     new Crosshair(),
     {},
@@ -324,7 +324,6 @@ const ammoView = new PixiAmmoView();
 assert(ammoView['prompt'].y >= 0 && ammoView['prompt'].y + 16 <= ammoView['bar'].y);
 assert(ammoView['bar'].y + 3 < ammoView['mode'].y, 'reload feedback stays above the readout');
 ammoView.update(0, {
-  empty: true,
   magSize: 30,
   loadedRounds: 0,
   spares: [30, 30],

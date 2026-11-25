@@ -1,12 +1,12 @@
 import type { WeaponMode } from '../weapons/defs.ts';
 
 export interface AmmoState {
-  empty: boolean;
   magSize: number;
   /** Borrowed spare inventory, fullest first. */
   spares: readonly number[];
+  nextSpare?: number;
+  /** Includes a lone chambered round; zero means empty. */
   loadedRounds: number;
-  tubeFed?: boolean;
   weaponName?: string;
   fireMode?: WeaponMode;
   reloading?: boolean;
