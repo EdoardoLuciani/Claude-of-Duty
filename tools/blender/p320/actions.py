@@ -170,13 +170,61 @@ def author_actions(root,asset,rig,parts,mag,spare,slide,barrel,trigger,catch,rou
         clips[name]['events']=[{'time':28/60,'event':'magazine_out'},{'time':103/60,'event':'magazine_in'}]
         if empty_reload:clips[name]['events'].append({'time':129/60,'event':'bolt_forward'})
         finish(name,end)
-    begin('Inspect',198)
-    for f,loc,rot in [(28,(.0,-.025,.012),(8,-30,10)),(65,(.0,-.025,.012),(8,-30,10)),
-                      (110,(-.015,-.020,.020),(-3,35,-8)),(151,(-.015,-.020,.020),(-3,35,-8)),(186,(0,0,0),(0,0,0))]:key(rig,f,loc,rot)
-    for f in [6,182]:pose('right',f,p=indexed(curled=True))
-    for f in [15,45,100,165]:pose('right',f,p=indexed())
-    for f,pos in [(18,[-.068,-.11,.09]),(45,[-.09,-.18,.10]),(145,[-.09,-.18,.10]),(180,ref['grips']['left']['pos'])]:pose('left',f,pos,p=relaxed('left') if f<180 else None)
-    finish('Inspect',198)
+    begin('Inspect',372)
+    for f,loc,rot in [
+        (6,(0,-.010,-.010),(-4,0,2)),
+        (17,(.039,-.068,.080),(10,5,46)),
+        (30,(.046,-.087,.136),(20,7,79)),
+        (53,(.037,-.081,.104),(14,6,77)),
+        (179,(.031,-.080,.102),(13,8,78)),
+        (203,(.009,-.094,.112),(6,4,83)),
+        (222,(.008,-.081,.115),(35,-20,63)),
+        (235,(.007,-.083,.111),(76,-48,-10)),
+        (248,(.014,-.073,.100),(93,-49,-42)),
+        (278,(.023,-.067,.097),(78,-41,-28)),
+        (301,(.022,-.057,.089),(66,-33,-18)),
+        (321,(.025,-.045,.076),(43,1,27)),
+        (340,(.012,-.013,.005),(9,-2,7)),
+        (366,(0,0,0),(0,0,0)),
+    ]:key(rig,f,loc,rot)
+
+    # The single-hand presentation needs a grip fitted on the actual P320
+    # mesh: the index enters from the side and curls onto the blade, while
+    # the other fingers wrap the frontstrap. Keep that contact through the roll.
+    wrist=(.04138,-.04880,.10400)
+    wrist_rotation=Quaternion((.737402,.051369,.128339,-.661157))
+    grip={
+        'fingerSpread':[.361,.570,.459,.341],
+        'fingers':[[-.326,1.262,.275],[.068,1.830,.738],[.316,1.765,.677],[.547,1.602,.726]],
+        'thumbBase':[-.971,-.098,-2.955],
+        'thumb':[.047,.921],
+    }
+    # Peel the thumb back around the tang before lifting it. The fingers stay seated.
+    peel={**grip,'thumbBase':[-1.953,-.891,2.463],'thumb':[.07,.52]}
+    offered={**grip,'thumbBase':[1.775,-1.412,-.362],'thumb':[.10,.15]}
+    for f,p in [(9,grip),(20,peel),(37,offered),(182,offered),(208,peel),(220,grip),(364,grip)]:
+        pose('right',f,wrist,wrist_rotation,p)
+
+    # Leave the grip outboard before the turn. While detached, key the wrist in
+    # ready space so it drops below view instead of orbiting with the slide.
+    left=ref['sides']['left']
+    lq=Quaternion((left['quaternion'][3],*left['quaternion'][:3]))
+    C4,CI4=C.to_4x4(),CI.to_4x4()
+    loose=relaxed('left')
+    pose('left',5,(-.060,-.059,.079))
+    for f,pos,p in [
+        (12,(-.105,-.092,.097),left['grip']),
+        (23,(-.148,-.197,.117),loose),
+        *((f,(-.142,-.246,.101),loose) for f in (38,179,222,235,248,278,301)),
+        (321,(-.127,-.229,.104),loose),
+        (338,(-.105,-.128,.097),loose),
+    ]:
+        scene.frame_set(f)
+        unrotate=CI4@rig.matrix_basis.inverted()@C4
+        pose('left',f,unrotate@Vector(pos),unrotate.to_quaternion()@lq,p)
+    pose('left',351,(-.065,-.065,.083))
+    pose('left',365)
+    finish('Inspect',372)
     for name,end,drawing in [('Draw',30,True),('Holster',24,False)]:
         begin(name,end)
         for f,k in ([(0,1),(8,.76),(21,.04),(30,0)] if drawing else [(0,0),(7,.08),(18,.80),(24,1)]):

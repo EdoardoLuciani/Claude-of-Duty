@@ -17,6 +17,9 @@ editable high bake sources, including the slide wordmark and SIGLITE insets.
 Preserve STEP magazines, sockets, events, hand contacts and runtime slide overrides.
 Shared arms and `hand-reference.json` are read-only; ordinary builds never refit.
 
+`Inspect` uses the [CS2 Glock-18 viewmodel](https://www.youtube.com/watch?v=-7spynqkYTk&t=2s)
+as a motion reference only.
+
 Run from the repository root with Blender 5.3.0 and gltfpack 1.3:
 
 ```sh
