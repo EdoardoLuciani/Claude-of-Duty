@@ -80,6 +80,32 @@ for frame in range(math.floor(.75*2.9*240),math.ceil(2.9*240)+1):
     assert not hand_tree.overlap(stock_tree),f'Reload_Empty/{frame/240:.4f}: deformed charging hand/sleeve intersects stock'
 print(f'M4_HAND_STOCK_CLEARANCE_OK: {hand_poses} arrival/pull/release/return poses, actual shared review skins')
 
+# Check the guard and blade on entry and exit, and the full grip during the fitted hold.
+inspect_duration=clips['Inspect']['duration'];hold=inspect_duration/3
+pose('Inspect',hold)
+glove=bpy.data.objects['M4_right_Charcoal_woven_glove_skin']
+trigger_guard=('GI trigger guard',tree(pick('GI trigger guard')))
+grip_surfaces=[trigger_guard]+[(part,tree(pick(part))) for part in ('Colt lower forging','A2 sculpted grip')]
+blade=tree(pick('Curved trigger'))
+for t in (.05,.12,hold,inspect_duration-.30,inspect_duration-.15):
+    pose('Inspect',t)
+    grip_skin=glove.evaluated_get(bpy.context.evaluated_depsgraph_get())
+    to_rig=CI@rig.matrix_world.inverted()@grip_skin.matrix_world
+    surfaces=grip_surfaces if t==hold else (trigger_guard,)
+    on_trigger=False
+    for v in glove.data.vertices:
+        if not v.groups:continue
+        bone=glove.vertex_groups[max(v.groups,key=lambda group:group.weight).group].name
+        if not bone.startswith(('finger_','thumb')):continue
+        p=to_rig@grip_skin.data.vertices[v.index].co
+        for part,surface in surfaces:
+            hit,normal,_,_=surface.find_nearest(p)
+            assert (p-hit).dot(normal)>-.0007,('Inspect',t,bone,'glove penetrates',part)
+        hit,normal,_,distance=blade.find_nearest(p)
+        assert (p-hit).dot(normal)>-.0007,('Inspect',t,bone,'finger through trigger')
+        if bone.startswith('finger_0_') and normal.z<-.35 and distance<.0012:on_trigger=True
+    if t==hold:assert on_trigger,'Inspect: index no longer reaches the trigger face'
+
 pose('Idle')
 upper=pick('Colt upper forging');lower=pick('Colt lower forging')
 fixed_channel=upper+pick(('Receiver end plate','Castle nut','Buffer extension','Upper receiver rail','Gas tube','Chamber extension'))

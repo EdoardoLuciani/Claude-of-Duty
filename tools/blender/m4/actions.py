@@ -130,11 +130,63 @@ def author_actions(root,asset,rig,parts,mag,spare,bolt,head,handle,trigger,cover
         clips[name]['events']=[{'time':.02*d,'event':'start'},{'time':out*d,'event':'magout'},{'time':drop*d,'event':'magdrop'},{'time':insert*d,'event':'magin'}]
         clips[name]['events'] += ([{'time':.90*d,'event':'charge'},{'time':.917*d,'event':'boltrelease'}] if empty_reload else [{'time':.88*d,'event':'slap'}])
         clips[name]['events'].append({'time':.995*d,'event':'end'});finish(name)
-    begin('Inspect',3.2)
-    for t,loc,rot in [(.42,(-.020,.075,-.15),(-10,-42,12)),(1.1,(-.020,.075,-.15),(-10,-42,12)),(1.8,(-.035,.065,-.18),(6,43,-12)),(2.45,(-.035,.065,-.18),(6,43,-12)),(3.04,(0,0,0),(0,0,0))]:key(rig,t,loc,rot)
-    for t in (.20,.80,1.6,2.7):pose('right',t,p=indexed())
-    for t,pos in [(.3,[-.09,-.12,-.08]),(.65,[-.12,-.19,-.07]),(2.6,[-.12,-.19,-.07]),(3.04,ref['grips']['left']['pos'])]:pose('left',t,pos,p=relaxed('left') if t<3 else None)
-    clips['Inspect']['events']=[{'time':3.184,'event':'end'}];finish('Inspect')
+    inspect_end=6
+    begin('Inspect',inspect_end)
+    for t,loc,rot in [
+        (.10,(.014,-.009,.012),(-3,0,2)),
+        (.29,(.030,.035,-.035),(19,9,-4)),
+        (.46,(.044,.068,-.093),(18,31,9)),
+        (.68,(.050,.080,-.120),(9,58,10)),
+        (.92,(.047,.079,-.109),(7,55,6)),
+        (2.85,(.023,.062,-.145),(6,64,7)),
+        (3.65,(.007,.057,-.146),(6,68,11)),
+        (4.10,(-.018,.038,-.112),(30,50,17)),
+        (4.30,(-.026,.048,-.104),(37,46,45)),
+        (4.51,(-.029,.055,-.119),(33,49,76)),
+        (4.76,(-.025,.054,-.111),(34,45,75)),
+        (4.98,(.001,.036,-.070),(32,31,33)),
+        (5.21,(.006,.016,-.029),(13,18,6)),
+        (5.48,(.005,-.008,.006),(-3,2,-2)),
+        (5.83,(0,0,0),(0,0,0)),
+    ]:key(rig,t,loc,rot)
+
+    # Seat the index on the trigger face and wrap the other fingers around the grip.
+    wrist=(.03540,-.01545,.14810)
+    wrist_rotation=Quaternion((.724537,-.036740,-.017803,-.688025))
+    grip={
+        'fingerSpread':[-.135,-.030,.022,-.168],
+        'fingers':[[-.242,1.322,.357],[.131,1.687,.946],[.388,1.660,.833],[.498,1.571,.804]],
+        'thumbBase':[-1.181,-.614,-2.643],
+        'thumb':[.015,1.087],
+    }
+    for t in (.18,5.52):pose('right',t,wrist,wrist_rotation,grip)
+    # Give the fingers room to change shape outside the guard before seating them.
+    right_wrist=hand_controls['right']['wrist']
+    for t,y,z in [(.04,-.0165,.122),(.137,-.0189,.144),(5.635,-.0189,.144),(5.894,-.0165,.122)]:
+        right_wrist.location=xyz((.0595,y,z))
+        right_wrist.keyframe_insert('location',frame=t*FPS)
+
+    # Peel off the rail before opening the fingers, then park the hand in
+    # ready space so it doesn't orbit with the receiver during the reveal.
+    loose=relaxed('left')
+    pose('left',.10,(-.083,.035,-.192))
+    pose('left',.18,(-.127,.010,-.191))
+    pose('left',.28,(-.167,-.055,-.185),p=loose)
+    left=ref['sides']['left']['quaternion'];lq=Quaternion((left[3],*left[:3]))
+    for t,pos in [
+        (.40,(-.194,-.200,-.170)),
+        *((t,(-.225,-.284,-.133)) for t in (.68,.92,2.85,3.65,3.95)),
+        (4.30,(-.222,-.217,-.155)),
+    ]:
+        f=round(t*FPS,6)
+        scene.frame_set(math.floor(f),subframe=f%1)
+        ready_to_rig=CI.to_4x4()@rig.matrix_basis.inverted()@C.to_4x4()
+        pose('left',t,ready_to_rig@Vector(pos),ready_to_rig.to_quaternion()@lq,loose)
+    pose('left',4.55,(-.156,-.024,-.204),p=loose)
+    pose('left',4.76,(-.120,.006,-.204),p=loose)
+    pose('left',4.92,(-.089,.032,-.196))
+    pose('left',5.08)
+    clips['Inspect']['events']=[{'time':inspect_end-.025,'event':'end'}];finish('Inspect')
     for name,d,drawing in [('Draw',.62,True),('Holster',.4,False)]:
         begin(name,d)
         for k,amount in ([(0,1),(.25,.78),(.78,.04),(.93,0),(1,0)] if drawing else [(0,0),(.20,.08),(.75,.8),(1,1)]):
