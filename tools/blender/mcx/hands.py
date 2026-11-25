@@ -169,9 +169,10 @@ def author_hands(root,asset,parts,clips):
                 'thumbBase':[-1.386,-.564,-2.898],
                 'thumb':[.015,1.280],
             }
-            for t in (.18,4.32): pose('right',t,pos,q,fitted)
+            duration = clips[name]['duration']
+            for t in (.18,duration-.18): pose('right',t,pos,q,fitted)
             # Unwrap the fingers outside the guard at the two grip transitions.
-            for t in (.045,.135,4.365,4.455):
+            for t in (.045,.135,duration-.135,duration-.045):
                 key(hands['right']['wrist'],'location',pos+C @ Vector((.023,-.004,0)),t*FPS)
             pose('left',.10,rest+C @ Vector((-.016,-.016,.005)))
             pose('left',.19,rest+C @ Vector((-.054,-.047,.014)))
@@ -184,9 +185,9 @@ def author_hands(root,asset,parts,clips):
             ]:
                 scene.frame_set(f)
                 ready_to_rig = rig.matrix_basis.inverted()
-                pose('left',f/FPS,ready_to_rig @ (rest+C @ Vector(offset)),
-                     ready_to_rig.to_quaternion() @ held['left'][1],opened)
-            pose('left',3.58,rest+C @ Vector((-.108,-.080,.024)),p=opened)
+                wrist('left',f/FPS,ready_to_rig @ (rest+C @ Vector(offset)),
+                      ready_to_rig.to_quaternion() @ held['left'][1])
+            wrist('left',3.58,rest+C @ Vector((-.108,-.080,.024)))
             pose('left',3.75,rest+C @ Vector((-.064,-.043,.013)),p=opened)
             pose('left',3.90,rest+C @ Vector((-.025,-.017,.004)))
             pose('left',4.05)
