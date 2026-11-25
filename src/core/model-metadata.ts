@@ -116,11 +116,8 @@ interface WorldQueryData {
   street?: WorldStreet | undefined;
   alleys?: Array<{ rect: [number, number, number, number]; surface: string }> | undefined;
 }
+/** Labels for the baked minimap image, which covers the manifest's world bounds. */
 export interface WorldMinimap {
-  minX: number;
-  minZ: number;
-  maxX: number;
-  maxZ: number;
   labels: { x: number; z: number; w: number; code: string; text: string | null }[];
 }
 export interface WorldManifest {
@@ -306,16 +303,7 @@ function parseWorldMarkers(value: unknown): WorldMarkers {
 }
 function parseMinimap(value: unknown): WorldMinimap {
   const source = object(value);
-  const minX = number(source.minX),
-    minZ = number(source.minZ),
-    maxX = number(source.maxX),
-    maxZ = number(source.maxZ);
-  if (minX >= maxX || minZ >= maxZ) throw new Error('[models] invalid minimap rectangle');
   return {
-    minX,
-    minZ,
-    maxX,
-    maxZ,
     labels: array(source.labels, (value): WorldMinimap['labels'][number] => {
       const label = object(value);
       return {

@@ -178,6 +178,8 @@ export class WeaponSystem {
   /** Mode-change latch: the new mode needs a fresh trigger press. */
   _triggerLatched: boolean = false;
   _spread: number = 0;
+  /** Between the active reload clip's `magout` and `magin` beats. */
+  _magazineOut = false;
   _shotIndex: number = 0;
   _sinceShot: number = 10;
   _switchTo: WeaponId | null = null;
@@ -740,14 +742,7 @@ export class WeaponSystem {
     h.magSize = a.magSize;
     h.reloading = this.reloading;
     // Only detachable magazines (and belt pouches) have out/in beats.
-    h.magazineOut = false;
-    if (h.reloading && vm?.clip) {
-      for (const ev of vm.clip.events) {
-        if (ev.t > vm.clipPrevT) break;
-        if (ev.name === 'magout') h.magazineOut = true;
-        else if (ev.name === 'magin') h.magazineOut = false;
-      }
-    }
+    h.magazineOut = h.reloading && this._magazineOut;
     // 0..1 through the active reload clip, independent of magazine fill.
     h.reloadProgress =
       h.reloading && vm?.clip?.duration ? Math.min(1, vm.clipT / vm.clip.duration) : 0;
@@ -1100,16 +1095,23 @@ export class WeaponSystem {
     const isReload = clipName === 'reloadTac' || clipName === 'reloadEmpty';
     switch (name) {
       case 'start':
-        if (isReload) this._emitReload('start');
+        if (isReload) {
+          this._magazineOut = false;
+          this._emitReload('start');
+        }
         break;
       case 'magout':
-        if (isReload) this._emitReload('magout');
+        if (isReload) {
+          this._magazineOut = true;
+          this._emitReload('magout');
+        }
         break;
       case 'magdrop':
         if (isReload) this._dropMagazine();
         break;
       case 'magin':
         if (isReload) {
+          this._magazineOut = false;
           this._emitReload('magin');
           this._completeReload(clipName === 'reloadEmpty');
         }

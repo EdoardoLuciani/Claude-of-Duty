@@ -1,7 +1,7 @@
 import { Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
 
 import { clamp01 } from '../core/math.ts';
-import type { WorldMinimap } from '../core/model-metadata.ts';
+import type { WorldManifest, WorldMinimap } from '../core/model-metadata.ts';
 
 export interface MapBlip {
   x: number;
@@ -103,14 +103,18 @@ export class PixiMinimap {
   }
 
   /** Install the session terrain once; the HUD owns the texture and its source. */
-  async setTerrain(png: Blob, map: WorldMinimap): Promise<void> {
+  async setTerrain(
+    png: Blob,
+    map: WorldMinimap,
+    { min, max }: WorldManifest['bounds']
+  ): Promise<void> {
     const bitmap = await createImageBitmap(png);
     const texture = Texture.from(bitmap, true);
     texture.source.once('destroy', (): void => bitmap.close());
     const sprite = new Sprite(texture);
-    sprite.width = (map.maxX - map.minX) * ppm;
-    sprite.height = (map.maxZ - map.minZ) * ppm;
-    sprite.position.set(map.minX * ppm, map.minZ * ppm);
+    sprite.width = (max[0] - min[0]) * ppm;
+    sprite.height = (max[2] - min[2]) * ppm;
+    sprite.position.set(min[0] * ppm, min[2] * ppm);
     this.terrain.addChild(sprite);
     for (const l of map.labels) {
       const room = l.w * ppm + 2;

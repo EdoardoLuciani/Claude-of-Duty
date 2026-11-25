@@ -12,11 +12,11 @@ const directory = join(root, 'public/models/world');
 const files = PLAYABLE_MAPS.flatMap(({ bundleDirectory, mode }): string[] => {
   const bundle = join(directory, bundleDirectory);
   const names = readdirSync(bundle).filter(
-    (name): boolean => name === 'level.json' || /^level-(visual|collision|nav)\..*\.gz$/.test(name)
+    (name): boolean => name === 'level.json' || /^level-(visual|collision|nav|minimap)\./.test(name)
   );
   assert.equal(
     names.length,
-    SESSION_MODE_POLICY[mode].survivalSystems ? 4 : 3,
+    SESSION_MODE_POLICY[mode].survivalSystems ? 5 : 4,
     `${bundle} has a complete generated bundle`
   );
   return names.map((name): string => join(bundle, name));

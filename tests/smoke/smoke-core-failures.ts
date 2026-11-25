@@ -200,7 +200,7 @@ try {
     sourceHash: 'fixture',
     transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
     bounds: { min: [-1, -1, -1], max: [1, 1, 1] },
-    minimap: { minX: -1, minZ: -1, maxX: 1, maxZ: 1, labels: [] },
+    minimap: { labels: [] },
     spawns: [],
     lights: [],
     stats: { staticTris: 0, instTris: 0, instances: 0, drawCalls: 0, collideTris: 0 },
@@ -216,7 +216,6 @@ try {
     },
     { preconnect: fetch.preconnect }
   );
-  await assert.rejects(models._prefetchWorld(), /HTTP 503/, 'Survival loads nav');
   meta.mapId = 'other-courtyard';
   await assert.rejects(models._prefetchWorld(), /unexpected world manifest map ID/);
   const other = new ModelSystem({

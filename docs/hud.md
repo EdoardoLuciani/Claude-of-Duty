@@ -31,8 +31,8 @@ with range targets add a target reset.
 - Passive messages use `pixi-feedback.ts`; controllers retain prompt ownership,
   progress, banner timing, six pooled killfeed rows and status priority. The supply
   countdown uses raw time and its own anchor, independent of interaction prompts.
-- Minimap terrain is baked once on a detached Canvas2D surface, uploaded once and
-  presented with retained dynamic cues.
+- The minimap shows the map's exported PNG and draws labels and live markers over it;
+  [ARCHITECTURE.md](../ARCHITECTURE.md#physics-and-world) covers the bake and prefetch.
 - The magazine bar empties at the removal beat and jumps to the actual ammo count
   when the new magazine seats. Tube reloads update the count one shell at a time.
   The separate progress bar tracks the active reload clip.
