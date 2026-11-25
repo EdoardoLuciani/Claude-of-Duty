@@ -80,6 +80,27 @@ for frame in range(math.floor(.75*2.9*240),math.ceil(2.9*240)+1):
     assert not hand_tree.overlap(stock_tree),f'Reload_Empty/{frame/240:.4f}: deformed charging hand/sleeve intersects stock'
 print(f'M4_HAND_STOCK_CLEARANCE_OK: {hand_poses} arrival/pull/release/return poses, actual shared review skins')
 
+# The firing hand holds one fitted pose through both angles of the inspect.
+pose('Inspect',clips['Inspect']['duration']/3)
+glove=bpy.data.objects['M4_right_Charcoal_woven_glove_skin']
+grip_skin=glove.evaluated_get(bpy.context.evaluated_depsgraph_get())
+to_rig=CI@rig.matrix_world.inverted()@grip_skin.matrix_world
+guard_surfaces=[(part,tree(pick(part))) for part in ('Colt lower forging','GI trigger guard','A2 sculpted grip')]
+blade=tree(pick('Curved trigger'))
+on_trigger=False
+for v in glove.data.vertices:
+    if not v.groups:continue
+    bone=glove.vertex_groups[max(v.groups,key=lambda group:group.weight).group].name
+    if not bone.startswith(('finger_','thumb')):continue
+    p=to_rig@grip_skin.data.vertices[v.index].co
+    for part,surface in guard_surfaces:
+        hit,normal,_,_=surface.find_nearest(p)
+        assert (p-hit).dot(normal)>-.0007,('Inspect',bone,'glove penetrates',part)
+    hit,normal,_,distance=blade.find_nearest(p)
+    assert (p-hit).dot(normal)>-.0007,('Inspect',bone,'finger through trigger')
+    if bone.startswith('finger_0_') and normal.z<-.35 and distance<.0012:on_trigger=True
+assert on_trigger,'Inspect: index no longer reaches the trigger face'
+
 pose('Idle')
 upper=pick('Colt upper forging');lower=pick('Colt lower forging')
 fixed_channel=upper+pick(('Receiver end plate','Castle nut','Buffer extension','Upper receiver rail','Gas tube','Chamber extension'))
