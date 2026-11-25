@@ -4,6 +4,7 @@ import { DEFAULT_BINDINGS, type ActionId } from '../core/bindings.ts';
 import type { SystemId, EngineContext, EngineSystems } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName } from '../core/events.ts';
 import { hasOwn } from '../core/guards.ts';
+import { isInstancedMesh } from '../core/three-guards.ts';
 import { STANCE } from '../player/tuning.ts';
 import {
   entries,
@@ -388,10 +389,6 @@ function recordField(key: string, value: unknown): unknown {
   if (value instanceof THREE.Vector3) return vec(value);
   if (key === 'weapon') return weaponId(value);
   return ENTITY_FIELDS.has(key) ? entityId(value) : undefined;
-}
-
-function isInstancedMesh(mesh: THREE.Object3D): mesh is THREE.InstancedMesh {
-  return mesh instanceof THREE.InstancedMesh;
 }
 
 const TAR_BLOCK = 512;

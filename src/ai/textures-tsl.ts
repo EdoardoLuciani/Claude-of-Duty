@@ -32,12 +32,12 @@ import type { DataArrayTexture } from 'three/webgpu';
 import type { Node, Texture } from 'three/webgpu';
 import type { TextureNode, VaryingNode } from 'three/webgpu';
 
-import { isClosable } from '../core/guards.ts';
+import { isClosable, isRecord } from '../core/guards.ts';
 import { loadPngTexture } from '../core/pngtex.ts';
 import { soldierSurface } from './soldier.ts';
 import type { VariantName } from './soldier.ts';
 import { soldierTextureArray } from './texture-array.ts';
-import { isRecord, isNumber, isStringArray } from './validation.ts';
+import { isNumber, isStringArray } from './validation.ts';
 
 // Authored silhouette darkening against bright sky: confine it to the grazing
 // sliver, using geometric normals so detail-map noise cannot make the band crawl.

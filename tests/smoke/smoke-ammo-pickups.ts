@@ -4,6 +4,7 @@ import * as THREE from 'three';
 
 import type { EngineEventMap } from '../../src/core/events.ts';
 import { Rng } from '../../src/core/rng.ts';
+import { isInstancedMesh } from '../../src/core/three-guards.ts';
 import { IntelSystem } from '../../src/intel/index.ts';
 import { UiSystem } from '../../src/ui/index.ts';
 import type { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
@@ -37,9 +38,6 @@ function rngState(rng: Rng): {
   spare: number | undefined;
 } {
   return { s0: rng.s0, s1: rng.s1, s2: rng.s2, s3: rng.s3, spare: rng['_spare'] };
-}
-function isInstancedMesh(value: unknown): value is THREE.InstancedMesh {
-  return value instanceof THREE.InstancedMesh;
 }
 function harness(): AmmoHarness {
   const prompts: (PromptData & { owner: unknown })[] = [],

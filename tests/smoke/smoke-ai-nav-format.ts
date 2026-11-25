@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 
 import { navHash, packNav, unpackNav } from '../../src/ai/nav-format.ts';
-import { isRecord } from '../../src/ai/validation.ts';
+import { isRecord } from '../../src/core/guards.ts';
 
 const directory = new URL('../../public/models/world/', import.meta.url);
 const level: unknown = JSON.parse(readFileSync(new URL('level.json', directory), 'utf8'));

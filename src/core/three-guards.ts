@@ -1,4 +1,4 @@
-import { Group, Mesh, SkinnedMesh, Texture } from 'three';
+import { Group, InstancedMesh, Mesh, SkinnedMesh, Texture } from 'three';
 import type { BufferGeometry, Material } from 'three';
 
 // Concrete predicates retain Three's safe generic defaults; bare instanceof
@@ -9,6 +9,10 @@ export function isGroup(value: unknown): value is Group {
 
 export function isMesh(value: unknown): value is Mesh {
   return value instanceof Mesh;
+}
+
+export function isInstancedMesh(value: unknown): value is InstancedMesh {
+  return value instanceof InstancedMesh;
 }
 
 export function isSingleMaterialMesh(value: unknown): value is Mesh<BufferGeometry, Material> {
