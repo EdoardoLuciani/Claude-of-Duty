@@ -28,7 +28,7 @@ import { RIG } from './rig.ts';
 import { prepareSoldierSurfaces, resolveVariantName, VARIANTS } from './soldier.ts';
 import { Squad } from './squad.ts';
 import { SoldierMaterialsNode } from './textures-tsl.ts';
-import { COMBAT, GRENADE, OPENING_WAVE_DELAY } from './tuning.ts';
+import { COMBAT, GRENADE, OPENING_WAVE_DELAY, SURVIVAL_WAVES } from './tuning.ts';
 import { isVector3Like } from './validation.ts';
 
 export type AiVariant = Pick<SoldierRecord, 'geometry' | 'weapon' | 'stats' | 'variant'> & {
@@ -829,7 +829,10 @@ export class AiSystem {
   }
 
   /** Materialise and publish a wave. Returns zero when no valid spawn exists. */
-  startWave(number: number, config: WaveConfig = this._waveConfig(number)): number {
+  startWave(
+    number: number,
+    config: WaveConfig = SURVIVAL_WAVES[Math.min(number, SURVIVAL_WAVES.length) - 1]
+  ): number {
     const made = this.populate(config);
     if (made <= 0) return 0;
     this._wave = number;
@@ -1226,8 +1229,7 @@ export class AiSystem {
 
   /**
    * Wave director. The opening countdown uses the same pending state as later
-   * waves, without reporting a wave clear. Waves grow slowly and cap at
-   * 3 squads x 4 (12 concurrent enemies) to stay inside the frame budget.
+   * waves, without reporting a wave clear.
    */
   _updateWaves(ctx: EngineContext): void {
     if (this._wavePending) {
@@ -1249,14 +1251,6 @@ export class AiSystem {
       nextWave: this._wave + 1,
       delay: this.waveDelay,
     });
-  }
-
-  /** Wave composition: gentle ramp, hard cap (see _updateWaves). */
-  _waveConfig(w: number): { squads: number; perSquad: number } {
-    return {
-      squads: Math.min(2 + Math.floor((w - 1) / 2), 3),
-      perSquad: Math.min(3 + Math.floor((w - 1) / 3), 4),
-    };
   }
 
   lateUpdate(): void {
