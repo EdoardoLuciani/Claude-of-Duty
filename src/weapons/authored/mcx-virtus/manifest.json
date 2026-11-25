@@ -109,10 +109,10 @@
     }
   },
   "stats": {
-    "triangles": 37520,
-    "vertices": 20246,
-    "meshes": 17,
-    "material_slots": 17
+    "triangles": 47355,
+    "vertices": 26435,
+    "meshes": 12,
+    "material_slots": 12
   },
   "textures": {
     "resolution": 1024,

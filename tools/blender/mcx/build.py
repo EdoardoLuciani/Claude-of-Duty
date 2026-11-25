@@ -21,6 +21,7 @@ from mcx.finishes import FINISH_LOOKUP_SIZE
 from mcx.materials import TEXTURE_SIZE, build_materials
 from mcx.hands import RUNTIME_ORIGIN, author_hands, bake_export_actions
 from mcx.studio import build_studio
+from troy_sights import set_sight_preview
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -61,8 +62,13 @@ def build(output, render=False, quick=False):
                 name + ' / ' + event['event'], frame=round(event['time'] * FPS)
             )
     select_clip(parts, clips, 'Idle')
+    alternate_sights = [bpy.data.objects[name] for name in ('IRON_sights_removed', 'IRON_troy')]
+    for group in alternate_sights:
+        set_sight_preview(group, False)
     bpy.ops.wm.save_as_mainfile(filepath=str(output / 'mcx-virtus.blend'))
 
+    for group in alternate_sights:
+        set_sight_preview(group, True)
     bake_export_actions(parts, clips)
     restore_rest(parts, rest)
     stats = export_asset(asset, parts, output)
@@ -95,7 +101,8 @@ def build(output, render=False, quick=False):
     }
     (output / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
     if render:
-        scene = bpy.context.scene
+        for group in alternate_sights:
+            set_sight_preview(group, False)
         for name,camera in cameras:
             scene.camera = bpy.data.objects[camera]
             scene.render.filepath = str(output/'renders'/(name+'.png'))

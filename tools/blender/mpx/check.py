@@ -192,8 +192,9 @@ def select(name, time=0):
 
 select('Idle')
 # Hidden replacement geometry is evaluated for checks, but not shown in source review.
-for name in ('IRON_sights_removed','MUZZLE_device_removed'):
-    bpy.data.objects[name].hide_viewport = False
+from troy_sights import set_sight_preview
+set_sight_preview(bpy.data.objects['IRON_sights_removed'], True)
+bpy.data.objects['MUZZLE_device_removed'].hide_viewport = False
 bpy.context.view_layer.update()
 mounted = {}
 loaded = []
@@ -238,7 +239,7 @@ for optic in attachment_source.OPTICS:
     for other in ('laser','srd762ti'):
         assert not mounted[optic].overlap(mounted[other]), (optic,other,'slot attachments intersect')
 assert not mounted['laser'].overlap(mounted['srd762ti']), 'rail/muzzle intersection'
-for name in ('IRON_sights','IRON_sights_removed'):
+for name in ('IRON_sights','IRON_sights_removed','IRON_troy'):
     parts=[o for o in bpy.data.objects[name].children if o.type=='MESH']
     mounted[name]=surface(parts,rig.matrix_world.inverted())
 

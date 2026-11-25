@@ -16,6 +16,7 @@ from mathutils import Matrix, Vector
 ROOT=Path(__file__).resolve().parents[3]
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import picatinny
+from troy_sights import build_troy_pair, set_sight_preview
 from review_hands import without_review_hands
 from ax338.actions import author_actions
 from ax338.export import prepare_export_actions, validate_export
@@ -333,6 +334,9 @@ def build(output,render=False,quick=False):
     box('Front sight post',(0,(.126+sight_y)/2,front),(.0018,sight_y-.126,.002),steel,irons,.0001)
     for side in (-1,1):
         box('Front sight guard',(side*.008,.139,front),(.003,.035,.005),steel,irons,.0006)
+    rear_troy, front_troy = (-.089 + groove * picatinny.PITCH for groove in (14,-45))
+    troy = build_troy_pair(asset, rig, xyz((0,.118,rear_troy)), xyz((0,.118,front_troy)),
+                           0, black, steel, mark)
     for side in (-1,1):
         text('ACCURACY INTERNATIONAL',(side*.0211,.091,-.116),.0032,side)
         text('AX338  .338 LAPUA MAG',(side*.0211,.064,-.103),.0026,side)
@@ -351,6 +355,7 @@ def build(output,render=False,quick=False):
     for o in list(asset.objects):
         if o.type!='MESH':continue
         active(o)
+        if o.parent == troy: bpy.ops.object.convert(target='MESH')
         if not o.data.uv_layers:o.data.uv_layers.new(name='UVMap')
         bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT');bpy.ops.uv.smart_project(angle_limit=1.15,island_margin=.01);bpy.ops.object.mode_set(mode='OBJECT')
         x0,scale=(.26,.245) if o.name.startswith('Grip stipple') else ((0,.245) if o.data.materials[0]==rubber else (.52,.47))
@@ -374,11 +379,13 @@ def build(output,render=False,quick=False):
     scene.render.resolution_x=800 if quick else 1600;scene.render.resolution_y=450 if quick else 900;scene.render.resolution_percentage=100;scene.render.film_transparent=True;scene.view_settings.view_transform='AgX'
     scene['clips']=json.dumps(clips)
     bpy.data.texts.new('START HERE').write('EARLY AX338 / REMOVABLE RAIL IRONS / GENERATED REVIEW PREVIEW\nEdit tools/blender/ax338/, not this product.\nNot a scan or manufacturer CAD. Read-only inputs, edit map and fidelity limits: asset README.md.\nNine weapon/wrist/finger NLA clips; shared review skins are not exported.\nSelect matching NLA tracks on all controls and review arms. 120 fps.\nGeometry remains separate editable components; runtime export joins copies.\nRegeneration overwrites manual edits; no saved-weapon input or automatic hand refit.\n')
+    set_sight_preview(troy, False)
     bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'ax338.blend'),compress=True)
     if render:
         (OUT/'renders').mkdir(exist_ok=True)
         for camera in [o for o in scene.objects if o.type=='CAMERA']:
             scene.camera=camera;scene.render.filepath=str(OUT/'renders'/(camera.name+'.png'));bpy.ops.render.render(write_still=True)
+    set_sight_preview(troy, True)
     for o in bpy.data.objects:
         if o.animation_data:
             for t in o.animation_data.nla_tracks:t.mute=True
@@ -392,7 +399,7 @@ def build(output,render=False,quick=False):
         contact_boxes.append({'part':o.name,'min':[round(min(p[i] for p in points),8) for i in range(3)],'max':[round(max(p[i] for p in points),8) for i in range(3)]})
     # Consolidation operates after source save and only on runtime geometry.
     consolidate_finishes(asset,rough,albedo,normal,OUT)
-    for parent in (body,hg,stock,irons,muzzle_device,muzzle_adapter,bolt,trigger,mag,spare,mag_rounds,spare_rounds):
+    for parent in (body,hg,stock,irons,troy,muzzle_device,muzzle_adapter,bolt,trigger,mag,spare,mag_rounds,spare_rounds):
         objects=[o for o in list(asset.objects) if o.type=='MESH' and o.parent==parent]
         if not objects:continue
         for o in objects:
@@ -411,7 +418,7 @@ def build(output,render=False,quick=False):
     stats=validate_export(OUT/'ax338.glb',clips)
     manifest={'asset':'Early AX338 / Dark Earth / factory brake / removable rail irons / no optional attachments','units':'metres','clips':clips,'stats':stats,'textureResolution':1024,'contactGeometry':{'magazine':contact_boxes,'pistolGripSections':grip_sections},'dimensions':{'barrel':.6858,'overall':1.250,'barrelFace':breech,'barrelCrown':crown,'muzzle':muzzle,'butt':butt,'ironSightRadius':rear-front,'ironSightHeight':sight_y,'magazineBodyHeight':.105,'magazineDepth':.104,'magazineThickness':.034,'magazineHeight':.1125},'source':'tools/blender/ax338/build.py + tools/blender/ax338/actions.py + tools/blender/ax338/export.py; calibration stage: tools/blender/ax338/hand-reference.ts'}
     (OUT/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
-    assert stats['triangles']<150000 and stats['primitives']==12 and stats['materials']==1 and stats['images']==3 and stats['bytes']<=15*1024*1024,stats
+    assert stats['triangles']<150000 and stats['primitives']==13 and stats['materials']==1 and stats['images']==3 and stats['bytes']<=15*1024*1024,stats
     print('AX338 export:',json.dumps(stats))
     for name in ('ax338_surface.png','ax338_roughness.png','ax338_normal.png','ax338_finishes.png'):(OUT/name).unlink(missing_ok=True)
 

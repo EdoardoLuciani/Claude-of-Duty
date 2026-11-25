@@ -35,6 +35,7 @@ function makeAX338Model(gltf: GLTF): AX338Model {
     handPoses: { left: handReference.sides.left.grip, right: handReference.sides.right.grip },
     nodes: {
       sight: point('SOCKET_sight'),
+      ironSights: { troy: point('SOCKET_troy') },
       ejectDir: [0.88, 0.4, 0.22],
     },
     shell: { caseLen: 0.0697, rimR: 0.0074 },

@@ -36,6 +36,7 @@ function makeEvolysModel(gltf: GLTF): EvolysModel {
     handPoses: { left: handReference.sides.left.grip, right: handReference.sides.right.grip },
     nodes: {
       sight: point('SOCKET_sight'),
+      ironSights: { troy: point('SOCKET_troy') },
       ejectDir: [0.86, 0.44, 0.26],
     },
     shell: { caseLen: 0.051, rimR: 0.005975 },

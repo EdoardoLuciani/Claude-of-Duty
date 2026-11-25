@@ -64,6 +64,11 @@ export function mountableWeapon(
     opticMountRest: new THREE.Matrix4(),
     nodes: fixture<WeaponModelRecord['nodes']>({ sight: [0, 0.14, 0.03] }),
   });
+  if (WEAPON_DEFS[id].fits?.iron?.troy) {
+    const troy = Object.assign(new THREE.Group(), { name: 'IRON_troy', visible: false });
+    scene.add(troy);
+    model.nodes.ironSights = { troy: [0, 0.16, 0.03] };
+  }
   const muzzleSocket = requiredNode(scene, 'SOCKET_muzzle');
   // The record union rejects a WeaponId-typed literal; assign it on the fixture instead.
   model.id = id;

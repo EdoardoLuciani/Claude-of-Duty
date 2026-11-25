@@ -44,6 +44,7 @@ export function makeMCXModel(gltf: GLTF): MCXModel {
     handPoses: { left: handReference.sides.left.grip, right: handReference.sides.right.grip },
     nodes: {
       sight: point('SOCKET_sight'),
+      ironSights: { troy: point('SOCKET_troy') },
       ejectDir: [1, 0.35, 0.35] as [number, number, number],
     },
     shell: { caseLen: 0.0348, rimR: 0.0048 },

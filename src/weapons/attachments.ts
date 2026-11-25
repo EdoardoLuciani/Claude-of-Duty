@@ -9,12 +9,15 @@ import { convertWeaponScene, type WeaponSceneMaterials } from './asset-material.
 import {
   CAN_MODELS,
   fittedCan,
+  IRON_SIGHT_IDS,
   isAttachmentConfig,
+  isOpticId,
   OPTIC_IDS,
   OPTICS,
   SLOTS,
   type AttachmentConfig,
   type CanModel,
+  type IronSightId,
   type OpticId,
   type RailId,
 } from './attachment-rules.ts';
@@ -130,13 +133,15 @@ export function hasAttachmentAssets(
 ): boolean {
   const can = fittedCan(id, config.muzzle);
   return (
-    (config.optic === null || assets[config.optic] !== undefined) &&
+    (!isOpticId(config.sight) || assets[config.sight] !== undefined) &&
     (config.rail === null || assets[config.rail] !== undefined) &&
     (can === null || (can !== undefined && assets[can] !== undefined))
   );
 }
 
-/** Mounted instance groups, one per slot; an empty group has no parent. */
+const MOUNT_SLOTS = ['optic', 'muzzle', 'rail'] as const;
+
+/** Mounted instance groups for external assets; an empty group has no parent. */
 interface AttachmentMounts {
   opticGroup: THREE.Group;
   railGroup: THREE.Group;
@@ -158,18 +163,22 @@ export function releaseAttachmentMounts(mounts: AttachmentMounts): void {
 
 /** Release the mounts copied along with a configured weapon scene clone. */
 export function releaseClonedMounts(root: THREE.Object3D): void {
-  for (const slot of SLOTS) {
+  for (const slot of MOUNT_SLOTS) {
     const group = root.getObjectByName(`${slot}_attachment`);
     if (isGroup(group)) releaseAttachmentMount(group);
   }
 }
 
 const REPLACED = {
-  optic: ['removableIrons', 'IRON_sights'],
+  sight: ['removableIrons', 'IRON_sights'],
   muzzle: ['removableMuzzleDevice', 'MUZZLE_device'],
 } as const;
 
-type SlotVisuals = { bare: THREE.Object3D; fitted: THREE.Object3D | undefined };
+type SlotVisuals = {
+  bare: THREE.Object3D;
+  fitted: THREE.Object3D | undefined;
+  alternatives: Array<{ id: IronSightId; node: THREE.Object3D }>;
+};
 
 /** Authored hardware whose visibility follows the slot, excluding permanent parts. */
 export function slotVisuals(
@@ -178,10 +187,18 @@ export function slotVisuals(
 ): SlotVisuals | undefined {
   if (slot === 'rail') return;
   const [flag, name] = REPLACED[slot];
-  if (!WEAPON_DEFS[model.id][flag]) return;
+  const def = WEAPON_DEFS[model.id];
+  const irons = slot === 'sight' ? def.fits?.iron : undefined;
+  if (!def[flag] && !irons) return;
+  const alternatives: SlotVisuals['alternatives'] = [];
+  if (irons) {
+    for (const id of IRON_SIGHT_IDS)
+      if (irons[id]) alternatives.push({ id, node: requiredNode(model.root, `IRON_${id}`) });
+  }
   return {
-    bare: requiredNode(model.scene, name),
-    fitted: model.scene.getObjectByName(`${name}_removed`),
+    bare: requiredNode(model.root, name),
+    fitted: model.root.getObjectByName(`${name}_removed`),
+    alternatives,
   };
 }
 
@@ -190,7 +207,7 @@ export function slotVisuals(
  * Mount-local instances keep slide/cover/bone animation authoritative. Nothing is attached here. */
 function stageMount(
   model: WeaponModelRecord,
-  slot: (typeof SLOTS)[number],
+  slot: (typeof MOUNT_SLOTS)[number],
   id: keyof AttachmentAssets | null,
   asset: { scene: THREE.Group; mount: THREE.Vector3; output?: string } | null | undefined
 ): { group: THREE.Group; parent: THREE.Object3D | null; socket: THREE.Object3D | null } {
@@ -219,9 +236,12 @@ export function mountAttachments(
   mountedOptic: WeaponEntry['mountedOptic'];
   sight: THREE.Vector3;
 } {
-  const { optic: opticId } = config;
   if (!isAttachmentConfig(config, model.id))
     throw new Error(`[weapons] incompatible attachments: ${model.id} ${JSON.stringify(config)}`);
+  const { sight: sightId } = config;
+  const optical = isOpticId(sightId);
+  const opticId = optical ? sightId : null;
+  const ironId = optical ? null : sightId;
   const opticAsset = opticId && assets[opticId];
   const opticSlot = stageMount(model, 'optic', opticId, opticAsset);
   // Select physical grooves along the rail, never a vertical seating correction.
@@ -233,7 +253,9 @@ export function mountAttachments(
   const muzzle = stageMount(model, 'muzzle', can, can && assets[can]);
   const visuals = SLOTS.map((slot): SlotVisuals | undefined => slotVisuals(model, slot));
   let mountedOptic: WeaponEntry['mountedOptic'] = null;
-  const sight = new THREE.Vector3().fromArray(model.nodes.sight);
+  const datum = ironId === null ? model.nodes.sight : model.nodes.ironSights?.[ironId];
+  if (!datum) throw new Error(`[weapons] ${model.id} has no sight datum for ${ironId}`);
+  const sight = new THREE.Vector3().fromArray(datum);
   if (opticId !== null && opticAsset && opticSlot.parent) {
     // Only the ADS datum is resolved in the weapon frame, from the rest-pose mount transform
     // (including orientation). Never the live pose: a slide or bolt may be mid-animation.
@@ -253,9 +275,13 @@ export function mountAttachments(
   for (const [i, slot] of SLOTS.entries()) {
     const nodes = visuals[i];
     if (!nodes) continue;
-    const fitted = config[slot] !== null;
-    nodes.bare.visible = !fitted;
+    const fitted =
+      slot === 'sight'
+        ? opticId !== null && WEAPON_DEFS[model.id].removableIrons === true
+        : config[slot] !== null;
+    nodes.bare.visible = !fitted && (slot !== 'sight' || ironId === null);
     if (nodes.fitted) nodes.fitted.visible = fitted;
+    for (const { id, node } of nodes.alternatives) node.visible = id === ironId;
   }
   return {
     opticGroup: opticSlot.group,
@@ -284,5 +310,7 @@ export function configureWeaponAttachments(
   entry.mountedOptic = mounted.mountedOptic;
   entry.sight.copy(mounted.sight);
   const { def } = entry;
-  entry.eyeRelief = (config.optic && def.fits?.optic?.[config.optic]?.eyeRelief) ?? def.eyeRelief;
+  const { sight } = config;
+  const fit = isOpticId(sight) ? def.fits?.optic?.[sight] : sight && def.fits?.iron?.[sight];
+  entry.eyeRelief = fit?.eyeRelief ?? def.eyeRelief;
 }

@@ -18,6 +18,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import picatinny
+from troy_sights import SIGHT_HEIGHT, build_troy_pair, set_sight_preview
 from review_hands import without_review_hands
 from mpx.actions import author_actions
 from mpx.animations import prepare_export_actions
@@ -541,8 +542,10 @@ def build(output, render=False, quick=False):
     box('Front iron post',(.284,0,.070),(.003,.0016,.008),steel,irons,.0001)
     for side in (-1,1):
         box('Front iron guard',(.284,side*.007,.070),(.006,.003,.018),steel,irons,.0007)
-    folded.hide_render = True
-    folded.hide_viewport = True
+    rail_top = .044
+    rear_x, front_x = (.025 + groove * picatinny.PITCH for groove in (-10, 25))
+    troy = build_troy_pair(asset, body, (rear_x,0,rail_top), (front_x,0,rail_top),
+                           -math.pi/2, alloy, steel, markmat)
     optic_mount = empty('MOUNT_optic', (.025,0,.044), body)
     optic_mount.rotation_euler.z = -math.pi/2
 
@@ -659,6 +662,8 @@ def build(output, render=False, quick=False):
                 'Original packed 1K PBR maps; photo-inferred depths/typography, not manufacturing CAD.\n'
                 'Metres; +X forward, +Z up, -Y ejection. Runtime normalizes the basis once.\n')
     # Stage 5: generated editable preview, saved before runtime preparation.
+    set_sight_preview(folded, False)
+    set_sight_preview(troy, False)
     bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'mpx.blend'))
     if render:
         # Preserve the approved fixed geometry/photo views without review-only arms.
@@ -682,7 +687,8 @@ def build(output, render=False, quick=False):
     # Merge only mesh copies sharing a rigid parent; original source remains editable.
     export=bpy.data.collections.new('EXPORT | evaluated copies')
     scene.collection.children.link(export)
-    folded.hide_viewport = False
+    set_sight_preview(folded, True)
+    set_sight_preview(troy, True)
     adapter.hide_viewport = False
     bpy.context.view_layer.update()
     copy_by_source={}
@@ -767,7 +773,10 @@ def build(output, render=False, quick=False):
     stats={'triangleInstances':triangles,'primitives':sum(len(m['primitives']) for m in j['meshes']),
            'materials':len(j.get('materials',[])),'images':len(j.get('images',[])),'bytes':len(raw)}
     assert triangles<80000,stats
-    assert stats['primitives']==16 and stats['materials']==1 and stats['images']==3 and len(raw)<=10*1024*1024,stats
+    assert stats['primitives']==17 and stats['materials']==1 and stats['images']==3 and len(raw)<=10*1024*1024,stats
+    nodes = {node['name']: i for i, node in enumerate(j['nodes']) if 'name' in node}
+    assert nodes['IRON_troy'] in j['nodes'][nodes['receiver']]['children']
+    assert nodes['SOCKET_troy'] in j['nodes'][nodes['IRON_troy']]['children']
     # Stage 7: separate manifest metadata (the GLB remains read-only).
     manifest={'status':'Base conversion candidate — human visual/animation/gameplay review pending',
         'asset':'SIG MPX 8 inch / open 9mm crown and thread protector / 30-round magazine / removable deployed irons',
@@ -777,7 +786,8 @@ def build(output, render=False, quick=False):
         'textures':{'resolution':1024,'packed':True,'embedded':True,'method':'original deterministic surface maps; no photographic inputs'},
         'dimensions':{'nominalBarrel':.2032,'barrelBreech':breech,'barrelCrown':barrel_end,
                       'muzzle':barrel_end+.006,'ironAxis':.074,'rearAperture':.0036,
-                      'opticMount':[.025,0,.044],'muzzleMount':[barrel_end+.004,0,0]},
+                      'opticMount':[.025,0,.044],'muzzleMount':[barrel_end+.004,0,0],
+                      'troySightAxis':rail_top+SIGHT_HEIGHT,'troyRailGrooves':[-10,25]},
         'notes':['Reference-supported assembly, not proof that the hero photograph depicts this barrel.',
                  'Depths, relief, magazine translucency and typography remain inferred.',
                  'No functional internals, certified pixel parity, or AAA visual sign-off.',

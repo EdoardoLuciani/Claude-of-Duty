@@ -4,6 +4,7 @@ import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { hasOwn } from '../core/guards.ts';
 import { isMesh, isSkinnedMesh } from '../core/three-guards.ts';
 import type { WeaponSceneMaterials } from './asset-material.ts';
+import type { IronSightId } from './attachment-rules.ts';
 import type { WeaponId } from './defs.ts';
 
 /** Required authored nodes, never a procedural fallback. */
@@ -150,5 +151,7 @@ export interface AuthoredModelData<Id extends WeaponId> extends WeaponSceneMater
 
 interface AuthoredNodes {
   sight: [number, number, number];
+  /** Weapon-frame ADS datums sampled in the authored rest pose. */
+  ironSights?: Partial<Record<IronSightId, [number, number, number]>>;
   ejectDir: number[];
 }

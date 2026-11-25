@@ -578,7 +578,11 @@ export class WeaponSystem {
         for (const slot of SLOTS) {
           const nodes = slotVisuals(w.model, slot);
           if (!nodes) continue;
-          for (const node of [nodes.bare, nodes.fitted]) {
+          for (const node of [
+            nodes.bare,
+            nodes.fitted,
+            ...nodes.alternatives.map(({ node }): THREE.Object3D => node),
+          ]) {
             if (!node) continue;
             visible.push([node, node.visible]);
             node.visible = true;
@@ -1018,7 +1022,7 @@ export class WeaponSystem {
     this._up.set(0, 1, 0).applyQuaternion(cam.quaternion);
     this.viewmodel.muzzleWorld(this._muzzle);
     /**
-     * Zeroed, not parallel: ADS puts the optic on the camera axis
+     * Zeroed, not parallel: ADS puts the selected sight on the camera axis
      * (viewmodel.js), so departing along `_camDir` would leave the bore a
      * sight-height low at any range (the subsonic MCX was 68 cm low at 100 m).
      * Depart at the sight line's `zeroRange` point, raised by the round's own

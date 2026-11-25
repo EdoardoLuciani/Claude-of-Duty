@@ -187,7 +187,7 @@ near(datum('SOCKET_sight'),(0,.151,.055))
 rear=surface([bpy.data.objects['Rear open aperture']])
 origin=Vector((0,-.070,.151));direction=Vector((0,1,0))
 assert rear.ray_cast(origin,direction,.020)[0] is None,'rear aperture blocked'
-body_meshes=[o for o in rig.children_recursive if o.type=='MESH' and o not in iron_meshes]
+body_meshes=[o for o in rig.children_recursive if o.type=='MESH' and o not in iron_meshes and o.parent.name!='IRON_troy']
 assert surface(body_meshes).ray_cast(origin,direction,.609)[0] is None,'base iron sight line obstructed'
 post=points('Front sight post');near((0,max(p.y for p in post),min(p.z for p in post)+.001),(0,.151,-.540))
 for foot in [o for o in iron_meshes if o.name.startswith('Iron rail foot')]:

@@ -7,6 +7,7 @@ from mathutils import Vector
 from mcx.review_hands import review_tracks, select_review_clip
 
 import attachment_source
+from troy_sights import set_sight_preview
 
 
 def points(obj, inverse):
@@ -21,12 +22,14 @@ def check_attachment_fits():
     scene = bpy.context.scene
     rig = bpy.data.objects['MCX_RIG']
     asset = bpy.data.collections['MCX VIRTUS | authored components']
+    installed = bpy.data.objects['IRON_sights']
+    folded = bpy.data.objects['IRON_sights_removed']
+    troy = bpy.data.objects['IRON_troy']
+    set_sight_preview(folded, True)
     select_review_clip('Idle')
     scene.frame_set(0)
     bpy.context.view_layer.update()
     inverse = rig.matrix_world.inverted()
-    installed = bpy.data.objects['IRON_sights']
-    folded = bpy.data.objects['IRON_sights_removed']
     device = bpy.data.objects['MUZZLE_device']
     # Weapon Blender +X forward; attachment Blender +Y forward and +Z up.
     for name, position in [('MOUNT_optic',(-.036,0,.046)),('MOUNT_muzzle',(.274,0,.009))]:
@@ -93,7 +96,7 @@ def check_attachment_fits():
                 frame = time*60
                 scene.frame_set(int(frame),subframe=frame%1)
                 inverse = rig.matrix_world.inverted()
-                moving = [o for o in asset.objects if o.type == 'MESH' and o.parent not in (bpy.data.objects['receiver'],installed,folded,device)]
+                moving = [o for o in asset.objects if o.type == 'MESH' and o.parent not in (bpy.data.objects['receiver'],installed,folded,troy,device)]
                 # Rigid mechanism states repeat during held review poses.
                 state = tuple(round(v,7) for o in moving for row in (inverse@o.matrix_world) for v in row)
                 if state not in checked:

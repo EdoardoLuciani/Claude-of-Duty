@@ -156,7 +156,7 @@ def export_asset(asset, parts, output):
     consolidate_finishes(asset, output)
 
     # One mesh per rigid parent. Explicit ordering fixes the active join object.
-    for parent in [bpy.data.objects['receiver'], *parts[1:]]:
+    for parent in [*(bpy.data.objects[name] for name in ('receiver', 'IRON_sights', 'IRON_sights_removed', 'IRON_troy')), *parts[1:]]:
         meshes = sorted(
             (obj for obj in asset.objects if obj.type == 'MESH' and obj.parent == parent),
             key=lambda item: item.name,

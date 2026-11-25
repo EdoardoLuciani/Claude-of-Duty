@@ -5,11 +5,11 @@
   "blenderForward": "+X",
   "blenderUp": "+Z",
   "stats": {
-    "triangleInstances": 63033,
-    "primitives": 16,
+    "triangleInstances": 71908,
+    "primitives": 17,
     "materials": 1,
     "images": 3,
-    "bytes": 6537520
+    "bytes": 7280368
   },
   "clips": {
     "Idle": {
@@ -208,6 +208,11 @@
       0.3162,
       0,
       0
+    ],
+    "troySightAxis": 0.0798,
+    "troyRailGrooves": [
+      -10,
+      25
     ]
   },
   "notes": [

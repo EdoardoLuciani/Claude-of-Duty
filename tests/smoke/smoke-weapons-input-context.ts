@@ -291,7 +291,7 @@ for (const [primary, first, second] of [
   tap('KeyL');
   wp.setWeaponImmediate('rifle');
   assert(!wp.state.laserEnabled, 'switching away and back preserves the per-gun switch');
-  assert(wp.setAttachments('rifle', { ...config, optic: 'railway' }));
+  assert(wp.setAttachments('rifle', { ...config, sight: 'railway' }));
   assert(!wp.state.laserEnabled, 'optic changes preserve an off switch');
   for (const gate of ['frozen', 'disabled', 'dead', 'control']) {
     input.frozen = gate === 'frozen';
@@ -327,7 +327,7 @@ for (const [primary, first, second] of [
     (): void => wp.resetForNewGame(),
   ]) {
     wp.resetForNewGame();
-    assert(wp.setAttachments('rifle', { ...config, optic: 'railway' }));
+    assert(wp.setAttachments('rifle', { ...config, sight: 'railway' }));
     assert(wp.state.laserEnabled);
     assert(!irons.visible, 'a mounted optic replaces the removable irons');
     assert(wp.state.def.adsFovScale !== undefined, 'the stored build drives ADS magnification');

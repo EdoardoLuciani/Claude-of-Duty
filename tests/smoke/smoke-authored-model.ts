@@ -168,14 +168,15 @@ assert.throws(
     muzzleSocket: baseSocket,
     def: { ...WEAPON_DEFS.rifle },
   });
-  const config: AttachmentConfig = { ...BASE_ATTACHMENTS, optic: 'railway' };
+  root.add(requiredNode(datums('IRON_troy'), 'IRON_troy'));
+  const config: AttachmentConfig = { ...BASE_ATTACHMENTS, sight: 'railway' };
   for (let i = 0; i < 9; i++) {
     const optic = (['railway', 'acog', 'scope'] as const)[i % 3];
-    const config: AttachmentConfig = { ...BASE_ATTACHMENTS, optic };
+    const config: AttachmentConfig = { ...BASE_ATTACHMENTS, sight: optic };
     // Mounting while the authored root is posed must not bake its current pose.
     root.rotation.x = i * 0.1;
     configureWeaponAttachments(entry, config, optics);
-    assert.equal(root.children.length, 5, 'empty slot groups stay detached');
+    assert.equal(root.children.length, 6, 'empty slot groups stay detached');
     assert.equal(entry.opticGroup.parent, socket, 'instance follows its authored mount');
     assert.equal(irons.visible, false, 'a mounted optic replaces the removable irons');
     assert(ironsRemoved.visible);
@@ -220,7 +221,7 @@ assert.throws(
     ) < 1e-8
   );
   railMount.position.z -= 0.089;
-  configureWeaponAttachments(entry, { ...laserConfig, optic: 'railway' }, { ...optics, laser });
+  configureWeaponAttachments(entry, { ...laserConfig, sight: 'railway' }, { ...optics, laser });
   assert.equal(entry.opticGroup.parent, socket, 'optic and rail coexist');
   assert.equal(entry.railGroup.parent, railMount);
   configureWeaponAttachments(entry, BASE_ATTACHMENTS, optics);
@@ -264,7 +265,7 @@ assert.throws(
     mcxRoot = new THREE.Group();
   mcxRoot.name = 'MCX_RIG';
   mcxScene.add(mcxRoot);
-  for (const name of ['muzzle', 'ejection', 'sight', 'magazine']) {
+  for (const name of ['muzzle', 'ejection', 'sight', 'magazine', 'troy']) {
     const node = new THREE.Object3D();
     node.name = `SOCKET_${name}`;
     mcxRoot.add(node);
@@ -276,7 +277,7 @@ assert.throws(
   mcxRoot.add(mcxMount);
   const mcxIrons = new THREE.Group();
   mcxIrons.name = 'IRON_sights';
-  mcxRoot.add(mcxIrons);
+  mcxRoot.add(mcxIrons, requiredNode(datums('IRON_troy'), 'IRON_troy'));
   const mcxDevice = new THREE.Group();
   mcxDevice.name = 'MUZZLE_device';
   mcxRoot.add(mcxDevice);
@@ -395,11 +396,16 @@ assert.throws(
     mount.rotation.y = -Math.PI / 2;
     nativeRoot.add(mount);
   }
-  for (const name of ['IRON_sights', 'IRON_sights_removed', 'MUZZLE_device']) {
+  for (const name of ['IRON_sights', 'IRON_sights_removed', 'IRON_troy', 'MUZZLE_device']) {
     const node = new THREE.Group();
     node.name = name;
     nativeRoot.add(node);
   }
+  const troy = requiredNode(nativeRoot, 'IRON_troy');
+  const troyDatum = new THREE.Object3D();
+  troyDatum.name = 'SOCKET_troy';
+  troyDatum.position.set(-0.075, 0.0798, 0);
+  troy.add(troyDatum);
   const mpx = makeMPXModel(
     fixture<GLTF>({
       scene: nativeScene,
@@ -417,6 +423,18 @@ assert.throws(
     })
   );
   const mounted = mountAttachments(mpx, laserConfig, { laser });
+  const baseIrons = requiredNode(nativeRoot, 'IRON_sights');
+  const folded = requiredNode(nativeRoot, 'IRON_sights_removed');
+  assert(baseIrons.visible && !troy.visible && !folded.visible);
+  const troyBuild = { ...laserConfig, sight: 'troy' } as const;
+  const selected = mountAttachments(mpx, troyBuild, { laser });
+  assert(!baseIrons.visible && troy.visible && !folded.visible);
+  assert.equal(selected.mountedOptic, null, 'physical sights never create an optical overlay');
+  assert(selected.sight.distanceTo(new THREE.Vector3(0, 0.0798, 0.075)) < 1e-9);
+  mountAttachments(mpx, { ...BASE_ATTACHMENTS, sight: 'rmr' }, { rmr: opticAsset() });
+  assert(!baseIrons.visible && !troy.visible && folded.visible);
+  mountAttachments(mpx, BASE_ATTACHMENTS, {});
+  assert(baseIrons.visible && !troy.visible && !folded.visible);
   const outward = 0.0105 * diagonal;
   const expectedEmitter = new THREE.Vector3(0.03 + outward, 0.04 + outward, -0.30518);
   for (const yaw of [0, 0.3]) {
@@ -540,7 +558,7 @@ assert.throws(
   viewmodel.active = null;
   root.rotation.set(0, 0, 0);
   for (const optic of ['acog', 'scope'] as const) {
-    configureWeaponAttachments(entry, { ...BASE_ATTACHMENTS, optic }, optics);
+    configureWeaponAttachments(entry, { ...BASE_ATTACHMENTS, sight: optic }, optics);
     viewmodel._updateScope(entry, 1);
     assert(viewmodel.scopeOverlay.visible, 'mounted scope shows the overlay on a carbine');
     assert.equal(weaponScene.visible, false, 'mounted scope hides the gun at full ADS');
@@ -557,7 +575,7 @@ assert.throws(
     assert(weaponScene.visible, 'removing the scope restores visible irons even while aiming');
   }
   // The EXPS3 ring is drawn only while it fits inside the lens.
-  configureWeaponAttachments(entry, { ...BASE_ATTACHMENTS, optic: 'exps3' }, optics);
+  configureWeaponAttachments(entry, { ...BASE_ATTACHMENTS, sight: 'exps3' }, optics);
   viewmodel.rig.position.set(0, 0, -entry.eyeRelief).sub(entry.sight);
   viewmodel._updateReticle(entry, 1);
   assert(viewmodel.reticle.visible && viewmodel.reticleRing.visible);

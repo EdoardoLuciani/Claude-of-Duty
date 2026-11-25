@@ -34,6 +34,14 @@ field radio equipped, press **Enter** to request the selected strike. Grenades a
 wound or kill you here just as in Survival; after a lethal hit, choose **New Game** to return to the
 firing line.
 
+In the Supply Market, the **Sight** menu selects one aiming setup: free default irons,
+a compatible alternate iron set, or an optic. The black TROY Di-Optic / HK set fits
+the MPX, MCX VIRTUS, EVOLYS and AX338. The M4A1, P320 Compact and M590 keep their
+default irons. Alternate irons use physical sight geometry without extra zoom or
+stat bonuses. The M590's suppressor blocks its default ghost-ring sightline;
+select a compatible optic for a clear aimed view. See the
+[weapon sight fits](docs/iron-sights.md).
+
 Use **Esc → Return to Start Menu** to choose another session without reloading. Look sensitivity,
 field of view, invert Y, and firing shake carry over; range builds and charges never carry over to
 Survival.

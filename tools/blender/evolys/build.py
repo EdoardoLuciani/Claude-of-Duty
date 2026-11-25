@@ -15,6 +15,7 @@ from mathutils import Matrix, Vector
 ROOT=Path(__file__).resolve().parents[3]
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import picatinny
+from troy_sights import build_troy_pair, set_sight_preview
 from review_hands import without_review_hands
 from evolys.actions import author_actions
 from evolys.export import consolidate_static_surfaces, prepare_export_actions, validate_export
@@ -292,6 +293,10 @@ def build(output, render=False, quick=False):
     for side in (-1,1):
         box('Front protective ear',(side*.007,rail_top+.017,front_z),(.003,.026,.006),black,irons,.0007)
     empty('SOCKET_front_post',(0,sight_y,front_z),rig)
+    groove_origin = .105-30*.01005
+    rear_troy, front_troy = (groove_origin + groove * picatinny.PITCH for groove in (27,-16))
+    troy = build_troy_pair(asset, rig, xyz((0,rail_top,rear_troy)), xyz((0,rail_top,front_troy)),
+                           0, black, steel, mark)
     # Rearward whole-groove seat; optics supply their own riser/base and sight.
     empty('MOUNT_optic',(0,rail_top,.105-30*.01005+6*picatinny.PITCH),rig)
     # FN's studio profile shows a direct underside rail below the molded covers.
@@ -361,11 +366,12 @@ def build(output, render=False, quick=False):
     bpy.ops.object.join();belt_mesh=bpy.context.object;belt_mesh.name='belt_mesh';belt_mesh.parent=belt
     mod=belt_mesh.modifiers.new('Rigid linked belt','ARMATURE');mod.object=belt
     # Consolidate only parts sharing a rigid transform, preserving all hinge nodes.
-    for parent in (body,hg,stock,irons,device,adapter,cover,charging,bolt,trigger,pouch,spare):
+    for parent in (body,hg,stock,irons,troy,device,adapter,cover,charging,bolt,trigger,pouch,spare):
         objects=[o for o in list(asset.objects) if o.type=='MESH' and o.parent==parent]
         if not objects:continue
         for o in objects:
             active(o);bpy.ops.object.transform_apply(location=False,rotation=False,scale=True)
+            if parent == troy: bpy.ops.object.convert(target='MESH')
             assert o.data.polygons,'Unexpected empty geometry: '+o.name
             if o.name.startswith('Lower Picatinny '):
                 group=o.vertex_groups.new(name='LASER_mount_hardware')
@@ -415,12 +421,14 @@ def build(output, render=False, quick=False):
     scene.render.film_transparent=True;scene.view_settings.view_transform='AgX'
     scene['clips']=json.dumps(clips)
     notes=bpy.data.texts.new('START HERE');notes.write('FN EVOLYS 7.62 / CURRENT STOCK / REMOVABLE IRONS / NO BIPOD\nOriginal game art, not a scan or certified CAD. Reference/photo caveats are in README.md.\nEight weapon/wrist/finger clips at 120 fps; belt_rig is a single batched skinned linked belt.\nShared review skins are not exported. Runtime ammunition controls belt-tail visibility.\nPacked original PBR maps. Select matching NLA tracks on every control and arm for review.\nGenerated preview: edit tools/blender/evolys/build.py and evolys/export.py; calibration and shared review arms are read-only inputs. Regeneration overwrites manual edits.\n')
+    set_sight_preview(troy, False)
     bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'fn-evolys-762.blend'))
     if render:
         (OUT/'renders').mkdir(exist_ok=True)
         for name in ('hero','left','right','top','feed_detail'):
             scene.camera=bpy.data.objects[name];scene.render.filepath=str(OUT/'renders'/(name+'.png'));bpy.ops.render.render(write_still=True)
     # Save the editable original actions first; prepare only the in-memory runtime copy.
+    set_sight_preview(troy, True)
     prepare_export_actions(asset, clips)
     bake_finish_atlas(asset, OUT)
     consolidate_static_surfaces(asset)

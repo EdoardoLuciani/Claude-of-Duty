@@ -392,28 +392,35 @@ artwork is mapped in `src/ui/market-art.ts`; its provenance lives in
 [`docs/provenance/market-art.md`](docs/provenance/market-art.md).
 
 `WeaponState.attachments` is the gun's one stored build, an immutable
-`{ optic, muzzle, rail }` snapshot; null slots retain the base weapon, and
-`optic: null` uses irons. Viewmodel entries hold the mounted instances and their
+`{ sight, muzzle, rail }` snapshot. `sight` holds one aiming choice: null for
+free default irons, a compatible alternate iron set, or a compatible optic.
+Null muzzle and rail slots retain base hardware. Viewmodel entries hold the mounted instances and their
 resolved data, never a copy of the build.
 `src/weapons/attachment-rules.ts` owns the finite catalog (`railway | acog | scope | exps3`
-optics, TOR Mini `laser`, one `suppressor`), compatibility and effective-definition
+optics, TROY Di-Optic / HK `troy` irons, TOR Mini `laser`, one `suppressor`),
+compatibility and effective-definition
 resolution without importing weapon loading or mounting. `src/weapons/attachments.ts`
-owns asset loading and the shared gameplay/inspection mount solver.
+owns asset loading and the shared gameplay/inspection mount solver, including
+weapon-local iron-set visibility.
 `src/market/attachments.ts` owns prices, not compatibility. Market holds one
 unconfirmed build; selecting, inspecting or editing never changes gameplay or credits.
 Confirmation rechecks credits, shop state and asset readiness, applies
 `weapons.applyBuild()` and charges the quoted total only after the build succeeds. New weapons are configured before replacing
 ownership, so a rejected build never drops the old gun.
 
-`WeaponDef.fits` is a per-slot partial record keyed by attachment ID: each entry
-enables a verified fit and holds its data (`fits.optic[id].eyeRelief`, optional
-`railSlots` at `PICATINNY_PITCH`, `fits.muzzle.suppressor.model`; rail entries
-are empty). The player-facing muzzle ID is always `suppressor`; assets are keyed by
+`WeaponDef.fits` contains partial records keyed by attachment ID: each entry
+enables a verified fit and holds its data. Optics and alternate irons have
+per-fit eye relief; optics may select `railSlots` at `PICATINNY_PITCH`.
+Muzzle fits name a can model; rail entries are empty. The player-facing muzzle ID is always `suppressor`; assets are keyed by
 can model. `isAttachmentConfig()` is the shared compatibility rule for gameplay,
 URL/debug input (narrowed once in `src/dev/attachments.ts` before prewarm) and
 `tools/capture.ts`; reject unverified fits, never silently change them.
-`removableIrons` swaps required `IRON_sights` for optional `IRON_sights_removed`
-with any optic; fixed irons stay and must clear it. `removableMuzzleDevice` similarly
+A fitted alternate selects only its weapon-local `IRON_<id>` instead of the
+base `IRON_sights`. ADS uses its `SOCKET_<id>` from the authored rest pose;
+meshes follow their rail or slide, with the same iron ADS settings and zeroing
+as the base, not an optical reticle or magnification preset. With an optic,
+`removableIrons` swaps required `IRON_sights` for optional `IRON_sights_removed`;
+fixed irons stay and must clear it. `removableMuzzleDevice` similarly
 swaps required `MUZZLE_device` for optional `MUZZLE_device_removed`; permanent
 hardware stays under the can. Missing required nodes fail loading.
 
@@ -445,7 +452,7 @@ exit (a can's endcap, else the weapon's `SOCKET_muzzle`) once; `viewmodel.muzzle
 reads it for ballistics/FX; ejection stays at `SOCKET_ejection`. A can's endcap shares
 the `SOCKET_muzzle` name, so the weapon's own socket is held from load as
 `baseMuzzleSocket`, never looked up by name on a mounted rig.
-Prewarm covers every loaded attachment and both iron/muzzle hardware states.
+Prewarm covers every loaded attachment and all authored iron/muzzle hardware states.
 
 Per-weapon and per-attachment datums/clearances live in each recipe's
 `tools/blender/*/README.md`. Blender fit checks load built attachments through

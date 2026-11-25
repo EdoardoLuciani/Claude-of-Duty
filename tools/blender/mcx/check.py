@@ -96,7 +96,7 @@ assert rear.ray_cast(sight+Vector((-.02,.003,0)),Vector((1,0,0)),.04)[0] is not 
 post = mesh_world('Front sight post')[0]
 assert abs(max(v.z for v in post)-sight.z) < 1e-6, 'post tip on sight axis'
 for obj in asset.objects:
-    if obj.type == 'MESH' and obj.parent not in (objects['IRON_sights'],objects['IRON_sights_removed']):
+    if obj.type == 'MESH' and obj.parent not in (objects['IRON_sights'],objects['IRON_sights_removed'],objects['IRON_troy']):
         assert bvh(obj.name).ray_cast(sight+Vector((.005,0,0)),Vector((1,0,0)),.37)[0] is None, ('obstructed iron line',obj.name)
 # The bare muzzle has a real bore and the entire device is replaceable.
 assert all(o.parent == objects['MUZZLE_device'] for o in asset.objects if o.name.startswith('Base muzzle '))

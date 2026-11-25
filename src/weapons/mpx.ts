@@ -42,6 +42,7 @@ export function makeMPXModel(gltf: GLTF): MPXModel {
     handPoses: { left: handReference.sides.left.grip, right: handReference.sides.right.grip },
     nodes: {
       sight: point('SOCKET_sight'),
+      ironSights: { troy: point('SOCKET_troy') },
       ejectDir: [0.82, 0.52, 0.24],
     },
     shell: { caseLen: 0.0192, rimR: 0.00478 },

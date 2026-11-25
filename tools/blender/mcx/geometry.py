@@ -9,6 +9,7 @@ import bpy
 from mathutils import Matrix, Vector
 from mcx.primitives import create_primitives
 import picatinny
+from troy_sights import build_troy_pair
 
 def build_geometry(materials):
     asset = bpy.data.collections.new("MCX VIRTUS | authored components")
@@ -201,8 +202,10 @@ def build_geometry(materials):
             for a,b in spans:
                 loft(name,[[(y,x,z) for x,z in outline] for y in (a,b)],coating,bevel=0)
         for x in (-.15,.232):
-            box('Backup sight base',(x,0,.049),(.030,.030,.007),steel)
-            cylinder('Backup sight hinge',(x+.004,0,.055),.006,.034,steel,'Y')
+            for hardware in (irons, folded):
+                box('Backup sight base',(x,0,.049),(.030,.030,.007),steel,hardware)
+                cylinder('Backup sight hinge',(x+.004,0,.055),.006,.034,steel,'Y',hardware)
+                for side in (-1,1): fastener(x+.004,side*.018,.055,.003,hardware)
             box('Folded backup sight leaf',(x-.006,0,.056),(.019,.014,.004),polymer,folded)
             if x < 0:
                 # Hinge-supported aperture leaf: an actual open bore, not glass.
@@ -214,7 +217,9 @@ def build_geometry(materials):
                 for side in (-1,1):
                     box('Front sight protective ear',(x+.004,side*.008,.074),(.004,.003,.020),polymer,irons)
 
-            for side in (-1,1): fastener(x+.004,side*.018,.055,.003)
+        rear, front = (-.036 + groove * picatinny.PITCH for groove in (-11, 27))
+        build_troy_pair(asset, body, (rear,0,.046), (front,0,.046),
+                        -math.pi/2, anodized, steel, materials['marking'])
 
     def build_charging_handle():
         # OEM KIT-MCX-CHARGE-HANDLE-SM: swept rear bow, separate hooked small

@@ -34,7 +34,8 @@ export async function loadWeapon(
   // Fail this weapon's load, not the batch it is mounted with.
   requiredNode(model.root, 'SOCKET_muzzle');
   requiredNode(model.root, 'SOCKET_ejection');
-  for (const slot of Object.keys(WEAPON_DEFS[id].fits ?? {}))
-    requiredNode(model.root, `MOUNT_${slot}`);
+  const { fits } = WEAPON_DEFS[id];
+  for (const slot of ['optic', 'muzzle', 'rail'] as const)
+    if (fits?.[slot]) requiredNode(model.root, `MOUNT_${slot}`);
   return model;
 }

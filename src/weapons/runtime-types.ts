@@ -63,7 +63,7 @@ export interface WeaponEntry {
   animation: WeaponAnimation;
   clips: Record<string, Clip>;
   sight: THREE.Vector3;
-  /** ADS eye distance for the mounted optic, else the authored iron-sight value. */
+  /** ADS eye distance for the selected sight. */
   eyeRelief: number;
   ejectDir: THREE.Vector3;
   magLen: number;

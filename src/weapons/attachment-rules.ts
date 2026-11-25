@@ -3,20 +3,23 @@ import { WEAPON_DEFS, type WeaponDef, type WeaponId } from './defs.ts';
 
 export const OPTIC_IDS = ['railway', 'acog', 'scope', 'exps3'] as const;
 export type OpticId = (typeof OPTIC_IDS)[number];
+export const IRON_SIGHT_IDS = ['troy'] as const;
+export type IronSightId = (typeof IRON_SIGHT_IDS)[number];
+type SightId = IronSightId | OpticId;
 export type RailId = 'laser';
 export type MuzzleId = 'suppressor';
 /** Calibre-specific can models; each weapon's muzzle fit names the one it mounts. */
 export const CAN_MODELS = ['srd762ti', 'suppressor9mm', 'suppressor338', 'suppressor12g'] as const;
 export type CanModel = (typeof CAN_MODELS)[number];
 
-/** Null means the authored base weapon (`optic: null` aims through its irons). */
+/** Null means the authored base weapon (`sight: null` uses its default irons). */
 export interface AttachmentConfig {
-  readonly optic: OpticId | null;
+  readonly sight: SightId | null;
   readonly muzzle: MuzzleId | null;
   readonly rail: RailId | null;
 }
 export const BASE_ATTACHMENTS: AttachmentConfig = Object.freeze({
-  optic: null,
+  sight: null,
   muzzle: null,
   rail: null,
 });
@@ -30,9 +33,13 @@ function hasFit(fits: object | undefined, value: unknown): boolean {
 export function isAttachmentConfig(value: unknown, id: WeaponId): value is AttachmentConfig {
   // A missing slot reads as undefined, which every check below rejects.
   if (!isRecord(value)) return false;
-  const { optic, muzzle, rail } = value;
+  const { sight, muzzle, rail } = value;
   const { fits } = WEAPON_DEFS[id];
-  return hasFit(fits?.optic, optic) && hasFit(fits?.rail, rail) && hasFit(fits?.muzzle, muzzle);
+  return (
+    (hasFit(fits?.optic, sight) || hasFit(fits?.iron, sight)) &&
+    hasFit(fits?.rail, rail) &&
+    hasFit(fits?.muzzle, muzzle)
+  );
 }
 
 export interface OpticData {
@@ -90,8 +97,12 @@ export const OPTICS: Record<
   },
 };
 
+export function isOpticId(value: unknown): value is OpticId {
+  return typeof value === 'string' && hasOwn(OPTICS, value);
+}
+
 export const SLOTS = [
-  'optic',
+  'sight',
   'muzzle',
   'rail',
 ] as const satisfies readonly (keyof AttachmentConfig)[];
@@ -104,10 +115,7 @@ export function fittedCan(id: WeaponId, muzzle: MuzzleId | null): CanModel | nul
 /** Handling trade-offs each attachment multiplies into the authored weapon; an omitted
  * field leaves that value unchanged. Optic magnification and laser/suppressor
  * presentation live with their own data, not here. */
-const HANDLING: Record<
-  NonNullable<AttachmentConfig[keyof AttachmentConfig]>,
-  { adsTime?: number; recoil?: number }
-> = {
+const HANDLING: Record<OpticId | MuzzleId | RailId, { adsTime?: number; recoil?: number }> = {
   railway: {},
   exps3: { adsTime: 1.04 },
   acog: { adsTime: 1.1 },
@@ -129,12 +137,12 @@ export interface BuiltWeaponDef extends WeaponDef {
 /** Resolve gameplay and preview from authored tuning, never from a previously fitted build. */
 export function buildDef(id: WeaponId, config: AttachmentConfig): BuiltWeaponDef {
   const base = WEAPON_DEFS[id];
-  const optic = config.optic === null ? undefined : OPTICS[config.optic];
+  const optic = isOpticId(config.sight) ? OPTICS[config.sight] : undefined;
   let adsTime = base.adsTime;
   let recoilScale = 1;
   for (const slot of SLOTS) {
     const attachment = config[slot];
-    if (attachment === null) continue;
+    if (attachment === null || !hasOwn(HANDLING, attachment)) continue;
     const effect = HANDLING[attachment];
     adsTime *= effect.adsTime ?? 1;
     recoilScale *= effect.recoil ?? 1;

@@ -154,6 +154,9 @@ function cookStep(id: ModelId, salt: string[]): AssetStep {
             ...(id === 'm67' || id === 'ammo_pickup' || id === 'intel_case'
               ? []
               : ['tools/blender/picatinny.py']),
+            ...(['mpx', 'mcx', 'evolys', 'ax338'].includes(id)
+              ? ['tools/blender/troy_sights.py']
+              : []),
             ...(authored ? [`${authored}/hand-reference.json`] : []),
           ],
     // Only this model's cook settings, so one profile edit rebuilds one model.

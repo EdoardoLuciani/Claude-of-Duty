@@ -4,13 +4,13 @@
  * Usage: bun tools/capture.ts --shot=hero --out=/tmp/hero.png
  *        bun tools/capture.ts --reload --out=/tmp/reload
  *        bun tools/capture.ts --weapon=mcx --clip=reloadEmpty --at=2.5 --out=/tmp/mcx-charge.png
- *        bun tools/capture.ts --weapon=pistol --muzzle=suppressor --shot=ads --out=/tmp/p320.png
+ *        bun tools/capture.ts --weapon=smg --sight=troy --shot=ads --out=/tmp/mpx-troy.png
  */
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
 import type { Engine } from '../src/core/engine.ts';
-import { isAttachmentConfig, type AttachmentConfig } from '../src/weapons/attachment-rules.ts';
+import { isAttachmentConfig, isOpticId } from '../src/weapons/attachment-rules.ts';
 import { isWeaponId } from '../src/weapons/defs.ts';
 import {
   ensureDevServer,
@@ -41,19 +41,23 @@ const SETTLE = Number(args.settle ?? 90);
 const WEAPON = String(args.weapon ?? 'rifle');
 if (!isWeaponId(WEAPON)) throw new Error(`Unknown weapon: ${WEAPON}`);
 const OPTIC = args.optic;
+if (OPTIC !== undefined && args.sight !== undefined)
+  throw new Error('--sight and --optic select the same slot; use only one.');
+if (OPTIC !== undefined && OPTIC !== 'none' && !isOpticId(OPTIC))
+  throw new Error(`Unknown optic: ${OPTIC}`);
+const SIGHT = args.sight ?? OPTIC;
 const RAIL = args.rail;
 const MUZZLE = args.muzzle;
 const requested: unknown = {
-  optic: OPTIC === undefined || OPTIC === 'none' ? null : OPTIC,
+  sight: SIGHT === undefined || SIGHT === 'none' ? null : SIGHT,
   muzzle: MUZZLE === undefined || MUZZLE === 'none' ? null : MUZZLE,
   rail: RAIL === undefined || RAIL === 'none' ? null : RAIL,
 };
 // The game's own rule: unknown ids and unverified fits are rejected.
 if (!isAttachmentConfig(requested, WEAPON))
   throw new Error(
-    `${WEAPON} does not accept optic=${OPTIC ?? 'none'}, rail=${RAIL ?? 'none'}, muzzle=${MUZZLE ?? 'none'}.`
+    `${WEAPON} does not accept sight=${SIGHT ?? 'none'}, rail=${RAIL ?? 'none'}, muzzle=${MUZZLE ?? 'none'}.`
   );
-const ATTACHMENTS: AttachmentConfig = requested;
 
 // Self-contained functions serialized by Playwright into the browser.
 function pump(frames: number): Promise<number> {
@@ -101,7 +105,7 @@ try {
   });
   try {
     const attachmentQuery =
-      (args.optic ? `&attachmentOptic=${encodeURIComponent(String(args.optic))}` : '') +
+      (SIGHT ? `&attachmentSight=${encodeURIComponent(String(SIGHT))}` : '') +
       (RAIL ? `&attachmentRail=${encodeURIComponent(String(RAIL))}` : '') +
       (MUZZLE ? `&attachmentMuzzle=${encodeURIComponent(String(MUZZLE))}` : '') +
       `&attachmentWeapon=${encodeURIComponent(WEAPON)}`;
@@ -113,7 +117,7 @@ try {
       }
     );
     await page.waitForFunction('window.__READY__ === true', null, { timeout: TIMEOUT });
-    if (args.weapon || OPTIC || RAIL || MUZZLE)
+    if (args.weapon || SIGHT || RAIL || MUZZLE)
       await page.evaluate(
         ({ id, config }): void => {
           const weapons = window.__ENGINE__?.ctx.get('weapons');
@@ -123,7 +127,7 @@ try {
         },
         {
           id: WEAPON,
-          config: ATTACHMENTS,
+          config: requested,
         }
       );
     if (args.list) {

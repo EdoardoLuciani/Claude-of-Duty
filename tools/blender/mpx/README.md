@@ -38,11 +38,16 @@ protector's end; base firing is unsuppressed.
 the rear peep, not an optical axis. `IRON_sights_removed` keeps the same hardware
 folded flat for any mounted optic.
 
-| Slot   | Authored datum                    | Catalog fits                   |
-| ------ | --------------------------------- | ------------------------------ |
-| Optic  | `MOUNT_optic`, rail-contact plane | shared optics                  |
-| Muzzle | `MOUNT_muzzle`, bore-forward      | shared `suppressor` (SRD762Ti) |
-| Rail   | `MOUNT_rail`, bore-forward        | TOR Mini `laser`               |
+`IRON_troy` is the shared [TROY Di-Optic / HK alternate](../../../docs/iron-sights.md).
+Its front and rear feet use whole grooves over the receiver and forward
+handguard. `SOCKET_troy` is the diamond centre aligned with the front post tip;
+the alternate rides on the rigid receiver and has its own iron eye relief.
+
+| Slot   | Authored datum                   | Catalog fits                                     |
+| ------ | -------------------------------- | ------------------------------------------------ |
+| Sight  | rear aiming datum / rail contact | default irons, TROY Di-Optic / HK, shared optics |
+| Muzzle | `MOUNT_muzzle`, bore-forward     | shared `suppressor` (SRD762Ti)                   |
+| Rail   | `MOUNT_rail`, bore-forward       | TOR Mini `laser`                                 |
 
 Optic and muzzle frames rotate Blender +Y forward onto weapon +X; the adapter
 preserves canonical shared-attachment locals at all three mount boundaries. Railway and
@@ -54,13 +59,14 @@ sits back from the front lip on the upper-right handguard chamfer and stays
 visible with or without the laser. The TOR Mini shares the rail's cant and
 still points along the bore.
 
-`check.py` verifies catalog seating, iron clashes, both iron states, concurrent
+`check.py` verifies catalog seating, iron clashes, all iron states, concurrent
 slots, fixed surfaces, every clip's mechanisms and deformed hands at 120 Hz, plus
 independent stock-fold and charging-handle sweeps (mechanical checks, not gameplay
-animations).
+animations). `../check_troy_sights.py` checks the TROY feet and open sight picture.
 
 ```sh
 bun tools/capture.ts --weapon=smg --shot=ads --out=/tmp/mpx-irons.png
+bun tools/capture.ts --weapon=smg --sight=troy --shot=ads --out=/tmp/mpx-troy.png
 bun tools/capture.ts --weapon=smg --rail=laser --muzzle=suppressor --shot=weapon --out=/tmp/mpx-attachments.png
 ```
 

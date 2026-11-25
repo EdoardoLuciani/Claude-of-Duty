@@ -2,7 +2,7 @@
  * zeroRange is the sight-line crossing; learned sightline recoil is separate from random spread.
  */
 
-import type { CanModel, MuzzleId, OpticId, RailId } from './attachment-rules.ts';
+import type { CanModel, IronSightId, MuzzleId, OpticId, RailId } from './attachment-rules.ts';
 
 export const WEAPON_IDS = ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper', 'mcx'] as const;
 export type WeaponId = (typeof WEAPON_IDS)[number];
@@ -77,10 +77,11 @@ export interface WeaponDef {
   hipRot: TuningVector;
   adsCant: TuningVector;
   eyeRelief: number;
-  /** Verified fits per attachment slot: a key enables that attachment on this weapon
+  /** Verified fits by attachment kind: a key enables that attachment on this weapon
    * and holds its fit data. Unverified fits stay absent; handling effects are catalog data. */
   fits?: {
     optic?: Partial<Record<OpticId, { eyeRelief: number; railSlots?: number }>>;
+    iron?: Partial<Record<IronSightId, { eyeRelief: number }>>;
     rail?: Partial<Record<RailId, Record<string, never>>>;
     muzzle?: Partial<Record<MuzzleId, { model: CanModel }>>;
   };
@@ -163,6 +164,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     adsCant: [0, 0, 0],
     eyeRelief: 0.06,
     fits: {
+      iron: { troy: { eyeRelief: 0.075 } },
       optic: OPTIC_FITS,
       muzzle: { suppressor: { model: 'srd762ti' } },
       rail: { laser: {} },
@@ -315,6 +317,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     // Keep the deployed peep centred without letting its housing dominate ADS.
     eyeRelief: 0.095,
     fits: {
+      iron: { troy: { eyeRelief: 0.075 } },
       optic: OPTIC_FITS,
       muzzle: { suppressor: { model: 'srd762ti' } },
       rail: { laser: {} },
@@ -383,6 +386,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     adsCant: [0, 0, 0.004],
     eyeRelief: 0.03,
     fits: {
+      iron: { troy: { eyeRelief: 0.075 } },
       optic: {
         ...OPTIC_FITS,
         // MOUNT_optic is the rearmost seat; each body sits whole grooves forward,
@@ -588,6 +592,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     adsCant: [0, 0, 0],
     eyeRelief: 0.07,
     fits: {
+      iron: { troy: { eyeRelief: 0.075 } },
       optic: OPTIC_FITS,
       rail: { laser: {} },
       muzzle: { suppressor: { model: 'suppressor338' } },
