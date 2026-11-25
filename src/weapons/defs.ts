@@ -2,7 +2,7 @@
  * zeroRange is the sight-line crossing; learned sightline recoil is separate from random spread.
  */
 
-import type { CanModel, MuzzleId, OpticId, RailId } from './attachment-rules.ts';
+import type { CanModel, MuzzleId, OpticId, RailId, SupportId } from './attachment-rules.ts';
 
 export const WEAPON_IDS = ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper', 'mcx'] as const;
 export type WeaponId = (typeof WEAPON_IDS)[number];
@@ -75,6 +75,7 @@ export interface WeaponDef {
   fits?: {
     optic?: Partial<Record<OpticId, { eyeRelief: number; railSlots?: number }>>;
     rail?: Partial<Record<RailId, Record<string, never>>>;
+    support?: Partial<Record<SupportId, Record<string, never>>>;
     muzzle?: Partial<Record<MuzzleId, { model: CanModel }>>;
   };
   /** Authored `IRON_sights` are hidden whenever an optic is mounted (an optional
@@ -241,6 +242,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
         scope: { eyeRelief: 0.16, railSlots: 7 },
       },
       rail: { laser: {} },
+      support: { handstop: {} },
     },
     removableIrons: true,
     removableMuzzleDevice: true,

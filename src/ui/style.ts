@@ -309,7 +309,7 @@ const CSS = `
 .ow-market-build { border-top:1px solid var(--hair-2); margin-top:calc(var(--u) * 2); padding-top:calc(var(--u) * 2); }
 .ow-market-build[hidden] { display:none; }
 .ow-market-build h3 { margin:0 0 calc(var(--u) * 2); }
-.ow-market-build-slot { display:grid; grid-template-columns:4em minmax(0, 1fr) 3em; align-items:center; gap:calc(var(--u) * 1.5); margin:calc(var(--u) * 1.5) 0; font-size:calc(10px * var(--k)); color:var(--ink-2); }
+.ow-market-build-slot { display:grid; grid-template-columns:5.5em minmax(0, 1fr) 3em; align-items:center; gap:calc(var(--u) * 1.5); margin:calc(var(--u) * 1.5) 0; font-size:calc(10px * var(--k)); color:var(--ink-2); }
 .ow-market-build select { min-width:0; width:100%; color:var(--ink); background:#171c21; border:1px solid var(--hair-2); padding:calc(var(--u) * 1.5); font:inherit; color-scheme:dark; }
 .ow-market-build-cost { text-align:right; font-family:var(--fm); }
 .ow-market-build-base { font-size:calc(10px * var(--k)); color:var(--ink-2); }

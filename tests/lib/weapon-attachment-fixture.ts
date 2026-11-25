@@ -26,9 +26,9 @@ export function opticAsset(scene = datums('MOUNT_base', 'SOCKET_sight')): Assets
   return { scene, mount, sight: datum(scene, 'SOCKET_sight'), dispose(): void {} };
 }
 
-/** Owned rigid (laser/can) record: `SOCKET_mount` plus its output socket. */
+/** Owned rigid record: `SOCKET_mount` plus its output socket. */
 export function rigidAsset(
-  output: 'SOCKET_laser' | 'SOCKET_muzzle',
+  output: 'SOCKET_laser' | 'SOCKET_muzzle' | 'SOCKET_support_wrist',
   scene = datums('SOCKET_mount', output)
 ): Assets['laser'] {
   return { scene, mount: datum(scene, 'SOCKET_mount'), output, dispose(): void {} };
@@ -43,6 +43,8 @@ export function mountableWeapon(
   | 'eyeRelief'
   | 'opticGroup'
   | 'railGroup'
+  | 'supportGroup'
+  | 'supportWrist'
   | 'muzzleGroup'
   | 'baseMuzzleSocket'
   | 'muzzleSocket'
@@ -55,6 +57,7 @@ export function mountableWeapon(
     'MUZZLE_device',
     'MOUNT_optic',
     'MOUNT_rail',
+    'MOUNT_support',
     'MOUNT_muzzle',
     'SOCKET_muzzle'
   );
@@ -72,6 +75,8 @@ export function mountableWeapon(
     eyeRelief: WEAPON_DEFS[id].eyeRelief,
     opticGroup: new THREE.Group(),
     railGroup: new THREE.Group(),
+    supportGroup: new THREE.Group(),
+    supportWrist: null,
     muzzleGroup: new THREE.Group(),
     baseMuzzleSocket: muzzleSocket,
     muzzleSocket,

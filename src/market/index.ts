@@ -374,7 +374,8 @@ export class MarketSystem {
       // Keep slot/id correlation explicit without allocating candidate objects per frame.
       if (offer.slot === 'optic') this._candidate.optic = offer.id;
       else if (offer.slot === 'muzzle') this._candidate.muzzle = offer.id;
-      else this._candidate.rail = offer.id;
+      else if (offer.slot === 'rail') this._candidate.rail = offer.id;
+      else this._candidate.support = offer.id;
       offer.compatible = isAttachmentConfig(this._candidate, id);
       offer.available = offer.compatible && this.weapons.canConfigure(id, this._candidate);
     }

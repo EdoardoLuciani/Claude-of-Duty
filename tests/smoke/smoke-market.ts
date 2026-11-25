@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import * as THREE from 'three';
 
-import { BASE_ATTACHMENTS } from '../../src/weapons/attachment-rules.ts';
+import { BASE_ATTACHMENTS, buildDef } from '../../src/weapons/attachment-rules.ts';
 import type { WeaponEntry } from '../../src/weapons/runtime-types.ts';
 import type { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { fixture } from '../lib/fixture.ts';
@@ -375,6 +375,7 @@ Object.assign(weapons, {
     rmr: opticAsset(),
     acog: opticAsset(),
     laser: rigidAsset('SOCKET_laser'),
+    handstop: rigidAsset('SOCKET_support_wrist'),
     srd762ti: rigidAsset('SOCKET_muzzle'),
   },
 });
@@ -391,7 +392,7 @@ assert(
 for (const optic of ['rmr', 'acog', 'scope', 'exps3'] as const)
   assert(!market.setBuild({ ...BASE_ATTACHMENTS, optic }), `${optic} cannot replace pistol irons`);
 assert(
-  market.setBuild({ optic: null, rail: 'laser', muzzle: 'suppressor' }),
+  market.setBuild({ ...BASE_ATTACHMENTS, rail: 'laser', muzzle: 'suppressor' }),
   'pistol laser and suppressor remain compatible together'
 );
 assert.deepEqual(
@@ -447,7 +448,12 @@ const authoredLmg = structuredClone(WEAPON_DEFS.lmg);
 const liveDef = weaponState('lmg').def;
 const baseDef = structuredClone(liveDef);
 const basePattern = weaponState('lmg').pattern;
-const fullBuild = { optic: 'acog', muzzle: 'suppressor', rail: 'laser' } as const;
+const fullBuild = {
+  ...BASE_ATTACHMENTS,
+  optic: 'acog',
+  muzzle: 'suppressor',
+  rail: 'laser',
+} as const;
 market.credits = 950;
 assert(market.setBuild(fullBuild) && market.confirmBuild());
 assert(liveDef.adsTime > baseDef.adsTime, 'fitted build takes longer to aim');
@@ -489,6 +495,50 @@ assert(market.beginBuild('rifle'));
 context.events.emit('game:restart', {});
 assert.equal(market.getHudState().build, null, 'restart drops unconfirmed build');
 assert.equal(market.credits, 0);
+
+{
+  // The bottom M4 hand stop is independent of the verified right-side laser mount.
+  const withHandstop = { ...BASE_ATTACHMENTS, support: 'handstop', rail: 'laser' } as const;
+  market.openShop();
+  market.credits = 1350;
+  assert(market.beginBuild('lmg') && !market.setBuild(withHandstop));
+  assert(!market.confirmBuild(), 'rejected support fit cannot be confirmed');
+  assert(
+    !market.getHudState().build?.config.support,
+    'invalid draft never replaces the base proposal'
+  );
+  assert.equal(market.getHudState().credits, 1350);
+  assert(!weapons.applyBuild('lmg', withHandstop), 'runtime also rejects unverified fits');
+  assert(market.beginBuild('rifle') && market.confirmBuild(), 'buy base rifle if not owned');
+  market.credits = 1350;
+  assert(market.setBuild(withHandstop));
+  market.credits = 349;
+  assert(!market.confirmBuild());
+  assert.equal(market.getHudState().credits, 349);
+  market.credits = 1350;
+  const baseRifle = buildDef('rifle', BASE_ATTACHMENTS);
+  const draftRifle = buildDef('rifle', withHandstop);
+  assert(
+    draftRifle.recoil.pitch < baseRifle.recoil.pitch && draftRifle.adsTime > baseRifle.adsTime
+  );
+  const rifleLiveDef = weaponState('rifle').def;
+  assert.equal(rifleLiveDef.recoil.pitch, baseRifle.recoil.pitch, 'draft never applies handling');
+  assert.equal(market.getHudState().build?.total, 350);
+  assert(market.confirmBuild());
+  assert.equal(market.getHudState().credits, 1000);
+  assert.equal(rifleLiveDef.recoil.pitch, draftRifle.recoil.pitch);
+  assert.equal(rifleLiveDef.adsTime, draftRifle.adsTime);
+  assert.deepEqual(weapons.getAttachments('rifle'), withHandstop);
+  const stopMount = rifleEntry.supportGroup;
+  assert.equal(stopMount.parent?.name, 'MOUNT_support');
+  assert.equal(rifleEntry.railGroup.parent?.name, 'MOUNT_rail');
+  assert(market.setBuild(BASE_ATTACHMENTS) && market.confirmBuild());
+  assert.equal(market.getHudState().credits, 1000, 'removal never refunds');
+  assert.deepEqual(rifleLiveDef, baseRifle);
+  assert.equal(rifleEntry.supportWrist, null);
+  assert.equal(stopMount.parent, null);
+  market.closeShop();
+}
 
 // ---- armour damage -------------------------------------------------------
 let damage: import('../../src/core/events.ts').EngineEventMap['damage:taken'] | undefined;

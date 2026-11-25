@@ -125,6 +125,8 @@ is authored by [`tools/blender/tor_mini/`](../tools/blender/tor_mini/), with nat
 Blender validation and `bun build/models.ts tor_mini`. It is generated alongside
 the EXPS3, independently of player arms, and uses the shared gameplay/inspection
 rail path on all seven weapons.
+The [M4A1 hand stop](../tools/blender/handstop/README.md) is a separate standalone
+asset and cook (`bun build/models.ts handstop`), seated on the bottom RIS II rail.
 
 Each suppressor can has its own Blender recipe and cook id
 (`tools/blender/suppressor/` for the shared SRD762Ti, `suppressor9mm/`,

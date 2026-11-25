@@ -13,6 +13,8 @@ The 2.2 mm rear bore, 2.60 mm post and green tip are authored geometry.
 `IRON_sights` retains the original front/rear assemblies; `IRON_sights_removed` supplies
 the replacement collar and bored gas-tube seat when irons are independently removed.
 See the [attachment contract](../../../ARCHITECTURE.md#models) for supported combinations.
+The [M4A1 hand stop](../handstop/README.md) seats on the bottom RIS II rail,
+separate from the right TOR Mini mount.
 Runtime ADS uses 30 mm eye relief and 42° weapon FOV, a readability trade-off,
 not changed ballistics. Hand calibration and review-arm inputs are read-only.
 

@@ -476,6 +476,8 @@ def build_geometry(materials):
     # Right RIS II seat: TOR Mini sits outboard, ahead of the support hand and FSP.
     rail_mount=empty('MOUNT_rail',(.028321,BORE,-.250-16*picatinny.PITCH),guard_root)
     rail_mount.rotation_euler.y=-math.pi/2
+    # Bottom RIS II groove immediately ahead of the support fingers. +Z in Blender points into the seat.
+    empty('MOUNT_support',(0,BORE-.02855,-.250-11*picatinny.PITCH),guard_root)
     parts=[rig,bolt,head,handle,trigger,cover,release,mag,spare,case,round_live,round_spare]
     parents=[body,muzzle_device,muzzle_adapter,guard_root,stock_root,irons_root,low_block,bolt,head,handle,trigger,cover,release,mag,spare,case,round_live,round_spare]
     return asset,parts,parents,(front_post,front_tip,stalk,cup)

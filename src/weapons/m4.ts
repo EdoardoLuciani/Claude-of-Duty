@@ -14,6 +14,11 @@ import { configureM4Finishes } from './m4-finishes.ts';
 import type { WeaponAnimation } from './runtime-types.ts';
 
 const M4_URL = 'models/weapons/m4a1-block-ii.runtime.glb';
+const LEFT_SUPPORT_REST = new THREE.Vector3().fromArray(handReference.grips.left.pos);
+// Keep the native wrap on the rail; let it go unchanged once the hand breaks contact.
+const SUPPORT_RELEASE_DISTANCE = 0.055;
+const SUPPORT_CLEARANCE_DISTANCE = 0.05;
+const SUPPORT_CLEARANCE_OFFSET = new THREE.Vector3(0, -0.008, 0.023);
 const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(MAGAZINE_ALIASES)];
 
 function makeM4Model(gltf: GLTF): M4Model {
@@ -66,6 +71,7 @@ type M4Model = AuthoredModelData<'rifle'> & {
 export function createM4Animation(model: M4Model): WeaponAnimation {
   const rig = createAuthoredRig(model);
   const node = (name: string): THREE.Object3D => requiredNode(rig.root, name);
+  const supportDelta = new THREE.Vector3();
   const bolt = node('bolt');
   const boltRest = bolt.position.clone();
   const boltHead = node('bolt_head');
@@ -103,6 +109,23 @@ export function createM4Animation(model: M4Model): WeaponAnimation {
       magazine.visible = magazine.scale.x > 0.5;
       spare.visible = spare.scale.x > 0.5;
       reviewCase.visible = false;
+    },
+
+    handTarget(
+      side: 'left' | 'right',
+      position: THREE.Vector3,
+      quaternion: THREE.Quaternion,
+      supportWrist?: THREE.Vector3 | null
+    ): void {
+      rig.handTarget.call(this, side, position, quaternion);
+      if (side !== 'left' || !supportWrist) return;
+      const distance = this.hands.left.wrist.position.distanceTo(LEFT_SUPPORT_REST);
+      const contact = 1 - THREE.MathUtils.smoothstep(distance, 0, SUPPORT_RELEASE_DISTANCE);
+      const transfer = Math.min(1, distance / SUPPORT_CLEARANCE_DISTANCE);
+      supportDelta.subVectors(supportWrist, LEFT_SUPPORT_REST).multiplyScalar(contact);
+      // Back off the pad during release/return; leave the native free-hand poses alone.
+      supportDelta.addScaledVector(SUPPORT_CLEARANCE_OFFSET, 4 * transfer * (1 - transfer));
+      position.add(supportDelta.applyQuaternion(this.root.quaternion));
     },
 
     fire(): void {

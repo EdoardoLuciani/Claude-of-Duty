@@ -52,6 +52,11 @@ Survival.
 
 Open **Esc → Controls** for the full reference. If you die, choose **New Game** to try again.
 
+In the Supply Market, **Customize** the M4A1 to preview its bottom-rail **Hand stop**.
+The draft shows less recoil and slightly slower aiming; applying it does not change ballistics.
+It can stay on with the right-side laser. Select **None** under **Support** and apply to remove
+it without a refund. Changing the draft alone never spends credits or changes the equipped gun.
+
 ## Run locally
 
 Install the Bun version in [`package.json`](package.json), **Blender 5.3.0** and

@@ -43,10 +43,12 @@ if (!isWeaponId(WEAPON)) throw new Error(`Unknown weapon: ${WEAPON}`);
 const OPTIC = args.optic;
 const RAIL = args.rail;
 const MUZZLE = args.muzzle;
+const SUPPORT = args.support;
 const requested: unknown = {
   optic: OPTIC === undefined || OPTIC === 'none' ? null : OPTIC,
   muzzle: MUZZLE === undefined || MUZZLE === 'none' ? null : MUZZLE,
   rail: RAIL === undefined || RAIL === 'none' ? null : RAIL,
+  support: SUPPORT === undefined || SUPPORT === 'none' ? null : SUPPORT,
 };
 // The game's own rule: unknown ids and unverified fits are rejected.
 if (!isAttachmentConfig(requested, WEAPON))
@@ -104,6 +106,7 @@ try {
       (args.optic ? `&attachmentOptic=${encodeURIComponent(String(args.optic))}` : '') +
       (RAIL ? `&attachmentRail=${encodeURIComponent(String(RAIL))}` : '') +
       (MUZZLE ? `&attachmentMuzzle=${encodeURIComponent(String(MUZZLE))}` : '') +
+      (SUPPORT ? `&attachmentSupport=${encodeURIComponent(String(SUPPORT))}` : '') +
       `&attachmentWeapon=${encodeURIComponent(WEAPON)}`;
     await page.goto(
       `http://127.0.0.1:${PORT}/?capture=1&lockstep=1&shot=${encodeURIComponent(SHOT)}${attachmentQuery}`,
@@ -113,7 +116,7 @@ try {
       }
     );
     await page.waitForFunction('window.__READY__ === true', null, { timeout: TIMEOUT });
-    if (args.weapon || OPTIC || RAIL || MUZZLE)
+    if (args.weapon || OPTIC || RAIL || MUZZLE || SUPPORT)
       await page.evaluate(
         ({ id, config }): void => {
           const weapons = window.__ENGINE__?.ctx.get('weapons');

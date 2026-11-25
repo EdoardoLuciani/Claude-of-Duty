@@ -385,11 +385,11 @@ artwork is mapped in `src/ui/market-art.ts`; its provenance lives in
 [`docs/provenance/market-art.md`](docs/provenance/market-art.md).
 
 `WeaponState.attachments` is the gun's one stored build, an immutable
-`{ optic, muzzle, rail }` snapshot; null slots retain the base weapon, and
+`{ optic, muzzle, rail, support }` snapshot; null slots retain the base weapon, and
 `optic: null` uses irons. Viewmodel entries hold the mounted instances and their
 resolved data, never a copy of the build.
 `src/weapons/attachment-rules.ts` owns the finite catalog (`rmr | acog | scope | exps3`
-optics, TOR Mini `laser`, one `suppressor`), compatibility and effective-definition
+optics, TOR Mini `laser`, `suppressor`, and `handstop`), compatibility and effective-definition
 resolution without importing weapon loading or mounting. `src/weapons/attachments.ts`
 owns asset loading and the shared gameplay/inspection mount solver.
 `src/market/attachments.ts` owns prices, not compatibility. Market holds one
@@ -400,8 +400,8 @@ ownership, so a rejected build never drops the old gun.
 
 `WeaponDef.fits` is a per-slot partial record keyed by attachment ID: each entry
 enables a verified fit and holds its data (`fits.optic[id].eyeRelief`, optional
-`railSlots` at `PICATINNY_PITCH`, `fits.muzzle.suppressor.model`; rail entries
-are empty). The player-facing muzzle ID is always `suppressor`; assets are keyed by
+`railSlots` at `PICATINNY_PITCH`, `fits.muzzle.suppressor.model`; rail and support
+entries enable a verified mount without offsets). The player-facing muzzle ID is always `suppressor`; assets are keyed by
 can model. `isAttachmentConfig()` is the shared compatibility rule for gameplay,
 URL/debug input (narrowed once in `src/dev/attachments.ts` before prewarm) and
 `tools/capture.ts`; reject unverified fits, never silently change them.
@@ -410,12 +410,12 @@ with any optic; fixed irons stay and must clear it. `removableMuzzleDevice` simi
 swaps required `MUZZLE_device` for optional `MUZZLE_device_removed`; permanent
 hardware stays under the can. Missing required nodes fail loading.
 
-`loadAttachments()` returns assets keyed by optic/rail ID or can model. A failed
+`loadAttachments()` returns assets keyed by optic/rail/support ID or can model. A failed
 asset disables only that key, never the base weapon. Weapons own shared assets;
 mounts and inspection clones own transforms only. `weapons.setAttachments(id, config)`
 changes an owned, loaded weapon synchronously outside the frame loop.
 `mountAttachments()` validates all assets/datums before attaching groups under
-`MOUNT_optic`/`MOUNT_rail`/`MOUNT_muzzle` and switching authored hardware via
+`MOUNT_optic`/`MOUNT_rail`/`MOUNT_muzzle`/`MOUNT_support` and switching authored hardware via
 `slotVisuals()`. Fixed side rails remain part of the base weapon when the laser is
 removed. Instances follow authored parents/animation, never a baked live pose;
 ADS uses the rest-pose optic datum in the weapon frame, while the reticle
@@ -431,7 +431,7 @@ the same resolver against the authored base.
 Frame-time reticle, ADS, laser and fire consumers allocate nothing.
 
 Optics define `MOUNT_base` and `SOCKET_sight`; rigid attachments define
-`SOCKET_mount` plus `SOCKET_laser` or `SOCKET_muzzle`, in metres, -Z forward,
+`SOCKET_mount` plus their output datum (`SOCKET_laser`, `SOCKET_muzzle` or `SOCKET_support_wrist`), in metres, -Z forward,
 +Y up, unit scale. Catalog `OpticData` owns magnification, sensitivity, reticle,
 glass and scope presentation, not weapon class. Mounting resolves the active bore
 exit (a can's endcap, else the weapon's `SOCKET_muzzle`) once; `viewmodel.muzzleWorld()`
@@ -458,6 +458,16 @@ The HUD hides the screen-centre crosshair while a gun is out.
 L toggles per-weapon state across swaps and pause/shop; new mounts start on,
 removal/drop/restart/death switch off. Busy hands hide the beam and block L.
 The laser changes no AI perception; the flashlight keeps separate light ownership.
+
+The hand stop fits only the M4A1's bottom RIS II rail. It coexists with the TOR Mini on the
+verified forward right seat. Market inspection and gameplay use the same rigid mount; the M4
+adapter uses its wrist datum near support contact and preserves the native finger wrap and
+magazine/charging contacts. The stop reduces kick and slows ADS through `buildDef()`. It does
+not change ballistics. No weapon-mounted flashlight is selectable: reserve the top and left
+support-hand sweep and the underside contact zone from future light placement. A light fit
+needs its own verified mount and beam/hand/part clearance in every enabled combination; reject
+any shared seat or blocked clearance before charging, never evict an existing attachment.
+See the [hand stop fit contract](tools/blender/handstop/README.md).
 
 `tools/blender/soldiers/` builds seeded parametric soldiers; a Bun GLTFExporter cook
 preserves the runtime joint/attribute format. `tools/export-models.ts` validates and

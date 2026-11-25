@@ -32,7 +32,7 @@ references and acceptance limits:
 Standalone world interaction prop: [Al-Maktaba intel case](intel_case/README.md).
 Standalone rigid prop: [M67 grenade](m67/README.md).
 Standalone attachments: [EXPS3-0](exps3/README.md),
-[TOR Mini laser](tor_mini/README.md).
+[TOR Mini laser](tor_mini/README.md), [M4A1 hand stop](handstop/README.md).
 The [field radio](field_radio/README.md) is a standalone
 first-person prop with a native export and separate live LCD binding.
 Standalone FX: [spent shotgun hull](spent_hull/README.md).
@@ -66,7 +66,7 @@ the profile or add vertical runtime seating offsets. A mount origin is a groove 
 `fits.optic[id].railSlots` may select whole forward grooves (default zero); gameplay,
 inspection and rest/live ADS datums share it, and `attachment_source.RAIL_SLOTS` mirrors it
 for source checks.
-Optic/laser sources machine the matching channel before UV/bake/export, retaining
+Optic/laser/hand-stop sources machine the matching channel before UV/bake/export, retaining
 exact saddle contact and 0.1 mm transverse assembly clearance on the flanks.
 
 After `bun tools/build-assets.ts`, run:

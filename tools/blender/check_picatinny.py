@@ -52,7 +52,7 @@ def check_clamp(id):
     bpy.ops.wm.read_factory_settings(use_empty=True)
     objects,datum=attachment_source.load(id)
     inverse=datum.matrix_world.inverted()
-    if id=='laser':inverse=Matrix.Rotation(math.pi,4,'Y')@inverse
+    if id in ('laser','handstop'):inverse=Matrix.Rotation(math.pi,4,'Y')@inverse
     meshes=[o for o in objects if o.type=='MESH']
     for obj in meshes:
         tree=surface([obj],inverse)
@@ -68,7 +68,7 @@ def check_clamp(id):
 
 
 errors=[]
-for id in (*attachment_source.OPTICS,'laser'):
+for id in (*attachment_source.OPTICS,'laser','handstop'):
     try:check_clamp(id)
     except AssertionError as error:
         errors.append(str(error));print('PICATINNY_FAIL',error,flush=True)
@@ -89,14 +89,15 @@ for file,optic_names,rail_names in WEAPONS:
             obj.animation_data.action=None
             for track in obj.animation_data.nla_tracks:track.mute=track.name!='Idle'
     bpy.context.scene.frame_set(0);bpy.context.view_layer.update()
-    for slot,names in [('optic',optic_names),('rail',rail_names)]:
+    support_names = ('RIS II bottom ',) if file.startswith('m4a1-block-ii/') else ()
+    for slot,names in [('optic',optic_names),('rail',rail_names),('support',support_names)]:
         if not names:continue
         mount=bpy.data.objects['MOUNT_'+slot]
         inverse=mount.matrix_world.inverted()
-        if slot=='rail':inverse=Matrix.Rotation(math.pi,4,'Y')@inverse
+        if slot in ('rail','support'):inverse=Matrix.Rotation(math.pi,4,'Y')@inverse
         meshes=[o for o in bpy.context.scene.objects if o.type=='MESH' and o.name.startswith(names)]
         try:check_rail(surface(meshes,inverse),file+' '+slot)
         except AssertionError as error:
             errors.append(str(error));print('PICATINNY_FAIL',error,flush=True)
 assert not errors,errors
-print('PICATINNY_INTERFACES_OK: 6 optic rails, 7 laser rails and 5 shared clamps',flush=True)
+print('PICATINNY_INTERFACES_OK: 6 optic rails, 7 laser rails, one hand stop rail and 6 shared clamps',flush=True)

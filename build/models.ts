@@ -127,6 +127,7 @@ export const MODEL_COOKS = {
   },
   // Preserve the small aperture, screw slots and pressure-pad silhouettes.
   tor_mini: attachment('steiner-tor-mini', 'tor-mini.glb', 'laser'),
+  handstop: attachment('handstop', 'handstop.glb', 'handstop'),
   // The P320 error limit clips the rounded optical opening on this smaller asset.
   exps3: attachment('eotech-exps3-0', 'exps3-0.glb', 'exps3', [
     '-si',

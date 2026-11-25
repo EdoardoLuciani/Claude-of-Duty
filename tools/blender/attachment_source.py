@@ -19,6 +19,7 @@ SOURCES = {
     'scope': 'schmidt-bender-pm-ii/scope.blend',
     'exps3': 'eotech-exps3-0/exps3-0.blend',
     'laser': 'steiner-tor-mini/tor-mini.blend',
+    'handstop': 'handstop/handstop.blend',
     'srd762ti': 'sig-srd762ti/suppressor.blend',
     'suppressor9mm': 'compact-9mm/suppressor9mm.blend',
     'suppressor338': 'suppressor-338/suppressor338.blend',

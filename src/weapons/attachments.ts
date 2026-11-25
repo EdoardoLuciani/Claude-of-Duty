@@ -17,6 +17,7 @@ import {
   type CanModel,
   type OpticId,
   type RailId,
+  type SupportId,
 } from './attachment-rules.ts';
 import { requiredNode } from './authored-model.ts';
 import { WEAPON_DEFS, type WeaponId } from './defs.ts';
@@ -71,7 +72,7 @@ function makeOpticModel(
 type OpticModel = ReturnType<typeof makeOpticModel>;
 
 /** Owned rigid attachment with an authored `SOCKET_mount` origin and an output socket:
- * `SOCKET_laser` (TOR Mini beam emitter) or `SOCKET_muzzle` (can endcap bore exit). */
+ * `SOCKET_laser`, `SOCKET_muzzle` or `SOCKET_support_wrist`. */
 function makeRigidAttachment(
   gltf: GLTF,
   output: string
@@ -90,9 +91,9 @@ function makeRigidAttachment(
 }
 type RigidAttachmentModel = ReturnType<typeof makeRigidAttachment>;
 
-/** Loaded assets keyed by optic/rail id or can model; a missing entry makes it unavailable. */
+/** Loaded assets keyed by optic/rail/support id or can model; a missing entry makes it unavailable. */
 export type AttachmentAssets = Partial<
-  Record<OpticId, OpticModel> & Record<RailId | CanModel, RigidAttachmentModel>
+  Record<OpticId, OpticModel> & Record<RailId | SupportId | CanModel, RigidAttachmentModel>
 >;
 
 /** Load every attachment in parallel; a failure only makes that attachment unavailable. */
@@ -115,6 +116,9 @@ export async function loadAttachments(
       load(id, (gltf): OpticModel => makeOpticModel(gltf, id))
     ),
     load('laser', (gltf): RigidAttachmentModel => makeRigidAttachment(gltf, 'SOCKET_laser')),
+    load('handstop', (gltf): RigidAttachmentModel =>
+      makeRigidAttachment(gltf, 'SOCKET_support_wrist')
+    ),
     ...CAN_MODELS.map((id): Promise<void> =>
       load(id, (gltf): RigidAttachmentModel => makeRigidAttachment(gltf, 'SOCKET_muzzle'))
     ),
@@ -132,6 +136,7 @@ export function hasAttachmentAssets(
   return (
     (config.optic === null || assets[config.optic] !== undefined) &&
     (config.rail === null || assets[config.rail] !== undefined) &&
+    (config.support === null || assets[config.support] !== undefined) &&
     (can === null || (can !== undefined && assets[can] !== undefined))
   );
 }
@@ -140,6 +145,7 @@ export function hasAttachmentAssets(
 interface AttachmentMounts {
   opticGroup: THREE.Group;
   railGroup: THREE.Group;
+  supportGroup: THREE.Group;
   muzzleGroup: THREE.Group;
 }
 
@@ -153,6 +159,7 @@ function releaseAttachmentMount(group: THREE.Group): void {
 export function releaseAttachmentMounts(mounts: AttachmentMounts): void {
   releaseAttachmentMount(mounts.opticGroup);
   releaseAttachmentMount(mounts.railGroup);
+  releaseAttachmentMount(mounts.supportGroup);
   releaseAttachmentMount(mounts.muzzleGroup);
 }
 
@@ -176,7 +183,7 @@ export function slotVisuals(
   model: WeaponModelRecord,
   slot: (typeof SLOTS)[number]
 ): SlotVisuals | undefined {
-  if (slot === 'rail') return;
+  if (slot !== 'optic' && slot !== 'muzzle') return;
   const [flag, name] = REPLACED[slot];
   if (!WEAPON_DEFS[model.id][flag]) return;
   return {
@@ -215,6 +222,7 @@ export function mountAttachments(
   assets: AttachmentAssets
 ): AttachmentMounts & {
   laserEmitter: THREE.Object3D | null;
+  supportWrist: THREE.Vector3 | null;
   muzzleSocket: THREE.Object3D | null;
   mountedOptic: WeaponEntry['mountedOptic'];
   sight: THREE.Vector3;
@@ -228,6 +236,20 @@ export function mountAttachments(
   const slots = opticId ? (WEAPON_DEFS[model.id].fits?.optic?.[opticId]?.railSlots ?? 0) : 0;
   opticSlot.group.position.z = -slots * PICATINNY_PITCH;
   const rail = stageMount(model, 'rail', config.rail, config.rail && assets[config.rail]);
+  const support = stageMount(
+    model,
+    'support',
+    config.support,
+    config.support && assets[config.support]
+  );
+  // The verified handguard is rigid in the weapon frame. Resolve the staged
+  // mount-local wrist datum once; the native action moves it with the gun.
+  const supportWrist =
+    support.parent && support.socket
+      ? model.root.worldToLocal(
+          support.parent.localToWorld(support.socket.getWorldPosition(new THREE.Vector3()))
+        )
+      : null;
   // isAttachmentConfig guarantees a fitted can for any installed muzzle.
   const can = fittedCan(model.id, config.muzzle) ?? null;
   const muzzle = stageMount(model, 'muzzle', can, can && assets[can]);
@@ -249,6 +271,7 @@ export function mountAttachments(
   // Staging succeeded: attach instances and switch the slot hardware.
   opticSlot.parent?.add(opticSlot.group);
   rail.parent?.add(rail.group);
+  support.parent?.add(support.group);
   muzzle.parent?.add(muzzle.group);
   for (const [i, slot] of SLOTS.entries()) {
     const nodes = visuals[i];
@@ -260,6 +283,8 @@ export function mountAttachments(
   return {
     opticGroup: opticSlot.group,
     railGroup: rail.group,
+    supportGroup: support.group,
+    supportWrist,
     muzzleGroup: muzzle.group,
     laserEmitter: rail.socket,
     muzzleSocket: muzzle.socket,
@@ -278,6 +303,8 @@ export function configureWeaponAttachments(
   releaseAttachmentMounts(entry);
   entry.opticGroup = mounted.opticGroup;
   entry.railGroup = mounted.railGroup;
+  entry.supportGroup = mounted.supportGroup;
+  entry.supportWrist = mounted.supportWrist;
   entry.muzzleGroup = mounted.muzzleGroup;
   entry.laserEmitter = mounted.laserEmitter;
   entry.muzzleSocket = mounted.muzzleSocket ?? entry.baseMuzzleSocket;

@@ -560,6 +560,8 @@ export class Viewmodel {
       id: model.id,
       opticGroup: new THREE.Group(),
       railGroup: new THREE.Group(),
+      supportGroup: new THREE.Group(),
+      supportWrist: null,
       muzzleGroup: new THREE.Group(),
       baseMuzzleSocket: muzzleSocket,
       muzzleSocket,
@@ -1321,7 +1323,7 @@ export class Viewmodel {
     if (w.lhandPose !== this.armL.pose) this.armL.setPose(w.lhandPose, 0.1);
     w.animation.handTarget('right', this._handPos, this._handQuat);
     this.armR.solve(this._handPos, this._handQuat);
-    w.animation.handTarget('left', this._handPosL, this._handQuatL);
+    w.animation.handTarget('left', this._handPosL, this._handQuatL, w.supportWrist);
     this.armL.solve(this._handPosL, this._handQuatL);
     w.animation.applyHands(this.armL, this.armR);
   }

@@ -41,6 +41,9 @@ export interface WeaponEntry {
   id: WeaponId;
   opticGroup: THREE.Group;
   railGroup: THREE.Group;
+  supportGroup: THREE.Group;
+  /** Indexed left wrist in the weapon rig frame, only for a verified support mount. */
+  supportWrist: THREE.Vector3 | null;
   muzzleGroup: THREE.Group;
   /** The weapon's own `SOCKET_muzzle`, resolved before any can (whose endcap shares
    * that name) is mounted. Never look the bore exit up by name afterwards. */
@@ -85,7 +88,12 @@ export interface WeaponAnimation {
   /** Seconds from a shot until its case leaves the port; else the shot cadence decides. */
   ejectDelay?: number;
   poseQ: THREE.Quaternion;
-  handTarget(side: 'left' | 'right', position: THREE.Vector3, quaternion: THREE.Quaternion): void;
+  handTarget(
+    side: 'left' | 'right',
+    position: THREE.Vector3,
+    quaternion: THREE.Quaternion,
+    supportWrist?: THREE.Vector3 | null
+  ): void;
   applyHands(left: Arm, right: Arm): void;
 }
 export interface ViewState {

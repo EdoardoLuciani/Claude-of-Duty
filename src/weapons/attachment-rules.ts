@@ -4,6 +4,7 @@ import { WEAPON_DEFS, type WeaponDef, type WeaponId } from './defs.ts';
 export const OPTIC_IDS = ['rmr', 'acog', 'scope', 'exps3'] as const;
 export type OpticId = (typeof OPTIC_IDS)[number];
 export type RailId = 'laser';
+export type SupportId = 'handstop';
 export type MuzzleId = 'suppressor';
 /** Calibre-specific can models; each weapon's muzzle fit names the one it mounts. */
 export const CAN_MODELS = ['srd762ti', 'suppressor9mm', 'suppressor338', 'suppressor12g'] as const;
@@ -14,11 +15,13 @@ export interface AttachmentConfig {
   readonly optic: OpticId | null;
   readonly muzzle: MuzzleId | null;
   readonly rail: RailId | null;
+  readonly support: SupportId | null;
 }
 export const BASE_ATTACHMENTS: AttachmentConfig = Object.freeze({
   optic: null,
   muzzle: null,
   rail: null,
+  support: null,
 });
 
 /** One rule for every slot: null keeps the base weapon; an id needs a fit record entry. */
@@ -30,9 +33,14 @@ function hasFit(fits: object | undefined, value: unknown): boolean {
 export function isAttachmentConfig(value: unknown, id: WeaponId): value is AttachmentConfig {
   // A missing slot reads as undefined, which every check below rejects.
   if (!isRecord(value)) return false;
-  const { optic, muzzle, rail } = value;
+  const { optic, muzzle, rail, support } = value;
   const { fits } = WEAPON_DEFS[id];
-  return hasFit(fits?.optic, optic) && hasFit(fits?.rail, rail) && hasFit(fits?.muzzle, muzzle);
+  return (
+    hasFit(fits?.optic, optic) &&
+    hasFit(fits?.rail, rail) &&
+    hasFit(fits?.muzzle, muzzle) &&
+    hasFit(fits?.support, support)
+  );
 }
 
 export interface OpticData {
@@ -94,6 +102,7 @@ export const SLOTS = [
   'optic',
   'muzzle',
   'rail',
+  'support',
 ] as const satisfies readonly (keyof AttachmentConfig)[];
 
 /** The can model a weapon mounts for a muzzle id; null without a muzzle, undefined without that fit. */
@@ -115,6 +124,7 @@ const HANDLING: Record<
   // Can mass at the muzzle slows aiming; its gas trap softens every shot.
   suppressor: { adsTime: 1.08, recoil: 0.88 },
   laser: {},
+  handstop: { adsTime: 1.04, recoil: 0.94 },
 };
 /** Kick magnitudes a recoil effect scales; spring, bracing and pattern shape stay authored. */
 const RECOIL_MAGNITUDES = ['pitch', 'yaw', 'kickBack', 'kickUp', 'roll', 'punch'] as const;

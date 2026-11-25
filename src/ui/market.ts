@@ -137,7 +137,8 @@ export class MarketOverlay {
       'ow-market-inspect-help',
       this.buildPanel,
       'Optics replace removable irons and magnify the aimed view. The suppressor quiets ' +
-        'shots and shrinks the muzzle flash; the laser beam does not predict spread or drop.'
+        'shots and shrinks the muzzle flash; the laser beam does not predict spread or drop. ' +
+        'The hand stop steadies recoil but slows aiming slightly.'
     );
     this.stats = new MarketStats(this.buildPanel);
     const baseCost = el('div', 'ow-market-build-base', this.buildPanel);

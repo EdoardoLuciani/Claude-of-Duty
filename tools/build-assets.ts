@@ -131,6 +131,7 @@ const STANDALONE_TOOLS: Partial<Record<ModelId, string[]>> = {
   rmr: ['tools/blender/rmr'],
   exps3: ['tools/blender/exps3'],
   tor_mini: ['tools/blender/tor_mini'],
+  handstop: ['tools/blender/handstop'],
   field_radio: ['tools/blender/field_radio/build.py'],
 };
 
