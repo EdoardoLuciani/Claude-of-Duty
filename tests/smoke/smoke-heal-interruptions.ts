@@ -65,7 +65,6 @@ function fixture(activeId: WeaponId = 'rifle'): HealFixture {
   weapons.viewmodel = presentationViewmodel(ctx);
   initializeWeaponStates(weapons, {
     magSize: 30,
-    reserve: 90,
     modes: ['semi'],
     spreadHip: 1,
     spreadAds: 0.1,

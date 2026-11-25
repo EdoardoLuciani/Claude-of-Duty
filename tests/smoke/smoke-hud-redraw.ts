@@ -44,8 +44,9 @@ try {
     health: 100,
     maxHealth: 100,
     armour: 0,
-    ammo: 30,
-    reserve: 210,
+    empty: false,
+    loadedRounds: 30,
+    spareMagazines: [30, 30],
     magSize: 30,
     time: 0,
   };
@@ -143,9 +144,6 @@ try {
       health.flashAlpha = 0;
     },
     (): void => {
-      state.ammo--;
-    },
-    (): void => {
       state.reloading = true;
       state.reloadProgress = 0.4;
     },
@@ -196,7 +194,6 @@ try {
   state.loadedRounds = 30;
   frame();
   const initialSpareDraw = hud.draws;
-  assert(!hud.ammo['current'].visible && !hud.ammo['magFill'].visible, 'trial hides precise ammo');
   state.loadedRounds = 29; // same fill step as the next value
   frame();
   const loadedDraw = hud.draws;
@@ -208,31 +205,31 @@ try {
   spares[2] = 13;
   frame();
   assert.equal(hud.draws, loadedDraw + 1, 'a non-leading spare still invalidates the HUD');
-  state.spareMagazines = null;
   // Magazine fill follows the removal/seating beats, not the progress bar.
-  state.ammo = 9;
+  state.loadedRounds = 15;
   state.reloading = true;
   state.reloadProgress = 0.1;
   frame();
-  const magazineFill = hud.ammo['magFill'].scale;
-  assert.equal(magazineFill.x, 0.3);
+  assert.equal(hud.ammo['lastLoadedLevel'], 2);
   state.magazineOut = true;
   state.reloadProgress = 0.8;
   frame();
-  assert.equal(magazineFill.x, 0);
+  assert.equal(hud.ammo['lastLoadedLevel'], 0);
   state.magazineOut = false;
-  state.ammo = 30;
+  state.loadedRounds = 30;
   frame();
-  assert.equal(magazineFill.x, 1, 'a seated magazine may fill before the clip ends');
+  assert.equal(hud.ammo['lastLoadedLevel'], 4, 'a seated magazine fills before the clip ends');
   state.reloading = false;
-  state.ammo = 0;
+  state.empty = true;
+  state.loadedRounds = 0;
   frame();
   const empty = hud.draws;
   frame(0.1);
   assert.equal(hud.draws, empty + 1, 'empty-ammo prompt still pulses');
   frame(0);
   assert.equal(hud.draws, empty + 1, 'paused prompt is static');
-  state.ammo = 30;
+  state.empty = false;
+  state.loadedRounds = 30;
   frame();
   const beforeFade = hud.draws;
   frame(1 / 60, 0.5);

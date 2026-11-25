@@ -197,7 +197,7 @@ export interface EngineEventMap {
   'player:heartbeat': { strength: number; fraction: number };
   'ammo:pickup': {
     amount: number;
-    pack?: 'magazine' | 'belt' | 'shell bundle' | undefined;
+    pack: 'magazine' | 'belt' | 'shell bundle';
     weapon: EventWeapon;
     position: Vector3;
   };

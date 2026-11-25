@@ -41,7 +41,7 @@ function rngState(rng: Rng): {
 function isInstancedMesh(value: unknown): value is THREE.InstancedMesh {
   return value instanceof THREE.InstancedMesh;
 }
-function harness(persistentMags = false): AmmoHarness {
+function harness(): AmmoHarness {
   const prompts: (PromptData & { owner: unknown })[] = [],
     cleared: unknown[] = [];
   const events: { name: 'ammo:pickup'; payload: EngineEventMap['ammo:pickup'] }[] = [];
@@ -73,12 +73,9 @@ function harness(persistentMags = false): AmmoHarness {
   ctx.events.on('ammo:pickup', (payload): void => {
     events.push({ name: 'ammo:pickup', payload });
   });
-  const weapons = new WeaponSystem(persistentMags);
+  const weapons = new WeaponSystem();
   const state = weapons._makeState('rifle');
-  if (!persistentMags) {
-    state.reserve = 0;
-    state.def = { ...state.def, reserve: 90 };
-  }
+  state.spareMagazines.length = 0;
   weapons.states.set('rifle', state);
   const owner = {
     ctx,
@@ -294,10 +291,12 @@ function matricesMatch(pickups: AmmoPickups): void {
   block(ctx.time, 'scale', 0);
   block(h.player.healCtrl, 'active', true);
   pickups.update(0.45);
-  assert.equal(owner.state.reserve, 45);
+  assert.deepEqual(owner.state.spareMagazines, [owner.current.magSize]);
+  assert.equal(prompts.at(-1)?.sub, '+1 full magazine · hold');
   assert.equal(pickups.items.length, 0);
   assert.equal(events[0].name, 'ammo:pickup');
-  assert.equal(events[0].payload.amount, 45);
+  assert.equal(events[0].payload.amount, owner.current.magSize);
+  assert.equal(events[0].payload.pack, 'magazine');
   assert.equal(events[0].payload.weapon, owner.current);
   assert.equal(owner.current.id, 'rifle');
   assert(events[0].payload.position.equals(first.group.position));
@@ -311,16 +310,18 @@ function matricesMatch(pickups: AmmoPickups): void {
   pickups.dispose();
 }
 
-// A field box gives exactly one full spare and does not advertise round counts.
+// The pickup prompt distinguishes a replacement from adding a spare.
 {
-  const { pickups, input, owner, prompts, events } = harness(true);
+  const { pickups, input, owner, prompts, events } = harness();
+  const capacity = owner.current.magSize;
+  owner.state.spareMagazines.push(capacity, capacity, capacity, 2);
   pickups.spawn({ x: 0, y: 0, z: 0 });
   input.use = true;
   pickups.update(0.45);
-  const capacity = owner.state.def.magSize;
-  assert.deepEqual(owner.state.spareMagazines, [capacity, capacity, capacity]);
-  assert.equal(prompts.at(-1)?.sub, '+1 full magazine · hold');
-  assert.equal(events[0].payload.pack, 'magazine');
+  assert.equal(prompts.at(-1)?.sub, 'Replace lowest spare · hold');
+  assert.deepEqual(owner.state.spareMagazines, Array<number>(4).fill(capacity));
+  assert.equal(events[0].payload.amount, capacity - 2);
+  assert.equal(pickups.items.length, 0);
   pickups.dispose();
 }
 

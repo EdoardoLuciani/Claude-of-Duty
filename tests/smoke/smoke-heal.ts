@@ -420,7 +420,6 @@ for (const motion of [
   initializeWeaponStates(wp, {
     label: 'test',
     magSize: 30,
-    reserve: 90,
     modes: ['auto'],
     rpm: 700,
   });
@@ -445,7 +444,6 @@ for (const motion of [
   check('inspect cancels healing', wp.healing === false);
   const s = rifle;
   s.mag = 10;
-  s.reserve = 80;
   wp.viewmodel.play('reloadTac');
   check('cannot start during reload', wp.canBeginHeal() === false);
   wp.viewmodel.stopClip();

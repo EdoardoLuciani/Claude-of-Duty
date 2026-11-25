@@ -135,19 +135,23 @@ assert.equal(writeHudText(label, 'short', 40), true);
 assert.equal(label.scale.x, 0.8, 'shorter replacement is fitted independently of the old scale');
 
 const ammoView = new PixiAmmoView();
-const ammoState: AmmoState = { ammo: 30, magSize: 30, reserve: 210, fireMode: 'auto' };
+const ammoState: AmmoState = {
+  empty: false,
+  magSize: 30,
+  loadedRounds: 30,
+  spareMagazines: [30, 30],
+  fireMode: 'auto',
+};
 ammoView.update(0, ammoState);
 ammoView.dirty = false;
 ammoView.update(0, ammoState);
-assert.equal(ammoView.dirty, false, 'unchanged ammo text and bars settle');
-ammoView.update(0, { ...ammoState, ammo: 29, reserve: 209, fireMode: 'semi' });
+assert.equal(ammoView.dirty, false, 'unchanged ammo presentation settles');
+const changedAmmo = { ...ammoState, spareMagazines: [18], fireMode: 'semi' as const };
+ammoView.update(0, changedAmmo);
 assert.equal(ammoView.dirty, true);
-assert.deepEqual(
-  [ammoView['current'].text, ammoView['reserve'].text, ammoView['mode'].text],
-  ['29', '/ 209', 'SEMI']
-);
+assert.deepEqual([ammoView['spareCount'].text, ammoView['mode'].text], ['1 SPARE', 'SEMI']);
 ammoView.dirty = false;
-ammoView.update(0, { ...ammoState, ammo: 29, reserve: 209, fireMode: 'semi' });
+ammoView.update(0, changedAmmo);
 assert.equal(ammoView.dirty, false);
 ammoView.stage.destroy({ children: true });
 

@@ -88,9 +88,8 @@ type WeaponPoseState = Required<ViewState>;
 interface WeaponHudState {
   name: string;
   mode: WeaponMode;
-  ammo: number;
-  reserve: number;
-  spareMagazines: readonly number[] | null;
+  empty: boolean;
+  spareMagazines: readonly number[];
   loadedRounds: number;
   tubeFed: boolean;
   magSize: number;
@@ -265,9 +264,8 @@ export class WeaponSystem {
   _hudState: WeaponHudState = {
     name: '',
     mode: 'auto',
-    ammo: 0,
-    reserve: 0,
-    spareMagazines: null,
+    empty: true,
+    spareMagazines: [],
     loadedRounds: 0,
     tubeFed: false,
     magSize: 0,
@@ -283,7 +281,7 @@ export class WeaponSystem {
     crosshair: false,
   };
 
-  constructor(private readonly persistentMags = false) {
+  constructor() {
     for (let i = 0; i < 8; i++) {
       this._shellQueue.push({ t: -1, weapon: null });
     }
@@ -401,61 +399,33 @@ export class WeaponSystem {
     );
   }
 
-  private buildStateDef(id: WeaponId, attachments: AttachmentConfig): WeaponState['def'] {
-    const def = buildDef(id, attachments);
-    if (this.persistentMags) def.reserve = def.magSize * MAX_SPARES;
-    return def;
-  }
-
   _makeState(id: WeaponId): WeaponState {
-    const def = this.buildStateDef(id, BASE_ATTACHMENTS);
-    const spareMagazines: number[] | undefined = this.persistentMags ? [] : undefined;
-    let pooledReserve = def.reserve;
-    const state: WeaponState = {
+    const def = buildDef(id, BASE_ATTACHMENTS);
+    return {
       def,
       attachments: BASE_ATTACHMENTS,
       laserEnabled: false,
       pattern: buildRecoilPattern(def, Rng),
       mag: def.magSize,
       chambered: true,
-      spareMagazines,
+      spareMagazines: Array<number>(STARTING_SPARES).fill(def.magSize),
       get reserve(): number {
-        return spareMagazines?.reduce((sum, rounds): number => sum + rounds, 0) ?? pooledReserve;
-      },
-      set reserve(rounds: number) {
-        if (!spareMagazines) {
-          pooledReserve = rounds;
-          return;
-        }
-        rounds = Math.min(rounds, this.def.reserve);
-        let remaining = rounds - this.reserve;
-        if (remaining < 0) {
-          // A debug override replaces the stock; gameplay resupply only adds rounds.
-          spareMagazines.length = 0;
-          remaining = rounds;
-        }
-        // Top up existing spares from fullest first, then supply new mags.
-        for (let i = 0; remaining > 0; i++) {
-          const current = spareMagazines[i] ?? 0;
-          const added = Math.min(remaining, this.def.magSize - current);
-          spareMagazines[i] = current + added;
-          remaining -= added;
-        }
+        return this.spareMagazines.reduce((sum, rounds): number => sum + rounds, 0);
       },
       mode: def.modes[0],
       modeIndex: 0,
     };
-    this.resetWeaponAmmo(state);
-    return state;
+  }
+
+  private fillSpares(s: WeaponState, count: number): void {
+    s.spareMagazines.length = count;
+    s.spareMagazines.fill(s.def.magSize);
   }
 
   private resetWeaponAmmo(s: WeaponState): void {
     s.mag = s.def.magSize;
     s.chambered = true;
-    if (s.spareMagazines) {
-      s.spareMagazines.length = STARTING_SPARES;
-      s.spareMagazines.fill(s.def.magSize);
-    } else s.reserve = s.def.reserve;
+    this.fillSpares(s, STARTING_SPARES);
   }
 
   /** Read-only market inspection; never mounts or animates the equipped model. */
@@ -524,7 +494,7 @@ export class WeaponSystem {
    * pattern scaled from them change together. */
   _storeBuild(state: WeaponState, attachments: AttachmentConfig): void {
     state.attachments = attachments;
-    Object.assign(state.def, this.buildStateDef(state.def.id, attachments));
+    Object.assign(state.def, buildDef(state.def.id, attachments));
     state.pattern = buildRecoilPattern(state.def, Rng);
   }
 
@@ -695,7 +665,7 @@ export class WeaponSystem {
     this.states.forEach((s, id): void => {
       if (!this.owned.has(id)) return;
       have += s.reserve;
-      max += s.def.reserve;
+      max += s.def.magSize * MAX_SPARES;
     });
     return max > 0 ? have / max : 1;
   }
@@ -703,7 +673,7 @@ export class WeaponSystem {
   /** Market: top every owned weapon's reserve back to full. */
   refillAmmo(): void {
     this.states.forEach((s, id): void => {
-      if (this.owned.has(id)) s.reserve = s.def.reserve;
+      if (this.owned.has(id)) this.fillSpares(s, MAX_SPARES);
     });
   }
 
@@ -787,17 +757,14 @@ export class WeaponSystem {
     const h = this._hudState;
     const s = this.state;
     if (!s) return h;
-    const a = this.ammo;
     const vm = this._viewmodel;
     h.name = s.def.label;
     h.mode = s.mode;
-    // The readout counts the chambered round but caps at magazine capacity.
-    h.ammo = Math.min(a.mag, a.magSize);
-    h.reserve = a.reserve;
-    h.spareMagazines = s.spareMagazines ?? null;
-    h.loadedRounds = a.inMag;
+    h.empty = s.mag === 0 && !s.chambered;
+    h.spareMagazines = s.spareMagazines;
+    h.loadedRounds = s.mag;
     h.tubeFed = s.def.reloadStyle === 'tube';
-    h.magSize = a.magSize;
+    h.magSize = s.def.magSize;
     h.reloading = this.reloading;
     // Only detachable magazines (and belt pouches) have out/in beats.
     h.magazineOut = h.reloading && this._magazineOut;
@@ -820,10 +787,8 @@ export class WeaponSystem {
   get ammoBoxGain(): number {
     const s = this.state;
     if (!s) return 0;
-    const { magSize, reserve } = s.def;
     const spares = s.spareMagazines;
-    if (spares) return magSize - (spares.length === MAX_SPARES ? (spares.at(-1) ?? 0) : 0);
-    return Math.min(reserve - s.reserve, Math.ceil(magSize * 1.5));
+    return s.def.magSize - (spares.length === MAX_SPARES ? spares[spares.length - 1] : 0);
   }
 
   collectAmmoBox(): number {
@@ -831,10 +796,8 @@ export class WeaponSystem {
     const gain = this.ammoBoxGain;
     if (!s || gain <= 0) return 0;
     const spares = s.spareMagazines;
-    if (spares) {
-      if (spares.length === MAX_SPARES) spares.pop();
-      spares.unshift(s.def.magSize);
-    } else s.reserve += gain;
+    if (spares.length === MAX_SPARES) spares.pop();
+    spares.unshift(s.def.magSize);
     return gain;
   }
 
@@ -936,9 +899,9 @@ export class WeaponSystem {
     if (this.disabled || !s || this.reloading || this.switching || this.cycling || this.pumping)
       return false;
     if (this._hands.state !== 'weapon') return false;
-    if (s.reserve <= 0) return false;
+    if (s.spareMagazines.length === 0) return false;
     const tube = s.def.reloadStyle === 'tube';
-    if ((!s.spareMagazines || tube) && s.chambered && s.mag >= s.def.magSize) return false;
+    if (tube && s.chambered && s.mag >= s.def.magSize) return false;
     this.viewmodel.stopClip();
     const empty = !s.chambered && (s.mag === 0 || s.def.boltAction);
     this.viewmodel.play(empty ? 'reloadEmpty' : 'reloadTac');
@@ -1176,11 +1139,9 @@ export class WeaponSystem {
           this._emitReload('magout');
         }
         break;
-      case 'magdrop': {
-        const s = this.state;
-        if (isReload && (!s?.spareMagazines || s.mag === 0)) this._dropMagazine();
+      case 'magdrop':
+        if (isReload && this.state?.mag === 0) this._dropMagazine();
         break;
-      }
       case 'magin':
         if (isReload) {
           this._magazineOut = false;
@@ -1247,22 +1208,15 @@ export class WeaponSystem {
     const s = this.state;
     if (!s) return;
     const spares = s.spareMagazines;
-    if (spares) {
-      // Commit both sides of the swap at magin. Cancelling before it changes neither.
-      const next = spares[0];
-      if (!next) return;
-      if (s.mag === 0) spares.shift();
-      else {
-        spares[0] = s.mag;
-        spares.sort((a, b): number => b - a);
-      }
-      s.mag = next;
-    } else {
-      const want = s.def.magSize - s.mag;
-      const take = Math.min(want, s.reserve);
-      s.reserve -= take;
-      s.mag += take;
+    // Commit both sides of the swap at magin. Cancelling before it changes neither.
+    const next = spares[0];
+    if (!next) return;
+    if (s.mag === 0) spares.shift();
+    else {
+      spares[0] = s.mag;
+      spares.sort((a, b): number => b - a);
     }
+    s.mag = next;
     if (empty && !s.chambered && s.mag > 0) {
       s.mag--;
       s.chambered = true;
@@ -1279,14 +1233,13 @@ export class WeaponSystem {
 
   _insertShell(): boolean {
     const s = this.state;
-    if (!s || s.reserve <= 0 || (s.chambered && s.mag >= s.def.magSize)) return false;
+    if (!s || (s.chambered && s.mag >= s.def.magSize)) return false;
     const spares = s.spareMagazines;
-    if (spares) {
-      // Finish the open shell bundle before opening another one.
-      const last = spares.length - 1;
-      if (spares[last] === 1) spares.pop();
-      else spares[last]--;
-    } else s.reserve--;
+    const last = spares.length - 1;
+    if (last < 0) return false;
+    // Finish the open shell bundle before opening another one.
+    if (spares[last] === 1) spares.pop();
+    else spares[last]--;
     if (s.chambered) s.mag++;
     else s.chambered = true;
     this._shotIndex = 0;
@@ -1295,7 +1248,7 @@ export class WeaponSystem {
 
   _continueTubeReload(): void {
     const s = this.state;
-    if (!this._tubeLoop || !s || s.reserve <= 0 || s.mag >= s.def.magSize) {
+    if (!this._tubeLoop || !s || s.spareMagazines.length === 0 || s.mag >= s.def.magSize) {
       this._tubeLoop = false;
       return;
     }
@@ -1938,9 +1891,8 @@ export class WeaponSystem {
         : (s.def.spreadHip ?? s.def.spreadAds)
       : 0;
     if (s) {
-      s.mag = kind === 'fire' ? 22 : s.def.magSize;
-      s.chambered = true;
-      s.reserve = s.def.reserve;
+      this.resetWeaponAmmo(s);
+      if (kind === 'fire') s.mag = 22;
     }
 
     if (kind === 'ads') {

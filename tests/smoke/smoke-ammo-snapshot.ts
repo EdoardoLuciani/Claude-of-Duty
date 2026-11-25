@@ -19,7 +19,7 @@ for (const chambered of [false, true]) {
   for (const mag of [0, 3]) {
     state.mag = mag;
     state.chambered = chambered;
-    state.reserve = 20;
+    state.spareMagazines.splice(0, state.spareMagazines.length, 12, 8);
     const snapshot = weapons.ammo;
     assert.deepEqual(snapshot, {
       mag: mag + Number(chambered),

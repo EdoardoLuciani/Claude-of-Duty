@@ -52,7 +52,7 @@ interface WeaponHarness {
   player: PlayerSystem;
   shots: { live: number; fired: number; impacts: number };
 }
-function makeHarness(persistentMags = false): WeaponHarness {
+function makeHarness(): WeaponHarness {
   const input = new Input(fixture<HTMLCanvasElement>({}), { sensitivity: 1, invertY: false });
   input.pointerLocked = true;
   input._pollGamepad = (): void => {};
@@ -61,7 +61,7 @@ function makeHarness(persistentMags = false): WeaponHarness {
       throw new Error(`weapons must not query raw ${method}`);
     };
   }
-  const wp = new ArmedWeaponSystem(persistentMags);
+  const wp = new ArmedWeaponSystem();
   wp.createGrenade = (): THREE.Mesh => new THREE.Mesh();
   const clips: string[] = [],
     prompts: Array<Parameters<UiSystem['setPrompt']>[0] & { owner: unknown }> = [],
@@ -205,10 +205,10 @@ for (const [primary, first, second] of [
   assert(wp.applyBuild(second, BASE_ATTACHMENTS) && !wp.owns(first));
   assert.deepEqual(wp.weaponIds, primary ? [second, 'pistol'] : ['rifle', second]);
   assert(!wp.reloading && wp.tryFire(), 'mid-reload purchase is immediately usable');
-  weaponState(wp, first).reserve = 0;
-  wp.state.reserve = 1;
+  weaponState(wp, first).spareMagazines.length = 0;
+  wp.state.spareMagazines.splice(0, wp.state.spareMagazines.length, 1);
   wp.refillAmmo();
-  assert.equal(wp.state.reserve, wp.current.reserve);
+  assert.equal(wp.state.spareMagazines.length, 4);
   assert.equal(weaponState(wp, first).reserve, 0, 'refill ignores unowned weapons');
   assert.equal(wp.ammoFraction(), 1);
   wp.resetForNewGame();
@@ -217,7 +217,7 @@ for (const [primary, first, second] of [
 }
 // Persistent magazines transfer once at the seating beat and stay with the M4.
 {
-  const { wp } = makeHarness(true);
+  const { wp } = makeHarness();
   const capacity = wp.current.magSize;
   const fullStock = [capacity, capacity];
   assert.deepEqual(
@@ -225,7 +225,7 @@ for (const [primary, first, second] of [
     fullStock,
     'the M4 starts with two full spares'
   );
-  wp.state.reserve = capacity + 12;
+  wp.state.spareMagazines.splice(0, 2, capacity, 12);
   wp.state.mag = 7;
   const total = wp.ammo.total;
   assert(wp.reload());
@@ -410,8 +410,8 @@ for (const [primary, first, second] of [
 }
 
 // A tube reload restarts the same authored Clip from its end callback.
-for (const persistentMags of [false, true]) {
-  const { wp } = makeHarness(persistentMags);
+{
+  const { wp } = makeHarness();
   assert(wp.applyBuild('shotgun', BASE_ATTACHMENTS));
   const vm = new Viewmodel(wp.ctx, wp.mats);
   vm._solveHands = (): void => {};
@@ -426,7 +426,7 @@ for (const persistentMags of [false, true]) {
   wp.viewmodel = vm;
   vm.onClipEvent = (name, clip): void => wp._onClipEvent(name, clip);
   wp.state.mag = 0;
-  wp.state.reserve = 2;
+  wp.state.spareMagazines.splice(0, 2, 2);
   const phases: string[] = [];
   wp.ctx.events.on('weapon:reload', ({ phase }): void => {
     phases.push(phase);
@@ -1072,7 +1072,7 @@ for (const blocked of ['disabled', 'frozen', 'dead', 'controls', 'input']) {
 // Ammo prompt and hold use the same canonical T binding; F does not resupply.
 {
   const { wp, frame, prompts } = makeHarness();
-  wp.state.reserve = 0;
+  wp.state.spareMagazines.length = 0;
   const pickups = ammoPickupFixture(wp);
   wp.pickups = pickups;
   try {

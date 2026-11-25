@@ -39,8 +39,10 @@ const HUD_DEFAULTS = {
   pulse: 0,
   credits: 0,
   marketIn: 0,
-  ammo: 30,
-  reserve: 210,
+  empty: false,
+  spareMagazines: [30, 30] as readonly number[],
+  loadedRounds: 30,
+  tubeFed: false,
   magSize: 30,
   reloading: false,
   magazineOut: false,
@@ -65,9 +67,6 @@ const HUD_DEFAULTS = {
 };
 type HudState = Omit<typeof HUD_DEFAULTS, 'fireMode'> & {
   fireMode: WeaponMode;
-  spareMagazines?: readonly number[] | null;
-  loadedRounds?: number;
-  tubeFed?: boolean;
   cooking?: boolean;
   grenadeEquipped?: boolean;
 };
@@ -264,11 +263,7 @@ export class UiSystem {
       }
     });
     on('ammo:pickup', (e): void => {
-      this.banner.show(
-        'Ammunition Recovered',
-        e.pack ? `+1 FULL ${e.pack.toUpperCase()}` : `+${e.amount} ROUNDS`,
-        1.5
-      );
+      this.banner.show('Ammunition Recovered', `+1 FULL ${e.pack.toUpperCase()}`, 1.5);
       this.sfx('objective', 0.45);
     });
     on('intel:available', (e): void => {
@@ -393,7 +388,7 @@ export class UiSystem {
     this.killfeed.clear();
     this.clearPrompt();
     const rifle = this.ctx.peek('weapons')?.states.get('rifle');
-    if (rifle) rifle.reserve = Math.round(rifle.def.reserve * 0.4);
+    if (rifle) rifle.spareMagazines.splice(0, rifle.spareMagazines.length, rifle.def.magSize);
     const hp = this.ctx.peek('player')?.health;
     if (hp) hp.armour = 50;
     const m = this.ctx.peek('market');
@@ -453,8 +448,7 @@ export class UiSystem {
     if (ws) {
       s.weaponName = ws.name;
       s.fireMode = ws.mode;
-      s.ammo = ws.ammo;
-      s.reserve = ws.reserve;
+      s.empty = ws.empty;
       s.spareMagazines = ws.spareMagazines;
       s.loadedRounds = ws.loadedRounds;
       s.tubeFed = ws.tubeFed;

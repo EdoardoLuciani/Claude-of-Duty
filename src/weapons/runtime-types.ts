@@ -22,9 +22,10 @@ export interface WeaponState {
   pattern: Float32Array;
   mag: number;
   chambered: boolean;
-  reserve: number;
-  /** Nonempty spare magazines, fullest first, for the Survival spike. */
-  spareMagazines?: number[] | undefined;
+  /** Sum of the spare packs; never stored separately. */
+  readonly reserve: number;
+  /** Nonempty spare magazines, belts, or shell bundles, fullest first. */
+  readonly spareMagazines: number[];
   mode: WeaponMode;
   modeIndex: number;
 }

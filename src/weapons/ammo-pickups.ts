@@ -316,18 +316,17 @@ export class AmmoPickups {
     if (this.ctx.input.action('use')) this._hold = Math.min(HOLD_TIME, this._hold + dt);
     else this._hold = Math.max(0, this._hold - dt * 2.5);
 
-    const pack = state.spareMagazines
-      ? state.def.reloadStyle === 'tube'
+    const pack =
+      state.def.reloadStyle === 'tube'
         ? 'shell bundle'
         : state.def.id === 'lmg'
           ? 'belt'
-          : 'magazine'
-      : undefined;
+          : 'magazine';
     this.ctx.peek('ui')?.setPrompt(
       {
         key: bindingLabel('use'),
         text: 'Resupply ammunition',
-        sub: pack ? `+1 full ${pack} · hold` : `+${gain} rounds · hold`,
+        sub: gain < state.def.magSize ? 'Replace lowest spare · hold' : `+1 full ${pack} · hold`,
         progress: this._hold / HOLD_TIME,
       },
       'ammo'
