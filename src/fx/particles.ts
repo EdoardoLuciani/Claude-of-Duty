@@ -527,7 +527,7 @@ export class ParticleLayer {
    * Write one particle. `s` is the shared {@link SP} descriptor — pass it after
    * resetSpawn() so nothing leaks between call sites.
    */
-  emit(s: typeof SP, now: number): number {
+  emit(s: typeof SP, now: number, minLife = 0.016): number {
     const i = this.cursor;
     this.cursor = i + 1;
     if (this.cursor >= this.capacity) {
@@ -538,7 +538,7 @@ export class ParticleLayer {
 
     const a = this.array;
     const b = i * STRIDE;
-    const life = Math.max(0.016, s.life);
+    const life = Math.max(minLife, s.life);
     const birth = now + s.delay;
 
     a[b + O_PS] = s.x;
