@@ -7,6 +7,7 @@ import math
 from pathlib import Path
 import sys
 
+import bmesh
 import bpy
 from mathutils import Matrix, Vector
 import numpy as np
@@ -35,12 +36,24 @@ def empty(name, parent=None, pos=(0, 0, 0)):
     return obj
 
 
-def subtract(obj, tool):
+def subtract(obj, tool, reuse=False):
     active(obj)
     cut = obj.modifiers.new('Machined relief', 'BOOLEAN')
-    cut.object = tool
+    cut.object, cut.material_mode = tool, 'TRANSFER'
     bpy.ops.object.modifier_apply(modifier=cut.name)
-    bpy.data.objects.remove(tool, do_unlink=True)
+    if not reuse:
+        bpy.data.objects.remove(tool, do_unlink=True)
+
+
+def pocket_edges(obj):
+    # Keep the molded contours smooth, but break normals at the pocket shoulders.
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    for edge in bm.edges:
+        if edge.is_manifold and edge.calc_face_angle(0) > math.radians(37):
+            edge.smooth = False
+    bm.to_mesh(obj.data)
+    bm.free()
 
 
 def fastener(name, center, radius, depth, metal, mask, root, axis='X', side=1):
@@ -65,9 +78,9 @@ def section_body(name, sections, mat, root):
     return finish(mesh(name,points,faces,mat,root),width=0)
 
 
-def side_slot(name, item, side, y, z, width, height, depth, mat, root):
+def side_slot(name, item, side, y, z, width, height, depth, mat, root, face=13.6):
     outline = [(y+a,z+b) for a,b in rounded_rect(width,height,min(height*.49,2),steps=8)]
-    x = side*13.6
+    x = side*face
     lo,hi = sorted((x-side*depth,x+side*2))
     subtract(item,prism(name,outline,lo,hi,mat,root,bevel=0))
 
@@ -94,33 +107,38 @@ def grain_map(finishes):
 
 
 def ring(root, mat):
-    # The hood is a thin rolled rim in front, not a tube. The exterior
-    # sweeps into a broad foot; the inside follows it only below the pane.
-    profile = [(42.0,.65,0,25),(42.85,.23,0,26),(44.0,0,0,26),
+    # Keep the top thin. The lower outside shoulders sweep aft into the deck,
+    # but the middle stays forward so it cannot bridge over the exposed well.
+    profile = [(43.1,.67,0,20),(43.8,.22,0,21),(44.7,0,0,21),
                (49.7,0,0,7),(51.25,.26,0,3),(51.85,.85,0,0),
-               (51.85,0,1,0),(49.85,0,1,0),(44.35,0,1,20),(42.0,0,1,24)]
+               (51.85,0,1,0),(49.85,0,1,0),(45.6,0,1,6),(43.1,0,1,12)]
     n = 120
     vertices = []
     for y,bevel,inner,sweep in profile:
         for i in range(n):
             a = i*math.tau/n
             h = math.sin(a)
-            blend = (max(0,.46-h)/1.46)**1.72
+            side = math.cos(a)
+            blend = (max(0,.33-h)/1.33)**1.5
+            # Leave a shallow land behind the circular well instead of two free tips.
+            sweep_weight = .71 + .29*min(1,abs(side)*2.55)
             x_r = WINDOW if inner else WIDTH/2-bevel
             z_r = WINDOW if inner else RIM_HEIGHT_R-bevel
-            drop = 0 if inner else 2.2*blend
+            drop = 0 if inner else 3.0*blend
             z = z_r*h*(math.cos(LENS_TILT) if inner else 1)
-            vertices.append((x_r*math.cos(a),y-sweep*blend+z_r*h*math.sin(LENS_TILT),AXIS+z-drop))
+            vertices.append((x_r*side,y-sweep*blend*sweep_weight+z_r*h*math.sin(LENS_TILT),AXIS+z-drop))
     faces = [(j*n+i,j*n+(i+1)%n,((j+1)%len(profile))*n+(i+1)%n,((j+1)%len(profile))*n+i)
              for j in range(len(profile)) for i in range(n)]
-    finish(mesh('Thin round lens surround', vertices, faces, mat, root), width=0)
+    return finish(mesh('Thin round lens surround', vertices, faces, mat, root), width=0)
 
 
 def build(root):
     body = material('02 | glass-filled black polymer', (.014,.0148,.0164), 0, .56)
-    base = material('03 | low satin anodized saddle', (.012,.0135,.0165), .48, .43)
-    steel = material('04 | dark hardware steel', (.065,.068,.071), .73, .40)
-    inset = material('05 | control rubber and pocket shade', (.010,.011,.013), 0, .79)
+    base = material('03 | matte anodized saddle', (.012,.013,.015), .36, .54)
+    steel = material('04 | dark hardware steel', (.042,.045,.049), .66, .43)
+    inset = material('05 | control rubber and pocket shade', (.006,.0068,.008), 0, .79)
+    hardware_top = material('08 | blackened countersunk steel', (.022,.024,.027), .52, .52)
+    saddle_recess = material('09 | dark saddle pockets', (.003,.0035,.0042), .68, .46)
     etch = material('06 | molded markings', (.012,.013,.014), 0, .68)
     diode = material('07 | red emitter inset', (.16,.012,.009), .1, .24)
     pane = material('10 | coated single pane', (.16,.079,.025), 0, .17)
@@ -136,13 +154,14 @@ def build(root):
            (heel+.64,25.6,BASE_BOTTOM,4.8,.85),(49.7,25.6,BASE_BOTTOM,4.8,.85),
            (53,25.4,-3.6,4.7,.75),(55.2,23.8,-2.8,4.15,.6)],base,root)
     picatinny.cut_channel([saddle], Matrix.Identity(4), -.064,.064)
-    bar = section_body('Right clamp bar', [(heel+.85,1.65,-3.2,3.1,.48),
-           (-58.5,2.4,-3.6,3.55,.63),(51.45,2.45,-3.6,3.55,.63),
-           (53.7,1.66,-3.15,3.15,.52)],base,root)
-    bar.location.x = .01265
+    bar = section_body('Right clamp bar', [(heel+.85,1.84,-3.25,3.2,.35),
+           (-58.5,2.3,-3.55,3.49,.37),(51.45,2.3,-3.55,3.49,.37),
+           (53.7,1.78,-3.23,3.18,.34)],base,root)
+    bar.location.x = .01245
     bpy.context.view_layer.update()
-    for y,w in [(-29.3,35.5),(18.5,37.6)]:
-        side_slot('Clamp rounded relief',bar,1,y,.36,w,2.55,2.4,base,root)
+    for y,w in [(-27.8,30.8),(17.6,34.7)]:
+        side_slot('Clamp rounded relief',bar,1,y,.28,w,2.88,1.02,saddle_recess,root)
+    pocket_edges(bar)
     for y in (-49.9,45.7):
         fastener('Rounded clamp screw', (14.15,y,.25), 3.53, 1.52, steel,inset,root)
         cylinder('Opposite screw tail', (-12.83,y,.25), 1.6, .27, steel,root,sides=20)
@@ -150,35 +169,45 @@ def build(root):
 
     section_body('Molded aft chassis', [(-59.45,24.2,6.25,18.95,1.28),
            (-58.6,26.6,5.1,20.35,1.28),(-55.2,27.6,4.9,20.6,1.62),
-           (-30,27.6,4.9,20.6,1.54),(-22,26.8,4.9,18.65,1.13),
-           (-13,26.2,4.9,18.65,1.12)],body,root)
-    section_body('Recessed diode access cover', [(-29.1,24.6,18.35,19.35,.35),
-           (-27.7,25.7,18.3,20.0,.5),(-16.2,25.7,18.3,20.0,.45),(-14.1,23.6,18.3,19.45,.39)],body,root)
+           (-34,27.6,4.9,20.6,1.54),(-31,27.3,4.9,20.15,1.27),
+           (-29.86,26.95,4.9,18.83,1.18),(-13,26.2,4.9,18.6,1.12)],body,root)
+    section_body('Dark access-cover gasket', [(-30.15,24.9,18.5,19.1,.18),
+           (-15.97,24.9,18.5,19.1,.18)],inset,root)
+    section_body('Recessed diode access cover', [(-29.75,24.55,18.93,19.54,.24),
+           (-28.6,25.2,18.93,20.0,.43),(-17.15,25.2,18.93,20.0,.43),
+           (-16.1,24.55,18.93,19.54,.24)],body,root)
     # The battery cover wraps down the sides with a curved shoulder into the narrower aft shell.
     section_body('Wrapped battery cover', [(-18.8,24.4,5,18.75,1.04),(-16.3,25.2,4.9,19.0,1.25),
            (-12.5,28.9,4.9,21.5,1.36),(-9,29.1,4.9,21.9,1.25),(5,29.1,4.9,21.9,1.22),
            (6.25,28.3,5.0,21.3,.88)],body,root)
-    nose = section_body('Lower polymer arm with rolled nose', [(6.36,27.1,5.1,16.5,.9),
-            (13,27.3,4.98,17.35,1.15),(41,27.35,5,17.5,1.36),
-            (50,28.4,5.3,18.3,1.48),(55.3,28.52,6.2,20.6,2.35),
-            (58.7,24.3,8.3,20.2,2.9),(LENGTH/2,18.8,10.15,17.2,2.3)],body,root)
+    nose = section_body('One-piece lower arm and front web', [(6.36,27.1,5.1,16.5,.9),
+            (13,27.3,4.98,17.35,1.15),(39,27.35,5,17.5,1.36),
+            (46.3,28.0,5.15,18.1,1.45),(51.8,28.52,5.48,24.0,2.6),
+            (55.4,27.8,6.32,23.8,3.55),(58.45,24.55,8.18,22.07,3.8),
+            (60.03,20.7,9.5,20.7,3.04),(LENGTH/2,17.3,10.22,19.35,2.62)],body,root)
     for side in (-1,1):
-        side_slot('Forward side capsule',nose,side,47.9,9.95,9.8,4.45,2.25,body,root)
-        side_slot('Nose relief seam',nose,side,56.1,15.0,5.25,4.55,2.25,body,root)
-    deck = section_body('Swept lens deck', [(8.4,23.6,14.5,18.65,.8),(11.2,24.3,14.5,19.4,.7),
-           (20.5,23.8,14.5,19.0,1.32),(36.9,24.8,14.5,21.0,1.4),
-           (50.6,26,14.5,24.55,2.4),(55.7,25.8,13.0,23.1,2.3)],body,root)
-    subtract(deck,cylinder('Round lens-well recess',(0,35.8,20.0),4.68,4.9,body,root,axis='Z',sides=56,bevel=.18))
-    cylinder('Dark lens-well floor',(0,35.8,17.59),4.51,.26,inset,root,axis='Z',sides=48)
-    cylinder('Adjustment-seat bevel',(0,17.3,19.22),4.07,.47,inset,root,axis='Z',sides=48)
-    fastener('Pedestal adjustment recess',(0,17.3,19.45),2.53,.76,steel,inset,root,axis='Z')
-    ring(root,body)
-    # Form the wide arched nose opening as a through pocket; keep the separate rolled edge.
-    arch = [(x,z) for x,z in rounded_rect(15,7.85,3.04,center_z=14.55,steps=10)]
-    outer = [(x,z) for x,z in rounded_rect(22.8,12.65,4.88,center_z=15.35,steps=10)]
-    eye = prism('Webbed forward arch',outer,50.65,LENGTH/2,body,root,axis='Y',bevel=.82)
-    subtract(nose,prism('Arm arch tool',arch,49.14,62,body,root,axis='Y',bevel=.25))
-    subtract(eye,prism('Arch opening tool',arch,49.14,62,body,root,axis='Y',bevel=.25))
+        side_slot('Forward side capsule',nose,side,46.75,10.22,9.88,3.83,1.42,inset,root,14.16)
+    # Square-bottomed arch: a parabolic roof cut into the same continuous nose.
+    arch = [(-7.75,10.9),(7.75,10.9),(8.13,11.7)]
+    arch += [(8.13*math.cos(i*math.pi/22),11.7+6.33*math.sin(i*math.pi/22)**.85) for i in range(1,22)]
+    arch += [(-8.13,11.7)]
+    subtract(nose,prism('Molded front arch relief',arch,48.05,63,inset,root,axis='Y',bevel=.29))
+    pocket_edges(nose)
+
+    deck = section_body('Open stepped lens deck', [(8.4,23.45,14.5,18.5,.79),(11.2,24.18,14.5,19.4,.68),
+           (20.5,24.12,14.5,19.54,1.12),(35.9,24.8,14.5,20.9,1.28),
+           (45.3,25.9,15.3,22.44,1.55),(51.08,24.1,18.45,23.42,1.9)],body,root)
+    hood = ring(root,body)
+    well = cylinder('Open round lens well',(0,34.65,20.8),5.16,10.7,inset,root,axis='Z',sides=64,bevel=.16)
+    subtract(deck,well,reuse=True)
+    subtract(hood,well)
+    cylinder('Dark lens-well floor',(0,34.65,17.61),4.98,.25,inset,root,axis='Z',sides=48)
+    seat = cylinder('Adjustment seat pocket tool',(0,18.0,19.70),4.21,2.77,inset,root,axis='Z',sides=56,bevel=.26)
+    subtract(deck,seat)
+    cylinder('Black adjustment seat',(0,18.0,18.57),3.98,.19,inset,root,axis='Z',sides=48,bevel=0)
+    fastener('Flush pedestal adjustment head',(0,18.0,19.14),2.36,.71,hardware_top,inset,root,axis='Z')
+    pocket_edges(deck)
+    pocket_edges(hood)
     # One pane, no tube or second rim, exported with the shared thin-glass convention.
     n = 96
     points = [(0,LENS_Y+.88,AXIS)]
@@ -201,12 +230,14 @@ def build(root):
                  inset,root,axis='Z',sides=10,bevel=.08)
     emitter = prism('Low emitter block', [(-39.5,19),(-39.5,23.6),(-37.4,25.7),
                     (-33.4,25.7),(-30.5,23),(-30.5,18)], -5.8,5.8,body,root,bevel=.85)
-    subtract(emitter,cylinder('Emitter cup tool',(0,-30.4,23.2),2.4,3.2,inset,root,axis='Y',bevel=0))
-    cylinder('Recessed emitter glass',(0,-31.8,23.2),1.32,.28,diode,root,axis='Y',sides=24)
+    subtract(emitter,cylinder('Emitter cup tool',(0,-31.22,23.03),2.4,4.5,inset,root,axis='Y',sides=44,bevel=.17))
+    cylinder('Dark emitter cup seat',(0,-33.43,23.03),2.1,.17,inset,root,axis='Y',sides=32)
+    cylinder('Small recessed emitter glass',(0,-33.28,23.03),.66,.14,diode,root,axis='Y',sides=24)
+    pocket_edges(emitter)
     for x in (-8.55,8.55):
-        for y,z,r in [(-21.4,19.95,1.53),(-1.9,21.84,2.02)]:
-            cylinder('Top countersink',(x,y,z),r+.52,.16,inset,root,axis='Z',sides=36)
-            fastener('Top recessed fastener',(x,y,z+.08),r,.43,steel,inset,root,axis='Z')
+        for y,z,r in [(-21.4,20.01,1.73),(-1.9,21.91,2.24)]:
+            cylinder('Dark top countersink',(x,y,z),r+.66,.14,inset,root,axis='Z',sides=40,bevel=.03)
+            fastener('Broad flush top fastener',(x,y,z+.049),r,.26,hardware_top,inset,root,axis='Z')
     for y,r in [(17.6,1.16),(24.1,1.32),(31.2,2.84),(37.2,2.42)]:
         fastener('Right windage hardware',(13.64,y,10.45),r,.69,steel,inset,root)
     for y,r in [(22.5,1.0),(27.2,1.38),(35.4,2.06)]:
