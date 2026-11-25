@@ -11,18 +11,22 @@ bun build/models.ts railway
 bun tools/capture.ts --weapon=rifle --optic=railway --shot=ads
 ```
 
-Dev/build generate the editable blend and runtime GLB. Source meshes stay
-separate in the blend and batch by material on export. The packed micro-grain
-is generated from a fixed seed. `MOUNT_base` is the rail-contact frame and
-`SOCKET_sight` is the lens centre, following the
-[attachment contract](../../../ARCHITECTURE.md#models). The EVOLYS fit seats
-forward to keep the long saddle outside the reload-hand sweep.
+Dev/build generate the editable blend and runtime GLB. The build measures the
+evaluated mesh envelope and lens diameter against the manufacturer's **RW**
+specification table. The table does not specify the individual molded parts;
+their contours follow the photos. Source meshes stay separate in the blend
+and batch by material on export. The packed micro-grain is generated from a
+fixed seed. `MOUNT_base` is the rail-contact frame and `SOCKET_sight` is the
+lens centre, following the [attachment contract](../../../ARCHITECTURE.md#models).
+The EVOLYS fit seats forward to keep the long saddle outside the reload-hand sweep.
 
 ## Photo review
 
 - [C-MORE RW](https://cmore.com/Item/RW): black polymer body, stepped controls,
   continuous low mount and side hardware pattern.
 - [C-MORE Railway base](https://cmore.com/Item/RW-Base): saddle and clamp edges.
+- [C-MORE parts illustration](https://cmore.com/media/CMS-IS-RW-041608.pdf):
+  battery-cover wrap, lens support and asymmetric side hardware.
 - [Optics Trade angle gallery](https://www.optics-trade.eu/en/c-more-railway-red-dot-sight.html):
   opposing sides and front, rear, lower and elevated angles. Some photos show
   a different clamp configuration; the game model uses the manufacturer's RW
