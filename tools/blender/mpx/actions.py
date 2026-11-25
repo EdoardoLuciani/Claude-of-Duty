@@ -164,19 +164,19 @@ def author_actions(root, asset, rig, parts, mag, spare, bolt, trigger, release, 
         clips[name]['events'] += [{'time': .02*d, 'event': 'start'}, {'time': out*d, 'event': 'magout'}, {'time': insert*d, 'event': 'magin'}, {'time': d-.0001, 'event': 'end'}]
         if empty: clips[name]['events'].append({'time': clear*d, 'event': 'magdrop'})
         clips[name]['events'].sort(key=lambda e: e['time']); finish(name)
-    # A short roll around the supported fore-end rather than a wide side-to-side swing.
-    begin('Inspect', 2.45)
+    # Roll around the supported fore-end without swinging the muzzle across the screen.
+    begin('Inspect', 3)
     for t, loc, rot in [
-        (.10, (.008, -.008, .006), (-3, 5, 0)),
-        (.36, (.006, .058, -.073), (9, 42, 7)),
-        (.50, (.006, .053, -.069), (7, 39, 6)),
-        (.89, (-.006, .042, -.081), (8, 45, 11)),
-        (1.15, (-.017, .048, -.075), (22, 40, 47)),
-        (1.33, (-.022, .058, -.072), (28, 35, 73)),
-        (1.59, (-.019, .056, -.069), (26, 32, 70)),
-        (1.91, (-.008, .031, -.037), (18, 20, 28)),
-        (2.18, (.005, -.006, .004), (-2, 2, -2)),
-        (2.36, (0, 0, 0), (0, 0, 0)),
+        (.12, (.008, -.008, .006), (-3, 5, 0)),
+        (.44, (.006, .058, -.073), (9, 42, 7)),
+        (.61, (.006, .053, -.069), (7, 39, 6)),
+        (1.09, (-.006, .042, -.081), (8, 45, 11)),
+        (1.41, (-.017, .048, -.075), (22, 40, 47)),
+        (1.63, (-.022, .058, -.072), (28, 35, 73)),
+        (1.95, (-.019, .056, -.069), (26, 32, 70)),
+        (2.34, (-.008, .031, -.037), (18, 20, 28)),
+        (2.67, (.005, -.006, .004), (-2, 2, -2)),
+        (2.89, (0, 0, 0), (0, 0, 0)),
     ]: key(rig, t, loc, rot)
     # Keep the support grip; seat the firing fingers on the visible side.
     pos = (.04050, -.09420, .15695)
@@ -187,12 +187,12 @@ def author_actions(root, asset, rig, parts, mag, spare, bolt, trigger, release, 
         'thumbBase': [-1.292, -.477, -2.720],
         'thumb': [.042, 1.144],
     }
-    for t in (.16, 2.29): pose('right', t, pos, q, fitted)
+    for t in (.20, 2.80): pose('right', t, pos, q, fitted)
     right_wrist = hands['right']['wrist']
-    for t in (.04, .12, 2.33, 2.41):
+    for t in (.05, .15, 2.85, 2.95):
         right_wrist.location = xyz((.059, -.105, .159))
         right_wrist.keyframe_insert('location', frame=t*FPS)
-    clips['Inspect']['events'] = [{'time': 2.4499, 'event': 'end'}]; finish('Inspect')
+    clips['Inspect']['events'] = [{'time': 2.9999, 'event': 'end'}]; finish('Inspect')
     for name, d, drawing in [('Draw', .52, True), ('Holster', .34, False)]:
         begin(name, d)
         for k,a in ([(0,1),(.25,.75),(.70,.12),(.86,0),(1,0)] if drawing else [(0,0),(.15,.08),(.65,.75),(1,1)]):
