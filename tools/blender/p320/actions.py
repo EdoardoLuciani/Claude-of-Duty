@@ -170,13 +170,55 @@ def author_actions(root,asset,rig,parts,mag,spare,slide,barrel,trigger,catch,rou
         clips[name]['events']=[{'time':28/60,'event':'magazine_out'},{'time':103/60,'event':'magazine_in'}]
         if empty_reload:clips[name]['events'].append({'time':129/60,'event':'bolt_forward'})
         finish(name,end)
-    begin('Inspect',198)
-    for f,loc,rot in [(28,(.0,-.025,.012),(8,-30,10)),(65,(.0,-.025,.012),(8,-30,10)),
-                      (110,(-.015,-.020,.020),(-3,35,-8)),(151,(-.015,-.020,.020),(-3,35,-8)),(186,(0,0,0),(0,0,0))]:key(rig,f,loc,rot)
-    for f in [6,182]:pose('right',f,p=indexed(curled=True))
-    for f in [15,45,100,165]:pose('right',f,p=indexed())
-    for f,pos in [(18,[-.068,-.11,.09]),(45,[-.09,-.18,.10]),(145,[-.09,-.18,.10]),(180,ref['grips']['left']['pos'])]:pose('left',f,pos,p=relaxed('left') if f<180 else None)
-    finish('Inspect',198)
+    # CS2 Glock reference: quick one-handed lift into a sustained side profile,
+    # then curl the fingers and roll up to the top of the slide before regripping.
+    inspect_end=372
+    begin('Inspect',inspect_end)
+    for f,loc,rot in [
+        (6,(0,-.010,-.010),(-4,0,2)),
+        (17,(.039,-.068,.080),(10,5,46)),
+        (30,(.046,-.087,.136),(20,7,79)),
+        (53,(.037,-.081,.104),(14,6,77)),
+        (179,(.031,-.080,.102),(13,8,78)),
+        (203,(.009,-.094,.112),(6,4,83)),
+        (222,(.008,-.081,.115),(35,-20,63)),
+        (235,(.007,-.083,.111),(76,-48,-10)),
+        (248,(.014,-.073,.100),(93,-49,-42)),
+        (278,(.023,-.067,.097),(78,-41,-28)),
+        (301,(.022,-.057,.089),(66,-33,-18)),
+        (321,(.025,-.045,.076),(43,1,27)),
+        (340,(.012,-.013,.005),(9,-2,7)),
+        (366,(0,0,0),(0,0,0)),
+    ]:key(rig,f,loc,rot)
+
+    offered=copy.deepcopy(ref['sides']['right']['grip'])
+    offered['fingers'][1:]=[[.48,.60,.36],[.53,.68,.40],[.61,.78,.45]]
+    # Lift the thumb behind the slide, rather than unfolding across its flank.
+    offered['thumbBase']=[-2.57,-1.35,1.56]
+    offered['thumb']=[.10,.15]
+    pose('right',12)
+    for f in (37,182):pose('right',f,p=offered)
+    pose('right',220)
+
+    # Leave the grip outboard before the turn. While detached, key the wrist in
+    # ready space so it drops below view instead of orbiting with the slide.
+    left=ref['sides']['left']
+    x,y,z,w=left['quaternion'];lq=Quaternion((w,x,y,z))
+    loose=relaxed('left')
+    pose('left',5,(-.060,-.059,.079))
+    for f,pos,p in [
+        (12,(-.105,-.092,.097),left['grip']),
+        (23,(-.148,-.197,.117),loose),
+        *((f,(-.142,-.246,.101),loose) for f in (38,179,222,235,248,278,301)),
+        (321,(-.127,-.229,.104),loose),
+        (338,(-.105,-.128,.097),loose),
+    ]:
+        scene.frame_set(f)
+        unrotate=CI.to_4x4()@rig.matrix_basis.inverted()@C.to_4x4()
+        pose('left',f,unrotate@Vector(pos),unrotate.to_quaternion()@lq,p)
+    pose('left',351,(-.065,-.065,.083))
+    pose('left',365)
+    finish('Inspect',inspect_end)
     for name,end,drawing in [('Draw',30,True),('Holster',24,False)]:
         begin(name,end)
         for f,k in ([(0,1),(8,.76),(21,.04),(30,0)] if drawing else [(0,0),(7,.08),(18,.80),(24,1)]):

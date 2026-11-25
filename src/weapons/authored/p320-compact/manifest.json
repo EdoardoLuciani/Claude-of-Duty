@@ -87,9 +87,9 @@
     "Inspect": {
       "frames": [
         0,
-        198
+        372
       ],
-      "duration": 3.3,
+      "duration": 6.2,
       "events": []
     },
     "Draw": {
@@ -117,7 +117,7 @@
     "materials": 1,
     "textureImages": 4,
     "joints": 9,
-    "bytes": 5449704
+    "bytes": 5417288
   },
   "textureResolutions": {
     "base": 1024,
