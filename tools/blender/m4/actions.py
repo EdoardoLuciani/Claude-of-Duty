@@ -130,7 +130,6 @@ def author_actions(root,asset,rig,parts,mag,spare,bolt,head,handle,trigger,cover
         clips[name]['events']=[{'time':.02*d,'event':'start'},{'time':out*d,'event':'magout'},{'time':drop*d,'event':'magdrop'},{'time':insert*d,'event':'magin'}]
         clips[name]['events'] += ([{'time':.90*d,'event':'charge'},{'time':.917*d,'event':'boltrelease'}] if empty_reload else [{'time':.88*d,'event':'slap'}])
         clips[name]['events'].append({'time':.995*d,'event':'end'});finish(name)
-    # CS2 M4 motion references: see the M4A1 authoring README.
     inspect_end=6
     begin('Inspect',inspect_end)
     for t,loc,rot in [
@@ -151,7 +150,7 @@ def author_actions(root,asset,rig,parts,mag,spare,bolt,head,handle,trigger,cover
         (5.83,(0,0,0),(0,0,0)),
     ]:key(rig,t,loc,rot)
 
-    # Keep the trigger opening clear and wrap the visible side of the A2 grip.
+    # Seat the index on the trigger face and wrap the other fingers around the grip.
     wrist=(.03540,-.01545,.14810)
     wrist_rotation=Quaternion((.724537,-.036740,-.017803,-.688025))
     grip={
@@ -161,6 +160,11 @@ def author_actions(root,asset,rig,parts,mag,spare,bolt,head,handle,trigger,cover
         'thumb':[.015,1.087],
     }
     for t in (.18,5.52):pose('right',t,wrist,wrist_rotation,grip)
+    # Give the fingers room to change shape outside the guard before seating them.
+    right_wrist=hand_controls['right']['wrist']
+    for t,y,z in [(.04,-.0165,.122),(.137,-.0189,.144),(5.635,-.0189,.144),(5.894,-.0165,.122)]:
+        right_wrist.location=xyz((.0595,y,z))
+        right_wrist.keyframe_insert('location',frame=t*FPS)
 
     # Peel off the rail before opening the fingers, then park the hand in
     # ready space so it doesn't orbit with the receiver during the reveal.
@@ -168,7 +172,7 @@ def author_actions(root,asset,rig,parts,mag,spare,bolt,head,handle,trigger,cover
     pose('left',.10,(-.083,.035,-.192))
     pose('left',.18,(-.127,.010,-.191))
     pose('left',.28,(-.167,-.055,-.185),p=loose)
-    x,y,z,w=ref['sides']['left']['quaternion'];lq=Quaternion((w,x,y,z))
+    left=ref['sides']['left']['quaternion'];lq=Quaternion((left[3],*left[:3]))
     for t,pos in [
         (.40,(-.194,-.200,-.170)),
         *((t,(-.225,-.284,-.133)) for t in (.68,.92,2.85,3.65,3.95)),
