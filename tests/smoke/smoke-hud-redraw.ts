@@ -193,14 +193,21 @@ try {
   }
   const spares = [30, 15, 7];
   state.spareMagazines = spares;
+  state.loadedRounds = 30;
   frame();
   const initialSpareDraw = hud.draws;
+  assert(!hud.ammo['current'].visible && !hud.ammo['magFill'].visible, 'trial hides precise ammo');
+  state.loadedRounds = 29; // same fill step as the next value
+  frame();
+  const loadedDraw = hud.draws;
+  assert.equal(loadedDraw, initialSpareDraw + 1, 'the loaded icon changes as rounds are spent');
+  state.loadedRounds = 28;
   spares[2] = 8; // same fill step
   frame();
-  assert.equal(hud.draws, initialSpareDraw, 'spares redraw only on visible fill changes');
+  assert.equal(hud.draws, loadedDraw, 'icons redraw only on visible fill changes');
   spares[2] = 13;
   frame();
-  assert.equal(hud.draws, initialSpareDraw + 1, 'a non-leading spare still invalidates the HUD');
+  assert.equal(hud.draws, loadedDraw + 1, 'a non-leading spare still invalidates the HUD');
   state.spareMagazines = null;
   // Magazine fill follows the removal/seating beats, not the progress bar.
   state.ammo = 9;

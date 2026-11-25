@@ -13,6 +13,11 @@ const INK = 0xe7f2ef,
   AMBER = 0xffb02a,
   RED = 0xff5145;
 
+function fillLevel(rounds: number, capacity: number): number {
+  if (!rounds) return 0;
+  return rounds >= capacity ? 4 : Math.min(3, Math.max(1, Math.round((4 * rounds) / capacity)));
+}
+
 /** Retained read-only ammo graphics; the owner decides when/where to render. */
 export class PixiAmmoView {
   readonly stage = new Container();
@@ -20,10 +25,12 @@ export class PixiAmmoView {
   private reserve: BitmapText;
   private spares = new Graphics();
   private spareCount: BitmapText;
+  private loaded: BitmapText;
   private spareLevels: number[] = [];
   private name: BitmapText;
   private mode: BitmapText;
   private prompt: BitmapText;
+  private magTrack = new Graphics().rect(16, 102, 216, 4).fill(0x35434c);
   private magFill = new Graphics().rect(0, 0, 216, 4).fill(0xffffff);
   private bar = new Graphics()
     .rect(0, 0, 216, 3)
@@ -34,6 +41,8 @@ export class PixiAmmoView {
   private lastAmmo = -1;
   private lastReserve = -1;
   private lastSpareCount = -1;
+  private lastLoadedLevel = -1;
+  private lastTubeFed = false;
   private lastMode: AmmoState['fireMode'] | null = null;
 
   constructor() {
@@ -46,14 +55,15 @@ export class PixiAmmoView {
     this.current.anchor.set(1, 1);
     this.reserve = this.text('/ 210', 131, 96, HUD_TYPE.secondary, MUTED);
     this.reserve.anchor.y = 1;
-    this.spareCount = this.text('', 78, 55, HUD_TYPE.label, MUTED);
-    this.spareCount.visible = this.spares.visible = false;
-    this.spares.position.set(78, 73);
+    this.loaded = this.text('LOADED', 16, 55, HUD_TYPE.label);
+    this.spareCount = this.text('', 90, 55, HUD_TYPE.label, MUTED);
+    this.loaded.visible = this.spareCount.visible = this.spares.visible = false;
+    this.spares.position.set(23, 73);
     this.stage.addChild(this.spares);
     // Warnings/reload feedback live above the readout, not below the bottom bar.
     this.prompt = this.text('', WIDTH / 2, 4, HUD_TYPE.label, AMBER);
     this.prompt.anchor.x = 0.5;
-    this.stage.addChild(new Graphics().rect(16, 102, 216, 4).fill(0x35434c));
+    this.stage.addChild(this.magTrack);
     this.magFill.position.set(16, 102);
     this.stage.addChild(this.magFill);
     this.bar.position.set(16, 22);
@@ -71,27 +81,37 @@ export class PixiAmmoView {
     this.dirty = writeHudText(text, value, width) || this.dirty;
   }
 
-  private updateSpares(magazines: readonly number[] | null, capacity: number): void {
+  private updateSpares(
+    magazines: readonly number[] | null,
+    capacity: number,
+    loadedRounds: number,
+    tubeFed: boolean
+  ): void {
     const visible = magazines !== null;
     if (this.spares.visible !== visible) {
-      this.spares.visible = this.spareCount.visible = visible;
-      this.reserve.visible = !visible;
-      this.current.x = visible ? 60 : 119;
+      this.spares.visible = this.spareCount.visible = this.loaded.visible = visible;
+      this.current.visible =
+        this.reserve.visible =
+        this.magTrack.visible =
+        this.magFill.visible =
+          !visible;
       this.dirty = true;
     }
     if (!magazines) return;
     const count = magazines.length;
     const levels = this.spareLevels;
-    let changed = count !== this.lastSpareCount;
-    if (changed) {
+    const loadedLevel = fillLevel(loadedRounds, capacity);
+    let changed = loadedLevel !== this.lastLoadedLevel || tubeFed !== this.lastTubeFed;
+    this.lastLoadedLevel = loadedLevel;
+    this.lastTubeFed = tubeFed;
+    if (count !== this.lastSpareCount) {
+      changed = true;
       this.lastSpareCount = count;
       levels.length = count;
       this.label(this.spareCount, `${count} ${count === 1 ? 'SPARE' : 'SPARES'}`);
     }
     for (let i = 0; i < count; i++) {
-      const rounds = magazines[i];
-      const level =
-        rounds === capacity ? 4 : Math.min(3, Math.max(1, Math.round((4 * rounds) / capacity)));
+      const level = fillLevel(magazines[i], capacity);
       if (level !== levels[i]) {
         levels[i] = level;
         changed = true;
@@ -99,15 +119,23 @@ export class PixiAmmoView {
     }
     if (!changed) return;
     this.spares.clear();
-    for (let i = 0; i < count; i++) this.drawSpare(i * 22, levels[i], i === 0);
+    this.drawMagazine(0, loadedLevel, INK);
+    const start = 67;
+    const next = tubeFed ? count - 1 : 0;
+    for (let i = 0; i < count; i++) {
+      this.drawMagazine(start + i * 27, levels[i], i === next ? AMBER : MUTED);
+    }
     if (!count) {
-      this.drawSpare(0, 0, false);
-      this.spares.moveTo(2, 22).lineTo(14, 2).stroke({ color: MUTED, width: 1.5 });
+      this.drawMagazine(start, 0, MUTED);
+      this.spares
+        .moveTo(start + 2, 22)
+        .lineTo(start + 14, 2)
+        .stroke({ color: MUTED, width: 1.5 });
     }
     this.dirty = true;
   }
 
-  private drawSpare(x: number, level: number, next: boolean): void {
+  private drawMagazine(x: number, level: number, outlineColor: number): void {
     const g = this.spares;
     const outline = [x, 0, x + 12, 0, x + 12, 9, x + 17, 24, x + 5, 24, x, 9];
     g.poly(outline).fill(0x111b22);
@@ -122,8 +150,8 @@ export class PixiAmmoView {
       if (top < 9) g.lineTo(x, 9);
       g.closePath().fill(INK);
     }
-    g.poly(outline).stroke({ color: next ? AMBER : MUTED, width: 1.2 });
-    if (next) g.rect(x + 5, 26, 12, 1.5).fill(AMBER);
+    g.poly(outline).stroke({ color: outlineColor, width: 1.2 });
+    if (outlineColor === AMBER) g.rect(x + 5, 26, 12, 1.5).fill(AMBER);
   }
 
   update(_dt: number, s: AmmoState): void {
@@ -131,27 +159,24 @@ export class PixiAmmoView {
       mag = Math.max(1, s.magSize | 0 || 30),
       reserve = Math.max(0, s.reserve | 0),
       mode = s.fireMode ?? 'auto';
-    // Build per-frame label strings only when their source value changes.
-    if (ammo !== this.lastAmmo) this.label(this.current, String((this.lastAmmo = ammo)));
     const spares = s.spareMagazines ?? null;
-    this.updateSpares(spares, mag);
-    if (!spares && reserve !== this.lastReserve)
-      this.label(this.reserve, `/ ${(this.lastReserve = reserve)}`);
+    this.updateSpares(spares, mag, s.magazineOut ? 0 : (s.loadedRounds ?? ammo), !!s.tubeFed);
+    if (!spares) {
+      if (ammo !== this.lastAmmo) this.label(this.current, String((this.lastAmmo = ammo)));
+      if (reserve !== this.lastReserve)
+        this.label(this.reserve, `/ ${(this.lastReserve = reserve)}`);
+      const color = ammo === 0 ? RED : ammo / mag <= 0.34 ? AMBER : INK;
+      const fraction = s.magazineOut ? 0 : clamp01(ammo / mag);
+      if (this.magFill.scale.x !== fraction || this.current.tint !== color) {
+        this.magFill.scale.x = fraction;
+        this.current.tint = this.magFill.tint = color;
+        this.dirty = true;
+      }
+    }
     this.label(this.name, s.weaponName ?? 'M4A1', 166);
     if (mode !== this.lastMode) this.label(this.mode, (this.lastMode = mode).toUpperCase());
-    const color = ammo === 0 ? RED : ammo / mag <= 0.34 ? AMBER : INK;
-    if (this.current.tint !== color) {
-      this.current.tint = color;
-      this.dirty = true;
-    }
     const reloading = !!s.reloading,
       progress = clamp01(s.reloadProgress ?? 0);
-    const fraction = s.magazineOut ? 0 : clamp01(ammo / mag);
-    if (this.magFill.scale.x !== fraction || this.magFill.tint !== color) {
-      this.magFill.scale.x = fraction;
-      this.magFill.tint = color;
-      this.dirty = true;
-    }
     this.label(
       this.prompt,
       reloading

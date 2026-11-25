@@ -52,12 +52,12 @@ Survival.
 
 Open **Esc → Controls** for the full reference. If you die, choose **New Game** to try again.
 
-**Survival playtest:** Add `?persistentMags=1` to the game URL and keep the starting M4A1.
-Reloading saves the old magazine if it still has rounds and selects the fullest spare if it holds
-more than the current magazine. The HUD shows how many spare magazines you have and the approximate
-fill of each, starting with the one that will load next. Pickups top up spare magazines starting
-with the fullest, and the market refills spare stock up to its starting limit. Remove the query
-parameter to play with pooled reserves.
+**Survival playtest:** Add `?persistentMags=1` to the game URL. The HUD shows approximate fill for
+loaded and spare ammo. Reloading selects the fullest spare magazine or belt even if it holds less
+than the one in use, and keeps the old one if it still has rounds. The tube-fed shotgun loads
+shells individually from spare bundles. A field ammo box gives the equipped weapon one full spare
+and replaces its emptiest spare if no slots are free. The market refills all owned weapons' spare
+stock to capacity. Remove the query parameter to play with pooled reserves.
 
 ## Run locally
 

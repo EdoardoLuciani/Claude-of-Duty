@@ -36,9 +36,9 @@ with range targets add a target reset.
 - The magazine bar empties at the removal beat and jumps to the actual ammo count
   when the new magazine seats. Tube reloads update the count one shell at a time.
   The separate progress bar tracks the active reload clip. In the opt-in Survival
-  M4 playtest, the reserve count is replaced by a spare-magazine count and one
-  silhouette per spare. Each silhouette fills in coarse steps. The leftmost is
-  marked as the next spare, and a crossed-out silhouette means there are none.
+  playtest, the counts and precise bar are replaced by a coarse fill silhouette
+  for the loaded magazine, belt, or tube and each spare. The spare count and
+  next-spare marker are visible; a crossed-out silhouette means no spares.
 - Keep the simple icons and bottom-readout tiers. There is no radio inventory or
   panel; the held radio's LCD is its interface.
 - Required HUD initialization failures propagate to the native boot/reload dialog,

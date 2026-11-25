@@ -225,14 +225,14 @@ for (const [primary, first, second] of [
     fullStock,
     'the M4 starts with two full spares'
   );
-  assert.equal(wp.ammoFraction(), 1, 'the market sees starting stock as full');
   wp.state.reserve = capacity + 12;
   wp.state.mag = 7;
   const total = wp.ammo.total;
   assert(wp.reload());
   wp._onClipEvent('magout', 'reloadTac');
   assert(wp.setWeaponImmediate('pistol'));
-  assert.equal(wp.getHudState().spareMagazines, null, 'sidearm still uses pooled ammo');
+  const sidearmSize = wp.current.magSize;
+  assert.deepEqual(wp.getHudState().spareMagazines, [sidearmSize, sidearmSize]);
   assert(wp.setWeaponImmediate('rifle'));
   assert.equal(wp.ammo.total, total, 'swap before seating leaves both magazines unchanged');
   assert.equal(wp.ammo.inMag, 7);
@@ -243,7 +243,11 @@ for (const [primary, first, second] of [
   assert.equal(wp.ammo.mag, capacity + 1, 'tactical reload keeps its chambered round');
   assert.equal(wp.ammo.total, total, 'partial mag is retained, not duplicated or lost');
   assert.deepEqual(wp.getHudState().spareMagazines, [12, 7], 'HUD lists spares fullest first');
-  assert(!wp.reload(), 'cannot swap down to a shorter magazine');
+  assert(wp.reload(), 'a shorter spare is still accepted');
+  wp._onClipEvent('magin', 'reloadTac');
+  wp.viewmodel.stopClip();
+  assert.equal(wp.ammo.inMag, 12);
+  assert.equal(wp.ammo.total, total, 'swapping down preserves the previous magazine');
 
   wp.state.mag = 0;
   wp.state.chambered = false;
@@ -251,16 +255,19 @@ for (const [primary, first, second] of [
   assert.equal(wp.viewmodel.clipName, 'reloadEmpty');
   wp._onClipEvent('magin', 'reloadEmpty');
   wp.viewmodel.stopClip();
-  assert.equal(wp.ammo.mag, 12, 'empty reload chambers one of the selected mag’s rounds');
-  assert.equal(wp.ammo.total, 19);
+  assert.equal(wp.ammo.mag, capacity, 'empty reload chambers one of the selected mag’s rounds');
+  assert.equal(wp.ammo.total, capacity + 7);
   assert.deepEqual(wp.getHudState().spareMagazines, [7], 'the retained partial can be used again');
-  assert.equal(wp.addReserve(5), 5);
-  assert.deepEqual(wp.getHudState().spareMagazines, [12], 'pickups fill the fullest spare first');
+  for (let i = 0; i < 3; i++) assert.equal(wp.collectAmmoBox(), capacity);
+  assert.deepEqual(wp.getHudState().spareMagazines, [capacity, capacity, capacity, 7]);
+  assert.equal(wp.collectAmmoBox(), capacity - 7, 'full inventory replaces its emptiest spare');
+  assert.deepEqual(wp.getHudState().spareMagazines, Array<number>(4).fill(capacity));
+  assert.equal(wp.collectAmmoBox(), 0, 'no box is used if all four spares are full');
   wp.refillAmmo();
-  assert.equal(wp.ammo.reserve, wp.current.reserve);
-  assert.deepEqual(wp.getHudState().spareMagazines, fullStock);
-  assert.equal(wp.addReserve(capacity), 0, 'a pickup cannot add a third spare');
-  assert.equal(wp.ammo.mag, 12, 'market refills spare stock, not the loaded magazine');
+  assert.equal(wp.ammoFraction(), 1, 'market fills the reserve of both owned weapons');
+  assert.equal(wp.ammo.mag, capacity, 'resupply does not change the loaded magazine');
+  wp.resetForNewGame();
+  assert.deepEqual(wp.getHudState().spareMagazines, fullStock, 'a new run starts below the cap');
 }
 // Mounted laser switches belong to the gun, not the flashlight or active slot.
 {
@@ -403,8 +410,8 @@ for (const [primary, first, second] of [
 }
 
 // A tube reload restarts the same authored Clip from its end callback.
-{
-  const { wp } = makeHarness();
+for (const persistentMags of [false, true]) {
+  const { wp } = makeHarness(persistentMags);
   assert(wp.applyBuild('shotgun', BASE_ATTACHMENTS));
   const vm = new Viewmodel(wp.ctx, wp.mats);
   vm._solveHands = (): void => {};

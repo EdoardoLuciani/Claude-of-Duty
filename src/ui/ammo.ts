@@ -6,6 +6,8 @@ export interface AmmoState {
   reserve: number;
   /** Borrowed spare inventory in reload order; null/absent for pooled ammo. */
   spareMagazines?: readonly number[] | null;
+  loadedRounds?: number;
+  tubeFed?: boolean;
   weaponName?: string;
   fireMode?: WeaponMode;
   reloading?: boolean;

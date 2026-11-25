@@ -195,7 +195,12 @@ export interface EngineEventMap {
     changedLowState?: boolean;
   };
   'player:heartbeat': { strength: number; fraction: number };
-  'ammo:pickup': { amount: number; weapon: EventWeapon; position: Vector3 };
+  'ammo:pickup': {
+    amount: number;
+    pack?: 'magazine' | 'belt' | 'shell bundle' | undefined;
+    weapon: EventWeapon;
+    position: Vector3;
+  };
   'intel:spawn': { id: string; position: Vector3 };
   'intel:available': { count: number };
   'intel:noise': { position: Vector3; loudness: number };

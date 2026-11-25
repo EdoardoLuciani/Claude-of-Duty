@@ -66,6 +66,8 @@ const HUD_DEFAULTS = {
 type HudState = Omit<typeof HUD_DEFAULTS, 'fireMode'> & {
   fireMode: WeaponMode;
   spareMagazines?: readonly number[] | null;
+  loadedRounds?: number;
+  tubeFed?: boolean;
   cooking?: boolean;
   grenadeEquipped?: boolean;
 };
@@ -262,7 +264,11 @@ export class UiSystem {
       }
     });
     on('ammo:pickup', (e): void => {
-      this.banner.show('Ammunition Recovered', `+${e.amount} ROUNDS`, 1.5);
+      this.banner.show(
+        'Ammunition Recovered',
+        e.pack ? `+1 FULL ${e.pack.toUpperCase()}` : `+${e.amount} ROUNDS`,
+        1.5
+      );
       this.sfx('objective', 0.45);
     });
     on('intel:available', (e): void => {
@@ -450,6 +456,8 @@ export class UiSystem {
       s.ammo = ws.ammo;
       s.reserve = ws.reserve;
       s.spareMagazines = ws.spareMagazines;
+      s.loadedRounds = ws.loadedRounds;
+      s.tubeFed = ws.tubeFed;
       s.magSize = ws.magSize;
       s.reloading = ws.reloading;
       s.magazineOut = ws.magazineOut;

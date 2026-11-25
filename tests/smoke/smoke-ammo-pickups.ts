@@ -41,7 +41,7 @@ function rngState(rng: Rng): {
 function isInstancedMesh(value: unknown): value is THREE.InstancedMesh {
   return value instanceof THREE.InstancedMesh;
 }
-function harness(): AmmoHarness {
+function harness(persistentMags = false): AmmoHarness {
   const prompts: (PromptData & { owner: unknown })[] = [],
     cleared: unknown[] = [];
   const events: { name: 'ammo:pickup'; payload: EngineEventMap['ammo:pickup'] }[] = [];
@@ -73,10 +73,13 @@ function harness(): AmmoHarness {
   ctx.events.on('ammo:pickup', (payload): void => {
     events.push({ name: 'ammo:pickup', payload });
   });
-  const weapons = new WeaponSystem();
+  const weapons = new WeaponSystem(persistentMags);
   const state = weapons._makeState('rifle');
-  state.reserve = 0;
-  state.def = { ...state.def, reserve: 90 };
+  if (!persistentMags) {
+    state.reserve = 0;
+    state.def = { ...state.def, reserve: 90 };
+  }
+  weapons.states.set('rifle', state);
   const owner = {
     ctx,
     rng: new Rng(123),
@@ -87,10 +90,10 @@ function harness(): AmmoHarness {
     disabled: false,
     grenadeEquipped: false,
     radioEquipped: false,
-    addReserve(n: number): number {
-      this.state.reserve += n;
-      return n;
+    get ammoBoxGain(): number {
+      return weapons.ammoBoxGain;
     },
+    collectAmmoBox: weapons.collectAmmoBox.bind(weapons),
   };
   return {
     pickups: ammoPickupFixture(owner),
@@ -305,6 +308,19 @@ function matricesMatch(pickups: AmmoPickups): void {
   pickups.update(0.1);
   assert.equal(pickups._nearest, null);
   assert.equal(pickups._prompting, false);
+  pickups.dispose();
+}
+
+// A field box gives exactly one full spare and does not advertise round counts.
+{
+  const { pickups, input, owner, prompts, events } = harness(true);
+  pickups.spawn({ x: 0, y: 0, z: 0 });
+  input.use = true;
+  pickups.update(0.45);
+  const capacity = owner.state.def.magSize;
+  assert.deepEqual(owner.state.spareMagazines, [capacity, capacity, capacity]);
+  assert.equal(prompts.at(-1)?.sub, '+1 full magazine · hold');
+  assert.equal(events[0].payload.pack, 'magazine');
   pickups.dispose();
 }
 
