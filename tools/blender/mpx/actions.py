@@ -164,9 +164,8 @@ def author_actions(root, asset, rig, parts, mag, spare, bolt, trigger, release, 
         clips[name]['events'] += [{'time': .02*d, 'event': 'start'}, {'time': out*d, 'event': 'magout'}, {'time': insert*d, 'event': 'magin'}, {'time': d-.0001, 'event': 'end'}]
         if empty: clips[name]['events'].append({'time': clear*d, 'event': 'magdrop'})
         clips[name]['events'].sort(key=lambda e: e['time']); finish(name)
-    # Fractional beats keep the roll and grip paths in sync when retiming the clip.
-    inspect_duration = 4
-    begin('Inspect', inspect_duration)
+    d = 4
+    begin('Inspect', d)
     for phase, loc, rot in [
         (.04, (.008, -.008, .006), (-3, 5, 0)),
         (.147, (.006, .058, -.073), (9, 42, 7)),
@@ -178,7 +177,7 @@ def author_actions(root, asset, rig, parts, mag, spare, bolt, trigger, release, 
         (.78, (-.008, .031, -.037), (18, 20, 28)),
         (.89, (.005, -.006, .004), (-2, 2, -2)),
         (.963, (0, 0, 0), (0, 0, 0)),
-    ]: key(rig, phase*inspect_duration, loc, rot)
+    ]: key(rig, phase*d, loc, rot)
     # Keep the support grip; seat the firing fingers on the visible side.
     pos = (.04050, -.09420, .15695)
     q = Quaternion((.682278, -.073526, -.025364, -.726944))
@@ -188,12 +187,12 @@ def author_actions(root, asset, rig, parts, mag, spare, bolt, trigger, release, 
         'thumbBase': [-1.292, -.477, -2.720],
         'thumb': [.042, 1.144],
     }
-    for phase in (.067, .933): pose('right', phase*inspect_duration, pos, q, fitted)
+    for phase in (.067, .933): pose('right', phase*d, pos, q, fitted)
     right_wrist = hands['right']['wrist']
+    right_wrist.location = xyz((.059, -.105, .159))
     for phase in (.017, .05, .95, .983):
-        right_wrist.location = xyz((.059, -.105, .159))
-        right_wrist.keyframe_insert('location', frame=phase*inspect_duration*FPS)
-    clips['Inspect']['events'] = [{'time': inspect_duration-.0001, 'event': 'end'}]; finish('Inspect')
+        right_wrist.keyframe_insert('location', frame=phase*d*FPS)
+    clips['Inspect']['events'] = [{'time': d-.0001, 'event': 'end'}]; finish('Inspect')
     for name, d, drawing in [('Draw', .52, True), ('Holster', .34, False)]:
         begin(name, d)
         for k,a in ([(0,1),(.25,.75),(.70,.12),(.86,0),(1,0)] if drawing else [(0,0),(.15,.08),(.65,.75),(1,1)]):
