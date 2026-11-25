@@ -431,7 +431,7 @@ assert.throws(
   assert(!baseIrons.visible && troy.visible && !folded.visible);
   assert.equal(selected.mountedOptic, null, 'physical sights never create an optical overlay');
   assert(selected.sight.distanceTo(new THREE.Vector3(0, 0.0798, 0.075)) < 1e-9);
-  mountAttachments(mpx, { ...BASE_ATTACHMENTS, sight: 'rmr' }, { rmr: opticAsset() });
+  mountAttachments(mpx, { ...BASE_ATTACHMENTS, sight: 'railway' }, { railway: opticAsset() });
   assert(!baseIrons.visible && !troy.visible && folded.visible);
   mountAttachments(mpx, BASE_ATTACHMENTS, {});
   assert(baseIrons.visible && !troy.visible && !folded.visible);
