@@ -13,6 +13,8 @@ Ordinary meshes retain nine clips, independent magazines and `IRON_sights`.
 Preserve 60°/100 mm bolt motion, the 1.1 s cycle, 2.8/3.6 s reloads, events,
 STEP visibility and spent-ammo persistence. Runtime sampling normalizes rotations.
 The registered cook uses 16-bit colors/positions without added simplification.
+Inspect shows the bolt side first, then the other receiver side. Both hands stay
+on the rifle and the bolt remains closed.
 
 Run from the repository root with Blender 5.3.0 and gltfpack 1.3:
 

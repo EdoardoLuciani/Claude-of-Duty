@@ -15,6 +15,8 @@ The insertion shell remains independent, unskinned and never a magazine.
 Native metres export −Z forward/+Y up without an adapter scale/basis correction.
 Manifest sockets/events/contact windows are authority, not a second schedule.
 Shared arms and hand calibration are read-only; ordinary builds never refit.
+Inspect shows both receiver sides without cycling the pump or releasing the
+support grip.
 
 Run from the repository root with Blender 5.3.0 and gltfpack 1.3:
 

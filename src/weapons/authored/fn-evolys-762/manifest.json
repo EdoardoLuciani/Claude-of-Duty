@@ -109,12 +109,12 @@
     "Inspect": {
       "frames": [
         0,
-        432.0
+        600
       ],
-      "duration": 3.6,
+      "duration": 5,
       "events": [
         {
-          "time": 3.582,
+          "time": 4.975,
           "event": "end"
         }
       ]
@@ -151,7 +151,7 @@
     "primitives": 12,
     "materials": 1,
     "images": 3,
-    "bytes": 7022932
+    "bytes": 6898884
   },
   "textureResolution": 1024,
   "belt": {
