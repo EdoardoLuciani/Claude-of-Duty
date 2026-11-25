@@ -100,6 +100,20 @@ function positiveSpan(span: number): boolean {
 function length(a: Point, b: Point): number {
   return Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
 }
+export function ladderPhase(segment: number): LadderPhase | undefined {
+  if (segment === 0) return 'align';
+  if (segment === 1) return 'shaft';
+  return segment === 2 ? 'dismount' : undefined;
+}
+
+export function ladderTraversalPoint(
+  descriptor: LadderDescriptor,
+  direction: LadderDirection,
+  index: number
+): Point {
+  return descriptor.points[direction === 'up' ? index : 3 - index];
+}
+
 /** Original complete budget, independent of frame rate and interrupted cursor. */
 export function ladderMoveBudget(d: LadderDescriptor): number {
   return (
@@ -211,17 +225,13 @@ export class LadderMotor {
   }
 
   get phase(): LadderPhase {
-    return this.cursor.segment === 0 ? 'align' : this.cursor.segment === 1 ? 'shaft' : 'dismount';
+    return ladderPhase(this.cursor.segment) ?? 'dismount';
   }
   private get start(): Point {
-    return this.descriptor.points[
-      this.direction === 'up' ? this.cursor.segment : 3 - this.cursor.segment
-    ];
+    return ladderTraversalPoint(this.descriptor, this.direction, this.cursor.segment);
   }
   private get target(): Point {
-    return this.descriptor.points[
-      this.direction === 'up' ? this.cursor.segment + 1 : 2 - this.cursor.segment
-    ];
+    return ladderTraversalPoint(this.descriptor, this.direction, this.cursor.segment + 1);
   }
   private validController(): boolean {
     const c = this.controller;

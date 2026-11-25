@@ -20,7 +20,13 @@ import { INFANTRY, vaultPoint } from './capabilities.ts';
 import type { AiSystem } from './index.ts';
 import type { AiVariant } from './index.ts';
 import { isBannedCover, FRIENDLY_HOLD, GRENADE_CLOSE_SPEED, LONG_RANGE } from './intent.ts';
-import { LADDER, LadderMotor, ladderMoveBudget } from './ladder.ts';
+import {
+  LADDER,
+  LadderMotor,
+  ladderMoveBudget,
+  ladderPhase,
+  ladderTraversalPoint,
+} from './ladder.ts';
 import type { LadderDescriptor, LadderCursor } from './ladder.ts';
 import type { BakedCoverPoint } from './nav-format.ts';
 import type { CoverMap, NavCache, SurfaceNav, NavRoute, NavLadderStep } from './nav.ts';
@@ -2039,9 +2045,8 @@ export class Agent {
     const c = this.controller;
     if (!c) return false;
     for (let segment = 0; segment < 3; segment++) {
-      const i = l.step.direction === 'up' ? segment : 3 - segment;
-      const a = l.descriptor.points[i],
-        b = l.descriptor.points[l.step.direction === 'up' ? i + 1 : i - 1];
+      const a = ladderTraversalPoint(l.descriptor, l.step.direction, segment),
+        b = ladderTraversalPoint(l.descriptor, l.step.direction, segment + 1);
       const dx = b.x - a.x,
         dy = b.y - a.y,
         dz = b.z - a.z;
@@ -2205,8 +2210,7 @@ export class Agent {
       !l.hold && !l.finished,
       l.travel,
       l.step.direction,
-      l.motor?.phase ??
-        (l.cursor.segment === 1 ? 'shaft' : l.cursor.segment === 2 ? 'dismount' : 'align')
+      l.motor?.phase ?? ladderPhase(l.cursor.segment) ?? 'align'
     );
   }
 
