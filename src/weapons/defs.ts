@@ -383,7 +383,8 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     fits: {
       optic: {
         ...OPTIC_FITS,
-        // Seat the full base clear of the glove on the late empty-reload return.
+        // MOUNT_optic is the rearmost seat; each body sits whole grooves forward,
+        // clear of the charging-hand sweep and the late empty-reload glove return.
         railway: { eyeRelief: 0.245, railSlots: 3 },
         exps3: { eyeRelief: 0.16, railSlots: 3 },
         acog: { ...OPTIC_FITS.acog, railSlots: 6 },
@@ -528,12 +529,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     // Extended integrated-sight rail seats Railway/ACOG and both PM II pedestals.
     // The optional TOR Mini stays on the fixed forward magazine-tube clamps.
     fits: {
-      optic: {
-        railway: OPTIC_FITS.railway,
-        acog: { eyeRelief: 0.1 },
-        scope: { eyeRelief: 0.09 },
-        exps3: { eyeRelief: 0.2 },
-      },
+      optic: { ...OPTIC_FITS, acog: { eyeRelief: 0.1 } },
       rail: { laser: {} },
       muzzle: { suppressor: { model: 'suppressor12g' } },
     },

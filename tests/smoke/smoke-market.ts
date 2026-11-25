@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import * as THREE from 'three';
 
-import { BASE_ATTACHMENTS } from '../../src/weapons/attachment-rules.ts';
+import { BASE_ATTACHMENTS, OPTIC_IDS } from '../../src/weapons/attachment-rules.ts';
 import type { WeaponEntry } from '../../src/weapons/runtime-types.ts';
 import type { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { fixture } from '../lib/fixture.ts';
@@ -388,7 +388,7 @@ assert(
     .every((offer): boolean => !offer.compatible),
   'pistol offers no optic customization'
 );
-for (const optic of ['railway', 'acog', 'scope', 'exps3'] as const)
+for (const optic of OPTIC_IDS)
   assert(!market.setBuild({ ...BASE_ATTACHMENTS, optic }), `${optic} cannot replace pistol irons`);
 assert(
   market.setBuild({ optic: null, rail: 'laser', muzzle: 'suppressor' }),

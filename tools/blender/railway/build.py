@@ -57,11 +57,11 @@ def pocket_edges(obj):
     bm.free()
 
 
-def fastener(name, center, radius, depth, metal, mask, root, axis='X', side=1):
+def fastener(name, center, radius, depth, metal, mask, root, axis='X'):
     sides = 16 if radius < 1.8 else 24
     head = cylinder(name, center, radius, depth, metal,root,axis=axis,sides=sides,bevel=.12)
     bit = Vector(center)
-    bit[0 if axis == 'X' else 2] += side*depth*.45
+    bit[0 if axis == 'X' else 2] += depth*.45
     boolean(head,cylinder('Hex socket tool',bit,radius*.46,depth*.65,mask,root,axis=axis,sides=6,bevel=0))
     return head
 
@@ -80,14 +80,23 @@ def slotted_head(name, center, radius, depth, metal, mask, root, axis='X', side=
     return head
 
 
-def loft(name, stations, mat, root, crown=False):
-    n = len(stations[0][1])
-    points = [(x,front_sweep(x,y,z) if crown else y,z) for y,loop in stations for x,z in loop]
-    last = (len(stations)-1)*n
-    faces = [tuple(range(n)), tuple(reversed(range(last,last+n)))]
-    faces += [(j*n+i,j*n+(i+1)%n,(j+1)*n+(i+1)%n,(j+1)*n+i)
-              for j in range(len(stations)-1) for i in range(n)]
+def rings_mesh(name, rings, mat, root, closed=False):
+    """Quad strips between equal-length 3D point rings; open strips get end caps."""
+    n, count = len(rings[0]), len(rings)
+    points = [point for loop in rings for point in loop]
+    faces = [] if closed else [tuple(range(n)), tuple(reversed(range((count-1)*n,count*n)))]
+    faces += [(j*n+i,j*n+(i+1)%n,(j+1)%count*n+(i+1)%n,(j+1)%count*n+i)
+              for j in range(count if closed else count-1) for i in range(n)]
     return finish(mesh(name,points,faces,mat,root),width=0)
+
+
+def loft(name, stations, mat, root):
+    return rings_mesh(name,[[(x,y,z) for x,z in loop] for y,loop in stations],mat,root)
+
+
+def mirrored(half):
+    """Close a right half-section that ends on the centreline."""
+    return half+[(-x,z) for x,z in reversed(half[:-1])]
 
 
 def section_body(name, sections, mat, root):
@@ -109,9 +118,7 @@ def lens_deck(root, mat):
         # corners rise into the rim but stay outside the coated pane.
         top = [(a-.56,rail-.61),(a-1.37,rail),(a-2.1,rail-.24),(a-3.28,rail-.93),
                (a-4.45,bed+.36),(a-5.7,bed+.03),(0,bed)]
-        loop = [(a-.75,lo),(a,lo+.68),(a,rail-1.04),*top,
-                *[(-x,z) for x,z in reversed(top[:-1])],(-a,rail-1.04),(-a,lo+.68),(-a+.75,lo)]
-        stations.append((y,loop))
+        stations.append((y,mirrored([(a-.75,lo),(a,lo+.68),(a,rail-1.04),*top])))
     return loft('Concave molded lens deck',stations,mat,root)
 
 
@@ -134,11 +141,9 @@ def front_web(root, mat):
         a = w/2
         top = [(a*t,shoulder+(crown-shoulder)*max(0,1-(t/.90)**2)**.88)
                for t in (.86,.73,.60,.47,.34,.21,.10,0)]
-        loop = [(a-1.18,lo),(a-.34,lo+.43),(a,lo+1.11),(a,shoulder-1.02),
-                (a-.40,shoulder-.34),*top,*[(-x,z) for x,z in reversed(top[:-1])],
-                (-a+.40,shoulder-.34),(-a,shoulder-1.02),(-a,lo+1.11),(-a+.34,lo+.43),(-a+1.18,lo)]
-        stations.append((y,loop))
-    return loft('Crowned front web and lower arm',stations,mat,root,crown=True)
+        half = [(a-1.18,lo),(a-.34,lo+.43),(a,lo+1.11),(a,shoulder-1.02),(a-.40,shoulder-.34),*top]
+        stations.append([(x,front_sweep(x,y,z),z) for x,z in mirrored(half)])
+    return rings_mesh('Crowned front web and lower arm',stations,mat,root)
 
 
 def side_slot(name, item, side, y, z, width, height, depth, mat, root, face=13.6):
@@ -176,22 +181,19 @@ def ring(root, mat):
     profile = [(43.1,.67,0,23.2),(43.8,.22,0,24.38),(44.7,0,0,25.3),
                (49.7,0,0,10.65),(51.25,.26,0,4),(51.85,.85,0,0),
                (51.85,0,1,0),(49.85,0,1,0),(45.6,0,1,2),(43.1,0,1,4)]
-    n = LENS_SEGMENTS
-    vertices = []
+    rings = []
     for y,bevel,inner,sweep in profile:
-        for i in range(n):
-            a = i*math.tau/n
+        x_r,z_r,drop,lean = ((WINDOW,WINDOW,0,math.cos(LENS_TILT)) if inner else
+                             (WIDTH/2-bevel,RIM_HEIGHT_R-bevel,5.35,1))
+        loop = []
+        for i in range(LENS_SEGMENTS):
+            a = i*math.tau/LENS_SEGMENTS
             h = math.sin(a)
-            side = math.cos(a)
             blend = (max(0,.33-h)/1.33)**1.65
-            x_r = WINDOW if inner else WIDTH/2-bevel
-            z_r = WINDOW if inner else RIM_HEIGHT_R-bevel
-            drop = 0 if inner else 5.35*blend
-            z = z_r*h*(math.cos(LENS_TILT) if inner else 1)
-            vertices.append((x_r*side,y-sweep*blend+z_r*h*math.sin(LENS_TILT),AXIS+z-drop))
-    faces = [(j*n+i,j*n+(i+1)%n,((j+1)%len(profile))*n+(i+1)%n,((j+1)%len(profile))*n+i)
-             for j in range(len(profile)) for i in range(n)]
-    return finish(mesh('Thin round lens surround', vertices, faces, mat, root), width=0)
+            loop.append((x_r*math.cos(a),y-sweep*blend+z_r*h*math.sin(LENS_TILT),
+                         AXIS+z_r*h*lean-drop*blend))
+        rings.append(loop)
+    return rings_mesh('Thin round lens surround',rings,mat,root,closed=True)
 
 
 def brightness_dial(root, mat):
@@ -199,17 +201,10 @@ def brightness_dial(root, mat):
     n = 64
     profile = [(20.20,2.82,0),(20.44,3.06,0),(20.78,3.26,.34),
                (25.85,3.26,.34),(26.10,3.04,0),(26.36,2.82,0)]
-    points = []
-    for z,r,flute in profile:
-        for i in range(n):
-            a = i*math.tau/n
-            radius = r-flute if i%4 in (0,3) else r
-            points.append((radius*math.cos(a),-48+radius*math.sin(a),z))
-    last = len(points)-n
-    faces = [tuple(reversed(range(n))),tuple(range(last,last+n))]
-    faces += [(j*n+i,j*n+(i+1)%n,(j+1)*n+(i+1)%n,(j+1)*n+i)
-              for j in range(len(profile)-1) for i in range(n)]
-    finish(mesh('Fluted brightness dial',points,faces,mat,root),width=0)
+    rings = [[(radius*math.cos(a),-48+radius*math.sin(a),z)
+              for i in range(n) for a in [i*math.tau/n] for radius in [r-flute if i%4 in (0,3) else r]]
+             for z,r,flute in profile]
+    rings_mesh('Fluted brightness dial',rings,mat,root)
 
 
 def build(root):
@@ -277,14 +272,9 @@ def build(root):
     # Curved recessed seat behind the well; its slotted head is flush with the deck.
     seat = [(17.1,22.4,7.9),(17.6,20.30,7.56),(18.2,19.55,6.8),
             (18.45,18.80,5.65),(18.52,17.95,4.58),(18.52,17.52,4.44)]
-    n = 64
-    seat_points = [(r*math.cos(a),y+r*math.sin(a),z) for y,z,r in seat
-                   for a in (i*math.tau/n for i in range(n))]
-    last = len(seat_points)-n
-    faces = [tuple(reversed(range(n))),tuple(range(last,last+n))]
-    faces += [(j*n+i,j*n+(i+1)%n,(j+1)*n+(i+1)%n,(j+1)*n+i)
-              for j in range(len(seat)-1) for i in range(n)]
-    boolean(shell,finish(mesh('Curved adjustment cup tool',seat_points,faces,body,root),width=0))
+    boolean(shell,rings_mesh('Curved adjustment cup tool',
+                             [[(r*math.cos(a),y+r*math.sin(a),z) for a in (i*math.tau/64 for i in range(64))]
+                              for y,z,r in seat],body,root))
     cylinder('Recessed adjuster seat',(0,18.52,17.61),4.37,.19,inset,root,axis='Z',sides=48,bevel=0)
     slotted_head('Flush elevation head',(0,18.52,18.20),2.72,.71,steel,inset,root,axis='Z')
     arch = [(-7.65,10.78),(7.65,10.78),(8.1,11.9)]
@@ -344,25 +334,25 @@ def build(root):
         mark.rotation_euler.z = a
     for label,x in [('OFF',-8.18),('HI',8.12)]:
         mark = text('Dial '+label,label,(x,-53.85,20.65),1.68,inset,root,side='rear')
-        mark.rotation_euler = (0,0,0)
+        mark.rotation_euler = (0,0,0)  # Flat on the deck, readable from above.
 
 
 def check_dimensions(root):
     """Measure the evaluated art, before any studio setup or export batching."""
     bpy.context.view_layer.update()
-    deps = bpy.context.evaluated_depsgraph_get()
     bounds = []
     lens = None
     for obj in root.children:
         if obj.type != 'MESH':
             continue
-        evaluated = obj.evaluated_get(deps)
-        data = evaluated.to_mesh()
-        points = np.array([evaluated.matrix_world@v.co for v in data.vertices])*1000
+        assert not obj.modifiers, obj.name
+        co = np.empty(len(obj.data.vertices)*3)
+        obj.data.vertices.foreach_get('co',co)
+        world = np.array(obj.matrix_world)
+        points = (co.reshape(-1,3)@world[:3,:3].T+world[:3,3])*1000
         bounds.append(points)
         if obj.name == 'Single dished coated lens':
             lens = [np.ptp(points[:,0]),np.ptp(points[:,1]*math.sin(LENS_TILT)+points[:,2]*math.cos(LENS_TILT))]
-        evaluated.to_mesh_clear()
     width,length,height = np.ptp(np.concatenate(bounds),axis=0)
     np.testing.assert_allclose([length,width,height],[LENGTH,WIDTH,HEIGHT],atol=.05,rtol=0)
     np.testing.assert_allclose(lens,[GLASS_DIAMETER]*2,atol=.025,rtol=0)
@@ -370,20 +360,16 @@ def check_dimensions(root):
 
 
 def check_pockets(root):
-    # The underlying saddle used to hide the plate cuts. Check the first surface
-    # of the complete rendered assembly, not the isolated clamp bar.
-    parts = [obj for obj in root.children if obj.type == 'MESH']
+    # Check the first surface of the complete assembly, not the isolated clamp
+    # bar, so overlapping saddle geometry cannot hide the plate cuts.
+    deps = bpy.context.evaluated_depsgraph_get()
     for center,width in CLAMP_POCKETS:
         for offset in (-width*.31,0,width*.31):
             origin = Vector((.02,(center+offset)*.001,.00028))
-            hits = []
-            for obj in parts:
-                inverse = obj.matrix_world.inverted()
-                hit,point,_,face = obj.ray_cast(inverse@origin,inverse.to_3x3()@Vector((-1,0,0)))
-                if hit:
-                    mat = obj.data.materials[obj.data.polygons[face].material_index]
-                    hits.append(((obj.matrix_world@point).x,mat.name))
-            assert hits and max(hits)[1].startswith('09 |'), ('saddle pocket is occluded',center,offset)
+            hit,_,_,face,obj,_ = bpy.context.scene.ray_cast(deps,origin,Vector((-1,0,0)))
+            assert hit, ('saddle pocket is open',center,offset)
+            mat = obj.data.materials[obj.data.polygons[face].material_index]
+            assert mat.name.startswith('09 |'), ('saddle pocket is occluded',center,offset)
     print('RAILWAY_POCKETS_OK: six visible floor rays',flush=True)
 
 
@@ -391,23 +377,23 @@ def batch_finishes(obj):
     """Bake opaque tints into the runtime mesh; glass keeps its own primitive."""
     data = obj.data
     source = list(data.materials)
-    tints = [tuple(mat.node_tree.nodes.get('Principled BSDF').inputs['Base Color'].default_value)
-             for mat in source]
-    glass = next(mat for mat in source if mat.name.startswith('10 |'))
-    polymer = next(mat for mat in source if mat.name.startswith('02 |'))
-    anodized = next(mat for mat in source if mat.name.startswith('03 |'))
-    targets = [2 if mat == glass else 1 if mat.name[:2] in {'03','04','08','09'} else 0
-               for mat in source]
-    colors = data.color_attributes.new(name='RailwayTint',type='FLOAT_COLOR',domain='CORNER')
-    old_indices = [face.material_index for face in data.polygons]
+    # Polymer, metal and glass primitives, keyed by material prefix.
+    polymer,anodized,glass = [next(mat for mat in source if mat.name[:2] == prefix)
+                              for prefix in ('02','03','10')]
+    targets = np.array([{'03':1,'04':1,'08':1,'09':1,'10':2}.get(mat.name[:2],0) for mat in source])
+    tints = np.array([(1,1,1,1) if mat == glass else
+                      mat.node_tree.nodes.get('Principled BSDF').inputs['Base Color'].default_value
+                      for mat in source],dtype=np.float32)
+    faces = len(data.polygons)
+    old, corners = np.empty(faces,dtype=np.int32), np.empty(faces,dtype=np.int32)
+    data.polygons.foreach_get('material_index',old)
+    data.polygons.foreach_get('loop_total',corners)
     data.materials.clear()
     for mat in (polymer,anodized,glass):
         data.materials.append(mat)
-    for face,i in zip(data.polygons,old_indices):
-        face.material_index = targets[i]
-        tint = (1,1,1,1) if targets[i] == 2 else tints[i]
-        for loop in face.loop_indices:
-            colors.data[loop].color = tint
+    data.polygons.foreach_set('material_index',targets[old].astype(np.int32))
+    colors = data.color_attributes.new(name='RailwayTint',type='FLOAT_COLOR',domain='CORNER')
+    colors.data.foreach_set('color',tints[np.repeat(old,corners)].ravel())
     for mat in (polymer,anodized):
         nodes = mat.node_tree.nodes
         tint = nodes.new('ShaderNodeVertexColor')

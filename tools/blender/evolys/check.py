@@ -179,7 +179,7 @@ def rig_tree(objects):
 fixed_irons=rig_tree([irons]);rail_tree=rig_tree([bpy.data.objects['receiver_mesh']]);attachments={}
 bpy.data.objects['MUZZLE_device_removed'].hide_viewport=False
 bpy.context.view_layer.update()
-for attachment_id,seat in [('railway',mount),('acog',mount),('scope',mount),('exps3',mount),('srd762ti',muzzle_mount),('laser',rail)]:
+for attachment_id,seat in [*((id,mount) for id in attachment_source.OPTICS),('srd762ti',muzzle_mount),('laser',rail)]:
     objects=attachment_source.seat(attachment_id,seat,weapon='evolys')
     meshes=[o for o in objects if o.type=='MESH']
     attachments[attachment_id]=rig_tree(meshes)
