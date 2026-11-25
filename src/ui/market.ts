@@ -176,12 +176,12 @@ export class MarketOverlay {
       });
     this.buildPanel.append(this.stats.root); // Keep status and actions visible above the stats.
     if (ctx.get('world').queries.rangeTargets.length) {
-      const reset = el('button', 'ow-market-skip', catalog, 'Reset Targets');
-      reset.type = 'button';
-      reset.onclick = (): void =>
-        this.edit('resetTargets', (): void => {
+      const clear = el('button', 'ow-market-skip', catalog, 'Clear Impact Marks');
+      clear.type = 'button';
+      clear.onclick = (): void =>
+        this.edit('clearImpactMarks', (): void => {
           this.ctx.get('fx').clearDecals();
-          this.setStatus('Target marks cleared.');
+          this.setStatus('Impact marks cleared.');
         });
     }
     const items = this.market.getHudState().items;
@@ -449,14 +449,10 @@ export class MarketOverlay {
 
   /** Driven from ui.lateUpdate with RAW dt — the sim clock is frozen here. */
   update(rawDt: number): void {
-    this.shown = damp(this.shown, this.active ? 1 : 0, this.active ? 8 : 12, rawDt);
-    if (this.shown < 0.004) {
-      setStyle(this.root, 'display', 'none');
-      setStyle(this.root, 'pointer-events', 'none');
-      return;
-    }
-    setStyle(this.root, 'display', '');
-    setStyle(this.root, 'pointer-events', this.active ? 'auto' : 'none');
+    // hide() closes the dialog at once; only opening fades in.
+    if (!this.active) return;
+    this.shown = damp(this.shown, 1, 8, rawDt);
+    setStyle(this.root, 'pointer-events', 'auto');
     setStyle(this.root, 'opacity', this.shown.toFixed(3));
 
     this.inspection.update();

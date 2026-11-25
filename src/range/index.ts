@@ -4,7 +4,7 @@ import type { EngineContext, EngineSystems, SystemId } from '../core/context.ts'
 import type { CourseGate } from '../core/model-metadata.ts';
 
 const STATION_RADIUS = 3;
-const STATION_PROMPT = { text: 'Supply market', sub: 'Loadout · Resupply · Reset targets' };
+const STATION_PROMPT = { text: 'Supply market', sub: 'Loadout · Resupply · Clear impact marks' };
 const PROMPT_OWNER = 'range';
 
 function matchesGate(gate: CourseGate | undefined, action: string, p: Vector3Like): boolean {

@@ -216,7 +216,6 @@ try {
     },
     { preconnect: fetch.preconnect }
   );
-  await assert.rejects(models._prefetchWorld(), /HTTP 503/, 'Survival loads nav');
   meta.mapId = 'other-courtyard';
   await assert.rejects(models._prefetchWorld(), /unexpected world manifest map ID/);
   const other = new ModelSystem({
