@@ -13,6 +13,14 @@ export type WeaponClass = 'carbine' | 'smg' | 'pistol' | 'lmg' | 'shotgun' | 'sn
 type TuningVector = [number, number, number];
 
 /** Authored tuning is checked against this contract, not inferred into one. */
+export type AmmoPack = 'magazine' | 'belt' | 'shell bundle';
+
+/** What one spare holds: tube guns load loose shells, LMGs carry belts. */
+export function ammoPack(def: Pick<WeaponDef, 'class' | 'reloadStyle'>): AmmoPack {
+  if (def.reloadStyle === 'tube') return 'shell bundle';
+  return def.class === 'lmg' ? 'belt' : 'magazine';
+}
+
 export interface WeaponDef {
   id: WeaponId;
   label: string;

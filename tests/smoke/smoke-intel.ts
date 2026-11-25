@@ -382,7 +382,7 @@ function pickupOwner(ctx: EngineContext, player: UiPlayer): WeaponSystem {
   owner.rng = new Rng(1);
   owner.player = player;
   const state = owner._makeState('rifle');
-  state.spareMagazines.length = 0;
+  state.spares.length = 0;
   owner.states.set('rifle', state);
   return owner;
 }

@@ -142,8 +142,8 @@ market.credits = 99999;
 check('ammo is buyable below full', item('ammo').affordable && market.buy('ammo'));
 check(
   'refill tops reserves and disables itself',
-  weaponState('rifle').spareMagazines.length === 4 &&
-    weaponState('pistol').spareMagazines.length === 4 &&
+  weaponState('rifle').spares.length === 4 &&
+    weaponState('pistol').spares.length === 4 &&
     !item('ammo').affordable &&
     !market.buy('ammo') &&
     item('ammo').action === 'max'
@@ -290,7 +290,7 @@ for (const previous of ['smg', 'shotgun'] as const) {
   const pistol = weaponState('pistol');
   pistol.mag = 0;
   pistol.chambered = false;
-  pistol.spareMagazines.length = 0;
+  pistol.spares.length = 0;
   market.credits = 399;
   check(
     'P320 unaffordable below 400 without charging or swapping',

@@ -19,7 +19,7 @@ function fillLevel(rounds: number, capacity: number): number {
 /** Retained read-only ammo graphics; the owner decides when/where to render. */
 export class PixiAmmoView {
   readonly stage = new Container();
-  private spares = new Graphics();
+  private icons = new Graphics();
   private spareCount: BitmapText;
   private spareLevels: number[] = [];
   private name: BitmapText;
@@ -44,8 +44,8 @@ export class PixiAmmoView {
     this.name.anchor.x = 1;
     this.text('LOADED', 16, 55, HUD_TYPE.label);
     this.spareCount = this.text('', 90, 55, HUD_TYPE.label, MUTED);
-    this.spares.position.set(23, 73);
-    this.stage.addChild(this.spares);
+    this.icons.position.set(23, 73);
+    this.stage.addChild(this.icons);
     // Warnings/reload feedback live above the readout, not below the bottom bar.
     this.prompt = this.text('', WIDTH / 2, 4, HUD_TYPE.label, AMBER);
     this.prompt.anchor.x = 0.5;
@@ -90,7 +90,7 @@ export class PixiAmmoView {
       }
     }
     if (!changed) return;
-    this.spares.clear();
+    this.icons.clear();
     this.drawMagazine(0, loadedLevel, INK);
     const start = 67;
     const next = tubeFed ? count - 1 : 0;
@@ -99,7 +99,7 @@ export class PixiAmmoView {
     }
     if (!count) {
       this.drawMagazine(start, 0, MUTED);
-      this.spares
+      this.icons
         .moveTo(start + 2, 22)
         .lineTo(start + 14, 2)
         .stroke({ color: MUTED, width: 1.5 });
@@ -108,7 +108,7 @@ export class PixiAmmoView {
   }
 
   private drawMagazine(x: number, level: number, outlineColor: number): void {
-    const g = this.spares;
+    const g = this.icons;
     const outline = [x, 0, x + 12, 0, x + 12, 9, x + 17, 24, x + 5, 24, x, 9];
     g.poly(outline).fill(0x111b22);
     if (level > 0) {
@@ -128,7 +128,7 @@ export class PixiAmmoView {
 
   update(_dt: number, s: AmmoState): void {
     const mode = s.fireMode ?? 'auto';
-    const spares = s.spareMagazines;
+    const spares = s.spares;
     const loaded = s.magazineOut ? 0 : Math.max(s.loadedRounds, s.empty ? 0 : 1);
     this.updateSpares(spares, s.magSize, loaded, !!s.tubeFed);
     this.label(this.name, s.weaponName ?? 'M4A1', 166);

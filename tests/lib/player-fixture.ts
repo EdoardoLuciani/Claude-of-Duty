@@ -79,7 +79,7 @@ export function initializeWeaponStates(
     Object.assign(state.def, patch);
     state.pattern = buildRecoilPattern(state.def, Rng);
     state.mag = state.def.magSize;
-    state.spareMagazines.fill(state.def.magSize);
+    state.spares.fill(state.def.magSize);
     state.mode = state.def.modes[0];
     weapons.states.set(id, state);
   }

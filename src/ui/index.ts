@@ -40,7 +40,7 @@ const HUD_DEFAULTS = {
   credits: 0,
   marketIn: 0,
   empty: false,
-  spareMagazines: [30, 30] as readonly number[],
+  spares: [30, 30] as readonly number[],
   loadedRounds: 30,
   tubeFed: false,
   magSize: 30,
@@ -392,7 +392,7 @@ export class UiSystem {
     this.killfeed.clear();
     this.clearPrompt();
     const rifle = this.ctx.peek('weapons')?.states.get('rifle');
-    if (rifle) rifle.spareMagazines.splice(0, rifle.spareMagazines.length, rifle.def.magSize);
+    if (rifle) rifle.spares.splice(0, rifle.spares.length, rifle.def.magSize);
     const hp = this.ctx.peek('player')?.health;
     if (hp) hp.armour = 50;
     const m = this.ctx.peek('market');
@@ -453,7 +453,7 @@ export class UiSystem {
       s.weaponName = ws.name;
       s.fireMode = ws.mode;
       s.empty = ws.empty;
-      s.spareMagazines = ws.spareMagazines;
+      s.spares = ws.spares;
       s.loadedRounds = ws.loadedRounds;
       s.tubeFed = ws.tubeFed;
       s.magSize = ws.magSize;

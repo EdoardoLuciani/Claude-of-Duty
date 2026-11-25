@@ -4,7 +4,7 @@ export interface AmmoState {
   empty: boolean;
   magSize: number;
   /** Borrowed spare inventory, fullest first. */
-  spareMagazines: readonly number[];
+  spares: readonly number[];
   loadedRounds: number;
   tubeFed?: boolean;
   weaponName?: string;

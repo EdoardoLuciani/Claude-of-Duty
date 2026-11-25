@@ -3,7 +3,7 @@ import type { Vector3 } from 'three';
 import type { SurfaceName } from '../physics/surfaces.ts';
 import type { PlayerState } from '../player/index.ts';
 import type { PlayerStance } from '../player/tuning.ts';
-import type { WeaponClass, WeaponId } from '../weapons/defs.ts';
+import type { AmmoPack, WeaponClass, WeaponId } from '../weapons/defs.ts';
 
 /** Gameplay and AI identities are closed; compact descriptors must identify a weapon. */
 type EventWeaponId = WeaponId | 'ai_rifle';
@@ -197,7 +197,7 @@ export interface EngineEventMap {
   'player:heartbeat': { strength: number; fraction: number };
   'ammo:pickup': {
     amount: number;
-    pack: 'magazine' | 'belt' | 'shell bundle';
+    pack: AmmoPack;
     replacedSpare: boolean;
     weapon: EventWeapon;
     position: Vector3;

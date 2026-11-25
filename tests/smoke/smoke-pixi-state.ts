@@ -139,14 +139,14 @@ const ammoState: AmmoState = {
   empty: false,
   magSize: 30,
   loadedRounds: 30,
-  spareMagazines: [30, 30],
+  spares: [30, 30],
   fireMode: 'auto',
 };
 ammoView.update(0, ammoState);
 ammoView.dirty = false;
 ammoView.update(0, ammoState);
 assert.equal(ammoView.dirty, false, 'unchanged ammo presentation settles');
-const changedAmmo = { ...ammoState, spareMagazines: [18], fireMode: 'semi' as const };
+const changedAmmo = { ...ammoState, spares: [18], fireMode: 'semi' as const };
 ammoView.update(0, changedAmmo);
 assert.equal(ammoView.dirty, true);
 assert.deepEqual([ammoView['spareCount'].text, ammoView['mode'].text], ['1 SPARE', 'SEMI']);

@@ -75,7 +75,7 @@ function harness(): AmmoHarness {
   });
   const weapons = new WeaponSystem();
   const state = weapons._makeState('rifle');
-  state.spareMagazines.length = 0;
+  state.spares.length = 0;
   weapons.states.set('rifle', state);
   const owner = {
     ctx,
@@ -291,7 +291,7 @@ function matricesMatch(pickups: AmmoPickups): void {
   block(ctx.time, 'scale', 0);
   block(h.player.healCtrl, 'active', true);
   pickups.update(0.45);
-  assert.deepEqual(owner.state.spareMagazines, [owner.current.magSize]);
+  assert.deepEqual(owner.state.spares, [owner.current.magSize]);
   assert.equal(prompts.at(-1)?.sub, '+1 full magazine · hold');
   assert.equal(pickups.items.length, 0);
   assert.equal(events[0].name, 'ammo:pickup');
@@ -315,12 +315,12 @@ function matricesMatch(pickups: AmmoPickups): void {
 {
   const { pickups, input, owner, prompts, events } = harness();
   const capacity = owner.current.magSize;
-  owner.state.spareMagazines.push(capacity, capacity, capacity, 2);
+  owner.state.spares.push(capacity, capacity, capacity, 2);
   pickups.spawn({ x: 0, y: 0, z: 0 });
   input.use = true;
   pickups.update(0.45);
   assert.equal(prompts.at(-1)?.sub, 'Replace lowest spare · hold');
-  assert.deepEqual(owner.state.spareMagazines, Array<number>(4).fill(capacity));
+  assert.deepEqual(owner.state.spares, Array<number>(4).fill(capacity));
   assert.equal(events[0].payload.amount, capacity - 2);
   assert.equal(events[0].payload.replacedSpare, true);
   assert.equal(pickups.items.length, 0);

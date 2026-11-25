@@ -57,6 +57,7 @@ const GRENADES_MAX = 6; // bought at the market, +1 per pack
 const SLOT_IDS = [...PRIMARY_IDS, ...SECONDARY_IDS];
 const STARTING_SPARES = 2;
 const MAX_SPARES = 4;
+const byFullest = (a: number, b: number): number => b - a;
 /** Catch-up bound for held AUTO/BURST fire within one frame. The engine clamps
  *  dt to 0.1 s, which needs at most two 1100 rpm rounds; due rounds beyond the
  *  bound are dropped rather than banked into later frames. */
@@ -89,7 +90,7 @@ interface WeaponHudState {
   name: string;
   mode: WeaponMode;
   empty: boolean;
-  spareMagazines: readonly number[];
+  spares: readonly number[];
   loadedRounds: number;
   tubeFed: boolean;
   magSize: number;
@@ -265,7 +266,7 @@ export class WeaponSystem {
     name: '',
     mode: 'auto',
     empty: true,
-    spareMagazines: [],
+    spares: [],
     loadedRounds: 0,
     tubeFed: false,
     magSize: 0,
@@ -408,9 +409,11 @@ export class WeaponSystem {
       pattern: buildRecoilPattern(def, Rng),
       mag: def.magSize,
       chambered: true,
-      spareMagazines: Array<number>(STARTING_SPARES).fill(def.magSize),
+      spares: Array<number>(STARTING_SPARES).fill(def.magSize),
       get reserve(): number {
-        return this.spareMagazines.reduce((sum, rounds): number => sum + rounds, 0);
+        let rounds = 0;
+        for (const spare of this.spares) rounds += spare;
+        return rounds;
       },
       mode: def.modes[0],
       modeIndex: 0,
@@ -418,8 +421,8 @@ export class WeaponSystem {
   }
 
   private fillSpares(s: WeaponState, count: number): void {
-    s.spareMagazines.length = count;
-    s.spareMagazines.fill(s.def.magSize);
+    s.spares.length = count;
+    s.spares.fill(s.def.magSize);
   }
 
   private resetWeaponAmmo(s: WeaponState): void {
@@ -761,7 +764,7 @@ export class WeaponSystem {
     h.name = s.def.label;
     h.mode = s.mode;
     h.empty = s.mag === 0 && !s.chambered;
-    h.spareMagazines = s.spareMagazines;
+    h.spares = s.spares;
     h.loadedRounds = s.mag;
     h.tubeFed = s.def.reloadStyle === 'tube';
     h.magSize = s.def.magSize;
@@ -787,7 +790,7 @@ export class WeaponSystem {
   get ammoBoxGain(): number {
     const s = this.state;
     if (!s) return 0;
-    const spares = s.spareMagazines;
+    const spares = s.spares;
     return s.def.magSize - (spares.length === MAX_SPARES ? spares[spares.length - 1] : 0);
   }
 
@@ -795,7 +798,7 @@ export class WeaponSystem {
     const s = this.state;
     const gain = this.ammoBoxGain;
     if (!s || gain <= 0) return 0;
-    const spares = s.spareMagazines;
+    const spares = s.spares;
     if (spares.length === MAX_SPARES) spares.pop();
     spares.unshift(s.def.magSize);
     return gain;
@@ -899,7 +902,7 @@ export class WeaponSystem {
     if (this.disabled || !s || this.reloading || this.switching || this.cycling || this.pumping)
       return false;
     if (this._hands.state !== 'weapon') return false;
-    if (s.spareMagazines.length === 0) return false;
+    if (s.spares.length === 0) return false;
     const tube = s.def.reloadStyle === 'tube';
     if (tube && s.chambered && s.mag >= s.def.magSize) return false;
     this.viewmodel.stopClip();
@@ -1203,14 +1206,14 @@ export class WeaponSystem {
   _completeReload(empty: boolean): void {
     const s = this.state;
     if (!s) return;
-    const spares = s.spareMagazines;
+    const spares = s.spares;
     // Commit both sides of the swap at magin. Cancelling before it changes neither.
     const next = spares[0];
     if (!next) return;
     if (s.mag === 0) spares.shift();
     else {
       spares[0] = s.mag;
-      spares.sort((a, b): number => b - a);
+      spares.sort(byFullest);
     }
     s.mag = next;
     if (empty && !s.chambered && s.mag > 0) {
@@ -1230,7 +1233,7 @@ export class WeaponSystem {
   _insertShell(): boolean {
     const s = this.state;
     if (!s || (s.chambered && s.mag >= s.def.magSize)) return false;
-    const spares = s.spareMagazines;
+    const spares = s.spares;
     const last = spares.length - 1;
     if (last < 0) return false;
     // Finish the open shell bundle before opening another one.
@@ -1244,7 +1247,7 @@ export class WeaponSystem {
 
   _continueTubeReload(): void {
     const s = this.state;
-    if (!this._tubeLoop || !s || s.spareMagazines.length === 0 || s.mag >= s.def.magSize) {
+    if (!this._tubeLoop || !s || s.spares.length === 0 || s.mag >= s.def.magSize) {
       this._tubeLoop = false;
       return;
     }

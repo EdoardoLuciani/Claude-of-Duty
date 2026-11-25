@@ -10,6 +10,7 @@ import type { EngineEventMap } from '../core/events.ts';
 import type { Rng } from '../core/rng.ts';
 import { isMesh, isSingleMaterialMesh, isTexture } from '../core/three-guards.ts';
 import { loadWeaponGLTF } from './asset-loader.ts';
+import { ammoPack } from './defs.ts';
 import type { WeaponSystem } from './index.ts';
 
 const PICKUP_RADIUS = 2.05;
@@ -316,12 +317,7 @@ export class AmmoPickups {
     if (this.ctx.input.action('use')) this._hold = Math.min(HOLD_TIME, this._hold + dt);
     else this._hold = Math.max(0, this._hold - dt * 2.5);
 
-    const pack =
-      state.def.reloadStyle === 'tube'
-        ? 'shell bundle'
-        : state.def.id === 'lmg'
-          ? 'belt'
-          : 'magazine';
+    const pack = ammoPack(state.def);
     const replacedSpare = gain < state.def.magSize;
     this.ctx.peek('ui')?.setPrompt(
       {

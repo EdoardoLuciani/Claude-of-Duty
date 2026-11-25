@@ -46,7 +46,7 @@ try {
     armour: 0,
     empty: false,
     loadedRounds: 30,
-    spareMagazines: [30, 30],
+    spares: [30, 30],
     magSize: 30,
     time: 0,
   };
@@ -190,7 +190,7 @@ try {
     assert.equal(hud.draws, before + 1, 'unchanged presentation settles again');
   }
   const spares = [30, 15, 7];
-  state.spareMagazines = spares;
+  state.spares = spares;
   state.loadedRounds = 30;
   frame();
   const initialSpareDraw = hud.draws;
