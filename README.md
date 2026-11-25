@@ -5,8 +5,8 @@
 **The streets are quiet. They won't stay that way.**
 
 Claude of Duty is a first-person survival shooter. Scout the market district before the first
-wave, then hold out against increasingly tough squads. Spend the credits you earn between waves
-on supplies, new weapons, and attachments. Or choose **Training Grounds** to try a build for free.
+wave, then hold out as enemy waves grow larger. Spend the credits you earn between waves on
+supplies, new weapons, and attachments. Or choose **Training Grounds** to try a build for free.
 
 ![First-person view of the player firing a rifle down a sunlit market street](docs/screenshots/market-firefight.webp)
 
