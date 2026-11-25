@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import * as THREE from 'three';
 
-import { BASE_ATTACHMENTS } from '../../src/weapons/attachment-rules.ts';
+import { BASE_ATTACHMENTS, OPTIC_IDS } from '../../src/weapons/attachment-rules.ts';
 import type { WeaponEntry } from '../../src/weapons/runtime-types.ts';
 import type { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { fixture } from '../lib/fixture.ts';
@@ -358,7 +358,7 @@ weapons.viewmodel = fixture<Viewmodel>({
 });
 Object.assign(weapons, {
   _attachments: {
-    rmr: opticAsset(),
+    railway: opticAsset(),
     acog: opticAsset(),
     laser: rigidAsset('SOCKET_laser'),
     srd762ti: rigidAsset('SOCKET_muzzle'),
@@ -374,7 +374,7 @@ assert(
     .every((offer): boolean => !offer.compatible),
   'pistol offers no optic customization'
 );
-for (const optic of ['rmr', 'acog', 'scope', 'exps3'] as const)
+for (const optic of OPTIC_IDS)
   assert(!market.setBuild({ ...BASE_ATTACHMENTS, optic }), `${optic} cannot replace pistol irons`);
 assert(
   market.setBuild({ optic: null, rail: 'laser', muzzle: 'suppressor' }),
@@ -386,7 +386,7 @@ assert.deepEqual(
   'draft preserves pistol irons'
 );
 market.cancelBuild();
-const redDotLaser = { ...BASE_ATTACHMENTS, optic: 'rmr', rail: 'laser' } as const;
+const redDotLaser = { ...BASE_ATTACHMENTS, optic: 'railway', rail: 'laser' } as const;
 assert(market.beginBuild('rifle') && market.setBuild(redDotLaser));
 assert.equal(market.getHudState().build?.total, 450, 'owned gun charges attachments only');
 assert.equal(weapons.getAttachments('rifle'), BASE_ATTACHMENTS, 'draft does not equip');
@@ -412,9 +412,13 @@ assert(!market.confirmBuild(), 'unchanged build cannot be purchased twice');
 market.credits = 400;
 assert(market.setBuild({ ...redDotLaser, optic: 'acog' }));
 assert.equal(market.getHudState().build?.total, 400);
-assert.equal(market.getHudState().build?.slots[0].discarded, 'Red dot');
+assert.equal(market.getHudState().build?.slots[0].discarded, 'Railway');
 market.cancelBuild();
-assert.equal(weapons.getAttachments('lmg').optic, 'rmr', 'cancel preserves replaced attachment');
+assert.equal(
+  weapons.getAttachments('lmg').optic,
+  'railway',
+  'cancel preserves replaced attachment'
+);
 assert(market.beginBuild('lmg') && market.setBuild({ ...redDotLaser, optic: 'acog' }));
 assert(market.confirmBuild());
 assert.equal(market.credits, 0, 'replacement gives no refund');

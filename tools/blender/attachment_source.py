@@ -12,9 +12,9 @@ from mathutils.bvhtree import BVHTree
 import picatinny
 
 ROOT = Path(__file__).resolve().parents[2]
-OPTICS = ('rmr', 'acog', 'scope', 'exps3')
+OPTICS = ('railway', 'acog', 'scope', 'exps3')
 SOURCES = {
-    'rmr': 'trijicon-rmr/rmr.blend',
+    'railway': 'c-more-railway/railway.blend',
     'acog': 'trijicon-acog/acog.blend',
     'scope': 'schmidt-bender-pm-ii/scope.blend',
     'exps3': 'eotech-exps3-0/exps3-0.blend',
@@ -26,7 +26,7 @@ SOURCES = {
 }
 # Whole forward grooves per weapon fit; mirrors `fits.optic[id].railSlots` in
 # src/weapons/defs.ts, which places the same optic at runtime.
-RAIL_SLOTS = {'m4': {'scope': 7}, 'evolys': {'exps3': 3, 'acog': 6, 'scope': 6}}
+RAIL_SLOTS = {'m4': {'scope': 7}, 'evolys': {'railway': 3, 'exps3': 3, 'acog': 6, 'scope': 6}}
 
 
 def surface(objects, transform):

@@ -88,7 +88,7 @@ def check_muzzle():
                     assert not adapter_tree.overlap(target), (clip, frame, obj.name, 'adapter crosses actual surface')
             poses += 1
     select('Idle', 0)
-    print('AX338_MUZZLE_CLEARANCE_OK:', poses, '120 Hz poses; all existing surfaces and evaluated hands; RMR/ACOG/PM II/TOR Mini; 10.6 mm adapter gauge; no bipod present')
+    print('AX338_MUZZLE_CLEARANCE_OK:', poses, '120 Hz poses; all existing surfaces and evaluated hands; Railway/ACOG/PM II/TOR Mini; 10.6 mm adapter gauge; no bipod present')
 
 
 if __name__ == '__main__':

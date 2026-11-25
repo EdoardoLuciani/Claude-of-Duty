@@ -145,7 +145,7 @@ assert.throws(
   const geometry = new THREE.BoxGeometry(0.02, 0.01, 0.001);
   assetScene.add(new THREE.Mesh(geometry, new THREE.MeshStandardMaterial()));
   const asset = opticAsset(assetScene);
-  const optics = { rmr: asset, acog: asset, scope: asset, exps3: asset };
+  const optics = { railway: asset, acog: asset, scope: asset, exps3: asset };
   let disposed = 0;
   geometry.addEventListener('dispose', (): void => {
     disposed++;
@@ -168,9 +168,9 @@ assert.throws(
     muzzleSocket: baseSocket,
     def: { ...WEAPON_DEFS.rifle },
   });
-  const config: AttachmentConfig = { ...BASE_ATTACHMENTS, optic: 'rmr' };
+  const config: AttachmentConfig = { ...BASE_ATTACHMENTS, optic: 'railway' };
   for (let i = 0; i < 9; i++) {
-    const optic = (['rmr', 'acog', 'scope'] as const)[i % 3];
+    const optic = (['railway', 'acog', 'scope'] as const)[i % 3];
     const config: AttachmentConfig = { ...BASE_ATTACHMENTS, optic };
     // Mounting while the authored root is posed must not bake its current pose.
     root.rotation.x = i * 0.1;
@@ -220,7 +220,7 @@ assert.throws(
     ) < 1e-8
   );
   railMount.position.z -= 0.089;
-  configureWeaponAttachments(entry, { ...laserConfig, optic: 'rmr' }, { ...optics, laser });
+  configureWeaponAttachments(entry, { ...laserConfig, optic: 'railway' }, { ...optics, laser });
   assert.equal(entry.opticGroup.parent, socket, 'optic and rail coexist');
   assert.equal(entry.railGroup.parent, railMount);
   configureWeaponAttachments(entry, BASE_ATTACHMENTS, optics);

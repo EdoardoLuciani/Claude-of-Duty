@@ -5,7 +5,7 @@ type AttachmentId = NonNullable<AttachmentConfig[keyof AttachmentConfig]>;
 /** Prices belong to the market; verified fits and assets belong to weapons.
  * Keyed by id so every attachment must have a price; declaration order is the shop order. */
 export const ATTACHMENT_OFFERS = {
-  rmr: { id: 'rmr', slot: 'optic', label: 'Red dot', cost: 250 },
+  railway: { id: 'railway', slot: 'optic', label: 'Railway', cost: 250 },
   exps3: { id: 'exps3', slot: 'optic', label: 'EXPS3', cost: 350 },
   acog: { id: 'acog', slot: 'optic', label: 'ACOG', cost: 400 },
   scope: { id: 'scope', slot: 'optic', label: 'Scope', cost: 500 },

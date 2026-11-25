@@ -31,7 +31,7 @@ references and acceptance limits:
 [M590](m590/README.md).
 Standalone world interaction prop: [Al-Maktaba intel case](intel_case/README.md).
 Standalone rigid prop: [M67 grenade](m67/README.md).
-Standalone attachments: [EXPS3-0](exps3/README.md),
+Standalone attachments: [Railway](railway/README.md), [EXPS3-0](exps3/README.md),
 [TOR Mini laser](tor_mini/README.md).
 The [field radio](field_radio/README.md) is a standalone
 first-person prop with a native export and separate live LCD binding.

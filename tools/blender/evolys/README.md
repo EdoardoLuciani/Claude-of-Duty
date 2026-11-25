@@ -15,9 +15,9 @@ Refit intentionally with `bun tools/blender/evolys/hand-reference.ts`.
 `IRON_sights` owns both iron assemblies; `SOCKET_sight` is the rear aperture centre, aligned with the
 front post tip. A mounted optic hides them, leaving the bare rail without replacement parts.
 
-`MOUNT_optic` is the rearmost identity rail-contact frame, where the RMR seats.
-Larger optics sit whole grooves farther forward (`fits.optic[id].railSlots`) to
-clear the calibrated charging-hand sweep. RMR and ACOG clear the irons; the PM II
+`MOUNT_optic` is the rearmost identity rail-contact frame. The optics seat whole
+grooves farther forward (`fits.optic[id].railSlots`) to clear the calibrated
+charging-hand sweep. Railway and ACOG clear the irons; the PM II
 crosses the front sight. Any mounted optic hides the irons at runtime.
 
 `MOUNT_muzzle` seats the shared SRD762Ti at the barrel crown (+Y up, -Z forward,
@@ -69,8 +69,8 @@ preserve held endpoint samples, matching NLA names and TRS resets.
 
 Receiver/handguard join as static surfaces. `IRON_sights` remains independently
 removable; there is no integrated optic or lens. `SOCKET_sight` owns the rear
-aperture centre, aligned with `SOCKET_front_post`. `MOUNT_optic` is the rail-contact
-frame for the RMR; larger optics seat whole grooves forward of the charging hand.
+aperture centre, aligned with `SOCKET_front_post`. The shared rail-contact frame
+and each optic's groove offset keep the assembly clear of the charging hand.
 `MOUNT_muzzle` seats the unchanged SRD762Ti at the barrel crown.
 `MUZZLE_device` removes the original hider/shoulder and
 `MUZZLE_device_removed` supplies the open game-fit sleeve. `MOUNT_rail` seats TOR Mini directly
@@ -82,9 +82,9 @@ Only the eight-joint belt is skinned; both pouches have independent STEP ownersh
 Keep 12.7 mm belt pitch, separate finish tiles and persistent runtime round masks.
 The registered cook uses shared gltfpack flags without added simplification.
 `check.py` requires freshly generated shared optic blends and checks actual
-mounted RMR/ACOG/PM II surfaces against irons and animated cover, charging handle,
+mounted Railway/ACOG/PM II surfaces against irons and animated cover, charging handle,
 stock, belt and deformed shared hands at 120 Hz. PM II crosses the front iron;
-RMR/ACOG retain both irons. The common TOR Mini checker adds all-clip 120 Hz
+Railway/ACOG retain both irons. The common TOR Mini checker adds all-clip 120 Hz
 laser/hand/emitter checks and lower-rail hardware versus evaluated hands.
 The same sweep checks the actual shared SRD762Ti, its 7.8 mm through-bore gauge,
 fixed handguard/adapter clearance and coexistence with every optic and TOR Mini.

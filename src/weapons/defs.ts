@@ -108,7 +108,7 @@ export function isWeaponId(value: unknown): value is WeaponId {
 
 /** Optic eye reliefs shared by every weapon whose rail seats them at the base slot. */
 const OPTIC_FITS = {
-  rmr: { eyeRelief: 0.125 },
+  railway: { eyeRelief: 0.215 },
   acog: { eyeRelief: 0.11 },
   scope: { eyeRelief: 0.09 },
   exps3: { eyeRelief: 0.2 },
@@ -385,8 +385,9 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     fits: {
       optic: {
         ...OPTIC_FITS,
-        // MOUNT_optic is the rearmost (RMR) seat; larger bodies sit whole
-        // grooves forward, clear of the charging-hand sweep.
+        // MOUNT_optic is the rearmost seat; each body sits whole grooves forward,
+        // clear of the charging-hand sweep and the late empty-reload glove return.
+        railway: { eyeRelief: 0.245, railSlots: 3 },
         exps3: { eyeRelief: 0.16, railSlots: 3 },
         acog: { ...OPTIC_FITS.acog, railSlots: 6 },
         scope: { ...OPTIC_FITS.scope, railSlots: 6 },
@@ -525,15 +526,10 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     hipRot: [0.003, 0.003, -0.125],
     adsCant: [0, 0, 0.003],
     eyeRelief: 0.28,
-    // Extended integrated-sight rail seats RMR/ACOG and both PM II pedestals.
+    // Extended integrated-sight rail seats Railway/ACOG and both PM II pedestals.
     // The optional TOR Mini stays on the fixed forward magazine-tube clamps.
     fits: {
-      optic: {
-        rmr: { eyeRelief: 0.12 },
-        acog: { eyeRelief: 0.1 },
-        scope: { eyeRelief: 0.09 },
-        exps3: { eyeRelief: 0.2 },
-      },
+      optic: { ...OPTIC_FITS, acog: { eyeRelief: 0.1 } },
       rail: { laser: {} },
       muzzle: { suppressor: { model: 'suppressor12g' } },
     },

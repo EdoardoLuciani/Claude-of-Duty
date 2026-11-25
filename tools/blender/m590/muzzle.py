@@ -38,7 +38,7 @@ def check_muzzle(manifest, rig, meshes, review, pose, tree, point, basis):
         assert not can.overlap(tree([o for o in collection.objects if o.type == 'MESH'])), (optic, 'can intersects optic')
         sight = attachment_source.named(collection.objects, 'SOCKET_sight')
         assert can.ray_cast(point(sight), Vector((0, 0, -1)), 1)[0] is None, (optic, 'can blocks optic sightline')
-    print('M590_SUPPRESSOR12G_SIGHTLINE: low irons occluded; actual RMR/ACOG/PM II meshes and sight rays clear; no sight auto-switch or tuning changes')
+    print('M590_SUPPRESSOR12G_SIGHTLINE: low irons occluded; actual Railway/ACOG/PM II meshes and sight rays clear; no sight auto-switch or tuning changes')
     # Include the real optional TOR Mini, not just its permanent clamp hardware.
     laser = attachment_source.seat('laser', bpy.data.objects['MOUNT_rail'],
                                    ('ATTACHMENT_tor_mini', 'TOR_MINI_body', 'SOCKET_mount'))
