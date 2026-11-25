@@ -56,8 +56,8 @@ Open **Esc → Controls** for the full reference. If you die, choose **New Game*
 Reloading saves the old magazine if it still has rounds and selects the fullest spare if it holds
 more than the current magazine. The HUD shows how many spare magazines you have and the approximate
 fill of each, starting with the one that will load next. Pickups top up spare magazines starting
-with the fullest, and the market fills your spare stock. Remove the query parameter to play with
-pooled reserves.
+with the fullest, and the market refills spare stock up to its starting limit. Remove the query
+parameter to play with pooled reserves.
 
 ## Run locally
 

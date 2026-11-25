@@ -55,6 +55,7 @@ import type { ViewModel } from './viewmodel.ts';
 const GRENADES_PER_LIFE = 2;
 const GRENADES_MAX = 6; // bought at the market, +1 per pack
 const SLOT_IDS = [...PRIMARY_IDS, ...SECONDARY_IDS];
+const PERSISTENT_M4_SPARES = 2;
 /** Catch-up bound for held AUTO/BURST fire within one frame. The engine clamps
  *  dt to 0.1 s, which needs at most two 1100 rpm rounds; due rounds beyond the
  *  bound are dropped rather than banked into later frames. */
@@ -395,8 +396,14 @@ export class WeaponSystem {
     );
   }
 
+  private buildStateDef(id: WeaponId, attachments: AttachmentConfig): WeaponState['def'] {
+    const def = buildDef(id, attachments);
+    if (this.persistentMags && id === 'rifle') def.reserve = def.magSize * PERSISTENT_M4_SPARES;
+    return def;
+  }
+
   _makeState(id: WeaponId): WeaponState {
-    const def = buildDef(id, BASE_ATTACHMENTS);
+    const def = this.buildStateDef(id, BASE_ATTACHMENTS);
     const spareMagazines: number[] | undefined =
       this.persistentMags && id === 'rifle' ? [] : undefined;
     let pooledReserve = def.reserve;
@@ -416,6 +423,7 @@ export class WeaponSystem {
           pooledReserve = rounds;
           return;
         }
+        rounds = Math.min(rounds, this.def.reserve);
         let remaining = rounds - this.reserve;
         if (remaining < 0) {
           // A debug override replaces the stock; gameplay resupply only adds rounds.
@@ -505,7 +513,7 @@ export class WeaponSystem {
    * pattern scaled from them change together. */
   _storeBuild(state: WeaponState, attachments: AttachmentConfig): void {
     state.attachments = attachments;
-    Object.assign(state.def, buildDef(state.def.id, attachments));
+    Object.assign(state.def, this.buildStateDef(state.def.id, attachments));
     state.pattern = buildRecoilPattern(state.def, Rng);
   }
 
@@ -795,7 +803,7 @@ export class WeaponSystem {
     return h;
   }
 
-  /** Add rounds to reserve without bypassing the weapon's authored cap. */
+  /** Add rounds to reserve without bypassing the weapon's reserve cap. */
   addReserve(amount: number, id = this.activeId): number {
     const s = this.states.get(id);
     if (!s || amount <= 0) return 0;

@@ -219,8 +219,13 @@ for (const [primary, first, second] of [
 {
   const { wp } = makeHarness(true);
   const capacity = wp.current.magSize;
-  const fullStock = Array<number>(wp.current.reserve / capacity).fill(capacity);
-  assert.deepEqual(wp.getHudState().spareMagazines, fullStock, 'HUD shows the starting stock');
+  const fullStock = [capacity, capacity];
+  assert.deepEqual(
+    wp.getHudState().spareMagazines,
+    fullStock,
+    'the M4 starts with two full spares'
+  );
+  assert.equal(wp.ammoFraction(), 1, 'the market sees starting stock as full');
   wp.state.reserve = capacity + 12;
   wp.state.mag = 7;
   const total = wp.ammo.total;
@@ -254,6 +259,7 @@ for (const [primary, first, second] of [
   wp.refillAmmo();
   assert.equal(wp.ammo.reserve, wp.current.reserve);
   assert.deepEqual(wp.getHudState().spareMagazines, fullStock);
+  assert.equal(wp.addReserve(capacity), 0, 'a pickup cannot add a third spare');
   assert.equal(wp.ammo.mag, 12, 'market refills spare stock, not the loaded magazine');
 }
 // Mounted laser switches belong to the gun, not the flashlight or active slot.
