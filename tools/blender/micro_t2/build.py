@@ -193,25 +193,28 @@ def build(root):
     steel = material('04 | dark turned steel', (.046,.049,.054), .72, .44)
     print_ink = material('05 | soft grey pad print', (.48,.462,.426), 0, .68)
     etch = material('06 | dark laser mark', (.015,.017,.019), .28, .75)
-    baffle = material('07 | nonreflective bore', (.003,.0036,.0044), 0, .94)
+    baffle = material('07 | matte black bore', (.0009,.0009,.0009), 0, .94)
     baffle.node_tree.nodes.get('Principled BSDF').inputs['Specular IOR Level'].default_value = 0
     objective = material('10 | amber objective coating', (.30,.066,.012), 0, .16, .24)
-    ocular = material('10 | clear ocular and cover', (.076,.123,.121), 0, .16, .16)
+    ocular = material('10 | clear ocular and cover', (.015,.020,.021), 0, .26, .16)
+    ocular.node_tree.nodes.get('Principled BSDF').inputs['Specular IOR Level'].default_value = .18
     X, Y, Z = (1,0,0), (0,1,0), (0,0,1)
 
-    # Turned main tube and stepped lens retainers. Its centre is physically open.
+    # Seat the 18 mm clear aperture just forward of the ocular; the forward
+    # bore is relieved so the rear eye sees one dark rim, not a long cone.
     tube = turned('Forged tube and end shoulders', (0,0,AXIS), Y,
            [(-36.4,13),(-37,14),(-36.6,15),(-30.7,15),(-29.4,15.9),(-27.4,16.1),
             (26.6,16.1),(28.5,15.5),(30,14.8),(36.7,14.8),(37.3,14.1),(37.3,12.8),
-            (34.5,12.7),(32.3,11.3),(27,10.2),(24,9),(-27,9),(-31,10.2),(-34,11.5),
-            (-36.4,12.5)], body, root, 96)
+            (32.3,12.5),(27,11.9),(-19,11.2),(-25,9.8),(-26,9),(-27,9),(-29,10.35),
+            (-31,11.1),(-34,11.5),(-36.4,12.5)], body, root, 96)
     tube.data.materials.append(baffle)
     for face in tube.data.polygons[11*96:]:
         face.material_index = 1
-    for side in (-1,1):
+    for side, radius in [(-1,11.3),(1,11.9)]:
         turned('Stepped inner retaining ring', (0,side*34,AXIS), Y,
-               [(-1.3,11.9),(-1.6,12.2),(1.6,12.2),(1.8,11.8),(1.8,11.3),(-1.3,11.3)], baffle, root)
-    glass('Warm coated front objective', (0,28,AXIS), (0,.993,.118), 10.6, 1.5, objective, root)
+               [(-1.3,radius+.6),(-1.6,radius+.9),(1.6,radius+.9),
+                (1.8,radius+.5),(1.8,radius),(-1.3,radius)], baffle, root)
+    glass('Warm coated front objective', (0,28,AXIS), (0,.993,.118), 11.9, 1.5, objective, root)
     glass('Recessed rear ocular', (0,-30,AXIS), (0,-1,0), 10.8, .9, ocular, root)
 
     # The top guard sweeps forward into the tube, leaving a U around the dial.
