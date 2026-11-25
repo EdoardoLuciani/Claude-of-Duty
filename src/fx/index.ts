@@ -375,17 +375,15 @@ export class FxSystem {
 
   /** View-scene spill tracks the viewmodel key for consistent relative brightness.
    * Inverse-square falloff gives a bright crown and a softer wash toward the magwell.
-   * The 90 ms lifetime and 8/s decay keep it visible across several frames.
    */
   viewFlash(x: number, y: number, z: number, r: number, g: number, b: number, strength = 1): void {
     this._attachView();
     const pool = this.viewLights;
     if (!pool) return;
     const key = this.render?.viewLightLevel ?? this.render?.viewSun.intensity ?? 2.5;
-    // 0.72 cd per key unit keeps the handguard's warm gradient legible.
-    const peak = Math.max(0.04, key * 0.72 * clamp(strength, 0.05, 2.2));
+    const peak = Math.max(0.02, key * 0.4 * clamp(strength, 0.05, 2.2));
     // Lift 4 cm off the bore: an on-axis source grazes the receiver (N.L ~0.15).
-    pool.flash(x, y + 0.04, z, r, g, b, peak, 0.09, 8, 1.6, 2);
+    pool.flash(x, y + 0.04, z, r, g, b, peak, 0.04, 40, 1.6, 2);
   }
 
   get physics(): EngineSystems['physics'] | undefined {
