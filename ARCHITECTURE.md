@@ -408,8 +408,8 @@ ownership, so a rejected build never drops the old gun.
 `WeaponDef.fits` is a per-slot partial record keyed by attachment ID: each entry
 enables a verified fit and holds its data (`fits.optic[id].eyeRelief`, optional
 `railSlots` at `PICATINNY_PITCH`, `fits.muzzle[id].model`; rail entries are empty).
-The suppressor shares a catalog ID across its can models. The M4-72 Brake is verified
-on the M4A1; stock, suppressor and brake are mutually exclusive.
+The suppressor shares a catalog ID across its can models. The M4-72 Brake shares
+one model across its verified fits. Stock, suppressor and brake are mutually exclusive.
 `isAttachmentConfig()` is the shared compatibility rule for gameplay, URL/debug input
 (narrowed once in `src/dev/attachments.ts` before prewarm) and `tools/capture.ts`; reject
 unverified fits, never silently change them. `removableIrons` swaps required `IRON_sights`
