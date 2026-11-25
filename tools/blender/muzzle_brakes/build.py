@@ -12,7 +12,7 @@ STEM = 'm4-72'
 # Game-art scale: keep the authored M4A1 shot-effect origin at the nose.
 LENGTH = .06604
 RADIUS = LENGTH * .189
-SIDES = 64
+SIDES = 48
 
 
 def ease(t):
@@ -23,14 +23,16 @@ def ease(t):
 def make_shell(root):
     # Photo-derived silhouette, not measured dimensions. The side impressions
     # are shallow relief backed by solid material, and the nose is a blind dimple.
+    body_start, body_end = .309, .971
     profile = [(0, .80), (.009, .865), (.021, .883), (.098, .883),
                (.114, .86), (.129, .751), (.144, .714), (.165, .714),
                (.181, .988), (.195, 1), (.219, 1), (.235, .995),
                (.250, .724), (.272, .726), (.289, .741), (.298, .965),
-               (.309, 1), (.971, 1), (.988, .955), (1, .863)]
+               (body_start, 1), (body_end, 1), (.988, .955), (1, .863)]
     radii = []
     for (y1, r1), (y2, r2) in zip(profile, profile[1:]):
-        steps = max(1, math.ceil((y2-y1)*112))
+        # Sample the swept impressions; straight collar and bevel spans need only their ends.
+        steps = math.ceil((y2-y1)*72) if y1 == body_start else 1
         radii.extend((y1+(y2-y1)*i/steps, r1+(r2-r1)*i/steps) for i in range(steps))
     radii.append(profile[-1])
     angles = [i*math.tau/SIDES for i in range(SIDES)]
