@@ -65,6 +65,19 @@ export const COMBAT = {
 /** Seconds of active play before the first wave spawns. */
 export const OPENING_WAVE_DELAY = 15;
 
+/** Survival wave compositions in order. Repeat the last entry to cap the frame cost. */
+export const SURVIVAL_WAVES = [
+  { squads: 1, perSquad: 3 },
+  { squads: 2, perSquad: 2 },
+  { squads: 2, perSquad: 3 },
+  { squads: 2, perSquad: 3 },
+  { squads: 2, perSquad: 4 },
+  { squads: 2, perSquad: 4 },
+  { squads: 3, perSquad: 3 },
+  { squads: 3, perSquad: 3 },
+  { squads: 3, perSquad: 4 },
+] as const;
+
 /** Enemy grenade launch/clearance, metres and seconds. */
 export const GRENADE = Object.freeze({
   maxSpeed: 24,
