@@ -25,6 +25,7 @@ AXIS = BASE_BOTTOM + HEIGHT - RIM_HEIGHT_R
 WINDOW = GLASS_DIAMETER/2
 LENS_Y = 46.9
 LENS_TILT = math.radians(7)
+CLAMP_POCKETS = [(-27.8,30.8),(17.6,34.7)]
 OUT = Path(__file__).resolve().parents[3]/'.cache/blender/attachments/c-more-railway'
 
 
@@ -36,13 +37,12 @@ def empty(name, parent=None, pos=(0, 0, 0)):
     return obj
 
 
-def subtract(obj, tool, reuse=False):
+def boolean(obj, tool, operation='DIFFERENCE'):
     active(obj)
-    cut = obj.modifiers.new('Machined relief', 'BOOLEAN')
-    cut.object, cut.material_mode = tool, 'TRANSFER'
+    cut = obj.modifiers.new('Molded detail', 'BOOLEAN')
+    cut.operation, cut.object, cut.material_mode = operation, tool, 'TRANSFER'
     bpy.ops.object.modifier_apply(modifier=cut.name)
-    if not reuse:
-        bpy.data.objects.remove(tool, do_unlink=True)
+    bpy.data.objects.remove(tool, do_unlink=True)
 
 
 def pocket_edges(obj):
@@ -60,29 +60,89 @@ def fastener(name, center, radius, depth, metal, mask, root, axis='X', side=1):
     head = cylinder(name, center, radius, depth, metal,root,axis=axis,sides=32,bevel=.12)
     bit = Vector(center)
     bit[0 if axis == 'X' else 2] += side*depth*.45
-    subtract(head, cylinder('Hex socket tool', bit, radius*.46, depth*.65, mask,root,
-                           axis=axis,sides=6,bevel=0))
+    boolean(head,cylinder('Hex socket tool',bit,radius*.46,depth*.65,mask,root,axis=axis,sides=6,bevel=0))
     return head
+
+
+def slotted_head(name, center, radius, depth, metal, mask, root, axis='X', side=1):
+    head = cylinder(name,center,radius,depth,metal,root,axis=axis,sides=40,bevel=.13)
+    bit = Vector(center)
+    i = 0 if axis == 'X' else 2
+    bit[i] += side*depth*.47
+    size = (depth*.72,.70,radius*2.2) if axis == 'X' else (radius*2.2,.69,depth*.72)
+    tool = box('Slotted drive tool',bit,size,mask,root,.07)
+    tool.rotation_euler[i] = math.radians(12)
+    boolean(head,tool)
+    pocket_edges(head)
+    return head
+
+
+def loft(name, stations, mat, root, crown=False):
+    n = len(stations[0][1])
+    points = [(x,front_sweep(x,y,z) if crown else y,z) for y,loop in stations for x,z in loop]
+    last = (len(stations)-1)*n
+    faces = [tuple(range(n)), tuple(reversed(range(last,last+n)))]
+    faces += [(j*n+i,j*n+(i+1)%n,(j+1)*n+(i+1)%n,(j+1)*n+i)
+              for j in range(len(stations)-1) for i in range(n)]
+    return finish(mesh(name,points,faces,mat,root),width=0)
 
 
 def section_body(name, sections, mat, root):
     """Molded part with a rounded section and individually tapered ends."""
-    slices = [rounded_rect(w, hi-lo, r, center_z=(hi+lo)/2, steps=5)
-              for _,w,lo,hi,r in sections]
-    n = len(slices[0])
-    points = [(x,s[0],z) for s,loop in zip(sections,slices) for x,z in loop]
-    last = (len(slices)-1)*n
-    faces = [tuple(range(n)), tuple(reversed(range(last,last+n)))]
-    faces += [(j*n+i,j*n+(i+1)%n,(j+1)*n+(i+1)%n,(j+1)*n+i)
-              for j in range(len(slices)-1) for i in range(n)]
-    return finish(mesh(name,points,faces,mat,root),width=0)
+    return loft(name,[(y,rounded_rect(w,hi-lo,r,center_z=(hi+lo)/2,steps=5))
+                      for y,w,lo,hi,r in sections],mat,root)
+
+
+def lens_deck(root, mat):
+    stations = []
+    for y,w,lo,rail,bed in [(8.72,22.65,14.25,18.68,17.98),(10.5,24.08,14.25,20.0,18.98),
+                           (14.3,24.8,14.3,20.33,19.0),(23.4,25.1,14.3,20.52,19.1),
+                           (31.1,25.25,14.45,21.04,19.68),(36.8,25.5,15.1,21.75,20.18),
+                           (40.3,26.10,15.38,22.49,20.95),(43.45,26.42,15.50,23.15,21.50),
+                           (46.0,26.58,15.6,23.69,21.62),(48.2,26.30,15.61,23.84,21.93),
+                           (51.0,25.20,15.65,23.55,22.60)]:
+        a = w/2
+        # Opposing molded shoulders share a depressed center deck. The forward
+        # corners rise into the rim but stay outside the coated pane.
+        top = [(a-.56,rail-.61),(a-1.37,rail),(a-2.1,rail-.24),(a-3.28,rail-.93),
+               (a-4.45,bed+.36),(a-5.7,bed+.03),(0,bed)]
+        loop = [(a-.75,lo),(a,lo+.68),(a,rail-1.04),*top,
+                *[(-x,z) for x,z in reversed(top[:-1])],(-a,rail-1.04),(-a,lo+.68),(-a+.75,lo)]
+        stations.append((y,loop))
+    return loft('Concave molded lens deck',stations,mat,root)
+
+
+def front_sweep(x,y,z):
+    # The upper part of the center arch leans back into the web. Its lower
+    # face and the outside cheeks don't move, so the opening reads from above.
+    return y-.72*max(0,z-10.25)*min(1,max(0,(y-50.0)/10.95))*max(0,1-(abs(x)/9.65)**4)
+
+
+def front_web(root, mat):
+    # The forward cross sections peak over the opening and drop at its sides.
+    # Preserve the vertical side wall where the round opening crosses the web.
+    stations = []
+    for y,w,lo,shoulder,crown in [(6.36,27.1,5.1,16.5,16.5),(13,27.3,4.98,17.35,17.35),
+                                 (39,27.35,5,17.54,17.54),(46.3,28,5.15,18.16,18.16),
+                                 (50.1,28.52,5.48,19.06,21.36),(53.35,29.8,6.1,20.12,23.15),
+                                 (55.8,29.10,6.91,20.05,22.86),(57.55,28.06,7.84,18.90,22.20),
+                                 (59.2,23.75,8.74,16.4,21.72),(60.29,21.05,9.45,15.66,21.33),
+                                 (LENGTH/2,18.8,9.94,15.04,20.66)]:
+        a = w/2
+        top = [(a*t,shoulder+(crown-shoulder)*max(0,1-(t/.90)**2)**.88)
+               for t in (.86,.73,.60,.47,.34,.21,.10,0)]
+        loop = [(a-1.18,lo),(a-.34,lo+.43),(a,lo+1.11),(a,shoulder-1.02),
+                (a-.40,shoulder-.34),*top,*[(-x,z) for x,z in reversed(top[:-1])],
+                (-a+.40,shoulder-.34),(-a,shoulder-1.02),(-a,lo+1.11),(-a+.34,lo+.43),(-a+1.18,lo)]
+        stations.append((y,loop))
+    return loft('Crowned front web and lower arm',stations,mat,root,crown=True)
 
 
 def side_slot(name, item, side, y, z, width, height, depth, mat, root, face=13.6):
     outline = [(y+a,z+b) for a,b in rounded_rect(width,height,min(height*.49,2),steps=8)]
     x = side*face
     lo,hi = sorted((x-side*depth,x+side*2))
-    subtract(item,prism(name,outline,lo,hi,mat,root,bevel=0))
+    boolean(item,prism(name,outline,lo,hi,mat,root,bevel=.06))
 
 
 def grain_map(finishes):
@@ -107,11 +167,12 @@ def grain_map(finishes):
 
 
 def ring(root, mat):
-    # Keep the top thin. The lower outside shoulders sweep aft into the deck,
-    # but the middle stays forward so it cannot bridge over the exposed well.
-    profile = [(43.1,.67,0,20),(43.8,.22,0,21),(44.7,0,0,21),
-               (49.7,0,0,7),(51.25,.26,0,3),(51.85,.85,0,0),
-               (51.85,0,1,0),(49.85,0,1,0),(45.6,0,1,6),(43.1,0,1,12)]
+    # The outside of the hoop carries the shoulder's long sweep. Its lower
+    # stations sink into the deck before they end, not as a raised heel.
+    # The upper rim and the circular aperture keep their dimensions.
+    profile = [(43.1,.67,0,23.2),(43.8,.22,0,24.38),(44.7,0,0,25.3),
+               (49.7,0,0,10.65),(51.25,.26,0,4),(51.85,.85,0,0),
+               (51.85,0,1,0),(49.85,0,1,0),(45.6,0,1,2),(43.1,0,1,4)]
     n = 120
     vertices = []
     for y,bevel,inner,sweep in profile:
@@ -119,14 +180,12 @@ def ring(root, mat):
             a = i*math.tau/n
             h = math.sin(a)
             side = math.cos(a)
-            blend = (max(0,.33-h)/1.33)**1.5
-            # Leave a shallow land behind the circular well instead of two free tips.
-            sweep_weight = .71 + .29*min(1,abs(side)*2.55)
+            blend = (max(0,.33-h)/1.33)**1.65
             x_r = WINDOW if inner else WIDTH/2-bevel
             z_r = WINDOW if inner else RIM_HEIGHT_R-bevel
-            drop = 0 if inner else 3.0*blend
+            drop = 0 if inner else 5.35*blend
             z = z_r*h*(math.cos(LENS_TILT) if inner else 1)
-            vertices.append((x_r*side,y-sweep*blend*sweep_weight+z_r*h*math.sin(LENS_TILT),AXIS+z-drop))
+            vertices.append((x_r*side,y-sweep*blend+z_r*h*math.sin(LENS_TILT),AXIS+z-drop))
     faces = [(j*n+i,j*n+(i+1)%n,((j+1)%len(profile))*n+(i+1)%n,((j+1)%len(profile))*n+i)
              for j in range(len(profile)) for i in range(n)]
     return finish(mesh('Thin round lens surround', vertices, faces, mat, root), width=0)
@@ -159,9 +218,13 @@ def build(root):
            (53.7,1.78,-3.23,3.18,.34)],base,root)
     bar.location.x = .01245
     bpy.context.view_layer.update()
-    for y,w in [(-27.8,30.8),(17.6,34.7)]:
-        side_slot('Clamp rounded relief',bar,1,y,.28,w,2.88,1.02,saddle_recess,root)
+    # Cut through the side plate and recess the saddle beneath it. The
+    # floor must be visible, not hidden behind overlapping saddle geometry.
+    for y,w in CLAMP_POCKETS:
+        side_slot('Clamp plate window',bar,1,y,.28,w,2.88,2.48,base,root)
+        side_slot('Saddle pocket floor',saddle,1,y,.28,w,2.88,2.04,saddle_recess,root)
     pocket_edges(bar)
+    pocket_edges(saddle)
     for y in (-49.9,45.7):
         fastener('Rounded clamp screw', (14.15,y,.25), 3.53, 1.52, steel,inset,root)
         cylinder('Opposite screw tail', (-12.83,y,.25), 1.6, .27, steel,root,sides=20)
@@ -180,34 +243,39 @@ def build(root):
     section_body('Wrapped battery cover', [(-18.8,24.4,5,18.75,1.04),(-16.3,25.2,4.9,19.0,1.25),
            (-12.5,28.9,4.9,21.5,1.36),(-9,29.1,4.9,21.9,1.25),(5,29.1,4.9,21.9,1.22),
            (6.25,28.3,5.0,21.3,.88)],body,root)
-    nose = section_body('One-piece lower arm and front web', [(6.36,27.1,5.1,16.5,.9),
-            (13,27.3,4.98,17.35,1.15),(39,27.35,5,17.5,1.36),
-            (46.3,28.0,5.15,18.1,1.45),(51.8,28.52,5.48,24.0,2.6),
-            (55.4,27.8,6.32,23.8,3.55),(58.45,24.55,8.18,22.07,3.8),
-            (60.03,20.7,9.5,20.7,3.04),(LENGTH/2,17.3,10.22,19.35,2.62)],body,root)
-    for side in (-1,1):
-        side_slot('Forward side capsule',nose,side,46.75,10.22,9.88,3.83,1.42,inset,root,14.16)
-    # Square-bottomed arch: a parabolic roof cut into the same continuous nose.
-    arch = [(-7.75,10.9),(7.75,10.9),(8.13,11.7)]
-    arch += [(8.13*math.cos(i*math.pi/22),11.7+6.33*math.sin(i*math.pi/22)**.85) for i in range(1,22)]
-    arch += [(-8.13,11.7)]
-    subtract(nose,prism('Molded front arch relief',arch,48.05,63,inset,root,axis='Y',bevel=.29))
-    pocket_edges(nose)
+    shell = lens_deck(root,body)
+    boolean(shell,ring(root,body),'UNION')
+    boolean(shell,front_web(root,body),'UNION')
+    shell.name = 'Continuous molded crown, deck and nose'
 
-    deck = section_body('Open stepped lens deck', [(8.4,23.45,14.5,18.5,.79),(11.2,24.18,14.5,19.4,.68),
-           (20.5,24.12,14.5,19.54,1.12),(35.9,24.8,14.5,20.9,1.28),
-           (45.3,25.9,15.3,22.44,1.55),(51.08,24.1,18.45,23.42,1.9)],body,root)
-    hood = ring(root,body)
-    well = cylinder('Open round lens well',(0,34.65,20.8),5.16,10.7,inset,root,axis='Z',sides=64,bevel=.16)
-    subtract(deck,well,reuse=True)
-    subtract(hood,well)
-    cylinder('Dark lens-well floor',(0,34.65,17.61),4.98,.25,inset,root,axis='Z',sides=48)
-    seat = cylinder('Adjustment seat pocket tool',(0,18.0,19.70),4.21,2.77,inset,root,axis='Z',sides=56,bevel=.26)
-    subtract(deck,seat)
-    cylinder('Black adjustment seat',(0,18.0,18.57),3.98,.19,inset,root,axis='Z',sides=48,bevel=0)
-    fastener('Flush pedestal adjustment head',(0,18.0,19.14),2.36,.71,hardware_top,inset,root,axis='Z')
-    pocket_edges(deck)
-    pocket_edges(hood)
+    for side in (-1,1):
+        side_slot('Forward side capsule',shell,side,46.75,10.22,9.88,3.83,1.42,inset,root,14.16)
+    well = cylinder('Round lens well tool',(0,34.5,20.55),4.77,9.25,inset,root,axis='Z',sides=64,bevel=.16)
+    boolean(shell,well)
+    cylinder('Dark lens-well floor',(0,34.5,15.99),4.45,.22,inset,root,axis='Z',sides=48)
+    # Curved recessed seat behind the well; its slotted head is flush with the deck.
+    seat = [(17.1,22.4,7.9),(17.6,20.30,7.56),(18.2,19.55,6.8),
+            (18.45,18.80,5.65),(18.52,17.95,4.58),(18.52,17.52,4.44)]
+    n = 64
+    seat_points = [(r*math.cos(a),y+r*math.sin(a),z) for y,z,r in seat
+                   for a in (i*math.tau/n for i in range(n))]
+    last = len(seat_points)-n
+    faces = [tuple(reversed(range(n))),tuple(range(last,last+n))]
+    faces += [(j*n+i,j*n+(i+1)%n,(j+1)*n+(i+1)%n,(j+1)*n+i)
+              for j in range(len(seat)-1) for i in range(n)]
+    boolean(shell,finish(mesh('Curved adjustment cup tool',seat_points,faces,body,root),width=0))
+    cylinder('Recessed adjuster seat',(0,18.52,17.61),4.37,.19,inset,root,axis='Z',sides=48,bevel=0)
+    slotted_head('Flush elevation head',(0,18.52,18.20),2.72,.71,steel,inset,root,axis='Z')
+    arch = [(-7.65,10.78),(7.65,10.78),(8.1,11.9)]
+    arch += [(8.1*math.cos(i*math.pi/28),11.9+6.82*math.sin(i*math.pi/28)**.89) for i in range(1,28)]
+    arch += [(-8.1,11.9)]
+    opening = prism('Arched front opening',arch,49.73,65,inset,root,axis='Y',bevel=.20)
+    # The pockets share an interior, but the side mouth stops aft of the front
+    # arch lip so both openings keep their own continuous molded border.
+    boolean(opening,cylinder('Transverse front-web opening',(0,53.45,16.28),2.64,34,inset,root,
+                             axis='X',sides=52,bevel=.20),'UNION')
+    boolean(shell,opening)
+    pocket_edges(shell)
     # One pane, no tube or second rim, exported with the shared thin-glass convention.
     n = 96
     points = [(0,LENS_Y+.88,AXIS)]
@@ -228,29 +296,38 @@ def build(root):
         a = i*math.tau/16
         cylinder('Dial grip flute',(3.02*math.cos(a),-48+3.02*math.sin(a),23.3),.31,5.25,
                  inset,root,axis='Z',sides=10,bevel=.08)
-    emitter = prism('Low emitter block', [(-39.5,19),(-39.5,23.6),(-37.4,25.7),
-                    (-33.4,25.7),(-30.5,23),(-30.5,18)], -5.8,5.8,body,root,bevel=.85)
-    subtract(emitter,cylinder('Emitter cup tool',(0,-31.22,23.03),2.4,4.5,inset,root,axis='Y',sides=44,bevel=.17))
-    cylinder('Dark emitter cup seat',(0,-33.43,23.03),2.1,.17,inset,root,axis='Y',sides=32)
-    cylinder('Small recessed emitter glass',(0,-33.28,23.03),.66,.14,diode,root,axis='Y',sides=24)
+    cap = [(-5.9,19.4),(5.9,19.4),(5.9,22.95)]
+    cap += [(5.9*math.cos(i*math.pi/24),22.95+4.05*math.sin(i*math.pi/24)) for i in range(1,24)]
+    cap += [(-5.9,22.95)]
+    emitter = prism('Arched emitter housing',cap,-39.45,-30.28,body,root,axis='Y',bevel=.68)
+    boolean(emitter,cylinder('Emitter cup tool',(0,-31.12,23.1),2.44,4.75,inset,root,axis='Y',sides=48,bevel=.16))
+    cylinder('Dark emitter cup seat',(0,-33.38,23.1),2.11,.16,inset,root,axis='Y',sides=36)
+    cylinder('Small recessed emitter glass',(0,-33.25,23.1),.77,.15,diode,root,axis='Y',sides=24)
     pocket_edges(emitter)
     for x in (-8.55,8.55):
         for y,z,r in [(-21.4,20.01,1.73),(-1.9,21.91,2.24)]:
             cylinder('Dark top countersink',(x,y,z),r+.66,.14,inset,root,axis='Z',sides=40,bevel=.03)
             fastener('Broad flush top fastener',(x,y,z+.049),r,.26,hardware_top,inset,root,axis='Z')
-    for y,r in [(17.6,1.16),(24.1,1.32),(31.2,2.84),(37.2,2.42)]:
-        fastener('Right windage hardware',(13.64,y,10.45),r,.69,steel,inset,root)
-    for y,r in [(22.5,1.0),(27.2,1.38),(35.4,2.06)]:
-        fastener('Left guide hardware',(-13.62,y,10.5),r,.55,steel,inset,root,side=-1)
+    slotted_head('Small right guide pin',(13.62,17.6,10.45),1.35,.49,hardware_top,inset,root)
+    cylinder('Recessed right lock pocket',(13.64,24.1,10.45),1.51,.28,inset,root,sides=32)
+    fastener('Right lock screw',(13.69,24.1,10.45),.9,.36,steel,inset,root)
+    slotted_head('Broad right windage head',(13.76,31.2,10.59),2.92,.75,steel,inset,root)
+    fastener('Right elevation lock',(13.74,37.4,10.48),2.29,.57,hardware_top,inset,root)
+    cylinder('Left guide pin',(-13.62,22.5,10.5),1.1,.25,hardware_top,root,sides=32)
+    cylinder('Left lock pocket',(-13.64,28.2,10.47),1.53,.28,inset,root,sides=32)
+    slotted_head('Left exposed lock head',(-13.67,35.4,10.5),2.13,.53,steel,inset,root,side=-1)
     for side in (-1,1):
         side_name = 'right' if side == 1 else 'left'
         text('Molded C-MORE wordmark','C-MORE',(side*13.82,-42.3,12.76),5.44,etch,root,side=side_name)
         text('Molded maker line','C-MORE SYSTEMS',(side*13.82,-42.3,9.92),1.40,etch,root,side=side_name)
     for i in range(7):
-        a = math.radians(20+42*i)
-        mark = box('Molded dial index',(5.7*math.cos(a),-48+5.7*math.sin(a),20.62),
-                   (.85,.26,.08),etch,root,0)
+        a = math.radians(23+42*i)
+        mark = box('Molded dial index',(5.85*math.cos(a),-48+5.85*math.sin(a),20.65),
+                   (1.26,.40,.12),inset,root,.07)
         mark.rotation_euler.z = a
+    for label,x in [('OFF',-8.18),('HI',8.12)]:
+        mark = text('Dial '+label,label,(x,-53.85,20.65),1.68,inset,root,side='rear')
+        mark.rotation_euler = (0,0,0)
 
 
 def check_dimensions(root):
@@ -273,6 +350,24 @@ def check_dimensions(root):
     np.testing.assert_allclose([length,width,height],[LENGTH,WIDTH,HEIGHT],atol=.05,rtol=0)
     np.testing.assert_allclose(lens,[GLASS_DIAMETER]*2,atol=.025,rtol=0)
     print(f'RAILWAY_ENVELOPE_OK: {length:.2f} x {width:.2f} x {height:.2f} mm; lens {lens[0]:.2f} mm',flush=True)
+
+
+def check_pockets(root):
+    # The underlying saddle used to hide the plate cuts. Check the first surface
+    # of the complete rendered assembly, not the isolated clamp bar.
+    parts = [obj for obj in root.children if obj.type == 'MESH']
+    for center,width in CLAMP_POCKETS:
+        for offset in (-width*.31,0,width*.31):
+            origin = Vector((.02,(center+offset)*.001,.00028))
+            hits = []
+            for obj in parts:
+                inverse = obj.matrix_world.inverted()
+                hit,point,_,face = obj.ray_cast(inverse@origin,inverse.to_3x3()@Vector((-1,0,0)))
+                if hit:
+                    mat = obj.data.materials[obj.data.polygons[face].material_index]
+                    hits.append(((obj.matrix_world@point).x,mat.name))
+            assert hits and max(hits)[1].startswith('09 |'), ('saddle pocket is occluded',center,offset)
+    print('RAILWAY_POCKETS_OK: six visible floor rays',flush=True)
 
 
 def render(output):
@@ -314,6 +409,7 @@ if __name__ == '__main__':
     empty('MOUNT_base',root)
     empty('SOCKET_sight',root,(0,LENS_Y,AXIS))
     check_dimensions(root)
+    check_pockets(root)
     bpy.ops.wm.save_as_mainfile(filepath=str(options.output/'railway.blend'))
     bpy.ops.object.select_all(action='DESELECT')
     pieces = [o for o in root.children if o.type == 'MESH']
