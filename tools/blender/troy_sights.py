@@ -172,13 +172,59 @@ def _troy_sight(collection, parent, frame, kind, body, steel, mark):
             d = .00237 / (abs(x)+abs(z-h))
             return x*d,h+(z-h)*d
         inner = [diamond(x,z) for x,z in outer]
-        verts = [(x*scale,y-.00155*max(0,min(1,(h-z-.0026)/.003)),h+(z-h)*scale)
+        verts = [(x*scale,y,h+(z-h)*scale)
                  for outline,y,scale in [(outer,-.0023,1),(inner,-.0023,1.08),(inner,.0003,1),(outer,.0003,.97)]
                  for x,z in outline]
         n = len(outer)
         faces = [(n*j+i,n*j+(i+1)%n,n*((j+1)%4)+(i+1)%n,n*((j+1)%4)+i)
                  for j in range(4) for i in range(n)]
-        mesh('through diamond aperture leaf', verts, faces, steel, bevel=.00009)
+        leaf = mesh('through diamond aperture leaf', verts, faces, steel, bevel=.00009)
+        # Section the leaf at the existing bend stations before offsetting it.
+        # Otherwise radial quads span the bend, twist, and shade as triangles.
+        bend_top, bend_height = h-.0026, .003
+        up = frame.to_3x3() @ Vector((0,0,1))
+        forward = frame.to_3x3() @ Vector((0,1,0))
+        bm = bmesh.new()
+        bm.from_mesh(leaf.data)
+        for step in range(5):
+            z = bend_top-bend_height*step/4
+            bmesh.ops.bisect_plane(bm, geom=[*bm.verts,*bm.edges,*bm.faces], dist=1e-7,
+                                  plane_co=frame @ Vector((0,0,z)), plane_no=up)
+        # A temporary slot separates the aiming face from the finished bevel.
+        leaf.data.materials.append(steel)
+        bm.normal_update()
+        for poly in bm.faces:
+            if poly.normal.dot(forward) < -.9999:
+                poly.material_index = 1
+
+        def bend_fraction(point):
+            z = (point-frame.translation).dot(up)
+            return max(0,min(1,(bend_top-z)/bend_height))
+
+        for vert in bm.verts:
+            vert.co -= forward * (.00155*bend_fraction(vert.co))
+        bm.to_mesh(leaf.data)
+        bm.free()
+        leaf.data.update()
+        leaf.modifiers['Edge highlights'].material = 0
+        bpy.ops.object.select_all(action='DESELECT')
+        leaf.select_set(True)
+        bpy.context.view_layer.objects.active = leaf
+        bpy.ops.object.convert(target='MESH')
+        data = leaf.data
+        normals = [corner.vector.copy() for corner in data.corner_normals]
+        for poly in data.polygons:
+            if poly.material_index != 1:
+                continue
+            poly.material_index = 0
+            poly.use_smooth = True
+            # Use one shading direction across each height, independent of the
+            # radial tessellation. Ease it back to the flat face at both ends.
+            for i in poly.loop_indices:
+                t = bend_fraction(data.vertices[data.loops[i].vertex_index].co)
+                normals[i] = (-forward - up*(.8*t*(1-t))).normalized()
+        data.materials.pop(index=1)
+        data.normals_split_custom_set(normals)
         lower_mark = [(0,.02410),(.0009,.02320),(0,.02230),(-.0009,.02320)]
         face('lower aperture witness', lower_mark, -.00391,-.00388, body, bevel=0)
         inscription('leaf legend', '300-600M', .00114, (0,-.00387,.0271), (-1,0,0), (0,0,-1))
