@@ -164,20 +164,21 @@ def author_actions(root, asset, rig, parts, mag, spare, bolt, trigger, release, 
         clips[name]['events'] += [{'time': .02*d, 'event': 'start'}, {'time': out*d, 'event': 'magout'}, {'time': insert*d, 'event': 'magin'}, {'time': d-.0001, 'event': 'end'}]
         if empty: clips[name]['events'].append({'time': clear*d, 'event': 'magdrop'})
         clips[name]['events'].sort(key=lambda e: e['time']); finish(name)
-    # Roll around the supported fore-end without swinging the muzzle across the screen.
-    begin('Inspect', 3)
-    for t, loc, rot in [
-        (.12, (.008, -.008, .006), (-3, 5, 0)),
-        (.44, (.006, .058, -.073), (9, 42, 7)),
-        (.61, (.006, .053, -.069), (7, 39, 6)),
-        (1.09, (-.006, .042, -.081), (8, 45, 11)),
-        (1.41, (-.017, .048, -.075), (22, 40, 47)),
-        (1.63, (-.022, .058, -.072), (28, 35, 73)),
-        (1.95, (-.019, .056, -.069), (26, 32, 70)),
-        (2.34, (-.008, .031, -.037), (18, 20, 28)),
-        (2.67, (.005, -.006, .004), (-2, 2, -2)),
-        (2.89, (0, 0, 0), (0, 0, 0)),
-    ]: key(rig, t, loc, rot)
+    # Fractional beats keep the roll and grip paths in sync when retiming the clip.
+    inspect_duration = 4
+    begin('Inspect', inspect_duration)
+    for phase, loc, rot in [
+        (.04, (.008, -.008, .006), (-3, 5, 0)),
+        (.147, (.006, .058, -.073), (9, 42, 7)),
+        (.203, (.006, .053, -.069), (7, 39, 6)),
+        (.363, (-.006, .042, -.081), (8, 45, 11)),
+        (.47, (-.017, .048, -.075), (22, 40, 47)),
+        (.543, (-.022, .058, -.072), (28, 35, 73)),
+        (.65, (-.019, .056, -.069), (26, 32, 70)),
+        (.78, (-.008, .031, -.037), (18, 20, 28)),
+        (.89, (.005, -.006, .004), (-2, 2, -2)),
+        (.963, (0, 0, 0), (0, 0, 0)),
+    ]: key(rig, phase*inspect_duration, loc, rot)
     # Keep the support grip; seat the firing fingers on the visible side.
     pos = (.04050, -.09420, .15695)
     q = Quaternion((.682278, -.073526, -.025364, -.726944))
@@ -187,12 +188,12 @@ def author_actions(root, asset, rig, parts, mag, spare, bolt, trigger, release, 
         'thumbBase': [-1.292, -.477, -2.720],
         'thumb': [.042, 1.144],
     }
-    for t in (.20, 2.80): pose('right', t, pos, q, fitted)
+    for phase in (.067, .933): pose('right', phase*inspect_duration, pos, q, fitted)
     right_wrist = hands['right']['wrist']
-    for t in (.05, .15, 2.85, 2.95):
+    for phase in (.017, .05, .95, .983):
         right_wrist.location = xyz((.059, -.105, .159))
-        right_wrist.keyframe_insert('location', frame=t*FPS)
-    clips['Inspect']['events'] = [{'time': 2.9999, 'event': 'end'}]; finish('Inspect')
+        right_wrist.keyframe_insert('location', frame=phase*inspect_duration*FPS)
+    clips['Inspect']['events'] = [{'time': inspect_duration-.0001, 'event': 'end'}]; finish('Inspect')
     for name, d, drawing in [('Draw', .52, True), ('Holster', .34, False)]:
         begin(name, d)
         for k,a in ([(0,1),(.25,.75),(.70,.12),(.86,0),(1,0)] if drawing else [(0,0),(.15,.08),(.65,.75),(1,1)]):
