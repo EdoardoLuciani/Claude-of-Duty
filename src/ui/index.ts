@@ -65,7 +65,7 @@ const HUD_DEFAULTS = {
 };
 type HudState = Omit<typeof HUD_DEFAULTS, 'fireMode'> & {
   fireMode: WeaponMode;
-  nextMagazine?: number | null;
+  spareMagazines?: readonly number[] | null;
   cooking?: boolean;
   grenadeEquipped?: boolean;
 };
@@ -449,7 +449,7 @@ export class UiSystem {
       s.fireMode = ws.mode;
       s.ammo = ws.ammo;
       s.reserve = ws.reserve;
-      s.nextMagazine = ws.nextMagazine;
+      s.spareMagazines = ws.spareMagazines;
       s.magSize = ws.magSize;
       s.reloading = ws.reloading;
       s.magazineOut = ws.magazineOut;

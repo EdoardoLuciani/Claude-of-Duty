@@ -18,9 +18,9 @@ export class PixiAmmoView {
   readonly stage = new Container();
   private current: BitmapText;
   private reserve: BitmapText;
-  private next = new Container();
-  private nextFill = new Graphics().rect(0, -16, 10, 16).fill(INK);
-  private noSpare = new Graphics().moveTo(3, 20).lineTo(14, 3).stroke({ color: MUTED, width: 2 });
+  private spares = new Graphics();
+  private spareCount: BitmapText;
+  private spareLevels: number[] = [];
   private name: BitmapText;
   private mode: BitmapText;
   private prompt: BitmapText;
@@ -33,7 +33,7 @@ export class PixiAmmoView {
   dirty = true;
   private lastAmmo = -1;
   private lastReserve = -1;
-  private lastNext = -1;
+  private lastSpareCount = -1;
   private lastMode: AmmoState['fireMode'] | null = null;
 
   constructor() {
@@ -46,19 +46,10 @@ export class PixiAmmoView {
     this.current.anchor.set(1, 1);
     this.reserve = this.text('/ 210', 131, 96, HUD_TYPE.secondary, MUTED);
     this.reserve.anchor.y = 1;
-    this.next.position.set(132, 64);
-    this.next.visible = false;
-    this.nextFill.position.set(3, 20);
-    this.next.addChild(
-      new Graphics()
-        .poly([0, 0, 15, 0, 15, 12, 19, 24, 5, 24, 0, 12])
-        .fill(0x111b22)
-        .stroke({ color: MUTED, width: 1.5 }),
-      this.nextFill,
-      this.noSpare,
-      hudText('NEXT', 26, 5, HUD_TYPE.label, MUTED)
-    );
-    this.stage.addChild(this.next);
+    this.spareCount = this.text('', 78, 55, HUD_TYPE.label, MUTED);
+    this.spareCount.visible = this.spares.visible = false;
+    this.spares.position.set(78, 73);
+    this.stage.addChild(this.spares);
     // Warnings/reload feedback live above the readout, not below the bottom bar.
     this.prompt = this.text('', WIDTH / 2, 4, HUD_TYPE.label, AMBER);
     this.prompt.anchor.x = 0.5;
@@ -80,6 +71,61 @@ export class PixiAmmoView {
     this.dirty = writeHudText(text, value, width) || this.dirty;
   }
 
+  private updateSpares(magazines: readonly number[] | null, capacity: number): void {
+    const visible = magazines !== null;
+    if (this.spares.visible !== visible) {
+      this.spares.visible = this.spareCount.visible = visible;
+      this.reserve.visible = !visible;
+      this.current.x = visible ? 60 : 119;
+      this.dirty = true;
+    }
+    if (!magazines) return;
+    const count = magazines.length;
+    const levels = this.spareLevels;
+    let changed = count !== this.lastSpareCount;
+    if (changed) {
+      this.lastSpareCount = count;
+      levels.length = count;
+      this.label(this.spareCount, `${count} ${count === 1 ? 'SPARE' : 'SPARES'}`);
+    }
+    for (let i = 0; i < count; i++) {
+      const rounds = magazines[i];
+      const level =
+        rounds === capacity ? 4 : Math.min(3, Math.max(1, Math.round((4 * rounds) / capacity)));
+      if (level !== levels[i]) {
+        levels[i] = level;
+        changed = true;
+      }
+    }
+    if (!changed) return;
+    this.spares.clear();
+    for (let i = 0; i < count; i++) this.drawSpare(i * 22, levels[i], i === 0);
+    if (!count) {
+      this.drawSpare(0, 0, false);
+      this.spares.moveTo(2, 22).lineTo(14, 2).stroke({ color: MUTED, width: 1.5 });
+    }
+    this.dirty = true;
+  }
+
+  private drawSpare(x: number, level: number, next: boolean): void {
+    const g = this.spares;
+    const outline = [x, 0, x + 12, 0, x + 12, 9, x + 17, 24, x + 5, 24, x, 9];
+    g.poly(outline).fill(0x111b22);
+    if (level > 0) {
+      // Both sides of the silhouette bend below the shoulder. Clip the fill
+      // to those same edges rather than scaling a rectangle inside the icon.
+      const top = 24 - level * 6;
+      const left = x + Math.max(0, top - 9) / 3;
+      g.moveTo(left, top).lineTo(left + 12, top);
+      if (top < 9) g.lineTo(x + 12, 9);
+      g.lineTo(x + 17, 24).lineTo(x + 5, 24);
+      if (top < 9) g.lineTo(x, 9);
+      g.closePath().fill(INK);
+    }
+    g.poly(outline).stroke({ color: next ? AMBER : MUTED, width: 1.2 });
+    if (next) g.rect(x + 5, 26, 12, 1.5).fill(AMBER);
+  }
+
   update(_dt: number, s: AmmoState): void {
     const ammo = Math.max(0, s.ammo | 0),
       mag = Math.max(1, s.magSize | 0 || 30),
@@ -87,26 +133,9 @@ export class PixiAmmoView {
       mode = s.fireMode ?? 'auto';
     // Build per-frame label strings only when their source value changes.
     if (ammo !== this.lastAmmo) this.label(this.current, String((this.lastAmmo = ammo)));
-    const next = s.nextMagazine;
-    // Approximate the spare's fill; reserve the full silhouette for a full magazine.
-    const level =
-      next == null
-        ? -1
-        : next === 0
-          ? 0
-          : next >= mag
-            ? 4
-            : Math.max(1, Math.min(3, Math.round((4 * next) / mag)));
-    if (level !== this.lastNext) {
-      this.lastNext = level;
-      this.next.visible = level >= 0;
-      this.reserve.visible = level < 0;
-      this.noSpare.visible = level === 0;
-      this.nextFill.visible = level > 0;
-      this.nextFill.scale.y = Math.max(0, level) / 4;
-      this.dirty = true;
-    }
-    if (level < 0 && reserve !== this.lastReserve)
+    const spares = s.spareMagazines ?? null;
+    this.updateSpares(spares, mag);
+    if (!spares && reserve !== this.lastReserve)
       this.label(this.reserve, `/ ${(this.lastReserve = reserve)}`);
     this.label(this.name, s.weaponName ?? 'M4A1', 166);
     if (mode !== this.lastMode) this.label(this.mode, (this.lastMode = mode).toUpperCase());
@@ -128,7 +157,7 @@ export class PixiAmmoView {
       reloading
         ? 'RELOADING'
         : ammo === 0
-          ? level === 0
+          ? spares?.length === 0
             ? 'NO SPARE MAG'
             : 'PRESS R TO RELOAD'
           : ''

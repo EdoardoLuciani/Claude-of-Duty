@@ -4,8 +4,8 @@ export interface AmmoState {
   ammo: number;
   magSize: number;
   reserve: number;
-  /** Null/absent for pooled ammo; zero means no spare magazine. */
-  nextMagazine?: number | null;
+  /** Borrowed spare inventory in reload order; null/absent for pooled ammo. */
+  spareMagazines?: readonly number[] | null;
   weaponName?: string;
   fireMode?: WeaponMode;
   reloading?: boolean;

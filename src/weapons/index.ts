@@ -88,7 +88,7 @@ interface WeaponHudState {
   mode: WeaponMode;
   ammo: number;
   reserve: number;
-  nextMagazine: number | null;
+  spareMagazines: readonly number[] | null;
   magSize: number;
   reloading: boolean;
   magazineOut: boolean;
@@ -263,7 +263,7 @@ export class WeaponSystem {
     mode: 'auto',
     ammo: 0,
     reserve: 0,
-    nextMagazine: null,
+    spareMagazines: null,
     magSize: 0,
     reloading: false,
     magazineOut: false,
@@ -775,7 +775,7 @@ export class WeaponSystem {
     // The readout counts the chambered round but caps at magazine capacity.
     h.ammo = Math.min(a.mag, a.magSize);
     h.reserve = a.reserve;
-    h.nextMagazine = s.spareMagazines ? (s.spareMagazines[0] ?? 0) : null;
+    h.spareMagazines = s.spareMagazines ?? null;
     h.magSize = a.magSize;
     h.reloading = this.reloading;
     // Only detachable magazines (and belt pouches) have out/in beats.

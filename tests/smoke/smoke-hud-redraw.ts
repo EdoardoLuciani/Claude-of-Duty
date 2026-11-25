@@ -191,6 +191,17 @@ try {
     frame();
     assert.equal(hud.draws, before + 1, 'unchanged presentation settles again');
   }
+  const spares = [30, 15, 7];
+  state.spareMagazines = spares;
+  frame();
+  const initialSpareDraw = hud.draws;
+  spares[2] = 8; // same fill step
+  frame();
+  assert.equal(hud.draws, initialSpareDraw, 'spares redraw only on visible fill changes');
+  spares[2] = 13;
+  frame();
+  assert.equal(hud.draws, initialSpareDraw + 1, 'a non-leading spare still invalidates the HUD');
+  state.spareMagazines = null;
   // Magazine fill follows the removal/seating beats, not the progress bar.
   state.ammo = 9;
   state.reloading = true;
