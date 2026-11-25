@@ -99,6 +99,21 @@ const REF_LIGHT = MUZZLE_PROFILES.rifle.light;
 export const VIEW_FLASH_TIME = 0.005;
 export const VIEW_FLASH_DECAY = 2 / VIEW_FLASH_TIME;
 
+/** First-person flash relative to the third-person recipe. */
+const VIEW = {
+  size: 0.64, // flame sprite size
+  radiance: 0.56, // flame sprite radiance, before exposure
+  // The few-pixel core keeps this power of exposure so it still reads in daylight at low FPS.
+  coreExposure: 0.5,
+  // Frame time cap for exposure, so a hitch on the firing frame doesn't swallow the shot.
+  maxFrame: 1 / 30,
+  spill: 0.5, // world spill peak; local and brief so nearby surfaces don't strobe in a burst
+  reach: 0.7, // world spill cutoff distance
+  // Flame sprites are drawn once, at this fraction of their life: past the shader's
+  // fade-in (particles.ts, first 4.5% of life) so the pulse shows on the firing frame.
+  drawAge: 0.06,
+};
+
 function profileFor(weapon?: string | MuzzleWeapon): MuzzleProfile {
   if (!weapon) return MUZZLE_PROFILES.rifle;
   if (typeof weapon !== 'string' && weapon.suppressed) return MUZZLE_PROFILES.suppressed;
@@ -110,11 +125,13 @@ function profileFor(weapon?: string | MuzzleWeapon): MuzzleProfile {
   return MUZZLE_PROFILES.rifle;
 }
 
+/** First-person flame lives one pulse, so it is drawn on a single frame near birth: each
+ * layer's life, growth, drag, spin and end radiance only shape the third-person flash.
+ */
 function emitFlame(fx: MuzzleFx, s: ReturnType<typeof resetSpawn>, view: boolean): void {
   if (view) {
     s.life = VIEW_FLASH_TIME;
-    // Skip the shader's fade-in so the pulse is visible on the firing frame.
-    s.delay = -0.06 * s.life;
+    s.delay = -VIEW.drawAge * s.life;
     s.alphaCurve = 1.5; // Any frame sampling the end of the pulse sees only a faint tail.
     fx.emitViewAdd(s, VIEW_FLASH_TIME);
   } else {
@@ -135,16 +152,16 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
   const view = o.view === true;
   // Approximate averaging a brief pulse over the frame. At low FPS, the
   // displayed frame persists longer, so show less glare rather than more.
-  const exposure = view ? VIEW_FLASH_TIME / Math.max(VIEW_FLASH_TIME, fx.ctx.time.dt) : 1;
+  const frame = Math.min(VIEW.maxFrame, Math.max(VIEW_FLASH_TIME, fx.ctx.time.dt));
+  const exposure = view ? VIEW_FLASH_TIME / frame : 1;
   const lightGain = gain * (o.light ?? 1) * exposure;
   // Scale enemy embers with flash gain instead of retaining player-strength streaks.
   const emberGain = 0.22 + 0.78 * Math.min(1, gain);
   // Roll size jitter once, independently of radiance jitter in `gain`.
   const sc = prof.scale * (o.scale ?? o.intensity ?? 1) * (0.88 + rng.float() * 0.24);
-  const flashSize = view ? 0.64 : 1;
+  const flashSize = view ? VIEW.size : 1;
   const flameScale = sc * flashSize;
-  const flameGain = gain * (view ? 0.56 * exposure : 1);
-  const emitAdd = view ? fx.emitViewAdd : fx.emitAdd;
+  const flameGain = gain * (view ? VIEW.radiance * exposure : 1);
   const emitLit = view ? fx.emitViewLit : fx.emitLit;
   const temp = prof.temp * (0.96 + rng.float() * 0.09);
   // Blackbody ramp: 3800-4400 K at the crown, cooling to 2200 K at the lobe tips.
@@ -191,8 +208,7 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
   s.life = 0.046;
   s.drag = 12;
   setSpawnColorRamp(s, cr, cg, cb, gr, gg, gb);
-  // Preserve the tiny core against bright backgrounds, without boosting the lobes or spill.
-  const coreGain = view ? gain * 0.56 * Math.sqrt(exposure) : flameGain;
+  const coreGain = view ? gain * VIEW.radiance * exposure ** VIEW.coreExposure : flameGain;
   s.i0 = 38 * coreGain;
   s.i1 = 6 * flameGain;
   s.alphaCurve = 0.6;
@@ -267,8 +283,10 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
   s.seed = rng.float();
   emitFlame(fx, s, view);
 
-  // Near the camera, powder grains read as brief specks rather than a spray of streaks.
-  const nSpark = Math.round(prof.sparks * fx.pScale * (view ? 0.18 : 1));
+  // Forward-constrained powder cools from ~2600 K to 1200 K; velocity controls
+  // streak length so fast grains streak and slower ones remain specks.
+  // Next to the camera they read as a spray across the view, so first person has none.
+  const nSpark = view ? 0 : Math.round(prof.sparks * fx.pScale);
   blackbody(C, 2600 * temp);
   blackbody(C2, 1200);
   for (let i = 0; i < nSpark; i++) {
@@ -281,21 +299,24 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
     s = resetSpawn();
     setSpawnPosition(s, p.x + d.x * 0.012, p.y + d.y * 0.012, p.z + d.z * 0.012);
     setSpawnVelocity(s, V.x * sp, V.y * sp, V.z * sp);
-    s.tile = view ? P.SPARK : P.STREAK;
-    s.size0 = rng.range(0.005, 0.011) * (view ? 0.65 : 1);
+    s.tile = P.STREAK;
+    s.size0 = rng.range(0.005, 0.011);
     s.size1 = s.size0 * 0.4;
-    s.stretch = view ? 0 : 0.16 + sp * 0.045;
-    s.life = view ? rng.range(0.03, 0.06) : rng.range(0.1, 0.4);
+    // Length ∝ velocity (the shader multiplies by |view velocity|), with a
+    // slightly super-linear coefficient so a fast grain reads as a streak and a
+    // slow one as an ember rather than everything being the same capsule.
+    s.stretch = 0.16 + sp * 0.045;
+    s.life = rng.range(0.1, 0.4);
     s.drag = 3.2;
     s.gravity = -11;
     setSpawnColorRamp(s, C.r, C.g, C.b, C2.r, C2.g, C2.b);
-    s.i0 = rng.range(5, 11) * emberGain * (view ? 0.4 : 1);
-    s.i1 = view ? 0 : 0.15;
+    s.i0 = rng.range(5, 11) * emberGain;
+    s.i1 = 0.15;
     s.flags = 1;
     s.alphaCurve = 0.5;
     s.soft = 0.05;
     s.seed = rng.float();
-    emitAdd(s);
+    fx.emitAdd(s);
   }
 
   // Delay the small crown-smoke puff so fire reads before smoke, not as one beige cloud.
@@ -391,8 +412,9 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
     emitLit(s);
   }
 
-  // World spill is separate from the weapon light. Keep the player's spill
-  // especially local and brief so nearby surfaces don't strobe in a burst.
+  // World spill belongs to ctx.scene, separate from the first-person weapon light.
+  // Rifle reference peak is 36 cd before lightGain, with a 5*sc metre cutoff: Three's window
+  // (1-(d/cutoff)^4)^2 / d^2 confines the warm pool without bleaching distant walls.
   const lp = o.lightPos ?? p;
   fx.lights.flash(
     lp.x + d.x * 0.1,
@@ -401,10 +423,10 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
     cr,
     cg,
     cb,
-    prof.light * lightGain * (view ? 0.09 : 0.18),
+    prof.light * lightGain * 0.18 * (view ? VIEW.spill : 1),
     view ? VIEW_FLASH_TIME : 0.09,
     view ? VIEW_FLASH_DECAY : 16,
-    (view ? 3.5 : 5) * sc,
+    5 * sc * (view ? VIEW.reach : 1),
     2
   );
 

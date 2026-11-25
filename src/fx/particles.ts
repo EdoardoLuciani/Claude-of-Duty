@@ -349,6 +349,7 @@ function buildParticleMaterial(o: ParticleOptions): {
       inten.mul(float(0.72).add(float(0.28).mul(sin(t.mul(63.0).add(ph.mul(9.0)))))),
       inten
     );
+    // First-person muzzle flame starts past this fade-in (VIEW.drawAge in muzzle.ts).
     const a = aMisc.z
       .mul(pow(max(float(1.0).sub(n), 0.0), max(aMisc.w, 0.02)))
       .mul(smoothstep(0.0, 0.045, n));
