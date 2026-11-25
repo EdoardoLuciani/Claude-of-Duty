@@ -7,6 +7,38 @@ import sys
 from pathlib import Path
 import bpy
 from mathutils import Matrix, Vector
+
+sys.path[:0] = [str(Path(__file__).resolve().parent), str(Path(__file__).resolve().parents[1])]
+from attachments import check_mounts, check_sight_emission, tree
+
+
+def check_inspect_grip(end):
+    rig = bpy.data.objects['P320_RIG']
+    frame = bpy.data.objects['Frame | continuous compact medium polymer shell']
+    trigger = bpy.data.objects['Trigger | original curved blade']
+    glove = bpy.data.objects['P320_right_Charcoal_woven_glove_skin']
+    digits = [(v.index, glove.vertex_groups[max(v.groups, key=lambda g: g.weight).group].name)
+              for v in glove.data.vertices if v.groups]
+    # Sample the one-handed presentation, not the blends to/from two-handed ready.
+    for f in range(end // 10, end * 9 // 10, end // 10):
+        s.frame_set(f)
+        evaluated = glove.evaluated_get(bpy.context.evaluated_depsgraph_get())
+        shell, blade = tree([frame]), tree([trigger])
+        muzzle = rig.matrix_world.to_3x3() @ Vector((0, 1, 0))
+        on_trigger = False
+        for i, bone in digits:
+            if not bone.startswith('finger_'):
+                continue
+            p = evaluated.matrix_world @ evaluated.data.vertices[i].co
+            hit, normal, _, _ = shell.find_nearest(p)
+            assert (p - hit).dot(normal) > -.0007, (f, bone, 'finger through P320 frame/guard')
+            hit, normal, _, distance = blade.find_nearest(p)
+            assert (p - hit).dot(normal) > -.0007, (f, bone, 'finger through P320 trigger')
+            if bone.startswith('finger_0_') and distance < .0012 and normal.dot(muzzle) > .4:
+                on_trigger = True
+        assert on_trigger, (f, 'P320 index no longer contacts front of trigger')
+
+
 s=bpy.context.scene;clips=json.loads(s['clips'])
 assert s.unit_settings.system=='METRIC'
 assert len(clips)==8
@@ -48,6 +80,8 @@ for name,info in clips.items():
         if not o.animation_data:continue
         o.animation_data.action=None
         for track in o.animation_data.nla_tracks:track.mute=track.name!=name
+    if name=='Inspect':
+        check_inspect_grip(info['frames'][1])
     for frame in range(0,info['frames'][1]+1,2):
         s.frame_set(frame);bpy.context.view_layer.update()
         mechanical=bpy.data.objects['P320_SKIN']
@@ -79,48 +113,7 @@ for o in bpy.data.collections['P320 | editable weapon'].objects:
     if o.type!='MESH':continue
     assert len(o.data.polygons)>0,o.name
     assert max((Vector(o.bound_box[6])-Vector(o.bound_box[0])).length,0)>.00001,o.name
-sys.path[:0] = [str(Path(__file__).resolve().parent), str(Path(__file__).resolve().parents[1])]
-from attachments import check_mounts, check_sight_emission, tree
-
-
-def check_inspect_grip():
-    rig = bpy.data.objects['P320_RIG']
-    frame = bpy.data.objects['Frame | continuous compact medium polymer shell']
-    trigger = bpy.data.objects['Trigger | original curved blade']
-    glove = bpy.data.objects['P320_right_Charcoal_woven_glove_skin']
-    digits = [(v.index, glove.vertex_groups[max(v.groups, key=lambda g: g.weight).group].name)
-              for v in glove.data.vertices if v.groups]
-    for o in s.objects:
-        if o.animation_data:
-            for track in o.animation_data.nla_tracks:
-                track.mute = track.name != 'Inspect'
-    # Sample the one-handed presentation, not the blends to/from two-handed ready.
-    end = clips['Inspect']['frames'][1]
-    for f in range(end // 10, end * 9 // 10, end // 10):
-        s.frame_set(f)
-        depsgraph = bpy.context.evaluated_depsgraph_get()
-        shell, blade = tree([frame]), tree([trigger])
-        muzzle = rig.matrix_world.to_3x3() @ Vector((0, 1, 0))
-        evaluated = glove.evaluated_get(depsgraph)
-        mesh = evaluated.to_mesh()
-        pad_distance = math.inf
-        for i, bone in digits:
-            if not bone.startswith('finger_'):
-                continue
-            p = evaluated.matrix_world @ mesh.vertices[i].co
-            hit, normal, _, _ = shell.find_nearest(p)
-            assert (p - hit).dot(normal) > -.0007, (f, bone, 'finger through P320 frame/guard')
-            hit, normal, _, distance = blade.find_nearest(p, .0012)
-            if hit is not None:
-                assert (p - hit).dot(normal) > -.0007, (f, bone, 'finger through P320 trigger')
-                if bone.startswith('finger_0_') and normal.dot(muzzle) > .4:
-                    pad_distance = min(pad_distance, distance)
-        evaluated.to_mesh_clear()
-        assert pad_distance < .0012, (f, 'P320 index no longer contacts front of trigger')
-
-
 check_sight_emission(surface)
-check_inspect_grip()
 check_mounts(clips)
 print(f'P320_BLENDER_OK: 8 synchronized actions, wrists {maximum*1000:.4f} mm, mechanical skin/source matrix error {skin_error:.9f}, packed shared-UV atlases, rigid weights and discrete magazines')
 

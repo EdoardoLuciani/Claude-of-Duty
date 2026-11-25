@@ -170,8 +170,7 @@ def author_actions(root,asset,rig,parts,mag,spare,slide,barrel,trigger,catch,rou
         clips[name]['events']=[{'time':28/60,'event':'magazine_out'},{'time':103/60,'event':'magazine_in'}]
         if empty_reload:clips[name]['events'].append({'time':129/60,'event':'bolt_forward'})
         finish(name,end)
-    # CS2 Glock reference: quick one-handed lift into a sustained side profile,
-    # then curl the fingers and roll up to the top of the slide before regripping.
+    # CS2 Glock-18 motion reference: see the P320 authoring README.
     inspect_end=372
     begin('Inspect',inspect_end)
     for f,loc,rot in [
