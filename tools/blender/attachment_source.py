@@ -23,6 +23,8 @@ SOURCES = {
     'suppressor9mm': 'compact-9mm/suppressor9mm.blend',
     'suppressor338': 'suppressor-338/suppressor338.blend',
     'suppressor12g': '12g-suppressor/suppressor12g.blend',
+    'crest_brake': 'crest-brake/crest-brake.blend',
+    'vector_brake': 'vector-brake/vector-brake.blend',
 }
 # Whole forward grooves per weapon fit; mirrors `fits.optic[id].railSlots` in
 # src/weapons/defs.ts, which places the same optic at runtime.

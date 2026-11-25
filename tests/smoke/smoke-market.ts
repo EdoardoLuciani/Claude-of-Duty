@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import * as THREE from 'three';
 
-import { BASE_ATTACHMENTS, OPTIC_IDS } from '../../src/weapons/attachment-rules.ts';
+import { BASE_ATTACHMENTS, buildDef, OPTIC_IDS } from '../../src/weapons/attachment-rules.ts';
 import type { WeaponEntry } from '../../src/weapons/runtime-types.ts';
 import type { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { fixture } from '../lib/fixture.ts';
@@ -362,6 +362,8 @@ Object.assign(weapons, {
     acog: opticAsset(),
     laser: rigidAsset('SOCKET_laser'),
     srd762ti: rigidAsset('SOCKET_muzzle'),
+    crest_brake: rigidAsset('SOCKET_muzzle'),
+    vector_brake: rigidAsset('SOCKET_muzzle'),
   },
 });
 market.openShop();
@@ -394,6 +396,45 @@ market.cancelBuild();
 assert.equal(market.credits, 1350);
 assert.equal(weapons.getAttachments('rifle'), BASE_ATTACHMENTS);
 assert(!market.confirmBuild());
+
+const rifle = weaponState('rifle');
+const rifleBase = buildDef('rifle', BASE_ATTACHMENTS);
+const { pitch, yaw } = rifleBase.recoil;
+const riflePattern = rifle.pattern;
+const rifleMount = entries.get('rifle')?.model.scene.getObjectByName('MOUNT_muzzle');
+assert(rifleMount);
+for (const muzzle of ['crest_brake', 'vector_brake'] as const) {
+  const draft = { ...BASE_ATTACHMENTS, muzzle };
+  assert(market.beginBuild('pistol') && !market.setBuild(draft), 'no unverified brake fits');
+  assert(market.beginBuild('rifle') && market.setBuild(draft));
+  assert.notEqual(rifle.attachments.muzzle, muzzle, 'draft never equips');
+  const preview = buildDef('rifle', draft);
+  if (muzzle === 'crest_brake') {
+    assert(preview.recoil.pitch < pitch);
+    assert.equal(preview.recoil.yaw, yaw);
+  } else {
+    assert.equal(preview.recoil.pitch, pitch);
+    assert(preview.recoil.yaw < yaw);
+  }
+  assert(preview.adsTime > rifleBase.adsTime);
+  assert.equal(preview.damage, rifleBase.damage);
+  assert.equal(preview.muzzleVelocity, rifleBase.muzzleVelocity);
+  assert.equal(preview.suppressed, false);
+  const credits: number = market.credits;
+  assert(market.confirmBuild());
+  assert.equal(market.credits, credits - 300);
+  assert.deepEqual(rifle.def, preview, 'market draft and gameplay share tuning');
+  assert.equal(rifleMount.children.length, 1, 'replacement keeps just one muzzle mount');
+  const { recoil } = rifle.def;
+  assert(Math.abs(rifle.pattern[0] / riflePattern[0] - recoil.pitch / pitch) < 1e-6);
+  assert(Math.abs(rifle.pattern[1] / riflePattern[1] - recoil.yaw / yaw) < 1e-6);
+}
+assert(market.setBuild(BASE_ATTACHMENTS) && market.confirmBuild());
+assert.deepEqual(rifle.def, rifleBase);
+assert.deepEqual(rifle.pattern, riflePattern);
+assert.equal(rifleMount.children.length, 0);
+market.credits = 1350;
+
 assert(market.beginBuild('lmg') && market.setBuild(redDotLaser));
 const hudBuild = market.getHudState().build;
 assert(hudBuild);

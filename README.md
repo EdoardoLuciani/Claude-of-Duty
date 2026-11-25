@@ -8,6 +8,10 @@ Claude of Duty is a first-person survival shooter. Scout the market district bef
 wave, then hold out as enemy waves grow larger. Spend the credits you earn between waves on
 supplies, new weapons, and attachments. Or choose **Training Grounds** to try a build for free.
 
+The M4A1 can fit one muzzle attachment: the suppressor, the Crest Brake for less upward kick,
+or the Vector Brake for less side-to-side kick. Both brakes take longer to aim than stock and keep
+the normal shot sound. Preview the fitted model and compare handling in the market before confirming.
+
 ![First-person view of the player firing a rifle down a sunlit market street](docs/screenshots/market-firefight.webp)
 
 | The streets after dark                                                                                    | Build your loadout                                                                                              |

@@ -74,6 +74,8 @@ export const MODEL_COOKS = {
   suppressor9mm: attachment('compact-9mm', 'suppressor9mm.glb', 'suppressor9mm'),
   suppressor338: attachment('suppressor-338', 'suppressor338.glb', 'suppressor338'),
   srd762ti: attachment('sig-srd762ti', 'suppressor.glb', 'srd762ti'),
+  crest_brake: attachment('crest-brake', 'crest-brake.glb', 'crest_brake'),
+  vector_brake: attachment('vector-brake', 'vector-brake.glb', 'vector_brake'),
   acog: attachment('trijicon-acog', 'acog.glb', 'acog'),
   scope: attachment('schmidt-bender-pm-ii', 'scope.glb', 'scope'),
   railway: attachment('c-more-railway', 'railway.glb', 'railway', [

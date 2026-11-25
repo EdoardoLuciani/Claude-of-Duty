@@ -120,6 +120,16 @@ const STANDALONE_TOOLS: Partial<Record<ModelId, string[]>> = {
   suppressor9mm: ['tools/blender/suppressor9mm', 'tools/blender/can.py'],
   suppressor338: ['tools/blender/suppressor338', 'tools/blender/can.py'],
   suppressor12g: ['tools/blender/suppressor12g', 'tools/blender/can.py'],
+  crest_brake: [
+    'tools/blender/muzzle_brakes/crest.py',
+    'tools/blender/muzzle_brakes/brake.py',
+    'tools/blender/can.py',
+  ],
+  vector_brake: [
+    'tools/blender/muzzle_brakes/vector.py',
+    'tools/blender/muzzle_brakes/brake.py',
+    'tools/blender/can.py',
+  ],
   acog: [
     'tools/blender/acog',
     'tools/blender/mcx/primitives.py',
