@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Build every generated runtime asset, skipping steps whose inputs are unchanged.
- * Blender 5.2.2 and gltfpack 1.3 are needed only when a Blender step is stale.
+ * Blender and gltfpack are needed only when a Blender step is stale.
  * OW_SKIP_ASSETS=1 (`bun run build:ci`) skips Blender/model assets, but builds the world.
  *
  * Player arms run first, then the bandage, which re-saves player-arms.blend.
@@ -112,16 +112,6 @@ const SPENT_HULL_STEP: AssetStep = {
   commands: [blender('tools/blender/spent_hull/build.py'), bun('tools/blender/spent_hull/cook.ts')],
 };
 
-// Shared authoring sources outside a weapon's own tooling directory.
-const SHARED_TOOLS: Partial<Record<ModelId, string[]>> = {
-  mcx: ['tools/blender/review_hands.py', 'tools/blender/hand-reference.ts'],
-  m4: ['tools/blender/hand-reference.ts'],
-  p320: ['tools/blender/hand-reference.ts'],
-  m590: ['tools/blender/hand-reference.ts'],
-  ax338: ['tools/blender/hand-reference.ts'],
-  evolys: ['tools/blender/review_hands.py', 'tools/blender/hand-reference.ts'],
-  mpx: ['tools/blender/review_hands.py', 'tools/blender/hand-reference.ts'],
-};
 const STANDALONE_TOOLS: Partial<Record<ModelId, string[]>> = {
   intel_case: ['tools/blender/intel_case'],
   ammo_pickup: ['tools/blender/ammo_pickup'],
@@ -148,7 +138,12 @@ const STANDALONE_TOOLS: Partial<Record<ModelId, string[]>> = {
 function cookStep(id: ModelId, salt: string[]): AssetStep {
   const { directory, source, output } = MODEL_COOKS[id];
   const authored = authoredDirectory(id);
-  const tools = STANDALONE_TOOLS[id] ?? [`tools/blender/${id}`, ...(SHARED_TOOLS[id] ?? [])];
+  // Weapons also depend on the shared review-arm baker and hand calibration helper.
+  const tools = STANDALONE_TOOLS[id] ?? [
+    `tools/blender/${id}`,
+    'tools/blender/review_hands.py',
+    'tools/blender/hand-reference.ts',
+  ];
   return {
     id,
     inputs:
@@ -189,7 +184,9 @@ function listFiles(path: string): string[] {
 }
 
 function inputHash(step: AssetStep): string {
-  const hash = createHash('sha256').update([RECIPE, step.id, ...(step.salt ?? [])].join('\0'));
+  const hash = createHash('sha256').update(
+    [RECIPE, BLENDER_VERSION, step.id, ...(step.salt ?? [])].join('\0')
+  );
   for (const path of step.inputs.flatMap(listFiles)) {
     const bytes = readFileSync(join(ROOT, path));
     // Normalize text checkouts without decoding the binary Blender dependencies.
@@ -205,7 +202,6 @@ function inputHash(step: AssetStep): string {
 let blenderChecked = false;
 function checkBlender(): void {
   if (blenderChecked) return;
-  blenderChecked = true;
   const result = spawnSync(BLENDER, ['--version'], { encoding: 'utf8' });
   if (result.error)
     throw new Error(
@@ -213,10 +209,10 @@ function checkBlender(): void {
         'BLENDER; use `bun run build:ci` for a code-only build.'
     );
   const version = result.stdout.split('\n')[0].trim();
+  // Cache stamps key on the pinned version, so another Blender must not write products.
   if (!version.startsWith(`Blender ${BLENDER_VERSION}`))
-    console.warn(
-      `[assets] expected Blender ${BLENDER_VERSION}, found ${version}; outputs may differ`
-    );
+    throw new Error(`[assets] expected Blender ${BLENDER_VERSION}, found ${version}`);
+  blenderChecked = true;
 }
 
 const run = ([command, ...args]: [string, ...string[]], stdio: StdioOptions): Promise<number> =>

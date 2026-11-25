@@ -100,6 +100,9 @@ def finish(obj, bevel=.2, smooth=True):
         mod = obj.modifiers.new('Weighted surface normals', 'WEIGHTED_NORMAL')
         mod.keep_sharp = True
         bpy.ops.object.modifier_apply(modifier=mod.name)
+    # Only the high source needs finish coordinates. The target gets AtlasUV in the baker.
+    if not HIGH:
+        return obj
     uv = obj.data.uv_layers.new(name='FinishUV')
     for polygon in obj.data.polygons:
         axis = max(range(3),key=lambda i:abs(polygon.normal[i]))
@@ -111,7 +114,7 @@ def finish(obj, bevel=.2, smooth=True):
 
 
 def box(name, pos, size, mat, root, bevel=.2):
-    bpy.ops.mesh.primitive_cube_add(size=1, location=tuple(v * MM for v in pos))
+    bpy.ops.mesh.primitive_cube_add(size=1, calc_uvs=HIGH, location=tuple(v * MM for v in pos))
     obj = bpy.context.object
     obj.name, obj.parent = name, root
     obj.dimensions = tuple(v * MM for v in size)
@@ -125,7 +128,7 @@ def cyl(name, pos, radius, depth, mat, root, axis='Z', bevel=.1, sides=48):
     if not HIGH:
         budget = 32 if name == 'Recessed laser window' else 12 if radius < 1 else 16 if radius < 3.5 else 24
         sides = min(sides,budget)
-    bpy.ops.mesh.primitive_cylinder_add(vertices=sides,
+    bpy.ops.mesh.primitive_cylinder_add(vertices=sides, calc_uvs=HIGH,
         radius=radius * MM, depth=depth * MM, location=tuple(v * MM for v in pos))
     obj = bpy.context.object
     obj.name, obj.parent = name, root
@@ -189,20 +192,20 @@ def rounded(y0, y1, z0, z1, r, steps=5):
         for i in range(steps + 1)]
 
 
-def mark(name, value, pos, size, mat, root, receiver, side):
+def wordmark(pos, mat, root, receiver, side):
     if not HIGH:
         return
+    name = 'STEINER wordmark '+str(side)
     data = bpy.data.curves.new(name, 'FONT')
-    data.body, data.size = value, size * MM
+    data.body, data.size = 'STEINER', 4.45 * MM
     data.align_x, data.align_y, data.resolution_u = 'CENTER', 'CENTER', 3
     obj = bpy.data.objects.new(name, data)
     bpy.context.collection.objects.link(obj)
     obj.location, obj.parent = tuple(v * MM for v in pos), root
     # Left side reads forward->rear; opposite side reads rear->forward.
     obj.rotation_euler = Matrix(((0,0,side),(side,0,0),(0,1,0))).to_euler()
-    if value == 'STEINER':
-        data.offset = .04 * MM
-        obj.scale.x = .66
+    data.offset = .04 * MM
+    obj.scale.x = .66
     active(obj)
     bpy.ops.object.convert(target='MESH')
     obj['receiver'] = receiver
@@ -357,11 +360,10 @@ def geometry(mats):
     ring('Laser aperture bezel',(0,24.68,-10.5),4.1,2.35,.95,body,root)
     ring('Aperture inner retaining ring',(0,24.77,-10.5),2.35,1.78,.24,mats['steel'],root)
     cyl('Recessed laser window',(0,24.1,-10.5),1.8,.15,mats['lens'],root,'Y',.03,64)
-    # Printed brand and battery polarity, rebuilt as vectors and baked to the atlas.
+    # Printed brand, rebuilt as vectors and baked to the atlas.
     for side in (-1,1):
         receiver = 'Machined aluminum housing'
-        mark('STEINER wordmark '+str(side),'STEINER',(side*12.34,2.1 if side == -1 else -2,-15.5),4.45,
-            mats['print'],root,receiver,side)
+        wordmark((side*12.34,2.1 if side == -1 else -2,-15.5),mats['print'],root,receiver,side)
         if HIGH:
             # White square/negative inverted triangle, separate from the wordmark.
             # Keep logo in the continuous flat housing area on both faces.
@@ -372,19 +374,6 @@ def geometry(mats):
             tri = prism('Brand negative triangle '+str(side),[(y-1.95,-14.25),
                 (y+1.95,-14.25),(y,-16.7)],side*12.36,side*12.37,body,root,bevel=0)
             tri['receiver'] = receiver
-        if side == 1:
-            continue
-        mark('Battery polarity '+str(side),'+',(side*12.34,-9.9,-21.9),1.7,
-            mats['print'],root,receiver,side)
-        mark('Battery negative '+str(side),'-',(side*12.34,-9.9,-20.0),1.7,
-            mats['print'],root,receiver,side)
-        if HIGH:
-            for y,z,dy,dz in [(-10.65,-21,.14,3.6),(-9.15,-21,.14,3.6),
-                              (-9.9,-22.8,1.5,.14),(-9.9,-19.2,1.5,.14)]:
-                line = prism('Battery outline',[(y-dy/2,z-dz/2),(y+dy/2,z-dz/2),
-                    (y+dy/2,z+dz/2),(y-dy/2,z+dz/2)],side*12.34,side*12.35,
-                    mats['print'],root,bevel=0)
-                line['receiver'] = receiver
     # Resolve normals after all Boolean operations. Broad machined planes stay
     # truly flat; smoothing a perforated n-gon makes false triangular dents.
     for obj in root.children_recursive:

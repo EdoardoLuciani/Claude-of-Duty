@@ -1,7 +1,13 @@
 declare global {
   interface Window {
     __STARTUP__: {
-      stage(text: 'Loading world and assets…' | 'Preparing graphics…'): void;
+      stage(
+        text:
+          | 'Loading world…'
+          | 'Loading weapons and equipment…'
+          | 'Preparing graphics…'
+          | 'Returning to Start Menu…'
+      ): void;
       complete(): void;
       terminal(): void;
       fail(error: unknown): void;

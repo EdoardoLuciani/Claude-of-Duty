@@ -292,15 +292,11 @@ export const LIBRARY: Record<MaterialName, MaterialDefinition> = {
       macro: [0.12, 0.34, 0.12, 0.3],
       macroBig: [1.8, 0.07, 0.09, 0],
       weather: [0.25, 0.2, 0.3, 0.35],
-      normalStrength: 1.15,
-      /**
-       * Canvas passes 18% of the beam, its underside sits ~0.75 stops under its
-       * top, and the drape structure is a 10 cm fold field. This is the whole
-       * difference between fabric and painted cardboard.
-       */
-      cloth: [0.2, 0.72, 0.26, 0],
+      normalStrength: 0.8,
+      // Let the mesh supply the large folds; the material adds weave and soft backlight.
+      cloth: [0.16, 0.78, 0.08, 0],
     },
-    three: { physical: true, sheen: 0.55, sheenRoughness: 0.85, sheenColor: 0x8a8272 },
+    three: { physical: true, sheen: 0.36, sheenRoughness: 0.9, sheenColor: 0x8a8272 },
   },
   burlap: {
     surface: 'fabric',

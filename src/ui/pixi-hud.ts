@@ -1,11 +1,10 @@
-import { Container, Graphics, WebGPURenderer } from 'pixi.js';
+import { Container, Graphics, WebGPURenderer, type BitmapFont } from 'pixi.js';
 import type { Renderer } from 'three/webgpu';
 
 import { clamp01 } from '../core/math.ts';
 import type { AmmoState } from './ammo.ts';
 import type { Crosshair } from './crosshair.ts';
 import type { HealthFx, HealthState } from './health.ts';
-import type { Minimap, MinimapState } from './minimap.ts';
 import { PixiAmmoView, AMMO_WIDTH, AMMO_HEIGHT } from './pixi-ammo-view.ts';
 import { PixiCombat } from './pixi-combat.ts';
 import type { CombatModels } from './pixi-combat.ts';
@@ -15,7 +14,14 @@ import { PixiFeedback } from './pixi-feedback.ts';
 import type { FeedbackModels } from './pixi-feedback.ts';
 import { PixiInjury } from './pixi-injury.ts';
 import { PixiMinimap } from './pixi-minimap.ts';
-import { HUD_TYPE, hudText as text, setHudTextResolution, writeHudText } from './pixi-type.ts';
+import type { MinimapState } from './pixi-minimap.ts';
+import {
+  HUD_TYPE,
+  hudText as text,
+  prepareHudGlyphs,
+  setHudTextResolution,
+  writeHudText,
+} from './pixi-type.ts';
 import { setStyle } from './util.ts';
 
 /** Gameplay HUD presentation on one passive, borrowed-device WebGPU canvas. */
@@ -44,6 +50,7 @@ export class PixiHud {
     .fill(0xffffff)
     .stroke({ color: 0x080c10, width: 1 });
   private restoreAdapter: () => void = (): void => {};
+  private readonly glyphs: BitmapFont[] = [];
   private disposed = false;
   private dirty = true;
   private enabled = false;
@@ -68,6 +75,7 @@ export class PixiHud {
         parent.clientWidth || innerWidth,
         parent.clientHeight || innerHeight
       );
+      prepareHudGlyphs(hud.renderer, hud.glyphs);
       parent.insertBefore(hud.canvas, before);
       return hud;
     } catch (error) {
@@ -94,10 +102,8 @@ export class PixiHud {
     this.stage.interactiveChildren = false;
     this.injury.mesh.visible = false;
     this.stage.addChild(this.injury.mesh, this.chrome);
+    this.chrome.addChild(this.ammo.stage, this.vitals, this.minimap.stage);
     this.chrome.addChild(
-      this.ammo.stage,
-      this.vitals,
-      this.minimap.stage,
       this.combat.arcs,
       this.reticle,
       this.combat.hits,
@@ -167,7 +173,6 @@ export class PixiHud {
     s: AmmoState & HealthState,
     health: HealthFx,
     crosshair: Crosshair,
-    map: Minimap,
     mapState: MinimapState,
     opacity: number,
     models: CombatModels & FeedbackModels
@@ -256,7 +261,7 @@ export class PixiHud {
       this.dot.scale.set(dotScale);
       this.dot.alpha = dotAlpha;
     }
-    this.dirty = this.minimap.update(map, mapState) || this.ammo.dirty || this.dirty;
+    this.dirty = this.minimap.update(mapState) || this.ammo.dirty || this.dirty;
     // Controllers still advance every frame. Draw only when their presentation
     // changes, including during gameplay; time alone is not a visual change.
     if (!this.dirty) return;
@@ -273,7 +278,11 @@ export class PixiHud {
       try {
         this.injury.dispose();
       } finally {
-        this.stage.destroy({ children: true, texture: true, textureSource: true });
+        try {
+          this.stage.destroy({ children: true, texture: true, textureSource: true });
+        } finally {
+          for (const font of this.glyphs) font.destroy();
+        }
       }
     } finally {
       try {

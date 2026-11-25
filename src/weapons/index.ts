@@ -90,6 +90,7 @@ interface WeaponHudState {
   reserve: number;
   magSize: number;
   reloading: boolean;
+  magazineOut: boolean;
   reloadProgress: number;
   ads: boolean;
   spread: number;
@@ -177,6 +178,8 @@ export class WeaponSystem {
   /** Mode-change latch: the new mode needs a fresh trigger press. */
   _triggerLatched: boolean = false;
   _spread: number = 0;
+  /** Between the active reload clip's `magout` and `magin` beats. */
+  _magazineOut = false;
   _shotIndex: number = 0;
   _sinceShot: number = 10;
   _switchTo: WeaponId | null = null;
@@ -261,6 +264,7 @@ export class WeaponSystem {
     reserve: 0,
     magSize: 0,
     reloading: false,
+    magazineOut: false,
     reloadProgress: 0,
     ads: false,
     spread: 0,
@@ -375,6 +379,12 @@ export class WeaponSystem {
       )
     );
     this._off.push(ctx.events.on('game:restart', (): void => this.resetForNewGame()));
+    // The shop suspends lateUpdate; shots already fired must not play with a later weapon.
+    this._off.push(
+      ctx.events.on('market:open', (): void => {
+        if (this._viewmodel) this._emitPendingShots(this._viewmodel);
+      })
+    );
 
     this.stats = { tris, drawCalls: 0, live: 0, fired: 0 };
     console.info(
@@ -732,14 +742,14 @@ export class WeaponSystem {
     const vm = this._viewmodel;
     h.name = s.def.label;
     h.mode = s.mode;
-    // `a.mag` counts the chambered round, so a topped-off rifle is 31. The HUD
-    // draws one pip per round against magSize, so clamp the *display* to the
-    // magazine capacity rather than overflowing the pip strip.
+    // The readout counts the chambered round but caps at magazine capacity.
     h.ammo = Math.min(a.mag, a.magSize);
     h.reserve = a.reserve;
     h.magSize = a.magSize;
     h.reloading = this.reloading;
-    // 0..1 through the active reload clip; the bar is meaningless otherwise.
+    // Only detachable magazines (and belt pouches) have out/in beats.
+    h.magazineOut = h.reloading && this._magazineOut;
+    // 0..1 through the active reload clip, independent of magazine fill.
     h.reloadProgress =
       h.reloading && vm?.clip?.duration ? Math.min(1, vm.clipT / vm.clip.duration) : 0;
     h.ads = (vm?.adsT ?? 0) > 0.5;
@@ -853,6 +863,7 @@ export class WeaponSystem {
     // even if the release happened while paused/frozen.
     this._burstLeft = 0;
     this._triggerLatched = true;
+    this.audio?.play('fire_selector', null, { send: 0 });
     return s.mode;
   }
 
@@ -1078,21 +1089,35 @@ export class WeaponSystem {
     }
   }
 
-  _onClipEvent(name: string, clipName: string): void {
+  private chamberFromMagazine(onlyWhileCycling = false): void {
     const s = this.state;
+    if (s && !s.chambered && s.mag > 0 && (!onlyWhileCycling || this.cycling)) {
+      s.mag--;
+      s.chambered = true;
+    }
+  }
+
+  _onClipEvent(name: string, clipName: string): void {
     const isReload = clipName === 'reloadTac' || clipName === 'reloadEmpty';
     switch (name) {
       case 'start':
-        if (isReload) this._emitReload('start');
+        if (isReload) {
+          this._magazineOut = false;
+          this._emitReload('start');
+        }
         break;
       case 'magout':
-        if (isReload) this._emitReload('magout');
+        if (isReload) {
+          this._magazineOut = true;
+          this._emitReload('magout');
+        }
         break;
       case 'magdrop':
         if (isReload) this._dropMagazine();
         break;
       case 'magin':
         if (isReload) {
+          this._magazineOut = false;
           this._emitReload('magin');
           this._completeReload(clipName === 'reloadEmpty');
         }
@@ -1119,10 +1144,7 @@ export class WeaponSystem {
         this._queueShell(0);
         break;
       case 'chamber':
-        if (s && !s.chambered && s.mag > 0) {
-          s.mag--;
-          s.chambered = true;
-        }
+        this.chamberFromMagazine();
         break;
       case 'grenade:release':
         this._releaseGrenade();
@@ -1709,6 +1731,19 @@ export class WeaponSystem {
     return st.sprint ? base * SPREAD_MODS.sprinting : base;
   }
 
+  private _emitPendingShots(vm: ViewModel): void {
+    if (this._pendingShots === 0) return;
+    const def = this.current;
+    vm.muzzleWorld(this._firePayload.origin);
+    vm.boreDir(this._firePayload.dir);
+    if (def) this._firePayload.weapon = def;
+    for (let i = 0; i < this._pendingShots; i++) {
+      this._firePayload.seed = this._shotSeeds[i];
+      this.ctx.events.emit('weapon:fire', this._firePayload);
+    }
+    this._pendingShots = 0;
+  }
+
   lateUpdate(dt: number, ctx: EngineContext): void {
     const vm = this._viewmodel;
     if (!vm) return;
@@ -1718,17 +1753,9 @@ export class WeaponSystem {
     vm.update(dt, this._state);
 
     // ---- muzzle flash / audio, now that the pose is final ---------------
-    if (this._pendingShots > 0) {
-      const def = this.current;
-      vm.muzzleWorld(this._firePayload.origin);
-      vm.boreDir(this._firePayload.dir);
-      if (def) this._firePayload.weapon = def;
-      for (let i = 0; i < this._pendingShots; i++) {
-        this._firePayload.seed = this._shotSeeds[i];
-        ctx.events.emit('weapon:fire', this._firePayload);
-      }
-      this._pendingShots = 0;
-    }
+    this._emitPendingShots(vm);
+
+    this.player?.applyFireVibe(vm.anchor);
 
     // ---- deferred shell ejection ---------------------------------------
     for (const q of this._shellQueue) {
@@ -1737,11 +1764,11 @@ export class WeaponSystem {
       if (q.t > 0) continue;
       q.t = -1;
       if (q.weapon !== this.activeId || this.disabled) continue;
-      vm.ejectWorld(this._shellPayload.position);
-      vm.ejectVelocity(this._shellPayload.velocity, 2.3 + this.rng.float() * 1.2);
+      const { position, velocity } = this._shellPayload;
+      vm.ejectCase(position, velocity);
+      velocity.multiplyScalar(2.3 + this.rng.float() * 1.2);
       const pv = this.player?.velocity;
-      if (pv) this._shellPayload.velocity.add(pv);
-      this._shellPayload.velocity.y += 1.1;
+      if (pv) velocity.add(pv);
       const current = this.current;
       if (current) this._shellPayload.weapon = current;
       const model = vm.active?.model;
@@ -1768,8 +1795,6 @@ export class WeaponSystem {
       !this.player?.dead &&
       this._hands.state === 'weapon';
     if (laser) laser.mesh.visible = false;
-
-    this.player?.applyFireVibe(vm.anchor);
 
     if (showLaser) {
       laser.update(
@@ -1862,10 +1887,12 @@ export class WeaponSystem {
     return kind;
   }
 
-  /** Swap without the draw animation (harness + debug only). */
+  /** Swap without the draw animation: market purchases, harness and debug. */
   setWeaponImmediate(id: string): boolean {
     if (!isWeaponId(id) || !this.states.has(id)) return false;
     if (!this._hasMesh(id)) return false;
+    // Finish a bolt cycle cut short by the swap; stopClip() below drops its chamber event.
+    this.chamberFromMagazine(true);
     this._switchTo = null;
     this.activeId = id;
     // A forced swap can skip the release beat, but not a committed throw.

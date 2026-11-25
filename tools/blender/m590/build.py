@@ -13,6 +13,7 @@ import numpy as np
 from mathutils import Vector, Matrix
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import picatinny
+from review_hands import without_review_hands
 from m590.actions import author_actions
 ROOT=Path(__file__).resolve().parents[3]
 from m590.export_actions import prepare_export_actions, validate_export
@@ -301,14 +302,18 @@ def build(output, render=False, quick=False):
         tang_rings.append(bottom+list(reversed(top)))
     loft('Rear tang crown continuation',tang_rings,steel,bevel=.0001,rounded=True)
     pad=loft('Rubber buttpad',[butt_ring(-.025),butt_ring(0)],rubber,bevel=.0005,rounded=True)
-    # Recessed diagonal diamond cavities leave a real crossing rubber lattice and perimeter border.
-    # Hidden vent depth and opposite-side relief are inferred, not manufacturer machining data.
+    # Disjoint diamond prisms cut the recessed lattice in one pass, leaving the rubber border intact.
+    diamond_faces=[(3,2,1,0),(4,5,6,7)]+[(i,(i+1)%4,4+(i+1)%4,4+i) for i in range(4)]
+    verts=[];faces=[]
     for side in (-1,1):
         for row in range(2):
             for i in range(19):
                 y=-.106+i*.0065+row*.00325
                 z=butt_z+.006*(y-butt_y)/.068-.007-row*.010
-                cut(pad,profile('CUT buttpad diamond',[(z-.0056,y),(z,y+.0028),(z+.0056,y),(z,y-.0028)],.017,None,None,0,x=side*.027))
+                faces.extend(tuple(len(verts)+j for j in face) for face in diamond_faces)
+                verts.extend((side*.027+dx,y+dy,z+dz) for dx in (-.0085,.0085)
+                             for dy,dz in ((0,-.0056),(.0028,0),(0,.0056),(-.0028,0)))
+    cut(pad,mesh('CUT buttpad lattice',verts,faces,None,None,0))
     cyl('Stock sling stud',(0,-.081,.255),.0025,.009,steel,axis='Y')
     tube('Stock sling eye',(0,-.087,.255),.004,.0025,.003,steel,axis='X',sides=24)
     # Factory full bottom / twin short side Picatinny rails and ribbed tri-rail forend.
@@ -352,7 +357,7 @@ def build(output, render=False, quick=False):
                 uv.data[loop].uv=(v[axes[0]]*8,v[axes[1]]*8)
     for o in list(asset.objects):
         if o.type=='MESH':surface_uv(o)
-    clips,controls,hands=author_actions(ROOT,asset,rig,[rig,body,forend,bolt,trigger,shell],forend,bolt,trigger,shell)
+    clips,controls=author_actions(ROOT,asset,rig,[rig,body,forend,bolt,trigger,shell],forend,bolt,trigger,shell)
     scene['clips']=json.dumps(clips);scene['basis']='game (x,y,z) -> Blender (x,-z,y); export_yup=True'
     scene.frame_start=0;scene.frame_end=360
 
@@ -454,10 +459,11 @@ def build(output, render=False, quick=False):
     bpy.ops.object.select_all(action='DESELECT')
     for o in export.objects:o.select_set(True)
     bpy.context.view_layer.objects.active=copies[rig]
-    bpy.ops.export_scene.gltf(filepath=str(OUT/'m590.glb'),export_format='GLB',use_selection=True,
-        export_animations=True,export_animation_mode='ACTIONS',export_merge_animation='NLA_TRACK',export_frame_range=False,
-        export_force_sampling=False,export_optimize_animation_keep_anim_object=True,
-        export_sampling_interpolation_fallback='LINEAR',export_extras=True,export_yup=True,export_cameras=False,export_lights=False)
+    with without_review_hands():
+        bpy.ops.export_scene.gltf(filepath=str(OUT/'m590.glb'),export_format='GLB',use_selection=True,
+            export_animations=True,export_animation_mode='ACTIONS',export_merge_animation='NLA_TRACK',export_frame_range=False,
+            export_force_sampling=False,export_optimize_animation_keep_anim_object=True,
+            export_sampling_interpolation_fallback='LINEAR',export_extras=True,export_yup=True,export_cameras=False,export_lights=False)
     raw=(OUT/'m590.glb').read_bytes();length,kind=struct.unpack_from('<II',raw,12);assert kind==0x4e4f534a
     j=json.loads(raw[20:20+length])
     validate_export(j, raw[28+length:], clips)

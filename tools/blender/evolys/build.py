@@ -1,4 +1,4 @@
-"""Source-first FN EVOLYS 7.62 game art. Blender 5.2.2; no old weapon inputs.
+"""Source-first FN EVOLYS 7.62 game art. Blender 5.3.0; no old weapon inputs.
 blender -b -t 2 --python-exit-code 1 --python tools/blender/evolys/build.py
 Optional: -- --output /absolute/directory --render --quick
 Reference/photo-inferred datums and regeneration caveats: asset README.md.
@@ -15,6 +15,7 @@ from mathutils import Matrix, Vector
 ROOT=Path(__file__).resolve().parents[3]
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import picatinny
+from review_hands import without_review_hands
 from evolys.actions import author_actions
 from evolys.export import consolidate_static_surfaces, prepare_export_actions, validate_export
 from evolys.finish_atlas import bake_finish_atlas
@@ -266,8 +267,7 @@ def build(output, render=False, quick=False):
     box('Visible bolt through port',(.009,.099,-.078),(.014,.014,.065),bright,bolt,.001)
     for side in (-1,1):
         for px,py in [(615,174),(639,186),(781,182),(1059,186),(1240,179),(615,328),(1415,286),(1548,197)]:
-            z,y=zy(px,py);cyl('Torx fastener',(side*.025,y,z),.0038,.003,steel,body,'X',24)
-            box('Fastener recess',(side*.027,y,z),(.001,.0008,.003),black,body,.0001)
+            z,y=zy(px,py);cyl('Receiver fastener',(side*.025,y,z),.0038,.003,steel,body,'X',24)
         cyl('Selector axle',(side*.024,.031,.015),.007,.005,steel,body,'X',24)
         box('Selector lever',(side*.028,.033,.001),(.006,.005,.025),black,body,.001)
         text('S  A',(side*.028,.020,.025),.004,side)
@@ -302,21 +302,16 @@ def build(output, render=False, quick=False):
     empty('MOUNT_muzzle',(0,.075,barrel_end),rig)
     # Identity keeps the emitter forward and the body below its contact datum.
     empty('MOUNT_rail',(0,lower_y,-.363725),hg)
-    # Soft 100-round pouch with a rigid mounting lid and shallow seam relief.
+    # Soft 100-round pouch with a rigid lid and open fabric throat for the belt tail.
     for parent in (pouch,spare):
-        box('Pouch fabric body',(-.023,-.048,-.166),(.108,.107,.125),canvas,parent,.008)
+        fabric=box('Pouch fabric body',(-.023,-.048,-.166),(.108,.107,.125),canvas,parent,.008)
         lid=box('Pouch rigid lid',(-.023,.009,-.166),(.104,.012,.122),black,parent,.002)
         cut(lid,box('CUT pouch belt exit',(-.0593,.009,-.164),(.022,.026,.091),None,None,.002))
-        # Short open fabric throat under the lid. No solid lid or sidewall lies
-        # across the entering belt; the last rounds disappear INSIDE the pouch.
-        body_mesh=next(o for o in asset.objects if o.parent==parent and o.name.startswith('Pouch fabric body'))
-        cut(body_mesh,box('CUT pouch inner throat',(-.0593,-.012,-.164),(.022,.050,.091),None,None,.002))
-        for side in (-1,1):
-            box('Pouch stitched panel',(-.023+side*.054,-.050,-.166),(.002,.087,.105),canvas,parent,.003)
-            for z in (-.211,-.121):box('Pouch seam',(-.023+side*.055,-.050,z),(.001,.080,.0013),black,parent,.0004)
+        cut(fabric,box('CUT pouch inner throat',(-.0593,-.012,-.164),(.022,.050,.091),None,None,.002))
+        for side in (-1,1):box('Pouch stitched panel',(-.023+side*.054,-.050,-.166),(.002,.087,.105),canvas,parent,.003)
         box('Pouch front strap',(-.023,-.055,-.103),(.020,.080,.003),black,parent,.001)
         box('Pouch mount tongue',(-.005,.020,-.165),(.030,.023,.055),steel,parent,.001)
-    # Eight rounds and links in ONE rigidly weighted skinned mesh, three primitives.
+    # Eight rigidly weighted rounds and links in one skinned mesh.
     # Each Fire clip translates each bone by one 12.7 mm pitch along the feed curve.
     data=bpy.data.armatures.new('Belt bones');belt=bpy.data.objects.new('belt_rig',data);asset.objects.link(belt);belt.parent=rig
     active(belt);bpy.ops.object.mode_set(mode='EDIT')
@@ -335,22 +330,34 @@ def build(output, render=False, quick=False):
         return (x,y,-.168)
     for i in range(8):
         b=data.edit_bones.new('belt_'+str(i));b.head=xyz(belt_pos(i));b.tail=b.head+Vector((0,.012,0));b.use_deform=True
-    bpy.ops.object.mode_set(mode='OBJECT');belt_meshes=[]
-    for i in range(8):
-        x,y,z=belt_pos(i);objects=[]
-        objects.append(turned('Belt brass',x,y,[(z+.040,.005975),(z+.0385,.005975),(z+.0385,.00565),(z+.004,.0056),(z-.005,.0043),(z-.011,.0043)],brass))
-        objects.append(cyl('Belt primer',(x,y,z+.0402),.0019,.0004,brass,None,sides=20,bevel=0))
-        objects.append(turned('Belt ogive',x,y,[(z-.010,.0039),(z-.016,.0039),(z-.020,.0035),(z-.026,.0024),(z-.033,.00045),(z-.034,.0001)],copper))
-        for dz in (-.002,.012):
-            ring=cyl('Disintegrating link',(x,y,z+dz),.0065,.004,steel,None,sides=20)
-            cut(ring,cyl('CUT link bore',(x,y,z+dz),.00585,.008,None,None,sides=20,bevel=0));objects.append(ring)
-        direction=(Vector(belt_pos(i+.01))-Vector(belt_pos(i))).normalized()
-        tab=box('Link connecting tab',(x+direction.x*.006,y+direction.y*.006,z+.005),(.011,.003,.021),steel,None,.0004)
-        tab.rotation_euler=(C@Matrix.Rotation(math.atan2(direction.y,direction.x),3,'Z')@C.inverted()).to_euler();objects.append(tab)
-        for o in objects:
-            group=o.vertex_groups.new(name='belt_'+str(i));group.add(list(range(len(o.data.vertices))),1,'REPLACE');belt_meshes.append(o)
-    active(belt_meshes[0])
-    for o in belt_meshes:o.select_set(True)
+    bpy.ops.object.mode_set(mode='OBJECT')
+    # Build at the first rest position so the joined skin keeps its original bind origin.
+    x0,y0,z0=belt_pos(0)
+    round_parts=[
+        turned('Belt brass',x0,y0,[(z0+.040,.005975),(z0+.0385,.005975),(z0+.0385,.00565),(z0+.004,.0056),(z0-.005,.0043),(z0-.011,.0043)],brass),
+        turned('Belt ogive',x0,y0,[(z0-.010,.0039),(z0-.016,.0039),(z0-.020,.0035),(z0-.026,.0024),(z0-.033,.00045),(z0-.034,.0001)],copper),
+    ]
+    for dz in (-.002,.012):
+        ring=cyl('Disintegrating link',(x0,y0,z0+dz),.0065,.004,steel,None,sides=20)
+        cut(ring,cyl('CUT link bore',(x0,y0,z0+dz),.00585,.008,None,None,sides=20,bevel=0));round_parts.append(ring)
+    active(round_parts[0])
+    for o in round_parts:o.select_set(True)
+    bpy.ops.object.join();round_mesh=bpy.context.object
+    tab=box('Link connecting tab',(0,0,0),(.011,.003,.021),steel,None,.0004)
+    belt_meshes=[]
+    for i,bone in enumerate(data.bones):
+        x,y,z=belt_pos(i);direction=(Vector(belt_pos(i+.01))-Vector((x,y,z))).normalized()
+        for template,loc in ((round_mesh,(x-x0,y-y0,z-z0)),(tab,(x+direction.x*.006,y+direction.y*.006,z+.005))):
+            o=template
+            if i:
+                o=bpy.data.objects.new(template.name,template.data.copy());asset.objects.link(o)
+            o.location=xyz(loc)
+            if template==tab:o.rotation_euler=(C@Matrix.Rotation(math.atan2(direction.y,direction.x),3,'Z')@C.inverted()).to_euler()
+            belt_meshes.append((o,bone.name))
+    # Assign weights only after copying the unweighted templates.
+    active(belt_meshes[0][0])
+    for o,bone_name in belt_meshes:
+        group=o.vertex_groups.new(name=bone_name);group.add(list(range(len(o.data.vertices))),1,'REPLACE');o.select_set(True)
     bpy.ops.object.join();belt_mesh=bpy.context.object;belt_mesh.name='belt_mesh';belt_mesh.parent=belt
     mod=belt_mesh.modifiers.new('Rigid linked belt','ARMATURE');mod.object=belt
     # Consolidate only parts sharing a rigid transform, preserving all hinge nodes.
@@ -421,7 +428,8 @@ def build(output, render=False, quick=False):
     bpy.ops.object.select_all(action='DESELECT')
     for o in asset.objects:o.select_set(True)
     bpy.context.view_layer.objects.active=rig
-    bpy.ops.export_scene.gltf(filepath=str(OUT/'fn-evolys-762.glb'),export_format='GLB',use_selection=True,export_animations=True,export_animation_mode='ACTIONS',export_anim_single_armature=False,export_merge_animation='NLA_TRACK',export_frame_range=False,export_force_sampling=False,export_optimize_animation_keep_anim_object=True,export_sampling_interpolation_fallback='LINEAR',export_extras=True,export_yup=True,export_cameras=False,export_lights=False)
+    with without_review_hands():
+        bpy.ops.export_scene.gltf(filepath=str(OUT/'fn-evolys-762.glb'),export_format='GLB',use_selection=True,export_animations=True,export_animation_mode='ACTIONS',export_anim_single_armature=False,export_merge_animation='NLA_TRACK',export_frame_range=False,export_force_sampling=False,export_optimize_animation_keep_anim_object=True,export_sampling_interpolation_fallback='LINEAR',export_extras=True,export_yup=True,export_cameras=False,export_lights=False)
     raw,doc=validate_export(OUT/'fn-evolys-762.glb',clips)
     primitives=[p for n in doc['nodes'] if 'mesh' in n for p in doc['meshes'][n['mesh']]['primitives']]
     stats={'triangles':sum(doc['accessors'][p['indices']]['count']//3 for p in primitives),'primitives':len(primitives),'materials':len(doc['materials']),'images':len(doc['images']),'bytes':len(raw)}

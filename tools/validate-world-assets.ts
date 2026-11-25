@@ -6,14 +6,22 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
 
+import { PNG } from 'pngjs';
+
 import { createLadderDescriptors } from '../src/ai/ladder.ts';
 import type { ExpectedNav } from '../src/ai/nav-format.ts';
 import { unpackNav, NAV_VERSION } from '../src/ai/nav-format.ts';
 import { isRecord } from '../src/core/guards.ts';
 import { parseWorldManifest } from '../src/core/model-metadata.ts';
 import type { WorldLadder, WorldManifest } from '../src/core/model-metadata.ts';
+import {
+  DEFAULT_PLAYABLE_MAP,
+  PLAYABLE_MAPS,
+  SESSION_MODE_POLICY,
+} from '../src/core/playable-maps.ts';
 import { SURFACE_NAMES } from '../src/physics/surfaces.ts';
 import { PALETTE } from '../src/world/palette.ts';
+import { minimapSize } from './worldgen/minimap-bake.ts';
 import { worldSourceHash } from './worldgen/source-hash.ts';
 
 type JsonObject = Record<string, unknown>;
@@ -67,6 +75,13 @@ const fail = (message: string): number => errors.push(message);
 const finite = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value);
 
+/** Product names end in `.<first 12 hex of sha256(bytes)>.<ext>`, like the exporter's. */
+function checkContentHash(file: string, bytes: Uint8Array, kind: string, ext: string): void {
+  const hash = createHash('sha256').update(bytes).digest('hex').slice(0, 12);
+  if (!basename(file).endsWith(`.${hash}.${ext}`))
+    fail(`${kind} filename does not match its content hash: ${basename(file)}`);
+}
+
 function parseGlbGzip(file: string | null, kind: string): GlbAsset | null {
   if (!file) return null;
   if (!existsSync(file)) {
@@ -84,15 +99,7 @@ function parseGlbGzip(file: string | null, kind: string): GlbAsset | null {
     return null;
   }
 
-  const hashMatch = basename(file).match(/\.([a-f0-9]{12})\.glb\.gz$/);
-  if (!hashMatch) {
-    fail(`${kind} filename must contain a 12-character content hash: ${basename(file)}`);
-  } else {
-    const actual = createHash('sha256').update(compressed).digest('hex').slice(0, 12);
-    if (actual !== hashMatch[1]) {
-      fail(`${kind} filename hash is ${hashMatch[1]}, but its content hash is ${actual}`);
-    }
-  }
+  checkContentHash(file, compressed, kind, 'glb.gz');
 
   if (glb.length < 20 || glb.toString('ascii', 0, 4) !== 'glTF') {
     fail(`${kind} asset is not a binary glTF file`);
@@ -341,14 +348,21 @@ function requireUnique(ids: unknown[], label: string): void {
   });
 }
 
+const mapId = args.map ?? meta?.mapId ?? DEFAULT_PLAYABLE_MAP.id;
+const map = PLAYABLE_MAPS.find((entry): boolean => entry.id === mapId);
+const survival = !!map && SESSION_MODE_POLICY[map.mode].survivalSystems;
 if (meta) {
+  if (!map) fail(`unknown playable map ID ${describe(mapId)}`);
+  else if (meta.mapId !== map.id) fail(`manifest map ID does not match ${map.id}`);
   const { bounds, WORLD, spawns, lights, volumes, query } = meta;
   for (let i = 0; i < 3; i++) {
     if (bounds.min[i] > bounds.max[i]) fail(`manifest bounds are inverted on axis ${i}`);
   }
   const intel = WORLD?.MARKERS?.INTEL ?? [];
-  if (intel.length !== 14)
-    fail(`WORLD.MARKERS.INTEL must contain 14 authored points, found ${intel.length}`);
+  // Intel exists only alongside the survival systems that consume it.
+  const intelCount = survival ? 14 : 0;
+  if (map && intel.length !== intelCount)
+    fail(`WORLD.MARKERS.INTEL must contain ${intelCount} authored points, found ${intel.length}`);
   requireUnique(
     intel.map((marker): string => marker.id),
     'intel marker'
@@ -369,8 +383,22 @@ if (meta) {
       fail(`manifest.lights[${index}] has invalid kind`);
   });
   if (!volumes) fail('manifest.volumes must be an array');
-  if (!query?.street) fail('manifest.query.street is invalid');
+  if (survival && !query?.street) fail('manifest.query.street is invalid');
   if (!query?.alleys) fail('manifest.query.alleys must be an array');
+}
+
+function validateMinimap(file: string | null, meta: WorldManifest | null): void {
+  if (!file || !meta) return;
+  try {
+    const bytes = readFileSync(file);
+    checkContentHash(file, bytes, 'minimap', 'png');
+    const image = PNG.sync.read(bytes);
+    const { width, height } = minimapSize(meta.bounds);
+    if (image.width !== width || image.height !== height)
+      fail(`minimap PNG dimensions must be ${width}×${height}`);
+  } catch (error) {
+    fail(`minimap PNG is invalid: ${errorMessage(error)}`);
+  }
 }
 
 async function parseNavGzip(
@@ -390,15 +418,7 @@ async function parseNavGzip(
     fail(`nav asset is not a readable gzip stream: ${errorMessage(error)}`);
     return null;
   }
-  const hashMatch = basename(file).match(/\.([a-f0-9]{12})\.bin\.gz$/);
-  if (!hashMatch) {
-    fail(`nav filename must contain a 12-character content hash: ${basename(file)}`);
-  } else {
-    const actual = createHash('sha256').update(compressed).digest('hex').slice(0, 12);
-    if (actual !== hashMatch[1]) {
-      fail(`nav filename hash is ${hashMatch[1]}, but its content hash is ${actual}`);
-    }
-  }
+  checkContentHash(file, compressed, 'nav', 'bin.gz');
   try {
     const navigation = object(manifest.navigation);
     if (
@@ -453,7 +473,8 @@ async function parseNavGzip(
 
 const visualAsset = parseGlbGzip(resolveAsset('visual'), 'visual');
 const collisionAsset = parseGlbGzip(resolveAsset('collision'), 'collision');
-const navAsset = await parseNavGzip(resolveAsset('nav'));
+validateMinimap(resolveAsset('minimap'), meta);
+const navAsset = survival ? await parseNavGzip(resolveAsset('nav')) : null;
 const visual = inspectVisual(visualAsset);
 const collision = inspectCollision(collisionAsset);
 const actual = visual && collision ? { ...visual, collideTris: collision.collideTris } : null;

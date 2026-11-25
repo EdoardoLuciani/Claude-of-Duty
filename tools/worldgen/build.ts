@@ -1,6 +1,6 @@
 import type { Assembler } from './builder.ts';
 import type { BuildingInfo } from './buildings.ts';
-import { buildBuilding, collapseRoof, exteriorStairBoxes } from './buildings.ts';
+import { buildBuilding, dressCollapse, exteriorStairBoxes } from './buildings.ts';
 import {
   registerDressingProps,
   dressStreet,
@@ -13,14 +13,26 @@ import { BUILDINGS } from './level/layout.ts';
 import type { ClearanceBox } from './placement.ts';
 import { clearDoorwayClutter, clearVolumeClutter, placeBaked } from './placement.ts';
 import { registerProps } from './props.ts';
-import { keyedRng } from './util.ts';
+
+// Low-triangle groups measured on Survival; keep larger and distance-LOD props separate.
+const BATCHED_PROPS = new Set([
+  'barrel_blue',
+  'block_big',
+  'block_small',
+  'cabinet',
+  'fan',
+  'lamp_post',
+  'mattress',
+  'sign_board',
+  'sign_hang',
+]);
 
 /**
  * Populate an Assembler with the complete authored level. Each element draws
  * from its own `keyedRng` stream; there is no level-wide random sequence.
  */
 export function buildWorld(A: Assembler): BuildingInfo[] {
-  registerProps(A);
+  registerProps(A, BATCHED_PROPS);
   registerDressingProps(A);
   buildGround(A);
 
@@ -28,13 +40,7 @@ export function buildWorld(A: Assembler): BuildingInfo[] {
   for (const spec of BUILDINGS) {
     const info = buildBuilding(A, spec);
     buildings.push(info);
-    if (spec.collapse) {
-      const rng = keyedRng('collapse', spec.id);
-      collapseRoof(A, rng, spec, info, {
-        x: spec.x + rng.range(-2, 2),
-        z: spec.z + rng.range(-2, 2),
-      });
-    }
+    if (spec.collapseDebris) dressCollapse(A, info, ...spec.collapseDebris);
   }
 
   buildGate(A);

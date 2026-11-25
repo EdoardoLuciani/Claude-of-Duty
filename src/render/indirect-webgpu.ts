@@ -129,7 +129,7 @@ export class IndirectFill {
   _ground: Vector3 = new Vector3();
   _tmp: Vector3 = new Vector3();
   _tmp2: Vector3 = new Vector3();
-  _patched: WeakSet<MeshStandardNodeMaterial> = new WeakSet();
+  _patches = new Map<MeshStandardNodeMaterial, () => void>();
 
   constructor(ctx: IndirectContext) {
     this.ctx = ctx;
@@ -168,17 +168,25 @@ export class IndirectFill {
   }
 
   patch(material: Material | null | undefined): void {
-    if (!(material instanceof MeshStandardNodeMaterial) || this._patched.has(material)) return;
+    if (!(material instanceof MeshStandardNodeMaterial) || this._patches.has(material)) return;
     if (material.userData.owNoPatch) return;
-    this._patched.add(material);
-    const original = material.setupEnvironment.bind(material);
+    // oxlint-disable-next-line typescript/unbound-method -- preserve hook identity; call with its original receiver below.
+    const original = material.setupEnvironment;
+    const restore = (): void => {
+      material.setupEnvironment = original;
+      material.removeEventListener('dispose', restore);
+      this._patches.delete(material);
+      material.needsUpdate = true;
+    };
+    this._patches.set(material, restore);
+    material.addEventListener('dispose', restore);
     const viewCamera = this.ctx.viewCamera;
     const wrapEnvironment = (node: Node, view: boolean): IndirectEnvironmentNode =>
       new IndirectEnvironmentNode(node, this, view);
     // NodeMaterial's public lighting hook: preserve the actual environment
     // sampling and add diffuse-only fill in the same PBR lighting context.
     material.setupEnvironment = function (builder: NodeBuilder): EnvironmentNode | null {
-      const env = original(builder);
+      const env = original.call(material, builder);
       // Shared library materials can appear in BOTH passes. Viewmodel prewarm
       // compiles them in a temporary scene, but always with the view camera.
       return env instanceof EnvironmentNode && env.envNode !== null
@@ -186,6 +194,11 @@ export class IndirectFill {
         : env;
     };
     material.needsUpdate = true; // also correct materials compiled before they were registered
+  }
+
+  dispose(): void {
+    // Shared materials can outlive the renderer that supplied their lighting.
+    for (const restore of this._patches.values()) restore();
   }
 
   update(light: IndirectLight, sky: IndirectSky): void {

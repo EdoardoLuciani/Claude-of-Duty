@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
+import { WORLD_BATCH_TINT } from '../../src/core/model-metadata.ts';
 import type { MaterialOptions } from '../../src/materials/index.ts';
 import type { SurfaceName } from '../../src/physics/surfaces.ts';
 import { PALETTE as WORLD_PALETTE } from './palette.ts';
@@ -11,6 +12,7 @@ export type { AssemblyOptions, InstanceMasks } from './util.ts';
 export interface PrototypeSpec {
   geo: THREE.BufferGeometry;
   visualGeo?: THREE.BufferGeometry;
+  visualOnly?: boolean;
   key: string;
   ballisticSurface?: SurfaceName;
   sheetThickness?: number;
@@ -20,11 +22,14 @@ export interface PrototypeSpec {
   chunk?: boolean;
   maxDist?: number;
   noPrepass?: boolean;
+  /** Fold only the visual instances into the existing static batch of the same palette. */
+  batchVisual?: boolean;
 }
 export interface Prototype {
   id: string;
   geo: THREE.BufferGeometry | null;
   visualGeo: THREE.BufferGeometry | null;
+  visualOnly: boolean;
   key: string;
   ballisticSurface: SurfaceName;
   sheetThickness: number;
@@ -34,11 +39,18 @@ export interface Prototype {
   chunk: boolean;
   maxDist: number;
   noPrepass: boolean;
+  batchVisual: boolean;
   matrices: THREE.Matrix4[];
   masks: Array<InstanceMasks | null>;
 }
 export interface AssemblyMaterials {
   get(name: string, opts: MaterialOptions): THREE.Material;
+}
+
+interface VisualBatch {
+  mesh: THREE.Mesh;
+  acc: Accum;
+  tints: { start: number; end: number; rgb: InstanceMasks }[];
 }
 
 const PALETTE: Partial<
@@ -86,6 +98,7 @@ export class Assembler {
   declare _static: Map<string, Accum>;
   declare _protos: Map<string, Prototype>;
   declare _geoCache: Map<string, THREE.BufferGeometry>;
+  private readonly collisionGeometries: THREE.BufferGeometry[] = [];
   declare meshes: THREE.Mesh[];
   declare interiorLights: THREE.Vector3Like[];
   declare lampAnchors: THREE.Vector3Like[];
@@ -236,6 +249,7 @@ export class Assembler {
       id,
       geo: spec.geo,
       visualGeo: spec.visualGeo ?? null,
+      visualOnly: spec.visualOnly ?? false,
       key: spec.key,
       ballisticSurface:
         spec.ballisticSurface ?? PALETTE[spec.key]?.ballisticSurface ?? this.surfaceOf(spec.key),
@@ -257,6 +271,7 @@ export class Assembler {
       matrices: [],
       masks: [],
       noPrepass: !!spec.noPrepass,
+      batchVisual: spec.batchVisual ?? false,
     });
     return id;
   }
@@ -324,6 +339,7 @@ export class Assembler {
    * Collision/nav must not change when visual-only draw organization changes.
    * Both outputs borrow this assembler's geometry/materials until disposal. */
   finalize(root: THREE.Object3D, collisionSource: THREE.Object3D | null = null): this {
+    const visualBatches = new Map<string, VisualBatch>();
     // --- merged static geometry ---
     for (const [key, acc] of this._static) {
       if (acc.empty) continue;
@@ -342,7 +358,37 @@ export class Assembler {
       mesh.userData.collision = false; // cooked into a separate derived asset
       mesh.updateMatrix();
       root.add(mesh);
-      collisionSource?.add(mesh.clone());
+      if (collisionSource) {
+        if (acc.visualRanges.length === 0) collisionSource.add(mesh.clone());
+        else {
+          const indices = geo.index!.array;
+          let count = indices.length;
+          for (const [start, end] of acc.visualRanges) count -= end - start;
+          if (count > 0) {
+            // Same index width as the render geometry, which shares its positions.
+            const physical =
+              indices instanceof Uint32Array ? new Uint32Array(count) : new Uint16Array(count);
+            let offset = 0;
+            let cursor = 0;
+            for (const [start, end] of acc.visualRanges) {
+              physical.set(indices.subarray(cursor, start), offset);
+              offset += start - cursor;
+              cursor = end;
+            }
+            physical.set(indices.subarray(cursor), offset);
+            // Index ranges survive the render weld; the cooker owns the physics weld.
+            const geometry = new THREE.BufferGeometry()
+              .setAttribute('position', geo.getAttribute('position'))
+              .setAttribute('_solid', geo.getAttribute('_solid'))
+              .setIndex(new THREE.BufferAttribute(physical, 1));
+            const collider = mesh.clone();
+            collider.geometry = geometry;
+            this.collisionGeometries.push(geometry);
+            collisionSource.add(collider);
+          }
+        }
+      }
+      acc.visualRanges.length = 0;
       this.meshes.push(mesh);
       this.stats.staticTris += geo.index!.count / 3;
       this.stats.drawCalls++;
@@ -382,10 +428,14 @@ export class Assembler {
         buckets.set(0, [...Array(n).keys()]);
       }
 
+      // Opted-in props draw inside their palette's static batch; collision keeps the buckets.
+      if (p.batchVisual) this.foldVisualProp(p, p.visualGeo ?? p.geo, visualBatches);
       // The fixed grid can split a compact cloud across cell boundaries. Join
       // whole visual buckets within a bounded X/Z span to trade culling for fewer draws.
       // Distance-LOD clouds keep their original bounds and visibility decisions.
-      const chunks = [...buckets.values()].map((list): number[] => list.slice());
+      const chunks = p.batchVisual
+        ? []
+        : Array.from(buckets.values(), (list): number[] => list.slice());
       if (p.chunk && p.maxDist === 0 && chunks.length > 1) {
         const bounds = chunks.map((list): THREE.Box3 => {
           const box = new THREE.Box3();
@@ -412,7 +462,7 @@ export class Assembler {
 
       const mat = this.mat(p.key);
       for (const [target, lists] of [
-        [collisionSource, buckets.values()],
+        [p.visualOnly ? null : collisionSource, buckets.values()],
         [root, chunks],
       ] satisfies [THREE.Object3D | null, Iterable<number[]>][]) {
         if (!target) continue;
@@ -463,7 +513,65 @@ export class Assembler {
       p.masks.length = 0;
     }
 
+    for (const { mesh, acc, tints } of visualBatches.values()) {
+      const source = mesh.geometry;
+      this.stats.staticTris += acc.tris - source.index!.count / 3;
+      // The canonical collision mesh may still borrow this geometry or its attributes.
+      if (collisionSource) this.collisionGeometries.push(source);
+      else source.dispose();
+      mesh.geometry = acc.build();
+      if (tints.length) {
+        const colors = new Float32Array(acc.verts * 3).fill(1);
+        for (const { start, end, rgb } of tints)
+          for (let i = start; i < end; i++) colors.set(rgb, i * 3);
+        mesh.geometry.setAttribute(WORLD_BATCH_TINT, new THREE.BufferAttribute(colors, 3));
+      }
+    }
+
     return this;
+  }
+
+  private foldVisualProp(
+    p: Prototype,
+    geometry: THREE.BufferGeometry,
+    batches: Map<string, VisualBatch>
+  ): void {
+    let batch = batches.get(p.key);
+    const name = `world_${p.key}`;
+    const mesh = batch?.mesh ?? this.meshes.find((m): boolean => m.name === name);
+    const palette = PALETTE[p.key];
+    const opts = palette?.opts;
+    if (
+      !mesh ||
+      !p.castShadow ||
+      !p.receiveShadow ||
+      p.noPrepass ||
+      p.maxDist ||
+      palette?.surface === 'glass' ||
+      opts?.localSpace ||
+      opts?.alphaMask ||
+      opts?.three?.transparent ||
+      opts?.three?.alphaTest ||
+      Object.keys(geometry.morphAttributes).length ||
+      Object.keys(geometry.attributes).some(
+        (name): boolean => !['position', 'normal', 'uv', 'color', '_solid'].includes(name)
+      )
+    )
+      throw new Error(`[world] ${p.id} is incompatible with the static visual batch for ${p.key}`);
+
+    if (!batch) {
+      batch = { mesh, acc: new Accum(mesh.name).add(mesh.geometry), tints: [] };
+      batches.set(p.key, batch);
+    }
+    for (const [i, transform] of p.matrices.entries()) {
+      if (transform.determinant() <= 0)
+        throw new Error(`[world] ${p.id} needs a positive transform for static visual batching`);
+      const start = batch.acc.verts;
+      batch.acc.add(geometry, transform);
+      const rgb = p.masks[i];
+      if (rgb && (rgb[0] !== 1 || rgb[1] !== 1 || rgb[2] !== 1))
+        batch.tints.push({ start, end: batch.acc.verts, rgb });
+    }
   }
 
   dispose(): void {
@@ -474,6 +582,8 @@ export class Assembler {
       m.parent?.remove(m);
     }
     this.meshes.length = 0;
+    for (const geo of this.collisionGeometries) geo.dispose();
+    this.collisionGeometries.length = 0;
     for (const p of this._protos.values()) {
       p.geo?.dispose();
       if (p.visualGeo !== p.geo) p.visualGeo?.dispose();

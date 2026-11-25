@@ -337,6 +337,19 @@ for (const width of [1, 14]) {
 // the second remains disconnected and must retain visible observation alternatives.
 const map = await loadMap(),
   grid = await SurfaceNav.load(map.surfaceRaw, map.physics);
+// E5's street-facing opaque curtain blocks the chest and head sightlines.
+{
+  const levelToWorld = new THREE.Matrix4().fromArray(map.meta.transform);
+  const eye = v(-1.5, 1.577, 27.78).applyMatrix4(levelToWorld);
+  for (const y of [1.416, 1.746]) {
+    const target = v(7.4, y, 27.4).applyMatrix4(levelToWorld);
+    assert.equal(
+      map.physics.lineOfSight(eye, target, map.physics.MASK.SIGHT),
+      false,
+      'E5 curtain occludes sight'
+    );
+  }
+}
 // A suspended observer cannot keep broadcasting a frozen visual contact.
 {
   const ai = makeAi(grid),
@@ -395,7 +408,8 @@ const map = await loadMap(),
 }
 for (const [from, target, reachable] of [
   [[-3.384, 0.091, -3.351], [-5.65, 8.16, 8.512], true],
-  [[-12, 0.074, -17.265], [-12.943, 8.165, -6.762], false],
+  // BN1 has no authored access, unlike the walkable W3 ruin and its ladder.
+  [[26.542, 0.136, 44.337], [23.005, 8.16, 46.693], false],
 ] as const) {
   const ai = makeAi(grid);
   const a = makeAgent({

@@ -383,7 +383,9 @@ function tyre(stagger: number, r = 0.33, visualOnly = false): THREE.BufferGeomet
     [0.505, 0.18],
     [0.52, 0.45],
   ].map(([pr, py]): THREE.Vector2 => new THREE.Vector2(pr * r, py * HW));
-  const g = new THREE.LatheGeometry(prof, radial);
+  // Lathe expects a bottom-to-top profile for outward-facing triangles.
+  // Correct the rendered derivative without changing the canonical cook.
+  const g = new THREE.LatheGeometry(visualOnly ? prof.reverse() : prof, radial);
   const pa = g.getAttribute('position');
   for (let i = 0; i < pa.count; i++) {
     const x = pa.getX(i);
@@ -1249,13 +1251,10 @@ export function burntCar(): THREE.BufferGeometry {
  * Register every instanced prototype. Called once, before the level is built.
  * Prototype ids are the vocabulary dressing.ts and interiors.ts draw from.
  */
-export function registerProps(A: Assembler): Assembler {
-  const P = (
-    id: string,
-    key: string,
-    geo: THREE.BufferGeometry,
-    opts: Omit<PrototypeSpec, 'geo' | 'key'> = {}
-  ): string => A.proto(id, { geo, key, ...opts });
+export function registerProps(A: Assembler, batchVisual?: ReadonlySet<string>): Assembler {
+  type Options = Omit<PrototypeSpec, 'geo' | 'key' | 'batchVisual'>;
+  const P = (id: string, key: string, geo: THREE.BufferGeometry, opts: Options = {}): string =>
+    A.proto(id, { geo, key, ...opts, batchVisual: batchVisual?.has(id) ?? false });
   // Each prototype owns its stream: adding or editing one never reshapes another.
   const R = (id: string): Rng => keyedRng('prop', id);
 
@@ -1294,7 +1293,7 @@ export function registerProps(A: Assembler): Assembler {
   P('block_small', 'concrete_dark', concreteBlock(R('block_small'), 0.55, 0.42, 0.4), {
     skirt: 0.31,
   });
-  const T = (id: string, r: number, opts: Omit<PrototypeSpec, 'geo' | 'key'> = {}): void => {
+  const T = (id: string, r: number, opts: Options = {}): void => {
     // Visual and canonical tyres share one stagger so collision matches.
     const stagger = R(id).float() * 6.28;
     P(id, 'rubber', tyre(stagger, r), { visualGeo: tyre(stagger, r, true), ...opts });
@@ -1335,13 +1334,17 @@ export function registerProps(A: Assembler): Assembler {
   P('rebar', 'metal_rust', rebarBundle(R('rebar')));
   P('plank_a', 'wood_prop', plank(R('plank_a')), { maxDist: 90, castShadow: false });
   P('plank_b', 'wood_prop_dark', plank(R('plank_b')), { maxDist: 90, castShadow: false });
-  P('litter', 'wood_pale', litterPaper(R('litter')), { maxDist: 45, castShadow: false });
+  P('litter', 'wood_pale', litterPaper(R('litter')), {
+    maxDist: 45,
+    castShadow: false,
+    visualOnly: true,
+  });
   /**
    * Contact fillets. Registered last so `put()` can find it, and never given a
    * skirt of its own. maxDist keeps them off the far half of the map, where
    * the contact line is a pixel wide anyway.
    */
-  P('dust_skirt', 'dust_skirt', dustSkirt(), { maxDist: 42, castShadow: false });
+  P('dust_skirt', 'dust_skirt', dustSkirt(), { maxDist: 42, castShadow: false, visualOnly: true });
   P('bottle', 'glass', bottle(), { maxDist: 55, castShadow: false });
   P('can', 'steel', can(), { maxDist: 45, castShadow: false });
 
@@ -1360,6 +1363,10 @@ export function registerProps(A: Assembler): Assembler {
   // damage
   // 3.2 cm base radius: the callers scale it 0.5-1.5x, so pocks land at 3-10 cm
   // across. At the old 5.5 cm base a single rifle strike was 16 cm wide.
-  P('pock', 'concrete_dark', pockGeometry(R('pock'), 0.032), { maxDist: 65, castShadow: false });
+  P('pock', 'concrete_dark', pockGeometry(R('pock'), 0.032), {
+    maxDist: 65,
+    castShadow: false,
+    visualOnly: true,
+  });
   return A;
 }

@@ -18,8 +18,10 @@ import {
   spallPatch,
 } from './kit.ts';
 import { STREET, BUILDINGS, SET_PIECES, GATE } from './level/layout.ts';
+import { ROOF_FIXTURES } from './level/roof-fixtures.ts';
 import { burntCar } from './props.ts';
 import { isOpen, groundY } from './queries.ts';
+import type { ClothOptions } from './util.ts';
 import {
   clothGeometry,
   catenaryTube,
@@ -440,6 +442,41 @@ function streetLampGrounding(A: Assembler): void {
 }
 
 // --- cables, laundry --------------------------------------------------------
+/** Fit the upper seam to the actual rendered cable, including droop and sway. */
+function laundryCloth(
+  line: THREE.TubeGeometry,
+  t: number,
+  w: number,
+  h: number,
+  opts: ClothOptions
+): THREE.BufferGeometry {
+  const { path, tubularSegments: segments } = line.parameters;
+  const a = path.getPointAt(0);
+  const b = path.getPointAt(1);
+  const span = Math.hypot(b.x - a.x, b.z - a.z);
+  const yaw = Math.atan2(a.z - b.z, b.x - a.x);
+  const point = new THREE.Vector3();
+  const next = new THREE.Vector3();
+  // TubeGeometry spaces its rings by arc length; interpolate between those rings.
+  const onLine = (f: number): THREE.Vector3 => {
+    const at = THREE.MathUtils.clamp(f, 0, 1) * segments;
+    const i = Math.min(Math.floor(at), segments - 1);
+    path.getPointAt(i / segments, point);
+    path.getPointAt((i + 1) / segments, next);
+    return point.lerp(next, at - i);
+  };
+  const centre = onLine(t).clone();
+  const frame = LL(IDENT, centre.x, centre.y - h / 2, centre.z, yaw).clone();
+  const inverse = frame.clone().invert();
+  return clothGeometry(w, h, {
+    ...opts,
+    topEdge: (u): THREE.Vector3 =>
+      onLine(t + ((u - 0.5) * w) / span)
+        .clone()
+        .applyMatrix4(inverse),
+  }).applyMatrix4(frame);
+}
+
 function overheadLines(A: Assembler): void {
   const insulator = (x: number, y: number, z: number): void => {
     A.add('concrete_dark', BOX_FINE(A), LL(IDENT, x, y, z, 0, 0.24, 0.16, 0.1), {
@@ -477,20 +514,13 @@ function overheadLines(A: Assembler): void {
     const dx = x1 - x0;
     const dz = z1 - z0;
     const len = Math.hypot(dx, dz);
-    const ry = Math.atan2(-dz, dx);
     const n = Math.max(2, Math.round(len / 1.7));
-    const K = Math.cosh(1.5) - 1;
     for (let i = 0; i < n; i++) {
       const t = (i + 0.5) / n;
       if (rng.float() < 0.12) continue;
-      // hang from the line where the line actually is: same catenary as the tube
-      const droop = (Math.cosh(1.5) - Math.cosh((t - 0.5) * 3)) / K;
-      const px = x0 + dx * t;
-      const pz = z0 + dz * t;
-      const py = y0 + (y1 - y0) * t - SAG * droop - 0.03;
       const w = rng.range(0.72, 1.15);
       const h = rng.range(0.85, 1.45);
-      const cloth = clothGeometry(w, h, {
+      const cloth = laundryCloth(line, t, w, h, {
         segX: 9,
         segY: 10,
         sag: rng.range(0.18, 0.3),
@@ -502,12 +532,9 @@ function overheadLines(A: Assembler): void {
         fray: rng.range(0.01, 0.03),
         bow: x0 > 0 ? -1 : 1,
       });
-      A.addOnce(
-        rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream', 'burlap']),
-        cloth,
-        LL(IDENT, px, py - h / 2 + 0.02, pz, ry, 1, 1, 1),
-        { masks: [0.3, rng.range(0.4, 0.8), 0.2] }
-      );
+      A.addOnce(rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream', 'burlap']), cloth, null, {
+        masks: [0.3, rng.range(0.4, 0.8), 0.2],
+      });
     }
   }
 }
@@ -567,6 +594,11 @@ function facadeHangings(A: Assembler): void {
 
 // --- rubble -----------------------------------------------------------------
 function rubbleDust(A: Assembler): void {
+  for (const [x, z, yaw, w, h, d] of SET_PIECES.rubbleCover) {
+    A.addBox('concrete_prop', BOX_SOFT(A), x, groundY(x, z) + h / 2 - 0.04, z, yaw, w, h, d, {
+      masks: [0.3, 0.75, 0.45],
+    });
+  }
   for (const [x, z, radius, count] of SET_PIECES.rubble) {
     const rng = keyedRng('rubble', x, z);
     const y = groundY(x, z);
@@ -575,18 +607,9 @@ function rubbleDust(A: Assembler): void {
 }
 
 function streetRubble(A: Assembler): void {
-  for (const [x, z] of [
-    [-5.4, 16.5],
-    [5.5, 11.0],
-    [-5.6, 2.0],
-    [5.6, -4.0],
-    [-5.5, -13.5],
-    [5.4, -19.0],
-    [-5.3, -25.5],
-    [5.5, -33.0],
-  ]) {
+  for (const [x, z, radius, count] of SET_PIECES.streetRubble) {
     const rng = keyedRng('street-rubble', x, z);
-    rubbleMound(A, rng, x, groundY(x, z), z, rng.range(1.1, 1.9), rng.int(18, 30), {
+    rubbleMound(A, rng, x, groundY(x, z), z, radius, count, {
       key: 'concrete_prop',
     });
   }
@@ -604,7 +627,6 @@ export function dressBuildings(A: Assembler, infos: BuildingInfo[]): void {
 
 function dressBuilding(A: Assembler, rng: Rng, info: BuildingInfo): void {
   const spec = info.spec;
-  const top = info.roofY;
 
   // ---- AC units, conduit and sat dishes hung off the open facades ----
   for (const wnd of info.windows) {
@@ -632,7 +654,7 @@ function dressBuilding(A: Assembler, rng: Rng, info: BuildingInfo): void {
       A.addOnce('metal_dark', line, null, { masks: [0.3, 0.6, 0] });
       for (let i = 0; i < 2; i++) {
         const t = 0.3 + i * 0.4;
-        const cloth = clothGeometry(rng.range(0.3, 0.5), rng.range(0.4, 0.7), {
+        const cloth = laundryCloth(line, t, rng.range(0.3, 0.5), rng.range(0.4, 0.7), {
           segX: 5,
           segY: 6,
           sag: 0.1,
@@ -641,18 +663,9 @@ function dressBuilding(A: Assembler, rng: Rng, info: BuildingInfo): void {
           fray: 0.012,
           rng,
         });
-        A.addOnce(
-          rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream']),
-          cloth,
-          LL(
-            IDENT,
-            a[0] + (b[0] - a[0]) * t,
-            a[1] - 0.35,
-            a[2] + (b[2] - a[2]) * t,
-            ryOf(pm) + Math.PI / 2
-          ),
-          { masks: [0.35, 0.6, 0.2] }
-        );
+        A.addOnce(rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream']), cloth, null, {
+          masks: [0.35, 0.6, 0.2],
+        });
       }
     }
   }
@@ -660,6 +673,7 @@ function dressBuilding(A: Assembler, rng: Rng, info: BuildingInfo): void {
   // ---- balconies get lived in ----
   for (const bal of info.balconies) {
     const pm = bal.pm;
+    const rng = keyedRng('balcony-rug', spec.id, bal.side, bal.floor, bal.bay);
     // rug over the railing — instantly reads as inhabited
     if (rng.float() < 0.55) {
       const cloth = clothGeometry(rng.range(0.8, 1.4), rng.range(0.7, 1.1), {
@@ -676,31 +690,20 @@ function dressBuilding(A: Assembler, rng: Rng, info: BuildingInfo): void {
         rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream']),
         cloth,
         LL(IDENT, wp[0], wp[1], wp[2], ryOf(pm) + Math.PI),
-        { masks: [0.4, 0.55, 0.2] }
+        { masks: [0.4, 0.55, 0.2], visualOnly: true }
       );
     }
   }
 
-  // ---- roof detail ----
-  // Roofs are playable ground in this map (balconies and parapets are the
-  // elevation layer), so they get real density, not a token water tank.
-  // The ROOF plate, not the ground footprint. On a setback building the two
-  // differ by a couple of metres, and using the footprint hangs water tanks,
-  // aerials and crate stacks in mid-air over the terrace void.
+  // Fixtures follow the roof plate, including any setback.
+  const roof = ROOF_FIXTURES[spec.id];
+  if (!roof) return;
   const rs = info.roofSpec ?? spec;
-  const rx0 = rs.x - rs.w / 2 + 1.0;
-  const rx1 = rs.x + rs.w / 2 - 1.0;
-  const rz0 = rs.z - rs.d / 2 + 1.0;
-  const rz1 = rs.z + rs.d / 2 - 1.0;
-  const roofY = top + 0.02;
-  // Collision-cooked roof dressing must not lid the roof stair hole or block the
-  // ladder climb-out beside it (1.1 m exit + capsule radius).
-  const hole = spec.stairHoles?.[info.floorY.length];
-  const blocksHole = (b: THREE.Box3): boolean => !!hole && overlapsRect(b, hole, 1.2);
-  // rooftop laundry line between the parapets
-  if (rs.w > 10 && rng.float() < 0.4) {
-    const a = [rs.x - rs.w / 2 + 0.4, roofY + 1.0, rng.range(rz0, rz1)];
-    const b = [rs.x + rs.w / 2 - 0.4, roofY + 0.96, rng.range(rz0, rz1)];
+  const roofY = info.roofY + 0.02;
+  if (roof.line) {
+    const [nearZ, farZ, garments] = roof.line;
+    const a = [rs.x - rs.w / 2 + 0.4, roofY + 1.0, rs.z + nearZ];
+    const b = [rs.x + rs.w / 2 - 0.4, roofY + 0.96, rs.z + farZ];
     const line = catenaryTube(a, b, 0.3, 0.01, { seg: 10, radial: 4 });
     A.addOnce('metal_dark', line, null, { masks: [0.3, 0.6, 0] });
     for (const sx of [-1, 1]) {
@@ -722,59 +725,35 @@ function dressBuilding(A: Assembler, rng: Rng, info: BuildingInfo): void {
         }
       );
     }
-    const n = rng.int(2, 5);
-    for (let i = 0; i < n; i++) {
-      const t = (i + 0.5) / n;
-      const cloth = clothGeometry(rng.range(0.5, 0.8), rng.range(0.45, 0.8), {
+    for (const [i, [key, w, h, sag, wrinkle, twist, fray, seed, grime]] of garments.entries()) {
+      const cloth = laundryCloth(line, (i + 0.5) / garments.length, w, h, {
         segX: 7,
         segY: 8,
-        sag: rng.range(0.12, 0.22),
-        wrinkle: rng.range(0.045, 0.075),
-        twist: rng.range(0.08, 0.18),
-        fray: rng.range(0.01, 0.025),
-        rng,
+        sag,
+        wrinkle,
+        twist,
+        fray,
+        seed,
       });
-      A.addOnce(
-        rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream', 'burlap']),
-        cloth,
-        LL(
-          IDENT,
-          a[0] + (b[0] - a[0]) * t,
-          a[1] - 0.5 - 0.22 * Math.sin(t * Math.PI),
-          a[2] + (b[2] - a[2]) * t,
-          0
-        ),
-        { masks: [0.3, rng.range(0.4, 0.8), 0.2] }
-      );
+      A.addOnce(key, cloth, null, { masks: [0.3, grime, 0.2] });
     }
   }
-  // aerials: thin, tall, and they do a lot for a skyline
-  for (let i = 0; i < rng.int(1, 3); i++) {
-    const px = rng.range(rx0, rx1);
-    const pz = rng.range(rz0, rz1);
-    const h = rng.range(1.4, 3.2);
-    // Footprint including the crossbars.
+
+  const hole = spec.stairHoles?.[info.floorY.length];
+  for (const [x, z, h, bars] of roof.aerials ?? []) {
+    const px = rs.x + x;
+    const pz = rs.z + z;
     _box.min.set(px - 0.5, roofY, pz - 0.5);
     _box.max.set(px + 0.5, roofY, pz + 0.5);
-    if (blocksHole(_box)) continue;
+    if (hole && overlapsRect(_box, hole, 1.2))
+      throw new Error(`[world] ${spec.id} roof aerial blocks stair access`);
     const pipe = A.cache('aerial', (): THREE.BufferGeometry => tubeY(0.018, 1, { radial: 5 }));
     A.add('metal_rust', pipe, LL(IDENT, px, roofY, pz, 0, 1, h, 1), { masks: [0.9, 0.5, 0.1] });
-    for (let k = 0; k < 4; k++) {
+    for (const [k, [yaw, length]] of bars.entries()) {
       A.add(
         'metal_rust',
         pipe,
-        LL(
-          IDENT,
-          px,
-          roofY + h * (0.5 + k * 0.11),
-          pz,
-          rng.float() * 3.14,
-          1,
-          rng.range(0.25, 0.5),
-          1,
-          0,
-          Math.PI / 2
-        ),
+        LL(IDENT, px, roofY + h * (0.5 + k * 0.11), pz, yaw, 1, length, 1, 0, Math.PI / 2),
         { masks: [0.9, 0.5, 0.1] }
       );
     }
@@ -802,7 +781,7 @@ function alleyLines(A: Assembler): void {
     const n = rng.int(2, 4);
     for (let i = 0; i < n; i++) {
       const f = (i + 0.5) / n;
-      const cloth = clothGeometry(rng.range(0.45, 0.8), rng.range(0.5, 1.0), {
+      const cloth = laundryCloth(t, f, rng.range(0.45, 0.8), rng.range(0.5, 1.0), {
         segX: 6,
         segY: 8,
         sag: rng.range(0.12, 0.22),
@@ -811,18 +790,9 @@ function alleyLines(A: Assembler): void {
         fray: rng.range(0.01, 0.025),
         rng,
       });
-      A.addOnce(
-        rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream', 'burlap']),
-        cloth,
-        LL(
-          IDENT,
-          x0 + (x1 - x0) * f,
-          y0 + (y1 - y0) * f - 0.6 - 0.4 * Math.sin(f * Math.PI),
-          z0 + (z1 - z0) * f,
-          Math.atan2(-(z1 - z0), x1 - x0)
-        ),
-        { masks: [0.3, rng.range(0.4, 0.8), 0.2] }
-      );
+      A.addOnce(rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream', 'burlap']), cloth, null, {
+        masks: [0.3, rng.range(0.4, 0.8), 0.2],
+      });
     }
   }
 }

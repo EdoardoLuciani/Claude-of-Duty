@@ -2,6 +2,7 @@
 import json
 import struct
 import bpy
+from review_hands import without_review_hands
 from m4.finishes import consolidate_finishes
 
 def active(o):
@@ -22,18 +23,19 @@ def export_asset(output, asset, parents, separate, clips):
     # gathering static children; hidden-parent scale must not bake into them.
     bpy.ops.object.select_all(action='DESELECT')
     for o in asset.objects:o.select_set(True)
-    bpy.ops.export_scene.gltf(
-        filepath=str(OUT/'m4a1-block-ii.glb'), export_format='GLB',
-        use_selection=True, export_animations=True,
-        export_animation_mode='ACTIONS', export_merge_animation='NLA_TRACK',
-        export_anim_single_armature=False, export_texcoords=True,
-        export_vertex_color='NAME', export_vertex_color_name='FinishColor',
-        export_all_vertex_colors=False,
-        export_frame_range=False, export_force_sampling=False,
-        export_optimize_animation_keep_anim_object=True,
-        export_sampling_interpolation_fallback='LINEAR', export_extras=True,
-        export_yup=True, export_cameras=False, export_lights=False,
-    )
+    with without_review_hands():
+        bpy.ops.export_scene.gltf(
+            filepath=str(OUT/'m4a1-block-ii.glb'), export_format='GLB',
+            use_selection=True, export_animations=True,
+            export_animation_mode='ACTIONS', export_merge_animation='NLA_TRACK',
+            export_anim_single_armature=False, export_texcoords=True,
+            export_vertex_color='NAME', export_vertex_color_name='FinishColor',
+            export_all_vertex_colors=False,
+            export_frame_range=False, export_force_sampling=False,
+            export_optimize_animation_keep_anim_object=True,
+            export_sampling_interpolation_fallback='LINEAR', export_extras=True,
+            export_yup=True, export_cameras=False, export_lights=False,
+        )
     path=output/'m4a1-block-ii.glb'
     raw=path.read_bytes();length=struct.unpack_from('<I',raw,12)[0];doc=json.loads(raw[20:20+length])
     # Count both magazines/cartridge instances even when glTF deduplicates buffers.

@@ -9,15 +9,15 @@ threaded barrel are game-fit adaptations, not a certified factory replica.
 [Runtime cook](../../../build/README.md)
 
 Sources live in `tools/blender/p320/`: `build.py` stages geometry/materials,
-`surfaces.py` and `color_uv.py` own bake surfaces/lettering UVs, `skin.py` owns
-nine rigid bones, and `actions.py`/`export.py` own eight clips and 60 Hz export.
-The mechanical skin and two ordinary barrel-owned muzzle-state meshes share the atlas.
-The blend retains editable high bake sources. Native and cooked exports use one
-physical material and four 1024² maps; color uses UV1, other maps UV0.
+`surfaces.py` owns the bake surfaces and UV layout, `skin.py` owns the rigid
+bones, and `actions.py`/`export.py` own the clips and sampled export.
+The mechanical skin and two ordinary barrel-owned muzzle-state meshes share one
+opaque material and one UV layout across all four maps. The blend retains
+editable high bake sources, including the slide wordmark and SIGLITE insets.
 Preserve STEP magazines, sockets, events, hand contacts and runtime slide overrides.
 Shared arms and `hand-reference.json` are read-only; ordinary builds never refit.
 
-Run from the repository root with Blender 5.2.2 and gltfpack 1.3:
+Run from the repository root with Blender 5.3.0 and gltfpack 1.3:
 
 ```sh
 blender -b -t 8 --python-exit-code 1 --python tools/blender/p320/build.py

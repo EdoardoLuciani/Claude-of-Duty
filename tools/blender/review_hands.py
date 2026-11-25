@@ -1,8 +1,22 @@
 """Shared Blender review-arm baking; no weapon geometry or runtime exports."""
+from contextlib import contextmanager
 import math
 import bpy
 from mathutils import Vector, Quaternion, Matrix
 
+SUFFIX=' | authored hands (shared appearance)'
+
+@contextmanager
+def without_review_hands():
+    """Exclude review arms from the view layer, so glTF sampling skips their skins."""
+    layers=[l for l in bpy.context.view_layer.layer_collection.children if l.name.endswith(SUFFIX)]
+    assert layers,'review arms are missing from the view layer'
+    for layer in layers:layer.exclude=True
+    try:yield
+    finally:
+        for layer in layers:layer.exclude=False
+
+# Three's intrinsic XYZ composes Rx*Ry*Rz; mathutils Euler XYZ uses the opposite order.
 def eq(e):return Quaternion((1,0,0),e[0])@Quaternion((0,1,0),e[1])@Quaternion((0,0,1),e[2])
 
 def author_review_hands(root,rig,hand_controls,all_parts,clips,*,basis,label,frame_step=2):
@@ -11,7 +25,7 @@ def author_review_hands(root,rig,hand_controls,all_parts,clips,*,basis,label,fra
     C=basis;CI=C.inverted()
     orientation=C@source_basis.inverted()
     scene=bpy.context.scene
-    collection=bpy.data.collections.new(label+' | authored hands (shared appearance)');scene.collection.children.link(collection)
+    collection=bpy.data.collections.new(label+SUFFIX);scene.collection.children.link(collection)
     with bpy.data.libraries.load(str(root/'.cache/blender/player/arms/player-arms.blend'),link=False) as (available,loaded):loaded.objects=list(available.objects)
     objects=[o for o in loaded.objects if o];source=next(o for o in objects if o.type=='ARMATURE')
     meshes=[o for o in objects if o.type=='MESH' and any(m.type=='ARMATURE' for m in o.modifiers)]
@@ -49,7 +63,10 @@ def author_review_hands(root,rig,hand_controls,all_parts,clips,*,basis,label,fra
             for name,start,end in [('upper',shoulder,elbow),('fore',elbow,hand)]:
                 z=(start-end).normalized();y=Vector((0,1,0));y=(y-z*y.dot(z)).normalized();x=y.cross(z);out[name]=mat(start,Matrix((x,y,z)).transposed().to_quaternion())
         return out
-    bind={s:game_matrices(s,True) for s in arms};cm=C.to_4x4();cmi=source_basis.inverted().to_4x4()
+    inverse_bind={side:{name:m.inverted() for name,m in game_matrices(side,True).items()} for side in arms}
+    scale={side:Matrix.Diagonal((-1,1,1,1) if side=='right' else (.97,.97,.97,1)) for side in arms}
+    inverse_transform={side:(orientation.to_4x4()@s).inverted() for side,s in scale.items()}
+    cm=C.to_4x4();cmi=source_basis.inverted().to_4x4()
     for name,info in clips.items():
         for o in all_parts:
             for track in o.animation_data.nla_tracks:track.mute=track.name!=name
@@ -63,8 +80,8 @@ def author_review_hands(root,rig,hand_controls,all_parts,clips,*,basis,label,fra
         for f in frames:
             scene.frame_set(math.floor(f),subframe=f%1)
             for side,arm in arms.items():
-                current=game_matrices(side);s=Matrix.Diagonal((-1,1,1,1) if side=='right' else (.97,.97,.97,1));transform=orientation.to_4x4()@s;desired={}
-                for pb in arm.pose.bones:desired[pb.name]=transform.inverted()@(cm@current[pb.name]@bind[side][pb.name].inverted()@cmi)@s@pb.bone.matrix_local
+                current=game_matrices(side);desired={}
+                for pb in arm.pose.bones:desired[pb.name]=inverse_transform[side]@(cm@current[pb.name]@inverse_bind[side][pb.name]@cmi)@scale[side]@pb.bone.matrix_local
                 for pb in arm.pose.bones:
                     pb.rotation_mode='QUATERNION';basis=pb.bone.matrix_local.inverted()
                     if pb.parent:basis=basis@pb.parent.bone.matrix_local@desired[pb.parent.name].inverted()
@@ -72,3 +89,4 @@ def author_review_hands(root,rig,hand_controls,all_parts,clips,*,basis,label,fra
                     for prop in ('location','rotation_quaternion','scale'):pb.keyframe_insert(prop,frame=f,group=pb.name)
         for arm in arms.values():
             ad=arm.animation_data;a=ad.action;t=ad.nla_tracks.new();t.name=name;st=t.strips.new(name,0,a);st.action_frame_start=0;st.action_frame_end=math.ceil(info['frames'][1]);st.extrapolation='HOLD';ad.action=None;t.mute=True
+    return list(collection.objects)

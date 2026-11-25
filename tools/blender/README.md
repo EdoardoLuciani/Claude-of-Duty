@@ -16,8 +16,12 @@ explicitly refits calibration. MCX's `animations.py` authors its mechanisms and
 Committed manifests may retain source-path notes from an older export; use the
 current recipe README commands below rather than historical paths embedded in products.
 
-Use **Blender 5.2.2** and its bundled glTF exporter. Each recipe README owns its asset
-contract, build/check commands, declared inputs, references and acceptance limits:
+Use **Blender 5.3.0** and its bundled glTF exporter. The playable build uses the
+upstream Blender distribution with Python 3.13; keep recipes compatible with it
+when using a distro package that embeds a newer Python.
+
+Each recipe README owns its asset contract, build/check commands, declared inputs,
+references and acceptance limits:
 [M4](m4/README.md),
 [MCX](mcx/README.md),
 [P320](p320/README.md),
@@ -85,9 +89,11 @@ transitions, and do not replace in-engine captures and final human approval.
 - Build factory-empty into an absolute `--output` scratch directory first.
   `--render` is optional; `--quick` changes preview samples/resolution only.
 - Shared review-arm appearance and versioned hand calibration are read-only
-  inputs, not exported duplicate arms. `review_hands.py` owns the shared
-  EVOLYS/MPX/MCX review-arm baker; each caller supplies its own basis, controls and
-  clips. Source attachment checks include those skins. Missing inputs fail. Refit
+  inputs, not exported duplicate arms. `review_hands.py` owns the review-arm
+  baker shared by every weapon; each caller supplies its own basis, controls and
+  clips. Source attachment checks include those skins. Wrap the glTF export in
+  `without_review_hands()`: otherwise the exporter re-evaluates the arm skins on
+  every frame it samples. Missing inputs fail. Refit
   calibration separately and intentionally, never automatically during a normal rebuild.
 - Save editable components/modifiers/sparse poses before preparing runtime copies.
   Preserve each weapon's own UV strategy, sampling lattice, fractional endpoints,

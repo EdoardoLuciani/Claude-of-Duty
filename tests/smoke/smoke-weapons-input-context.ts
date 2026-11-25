@@ -319,6 +319,12 @@ for (const [primary, first, second] of [
   wp._completeReload(true);
   assert(wp.state.chambered && wp.state.mag === wp.current.magSize - 1);
 }
+{
+  const { wp } = makeHarness();
+  assert(wp.applyBuild('sniper', BASE_ATTACHMENTS) && wp.tryFire() && wp.cycling);
+  assert(wp.applyBuild('pistol', BASE_ATTACHMENTS) && wp.setWeaponImmediate('sniper'));
+  assert(wp.state.chambered, 'a market swap finishes the interrupted bolt cycle');
+}
 
 // A market swap selects the new gun without drawing it over a cooking grenade.
 {
@@ -1032,6 +1038,51 @@ for (const blocked of ['disabled', 'frozen', 'dead', 'controls', 'input']) {
 /*  frame-rate independent cadence (issue 605)                              */
 /* ======================================================================== */
 
+// World brass must leave the live animated port, even with separate ADS FOVs.
+{
+  const camera = new THREE.PerspectiveCamera(24, 1.7);
+  camera.position.set(4, 2, -3);
+  camera.rotation.y = 1.8;
+  const viewCamera = camera.clone();
+  viewCamera.fov = 52;
+  viewCamera.updateProjectionMatrix();
+  const anchor = new THREE.Group();
+  anchor.position.copy(viewCamera.position);
+  anchor.quaternion.copy(viewCamera.quaternion);
+  const root = new THREE.Group();
+  anchor.add(root);
+  root.position.set(0.12, -0.17, -0.35);
+  root.rotation.set(0.13, 0.2, -0.1);
+  const port = new THREE.Object3D();
+  root.add(port);
+  port.position.set(0.026, 0.08, -0.02);
+
+  const ctx = createTestContext({ camera, viewCamera });
+  const ejectDir = new THREE.Vector3(1, 0.4, 0.2).normalize();
+  const active = fixture<WeaponEntry>({
+    ejectionSocket: port,
+    model: fixture<WeaponEntry['model']>({ root }),
+    ejectDir,
+  });
+  const position = new THREE.Vector3(),
+    direction = new THREE.Vector3();
+  Viewmodel.prototype.ejectCase.call(fixture<Viewmodel>({ active, ctx }), position, direction);
+  const pixel = (p: THREE.Vector3, c: THREE.Camera): THREE.Vector2 => {
+    const { x, y } = p.clone().project(c);
+    return new THREE.Vector2(x, y);
+  };
+  const launch = port.getWorldPosition(new THREE.Vector3());
+  const viewPixel = pixel(launch, viewCamera);
+  const worldPixel = pixel(position, camera);
+  assert(viewPixel.distanceTo(worldPixel) < 1e-6);
+  const expected = pixel(
+    launch.add(ejectDir.clone().transformDirection(root.matrixWorld)),
+    viewCamera
+  );
+  const actual = pixel(position.add(direction), camera);
+  assert(expected.sub(viewPixel).normalize().distanceTo(actual.sub(worldPixel).normalize()) < 1e-6);
+}
+
 // Real update() + lateUpdate(): record accepted rounds, fire events and seeds.
 interface CadenceHarness extends WeaponHarness {
   events: { fire: number; shell: number; seeds: number[] };
@@ -1053,8 +1104,7 @@ function cadenceHarness(id: WeaponId): CadenceHarness {
   });
   wp.viewmodel.update = (): void => {};
   wp.viewmodel.boreDir = (out): THREE.Vector3 => out;
-  wp.viewmodel.ejectWorld = (out): THREE.Vector3 => out;
-  wp.viewmodel.ejectVelocity = (out): THREE.Vector3 => out;
+  wp.viewmodel.ejectCase = (): void => {};
   const pellets = Math.max(1, wp.state.def.pellets ?? 1);
   const times: number[] = [];
   let t = 0;

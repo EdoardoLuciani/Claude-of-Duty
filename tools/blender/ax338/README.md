@@ -14,7 +14,7 @@ Preserve 60°/100 mm bolt motion, the 1.1 s cycle, 2.8/3.6 s reloads, events,
 STEP visibility and spent-ammo persistence. Runtime sampling normalizes rotations.
 The registered cook uses 16-bit colors/positions without added simplification.
 
-Run from the repository root with Blender 5.2.2 and gltfpack 1.3:
+Run from the repository root with Blender 5.3.0 and gltfpack 1.3:
 
 ```sh
 blender -b -t 2 --python-exit-code 1 --python tools/blender/ax338/build.py

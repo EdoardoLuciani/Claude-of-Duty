@@ -19,6 +19,8 @@ export type MaskPainter = (
   out: number[]
 ) => void;
 export interface AssemblyOptions {
+  /** Render-only; defaults to the geometry's `userData.visualOnly` mark. */
+  visualOnly?: boolean;
   masks?: InstanceMasks;
   paint?: MaskPainter;
 }
@@ -53,6 +55,8 @@ export interface ClothOptions {
   hem?: number;
   fray?: number;
   bow?: number;
+  /** Position of the upper seam in local space, by normalized cloth width. */
+  topEdge?: (u: number) => THREE.Vector3Like;
 }
 
 /**
@@ -204,6 +208,7 @@ export class Accum {
   declare col: number[] | null;
   declare solid: number[] | null;
   declare idx: number[] | null;
+  readonly visualRanges: [start: number, end: number][] = [];
   constructor(name = 'merged') {
     this.name = name;
     this.pos = [];
@@ -285,6 +290,7 @@ export class Accum {
     }
 
     this.solidCount += solidCount;
+    const start = this.idx!.length;
     if (index) {
       const a = index.array;
       for (let i = 0; i < a.length; i++) this.idx!.push(base + a[i]);
@@ -292,6 +298,12 @@ export class Accum {
     } else {
       for (let i = 0; i < pa.count; i++) this.idx!.push(base + i);
       this.tris += pa.count / 3;
+    }
+    const end = this.idx!.length;
+    if ((opts?.visualOnly ?? geo.userData.visualOnly === true) && end > start) {
+      const last = this.visualRanges.at(-1);
+      if (last?.[1] === start) last[1] = end;
+      else this.visualRanges.push([start, end]);
     }
     return this;
   }
@@ -712,6 +724,7 @@ export function runoffStreak(
   g.setIndex(idx);
   g.computeBoundingBox();
   g.computeBoundingSphere();
+  g.userData.visualOnly = true; // a surface stain, never a ledge
   return g;
 }
 
@@ -868,6 +881,7 @@ export function clothGeometry(w: number, h: number, opts: ClothOptions = {}): TH
      * it bows out into the street instead of through the wall behind it.
      */
     bow = 1,
+    topEdge,
   } = opts;
   const u0 = uRange ? uRange[0] : 0;
   const u1 = uRange ? uRange[1] : 1;
@@ -889,6 +903,9 @@ export function clothGeometry(w: number, h: number, opts: ClothOptions = {}): TH
     return f < 0.5 ? f * 4 - 1 : 3 - f * 4;
   };
 
+  const seam = topEdge
+    ? Array.from({ length: nx }, (_, i): THREE.Vector3Like => topEdge(u0 + (i / segX) * (u1 - u0)))
+    : null;
   for (let j = 0; j < ny; j++) {
     for (let i = 0; i < nx; i++) {
       const k = j * nx + i;
@@ -914,9 +931,11 @@ export function clothGeometry(w: number, h: number, opts: ClothOptions = {}): TH
         y -= fray * (0.3 + 0.7 * Math.abs(Math.sin(u * 8.7 + seed * 1.7)));
         x += fray * 0.35 * Math.sin(u * 15.3 + seed);
       }
-      P[k * 3] = x;
-      P[k * 3 + 1] = y;
-      P[k * 3 + 2] = z;
+      const pin = seam?.[i];
+      const blend = v * v;
+      P[k * 3] = pin ? THREE.MathUtils.lerp(x, pin.x, blend) : x;
+      P[k * 3 + 1] = pin ? y + blend * (pin.y - (y + (1 - v) * h)) : y;
+      P[k * 3 + 2] = pin ? THREE.MathUtils.lerp(z, pin.z, blend) : z;
       UV[k * 2] = uu;
       UV[k * 2 + 1] = v;
       // the hem: a rolled bead at the bottom, a narrower one at the other edges
@@ -1110,6 +1129,8 @@ export function catenaryTube(
   const curve = new THREE.CatmullRomCurve3(pts);
   const g = new THREE.TubeGeometry(curve, seg, radius, radial, false);
   g.computeBoundingBox();
+  // A centimetre cable is not cover; simplified, it collapses into a sheet.
+  g.userData.visualOnly = true;
   return g;
 }
 

@@ -17,7 +17,7 @@ const assets = baseline.assets;
 const stats = baseline.stats;
 const directory = mkdtempSync(join(tmpdir(), 'cod-world-validator-'));
 try {
-  for (const kind of ['visual', 'collision', 'nav']) {
+  for (const kind of ['visual', 'collision', 'minimap', 'nav']) {
     const name = assets[kind];
     assert(typeof name === 'string');
     symlinkSync(join(world, name), join(directory, name));
@@ -36,6 +36,11 @@ try {
   const good = run(baseline);
   assert.equal(good.status, 0, good.stdout + good.stderr);
   assert.match(good.stdout, /\[validate-world\] ok/);
+
+  const badMinimap = run({ ...baseline, assets: { ...assets, minimap: assets.visual } });
+  assert.equal(badMinimap.status, 1);
+  assert.match(badMinimap.stderr, /minimap filename does not match its content hash/);
+  assert.match(badMinimap.stderr, /minimap PNG is invalid/);
 
   // Schema errors come from the runtime parser; cross-record errors are aggregated.
   const malformed = run({ ...baseline, transform: [1, 2] });

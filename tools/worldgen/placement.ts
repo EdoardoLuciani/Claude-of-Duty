@@ -23,7 +23,7 @@ export interface ClearanceBox extends RectXZ {
  * a `/` is shorthand for `prototype/id`; a scalar scale is uniform. */
 export type PlacementRow = [string, string, Vec3, Vec3, number | Vec3, InstanceMasks?];
 
-const PLACEMENTS = PLACEMENT_ROWS.map(
+export const PLACEMENTS = PLACEMENT_ROWS.map(
   ([prototype, id, position, rotationDeg, scale, masks]): Placement => ({
     id: id.includes('/') ? id : `${prototype}/${id}`,
     prototype,

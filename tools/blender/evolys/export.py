@@ -1,4 +1,5 @@
 """Weapon-local runtime curves and read-only validation of stock glTF output."""
+from itertools import pairwise
 import json
 import math
 import struct
@@ -101,7 +102,7 @@ def validate_export(path, clips):
             offset=28+length+view.get('byteOffset',0)+accessor.get('byteOffset',0)
             times=struct.unpack_from('<'+'f'*accessor['count'],raw,offset)
             assert times[0]==0 and times[-1]==expected
-            assert all(a<b for a,b in zip(times,times[1:]))
+            assert all(a<b for a,b in pairwise(times))
         for channel in animation['channels']:
             sampler=animation['samplers'][channel['sampler']]
             # One-key curves are always baked with our LINEAR fallback; one key cannot interpolate.

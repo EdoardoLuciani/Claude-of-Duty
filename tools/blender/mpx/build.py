@@ -3,6 +3,7 @@ blender -b --threads 2 --python-exit-code 1 --python tools/blender/mpx/build.py 
 Original reference-informed game art; never manufacturing geometry.
 """
 import argparse
+from itertools import pairwise
 import json
 import math
 from pathlib import Path
@@ -17,6 +18,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import picatinny
+from review_hands import without_review_hands
 from mpx.actions import author_actions
 from mpx.animations import prepare_export_actions
 from mpx.finishes import consolidate_finishes
@@ -125,8 +127,11 @@ def build(output, render=False, quick=False):
     normal_map = image('mpx-normal', norm*.5+.5)
 
 
-    def material(name, color, metal=0, roughness=.65, detail=.15):
-        m = bpy.data.materials.new(name)
+    finish_slots = {}
+
+    def material(slot, name, color, metal, roughness, detail):
+        m = bpy.data.materials.new(f'{slot + 1:02d} | {name}')
+        finish_slots[m] = slot
         m.use_nodes = True
         m.diffuse_color = (*color, 1)
         nodes, links = m.node_tree.nodes, m.node_tree.links
@@ -151,28 +156,16 @@ def build(output, render=False, quick=False):
         return m
 
 
-    alloy = material('01 | black anodized receiver', (.060, .065, .071), 1, .66, .13)
-    wear = material('02 | restrained exposed edge alloy', (.112, .117, .125), 1, .57, .1)
-    polymer = material('03 | black moulded polymer', (.030, .032, .035), 0, .84, .55)
-    rubber = material('04 | grip and butt rubber', (.022, .024, .026), 0, .94, 1)
-    steel = material('05 | black oxidized controls and fasteners', (.066, .072, .08), 1, .51, .18)
-    carrier = material('06 | satin steel carrier', (.18, .19, .21), 1, .48, .1)
-    canmat = material('07 | graphite suppressor finish', (.039, .041, .044), 0, .74, .32)
-    magmat = material('08 | smoked magazine polymer', (.052, .058, .062), 0, .54, .25)
-    markmat = material('09 | subdued laser marking', (.28, .29, .30), 0, .67, .03)
-    solar = material('10 | photovoltaic panel', (.033, .049, .075), 0, .31, .02)
-    glass = material('11 | coated optical glass', (.31, .40, .46), 0, .12, 0)
-    p = glass.node_tree.nodes.get('Principled BSDF')
-    p.inputs['Transmission Weight'].default_value = .94
-    p.inputs['IOR'].default_value = 1.45
-    p.inputs['Coat Weight'].default_value = .25
-    clear = material('12 | clear protective caps', (.35, .4, .42), 0, .16, 0)
-    p = clear.node_tree.nodes.get('Principled BSDF')
-    p.inputs['Transmission Weight'].default_value = .93
-    p.inputs['IOR'].default_value = 1.45
-    brass = material('13 | loaded cartridge brass', (.25, .15, .055), 1, .55, .06)
-    copper = material('14 | loaded bullet jacket', (.22, .09, .045), 1, .58, .04)
-    optic_interior = material('15 | light-absorbing optic interior', (.004, .0045, .005), 0, .96, .04)
+    # Slots are zero-based UV1 tile indices; holes keep surviving UVs fixed.
+    alloy = material(0, 'black anodized receiver', (.060, .065, .071), 1, .66, .13)
+    polymer = material(2, 'black moulded polymer', (.030, .032, .035), 0, .84, .55)
+    rubber = material(3, 'grip and butt rubber', (.022, .024, .026), 0, .94, 1)
+    steel = material(4, 'black oxidized controls and fasteners', (.066, .072, .08), 1, .51, .18)
+    carrier = material(5, 'satin steel carrier', (.18, .19, .21), 1, .48, .1)
+    magmat = material(7, 'smoked magazine polymer', (.052, .058, .062), 0, .54, .25)
+    markmat = material(8, 'subdued laser marking', (.28, .29, .30), 0, .67, .03)
+    brass = material(12, 'loaded cartridge brass', (.25, .15, .055), 1, .55, .06)
+    copper = material(13, 'loaded bullet jacket', (.22, .09, .045), 1, .58, .04)
 
 
     def finish(o, name, mat=alloy, parent=body, bevel=.0006, smooth=False):
@@ -553,11 +546,6 @@ def build(output, render=False, quick=False):
     optic_mount = empty('MOUNT_optic', (.025,0,.044), body)
     optic_mount.rotation_euler.z = -math.pi/2
 
-    # Sparse local polished nicks rather than uniform silver wireframes.
-    for loc,dims in [((.108,-.025,.022),(.005,.0003,.0005)),((.256,-.024,.024),(.009,.0003,.0004)),
-                     ((-.087,-.024,.034),(.004,.0002,.0006)),((.076,-.024,-.075),(.006,.0003,.0004))]:
-        box('Localized handling nick',loc,dims,wear,bevel=.0001)
-
     for name,loc in {'muzzle':(barrel_end+.006,0,0),'barrel_crown':(barrel_end,0,0),'breech':(breech,0,0),
                      'ejection':(.070,-.027,.010),'sight':(-.079,0,.074),'front_post':(.284,0,.074),
                      'grip_right':(-.045,0,-.103),'grip_left':(.209,0,-.017),
@@ -713,7 +701,7 @@ def build(output, render=False, quick=False):
     for clone in meshes:
         clone.select_set(True)
     bpy.ops.object.convert(target='MESH')
-    consolidate_finishes(list(export.objects), OUT, orm_map, normal_map)
+    consolidate_finishes(meshes, finish_slots, OUT, orm_map, normal_map)
     # Join mesh copies under the same rigid parent (not all components indiscriminately).
     parents={o.parent for o in export.objects if o.type=='MESH'}
     for parent in parents:
@@ -741,14 +729,15 @@ def build(output, render=False, quick=False):
     bpy.ops.object.select_all(action='DESELECT')
     for o in export.objects: o.select_set(True)
     bpy.context.view_layer.objects.active=copy_by_source[rig]
-    bpy.ops.export_scene.gltf(filepath=str(OUT/'mpx.glb'),export_format='GLB',use_selection=True,
-                              export_animations=True,export_animation_mode='ACTIONS',export_merge_animation='NLA_TRACK',
-                              export_frame_range=False,export_force_sampling=False,
-                              export_optimize_animation_keep_anim_object=True,
-                              export_sampling_interpolation_fallback='LINEAR',
-                              export_extras=True,export_yup=True,export_cameras=False,export_lights=False,
-                              export_vertex_color='ACTIVE',export_all_vertex_colors=False,
-                              export_rest_position_armature=False)
+    with without_review_hands():
+        bpy.ops.export_scene.gltf(filepath=str(OUT/'mpx.glb'),export_format='GLB',use_selection=True,
+                                  export_animations=True,export_animation_mode='ACTIONS',export_merge_animation='NLA_TRACK',
+                                  export_frame_range=False,export_force_sampling=False,
+                                  export_optimize_animation_keep_anim_object=True,
+                                  export_sampling_interpolation_fallback='LINEAR',
+                                  export_extras=True,export_yup=True,export_cameras=False,export_lights=False,
+                                  export_vertex_color='ACTIVE',export_all_vertex_colors=False,
+                                  export_rest_position_armature=False)
     raw=(OUT/'mpx.glb').read_bytes()
     length,kind=struct.unpack_from('<II',raw,12)
     assert kind==0x4e4f534a
@@ -764,7 +753,7 @@ def build(output, render=False, quick=False):
             times=struct.unpack_from('<'+'f'*acc['count'],raw,offset)
             endpoint=struct.unpack('<f',struct.pack('<f',duration))[0]
             assert times[0]==0 and times[-1]==endpoint, (animation['name'], times[-1], endpoint)
-            assert all(a<b for a,b in zip(times,times[1:])), animation['name']
+            assert all(a<b for a,b in pairwise(times)), animation['name']
         for channel in animation['channels']:
             sampler=animation['samplers'][channel['sampler']]
             # One-key curves are always baked with our LINEAR fallback; one key cannot interpolate.

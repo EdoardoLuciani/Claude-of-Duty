@@ -11,7 +11,6 @@ interface RunSummary {
   wave?: number;
 }
 export class GameOverScreen {
-  declare ctx: unknown;
   declare onRestart: (() => void) | null;
   declare root: HTMLDialogElement;
   declare eyebrow: HTMLElement;
@@ -30,8 +29,7 @@ export class GameOverScreen {
   shown: number = 0;
   delay: number = 2.85;
 
-  constructor(parent: HTMLElement, ctx: unknown, onRestart: (() => void) | null) {
-    this.ctx = ctx;
+  constructor(parent: HTMLElement, onRestart: (() => void) | null) {
     this.onRestart = onRestart;
     this.root = el('dialog', 'ow-gameover ow-dialog', parent);
     this.root.setAttribute('aria-labelledby', 'ow-gameover-title');
@@ -42,7 +40,7 @@ export class GameOverScreen {
     this.title = el('div', 'ow-gameover-title', panel, 'KILLED IN ACTION');
     this.title.id = 'ow-gameover-title';
     el('div', 'ow-gameover-rule', panel);
-    this.summary = el('div', 'ow-gameover-sub', panel, 'SCORE 000000 · WAVE 1');
+    this.summary = el('div', 'ow-gameover-sub', panel, '');
     this.button = el('button', 'ow-gameover-button', panel, 'NEW GAME');
     this.button.autofocus = true;
     el('div', 'ow-gameover-hint', panel, 'ENTER / SPACE');
@@ -52,12 +50,14 @@ export class GameOverScreen {
     setStyle(this.root, 'display', 'none');
   }
 
-  show(run: RunSummary = {}, credits = 0): void {
+  show(run?: RunSummary, credits = 0): void {
     if (this.active) return;
-    const score = String(Math.max(0, Math.round(run.score ?? 0))).padStart(6, '0');
-    const wave = Math.max(0, Math.round(run.wave ?? 0));
-    const cred = String(Math.max(0, Math.round(credits))).padStart(6, '0');
-    this.summary.textContent = `SCORE ${score} · WAVE ${wave} · CREDITS ${cred}`;
+    if (run) {
+      const score = String(Math.max(0, Math.round(run.score ?? 0))).padStart(6, '0');
+      const wave = Math.max(0, Math.round(run.wave ?? 0));
+      const cred = String(Math.max(0, Math.round(credits))).padStart(6, '0');
+      this.summary.textContent = `SCORE ${score} · WAVE ${wave} · CREDITS ${cred}`;
+    }
     this.active = true;
     this.elapsed = 0;
     document.exitPointerLock();

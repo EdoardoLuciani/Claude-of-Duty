@@ -1,4 +1,4 @@
-"""Build original early AX338 game art from Python; Blender 5.2.2, metres.
+"""Build original early AX338 game art from Python; Blender 5.3.0, metres.
 blender -b -t 4 --python-exit-code 1 --python tools/blender/ax338/build.py
 Optional: -- --output /absolute/directory --render --quick
 Declared read-only calibration/review inputs and edit map: asset README.md.
@@ -16,6 +16,7 @@ from mathutils import Matrix, Vector
 ROOT=Path(__file__).resolve().parents[3]
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import picatinny
+from review_hands import without_review_hands
 from ax338.actions import author_actions
 from ax338.export import prepare_export_actions, validate_export
 from ax338.finishes import consolidate_finishes
@@ -246,9 +247,6 @@ def build(output,render=False,quick=False):
     box('Butt spacer',(0,-.005,.349),(.027,.150,.025),steel,stock,.001)
     cyl('Length of pull lock',(-.026,-.029,.308),.008,.008,black,stock,'X',32)
     cyl('Butt pad adjustment wheel',(0,-.035,.351),.009,.034,black,stock,'X',32)
-    for i in range(24):
-        a=i*math.tau/24
-        cyl('Pad wheel knurl',(0,-.035+math.sin(a)*.009,.351+math.cos(a)*.009),.0007,.034,black,stock,'X',8,0)
     for side in (-1,1):
         cyl('Stock sling cup',(side*.024,.017,.145),.0055,.002,steel,stock,'X',32)
         cyl('Stock sling recess',(side*.0251,.017,.145),.0038,.0004,black,stock,'X',24,0)
@@ -271,14 +269,17 @@ def build(output,render=False,quick=False):
     cut(tube,mesh('CUT free float bore',inside,[tuple(range(7,-1,-1)),tuple(range(8,16))]+[(i,(i+1)%8,(i+1)%8+8,i+8) for i in range(8)],None,None,0))
     box('Forend rear collar',(0,.075,hg0+.002),(.058,.053,.009),black,hg,.004)
     cut(bpy.context.object,cyl('CUT collar clearance',(0,.075,hg0+.002),.021,.020,None,None,'Z',32,0))
+    # One continuous KeySlot outline, repeated with the vents in a single cut.
+    arc=math.pi-math.asin(.55)
+    slot=[(.005*math.cos(a),.005*math.sin(a)) for a in np.linspace(-arc,arc,15)]+[(-.012,.00275),(-.0135,.00125),(-.0135,-.00125),(-.012,-.00275)]
+    cutters=[profile('CUT KeySlot',[(z+dz,row+dy) for dz,dy in slot],.018,None,None,x=side*.025,bevel=0)
+             for side in (-1,1) for row in (.064,.085) for z in np.linspace(hg0-.025,hg1+.025,15)]
+    cutters += [box('CUT upper vent',(side*.019,.100,z),(.012,.013,.017),None,None,.001)
+                for side in (-1,1) for z in np.linspace(hg0-.030,hg1+.030,9)]
+    active(cutters[0])
+    for cutter in cutters[1:]:cutter.select_set(True)
+    bpy.ops.object.join();cut(tube,cutters[0])
     for side in (-1,1):
-        for row in (.064,.085):
-            for z in np.linspace(hg0-.025,hg1+.025,15):
-                # KeySlot: a circular head and a narrower longitudinal neck.
-                cut(tube,cyl('CUT KeySlot round',(side*.025,row,float(z)),.005,.018,None,None,'X',28,0))
-                cut(tube,box('CUT KeySlot neck',(side*.025,row,float(z)-.006),(.018,.0055,.015),None,None,.0015))
-        for z in np.linspace(hg0-.030,hg1+.030,9):
-            cut(tube,box('CUT upper vent',(side*.019,.100,float(z)),(.012,.013,.017),None,None,.001))
         profile('Tan forward grip panel',[(hg0,.057),(hg0-.140,.057),(hg0-.137,.028),(hg0+.006,.032)],.006,fde,hg,x=side*.026,bevel=.003)
         # Inboard mounting strip overlaps both the rounded panel shoulder and the
         # tube's lower diagonal wall; a panel sitting below that wall would float.
@@ -356,7 +357,7 @@ def build(output,render=False,quick=False):
         for loop in o.data.uv_layers.active.data:loop.uv.x=x0+loop.uv.x*scale
     # Keep editable component meshes in the source. Runtime consolidation does not
     # export review arms, and never changes the source file after this save.
-    clips,controls,hands=author_actions(ROOT,asset,rig,[rig,bolt,trigger,mag,spare],mag,spare,bolt,trigger)
+    clips,controls=author_actions(ROOT,asset,rig,[rig,bolt,trigger,mag,spare],mag,spare,bolt,trigger)
     for o in bpy.data.objects:
         if o.animation_data:
             o.animation_data.action=None
@@ -405,7 +406,8 @@ def build(output,render=False,quick=False):
     bpy.ops.object.select_all(action='DESELECT')
     for o in asset.objects:o.select_set(True)
     bpy.context.view_layer.objects.active=rig
-    bpy.ops.export_scene.gltf(filepath=str(OUT/'ax338.glb'),export_format='GLB',use_selection=True,export_animations=True,export_animation_mode='ACTIONS',export_merge_animation='NLA_TRACK',export_frame_range=False,export_force_sampling=False,export_optimize_animation_keep_anim_object=True,export_sampling_interpolation_fallback='LINEAR',export_extras=True,export_yup=True,export_cameras=False,export_lights=False)
+    with without_review_hands():
+        bpy.ops.export_scene.gltf(filepath=str(OUT/'ax338.glb'),export_format='GLB',use_selection=True,export_animations=True,export_animation_mode='ACTIONS',export_merge_animation='NLA_TRACK',export_frame_range=False,export_force_sampling=False,export_optimize_animation_keep_anim_object=True,export_sampling_interpolation_fallback='LINEAR',export_extras=True,export_yup=True,export_cameras=False,export_lights=False)
     stats=validate_export(OUT/'ax338.glb',clips)
     manifest={'asset':'Early AX338 / Dark Earth / factory brake / removable rail irons / no optional attachments','units':'metres','clips':clips,'stats':stats,'textureResolution':1024,'contactGeometry':{'magazine':contact_boxes,'pistolGripSections':grip_sections},'dimensions':{'barrel':.6858,'overall':1.250,'barrelFace':breech,'barrelCrown':crown,'muzzle':muzzle,'butt':butt,'ironSightRadius':rear-front,'ironSightHeight':sight_y,'magazineBodyHeight':.105,'magazineDepth':.104,'magazineThickness':.034,'magazineHeight':.1125},'source':'tools/blender/ax338/build.py + tools/blender/ax338/actions.py + tools/blender/ax338/export.py; calibration stage: tools/blender/ax338/hand-reference.ts'}
     (OUT/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')

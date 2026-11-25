@@ -6,6 +6,7 @@
 import type { SystemId, EngineContext } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName, ReloadPhase } from '../core/events.ts';
 import { clamp } from '../core/math.ts';
+import { SESSION_MODE_POLICY } from '../core/playable-maps.ts';
 import type { Rng } from '../core/rng.ts';
 import type { SurfaceName } from '../physics/surfaces.ts';
 import { AircraftVoice, AIRCRAFT_MIX, type AircraftPosition } from './aircraft.ts';
@@ -85,7 +86,7 @@ interface AudioOptions {
   bus?: BusName | undefined;
   force?: boolean | undefined;
 }
-type AudioRuntimeContext = Pick<EngineContext, 'rng' | 'camera' | 'events' | 'peek'>;
+type AudioRuntimeContext = Pick<EngineContext, 'rng' | 'camera' | 'config' | 'events' | 'peek'>;
 interface SpaceMetrics {
   tight: number;
   room: number;
@@ -224,6 +225,7 @@ export class AudioSystem {
   bank: NoiseBank | null = null;
   samples: WeaponSampleBank | null = null;
   _starting: Promise<boolean> | null = null;
+  private _disposed = false;
   deafness: number = 0;
   /* preallocated scratch — update() allocates nothing */
   _probeDirs: Vec3Like[] = [];
@@ -317,7 +319,7 @@ export class AudioSystem {
    */
   async start(): Promise<boolean> {
     if (this.running) return true;
-    if (this.failed) return false;
+    if (this.failed || this._disposed) return false;
     // A pointer gesture and a menu/API call can land in the same task. Without
     // this guard both calls build complete graphs, doubling every ambience bed
     // and leaving one graph orphaned — exactly the kind of noisy, muddy mix that
@@ -339,11 +341,14 @@ export class AudioSystem {
       this.actx = actx;
 
       await Mixer.prepare(actx);
+      if (this.actx !== actx) return false;
 
       // Preserve the shared deterministic noise used by finite synthesized events.
       this.bank = new NoiseBank(actx, this.rng.fork(), 9.6);
+      const { survivalSystems: enemyCallouts } = SESSION_MODE_POLICY[this.ctx.config.mode];
       const samples = (this.samples = new WeaponSampleBank(actx));
-      await samples.load();
+      await samples.load(enemyCallouts);
+      if (this.actx !== actx) return false;
       const busVolumes: Partial<Record<BusName, number>> = {};
       for (const name of BUS_NAMES) busVolumes[name] = volumeGain(this.volumes[name]);
       const mixer = (this.mixer = new Mixer(actx, this.rng.fork(), {
@@ -358,7 +363,9 @@ export class AudioSystem {
       };
       mixer.buildReverbs();
       this.field = new SpatialField(actx, mixer, this.ctx);
-      this._callouts = new CalloutPlayer(actx, this.field, samples, this.rng.fork());
+      // Keep the shared ambience and music RNG streams independent of callout availability.
+      const calloutRng = this.rng.fork();
+      if (enemyCallouts) this._callouts = new CalloutPlayer(actx, this.field, samples, calloutRng);
       const ambience = (this.ambience = new Ambience(this.rng.fork()));
       ambience.start();
       const tentRadio = (this.tentRadio = new TentRadio(actx, mixer, this.rng.fork()));
@@ -366,12 +373,19 @@ export class AudioSystem {
       mixer.setSpace(this._space, 0.001);
 
       if (actx.state === 'suspended') await actx.resume();
+      if (this.actx !== actx) return false;
       this.running = true;
       this.stats.started = true;
+      // The shop may have opened while the graph was loading.
+      if (this.ctx.peek('market')?.open) {
+        void tentRadio.start().catch((): void => {});
+        mixer.setShopMix(true);
+      }
       this.stats.contextState = actx.state;
       console.info(`[audio] online @ ${actx.sampleRate} Hz`);
       return true;
     } catch (err) {
+      if (this._disposed) return false;
       console.warn('[audio] disabled:', err instanceof Error ? err.message : err);
       this.failed = true;
       this._teardown();
@@ -402,6 +416,7 @@ export class AudioSystem {
   }
 
   dispose(): void {
+    this._disposed = true;
     this._disarmGesture();
     for (const off of this._offs) off();
     this._offs.length = 0;
@@ -612,6 +627,9 @@ export class AudioSystem {
           level: o.level,
           send: COMBAT_MIX.drySend,
         });
+      case 'fire_selector':
+        // Switch detent only; reuse the recorded mechanical click without static.
+        return this.samples!.radio('fire_selector', rng, { when, level: o.level });
       case 'grenade_throw':
         return this.samples!.combat('grenade-throw', rng, {
           when,

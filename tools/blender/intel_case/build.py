@@ -33,7 +33,7 @@ class Assembly:
 
     def surface(self, name, verts, faces, tile, face_uv=None):
         mesh = bpy.data.meshes.new(name)
-        mesh.from_pydata(verts, [], faces)
+        mesh.from_pydata(verts, [], faces, shade_flat=False)
         mesh.update()
         obj = bpy.data.objects.new(name, mesh)
         bpy.context.collection.objects.link(obj)
@@ -60,8 +60,6 @@ class Assembly:
                     else:
                         u, v = .5 + x * 1.05 + z * .35, .48 + y * 1.38 + z * .56
                     uv.data[i].uv = atlas.coordinates(tile, u, v)
-        for poly in mesh.polygons:
-            poly.use_smooth = True
         mesh.set_sharp_from_angle(angle=pi / 5)
         self.parts.append(obj)
         return obj

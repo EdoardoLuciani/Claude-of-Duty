@@ -71,7 +71,7 @@ def cut(o,cutter):
 
 def text(label,loc,size,side,parent):
     bpy.ops.object.text_add(location=C@Vector(loc));o=bpy.context.object
-    o.data.body=label;o.data.size=size;o.data.extrude=.00002
+    o.data.body=label;o.data.size=size
     o.rotation_euler=(C@Matrix(((0,0,side),(0,1,0),(-side,0,0)))).to_euler()
     active(o);bpy.ops.object.convert(target='MESH');return finish(o,'Mark | '+label,mark,parent,0)
 

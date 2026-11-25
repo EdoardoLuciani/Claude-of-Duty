@@ -146,7 +146,6 @@ interface Strike {
   dir: THREE.Vector3;
   speed: number;
   travel: number;
-  drops: number[];
   /** Travel of the final drop; the strike stays airborne until just past it. */
   lastDrop: number;
   dropIdx: number;
@@ -163,7 +162,7 @@ export class RadioSystem {
   _physics: EngineSystems['physics'] | null = null;
   _player: EngineSystems['player'] | null = null;
   _audio: EngineSystems['audio'] | null = null;
-  /** Active strikes: { plane, bombs, drops, travel, start, dir } */
+  /** Active strikes: { plane, bombs, travel, start, dir } */
   active: Strike[] = [];
   _warmed: boolean = false;
   _off: (() => void)[] = [];
@@ -218,21 +217,13 @@ export class RadioSystem {
     const max = bounds.max;
     const cx = (min.x + max.x) / 2;
     const cz = (min.z + max.z) / 2;
-    const corners = [
-      min.x * dx + min.z * dz,
-      max.x * dx + min.z * dz,
-      min.x * dx + max.z * dz,
-      max.x * dx + max.z * dz,
-    ];
-    const tMin = Math.min(...corners);
-    const tMax = Math.max(...corners);
-    const startT = tMin - LEAD;
+    // Project the map's half-extents: start and end are offsets from its centre,
+    // not world coordinates (the range need not be centred on the origin).
+    const halfSpan = ((max.x - min.x) * Math.abs(dx) + (max.z - min.z) * Math.abs(dz)) / 2;
+    const startT = -halfSpan - LEAD;
 
-    const drops = [];
-    for (let t = tMin; t <= tMax + 1e-3; t += CARPET.dropStep) drops.push(t - tMin);
-    // Finite bounds always yield the t = tMin drop; non-finite bounds have no bomb line.
-    const lastDrop = drops.at(-1);
-    if (lastDrop === undefined) return false;
+    const lastDrop = Math.floor((2 * halfSpan + 1e-3) / CARPET.dropStep) * CARPET.dropStep;
+    if (!Number.isFinite(lastDrop) || lastDrop < 0) return false;
 
     const start = new THREE.Vector3(cx + dx * startT, ALTITUDE, cz + dz * startT);
     const dir = new THREE.Vector3(dx, 0, dz);
@@ -248,7 +239,6 @@ export class RadioSystem {
       dir,
       speed: CARPET.planeSpeed,
       travel: 0,
-      drops,
       lastDrop,
       dropIdx: 0,
       bombs: [],
@@ -279,11 +269,10 @@ export class RadioSystem {
         for (const prop of props) if (prop instanceof THREE.Mesh) prop.rotation.z += dt * 26;
       }
 
-      let next = s.drops.at(s.dropIdx);
-      while (next !== undefined && s.travel >= next) {
+      const reached = Math.min(s.travel, s.lastDrop);
+      while (s.dropIdx * CARPET.dropStep <= reached) {
         s.dropIdx++;
         for (const off of CARPET.lateral) this._dropBomb(s, off);
-        next = s.drops.at(s.dropIdx);
       }
       // Audio may still be loading on the gesture that launched the strike.
       // Attach at the current plane position once ready; never restart mid-flight.

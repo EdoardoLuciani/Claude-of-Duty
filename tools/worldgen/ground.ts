@@ -2,9 +2,12 @@ import * as THREE from 'three';
 
 import type { Assembler } from './builder.ts';
 import { BOX, BOX_SOFT, IDENT, LL } from './kit.ts';
+import { GULLIES, MANHOLES } from './level/ground-covers.ts';
+import { GROUND_STONES } from './level/ground-stones.ts';
 import { STREET, ALLEYS } from './level/layout.ts';
-import { ALLEY_MOUTHS, groundY } from './queries.ts';
-import { fbm3, keyedRng, paintMasks } from './util.ts';
+import { PAVEMENT } from './level/pavement.ts';
+import { ALLEY_MOUTHS, seatY } from './queries.ts';
+import { fbm3, paintMasks } from './util.ts';
 
 /**
  * WORLD — ground plane, road, kerbs and the stuff wind piles against them.
@@ -66,7 +69,6 @@ export function buildGround(A: Assembler): void {
 
   // ------------------------------------------------------- pavement slabs --
   for (const side of [-1, 1]) {
-    const rng = keyedRng('pavement', side);
     const cx = (side * (KB + HW)) / 2;
     const wSlab = KB - HW;
     const mouths = ALLEY_MOUTHS.filter((mouth): boolean => mouth.side === side);
@@ -78,46 +80,21 @@ export function buildGround(A: Assembler): void {
       });
     }
 
-    let z = zMin;
-    while (z < zMax) {
-      const segLen = rng.range(3.2, 6.5);
-      const gap = rng.float() < 0.12 ? rng.range(0.6, 1.6) : 0.06;
-      // Slabs over an alley's edge stay at kerb height without a stain patch.
-      let legacyMouth = false;
-      for (const a of ALLEYS) {
-        const [ax0, az0, ax1, az1] = a.rect;
-        const inX = side > 0 ? ax0 >= KB - 0.5 : ax1 <= -KB + 0.5;
-        if (inX && z + segLen > az0 - 0.2 && z < az1 + 0.2) legacyMouth = true;
-      }
-      const h = legacyMouth ? WH : WH + rng.range(-0.012, 0.012);
-      let ranges = [[z + gap / 2, z + segLen - gap / 2]];
-      for (const mouth of mouths) {
-        const next = [];
-        for (const [from, to] of ranges) {
-          if (mouth.z1 <= from || mouth.z0 >= to) next.push([from, to]);
-          else {
-            if (mouth.z0 > from) next.push([from, mouth.z0]);
-            if (mouth.z1 < to) next.push([mouth.z1, to]);
-          }
+    for (const [from, to, h] of PAVEMENT[side]) {
+      if (mouths.some((mouth): boolean => from < mouth.z1 - 0.001 && to > mouth.z0 + 0.001))
+        throw new Error(`[world] pavement ${from}..${to} on side ${side} covers an alley mouth`);
+      const cz = (from + to) / 2;
+      A.add('concrete', BOX_SOFT(A), LL(IDENT, cx, h / 2, cz, 0, wSlab - 0.05, h, to - from), {
+        masks: [0.6, 0.45, 0.2],
+      });
+      A.add(
+        'concrete',
+        BOX_SOFT(A),
+        LL(IDENT, side * (HW + 0.11), (h + 0.022) / 2, cz, 0, 0.22, h + 0.022, to - from),
+        {
+          masks: [0.95, 0.35, 0.1],
         }
-        ranges = next;
-      }
-      for (const [from, to] of ranges) {
-        if (to - from < 0.02) continue;
-        const cz = (from + to) / 2;
-        A.add('concrete', BOX_SOFT(A), LL(IDENT, cx, h / 2, cz, 0, wSlab - 0.05, h, to - from), {
-          masks: [0.6, 0.45, 0.2],
-        });
-        A.add(
-          'concrete',
-          BOX_SOFT(A),
-          LL(IDENT, side * (HW + 0.11), (h + 0.022) / 2, cz, 0, 0.22, h + 0.022, to - from),
-          {
-            masks: [0.95, 0.35, 0.1],
-          }
-        );
-      }
-      z += segLen + gap;
+      );
     }
   }
 
@@ -140,78 +117,13 @@ export function buildGround(A: Assembler): void {
     );
   }
 
-  // --------------------------------------------------- material seams --
-  // Every place two ground materials meet is otherwise a razor-straight polygon
-  // edge with a value step across it — the loudest artefact in any low-angle
-  // shot. Loose stones lying across the line break it up.
-  const seam = (
-    ax: number,
-    az: number,
-    bx: number,
-    bz: number,
-    keyA: string,
-    keyB: string
-  ): void => {
-    const sr = keyedRng('seam', ax, az, bx, bz, keyA, keyB);
-    const len = Math.hypot(bx - ax, bz - az);
-    const n = Math.max(6, Math.round(len / 1.15));
-    const tx = (bx - ax) / len;
-    const tz = (bz - az) / len;
-    // unit normal across the seam
-    const nxs = -tz;
-    const nzs = tx;
-    for (let i = 0; i < n; i++) {
-      const t = ((i + sr.range(0.15, 0.85)) / n) * len;
-      const px = ax + tx * t;
-      const pz = az + tz * t;
-      // loose stones lying across the join
-      if (A.has('rock_b')) {
-        for (let k = 0; k < sr.int(1, 3); k++) {
-          const off = sr.range(-0.55, 0.55);
-          const sx = px + nxs * off + sr.range(-0.2, 0.2);
-          const sz = pz + nzs * off + sr.range(-0.2, 0.2);
-          const sy = Math.min(
-            groundY(sx, sz),
-            groundY(sx - 0.4, sz),
-            groundY(sx + 0.4, sz),
-            groundY(sx, sz - 0.4),
-            groundY(sx, sz + 0.4)
-          );
-          A.put(
-            sr.float() < 0.68 ? 'rock_b' : 'rock_a',
-            sx,
-            sy,
-            sz,
-            sr.float() * 6.28,
-            sr.range(0.45, 1.0),
-            [1, sr.range(1.0, 1.5), 1]
-          );
-        }
-      }
-    }
-  };
-  // The gutter, where the road surface meets the pavement: the seam the eye
-  // lands on first in any street-level frame.
-  seam(-HW + 0.08, zMin + 2, -HW + 0.08, zMax - 2, 'sand', 'road_dust');
-  seam(HW - 0.08, zMin + 2, HW - 0.08, zMax - 2, 'sand', 'road_dust');
-  // the pavement / open-ground line down both sides of the street, and the
-  // perimeter of every alley and courtyard where its floor meets the sand
-  seam(-KB, zMin + 2, -KB, zMax - 2, 'concrete', 'sand');
-  seam(KB, zMin + 2, KB, zMax - 2, 'concrete', 'sand');
-  for (const a of ALLEYS) {
-    const [ax0, az0, ax1, az1] = a.rect;
-    seam(ax0, az0, ax1, az0, a.surface, 'sand');
-    seam(ax0, az1, ax1, az1, a.surface, 'sand');
-    seam(ax0, az0, ax0, az1, a.surface, 'sand');
-    seam(ax1, az0, ax1, az1, a.surface, 'sand');
-  }
+  // Small loose stones at the street and alley material seams.
+  for (const [name, x, z, yaw, scale, grime] of GROUND_STONES)
+    A.put(name, x, seatY(x, z), z, yaw, scale, [1, grime, 1]);
 
   // ------------------------------------------------------------ covers --
   // manholes and gully gratings
-  for (let i = 0; i < 7; i++) {
-    const rng = keyedRng('manhole', i);
-    const z = rng.range(zMin + 6, zMax - 6);
-    const x = rng.range(-2.5, 2.5);
+  for (const [x, z, yaw] of MANHOLES) {
     const ring = A.cache('manhole', (): THREE.BufferGeometry => {
       const g = new THREE.CylinderGeometry(0.36, 0.36, 0.04, 18, 1);
       paintMasks(g, (px, py, pz, nx, ny, nz, out): void => {
@@ -220,21 +132,10 @@ export function buildGround(A: Assembler): void {
       });
       return g;
     });
-    A.add(
-      'metal_dark',
-      ring,
-      LL(IDENT, x, 0.035 + (1 - (x / HW) ** 2) * 0.05, z, rng.float() * 6.28, 1, 1, 1)
-    );
+    A.add('metal_dark', ring, LL(IDENT, x, 0.035 + (1 - (x / HW) ** 2) * 0.05, z, yaw, 1, 1, 1));
   }
-  for (const side of [-1, 1]) {
-    for (let i = 0; i < 5; i++) {
-      const z = keyedRng('gully', side, i).range(zMin + 8, zMax - 8);
-      A.add(
-        'metal_dark',
-        BOX(A),
-        LL(IDENT, side * (HW - 0.22), WH - 0.03, z, 0, 0.42, 0.05, 0.62),
-        { masks: [0.7, 0.8, 0.6] }
-      );
-    }
-  }
+  for (const [side, z] of GULLIES)
+    A.add('metal_dark', BOX(A), LL(IDENT, side * (HW - 0.22), WH - 0.03, z, 0, 0.42, 0.05, 0.62), {
+      masks: [0.7, 0.8, 0.6],
+    });
 }

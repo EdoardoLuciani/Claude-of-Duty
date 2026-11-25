@@ -8,7 +8,6 @@ import assert from 'node:assert/strict';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 import { ModelSystem } from '../../src/core/models.ts';
-import { createTestContext } from '../lib/context.ts';
 import { fixture } from '../lib/fixture.ts';
 
 const delay = (ms: number): Promise<void> =>
@@ -38,7 +37,7 @@ process.on('unhandledRejection', onUnhandled);
 
 const models = new ModelSystem();
 models.loader = fixture<GLTFLoader>({ load(): void {} });
-await models.init(createTestContext());
+await models.init();
 await delay(60);
 process.off('unhandledRejection', onUnhandled);
 

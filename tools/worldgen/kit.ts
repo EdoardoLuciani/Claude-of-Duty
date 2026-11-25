@@ -147,8 +147,8 @@ export const BOX_SOFT = (A: GeometrySink): THREE.BufferGeometry =>
 /** 12-tri box for thin members (see util.plainBox). */
 export const BOX_THIN = (A: GeometrySink): THREE.BufferGeometry =>
   A.cache('box:plain', (): THREE.BufferGeometry => plainBox());
-/** Single quad for glass panes. */
-const PANE = (A: GeometrySink): THREE.BufferGeometry =>
+/** Single unit quad for glass panes and painted markings. */
+export const PANE = (A: GeometrySink): THREE.BufferGeometry =>
   A.cache('pane', (): THREE.BufferGeometry => quad(1, 1));
 /**
  * Centimetre-rounded size for cache keys. Cached shapes are built from the
@@ -391,7 +391,7 @@ export function windowUnit<T extends WallOpening>(
             0,
             rng.range(-0.5, 0.5)
           ),
-          null
+          { visualOnly: true }
         );
       }
     }
@@ -478,7 +478,7 @@ export function windowUnit<T extends WallOpening>(
     );
   }
 
-  // interior curtain / cloth, visible from the street
+  // Curtains on playable windows must also occlude AI sight.
   if (opts.curtain) {
     const c = clothGeometry(w * 0.92, h * 0.95, {
       segX: 7,
@@ -493,7 +493,7 @@ export function windowUnit<T extends WallOpening>(
       opts.curtainKey ?? 'fabric_cream',
       c,
       LL(pm, x + w * 0.03, y, depth + 0.09, 0, 1, 1, 1),
-      { masks: [0.1, 0.35, 0.1] }
+      { masks: [0.1, 0.35, 0.1], visualOnly: opts.back !== false }
     );
   }
   return o;
@@ -747,12 +747,9 @@ export function balcony(
   x: number,
   y: number,
   w: number,
-  rng: Rng,
-  opts: { depth?: number; key?: string; railing?: 'concrete' | 'metal'; railKey?: string } = {}
-): { x: number; y: number; w: number; d: number } {
-  const d = opts.depth ?? 1.15;
+  { depth: d, key, railing }: { depth: number; key: string; railing: 'concrete' | 'metal' }
+): void {
   const box = BOX(A);
-  const key = opts.key ?? 'concrete';
   // slab, slightly sagging feel via thickness taper
   A.add(key, BOX_SOFT(A), LL(pm, x, y + 0.06, -d / 2, 0, w, 0.13, d), {
     masks: [0.45, 0.55, 0.3],
@@ -764,7 +761,7 @@ export function balcony(
     });
   }
   // railing
-  if (opts.railing === 'concrete') {
+  if (railing === 'concrete') {
     A.add(key, box, LL(pm, x, y + 0.55, -d + 0.06, 0, w, 0.85, 0.12), { masks: [0.5, 0.5, 0.2] });
     A.add(key, box, LL(pm, x - w / 2 + 0.06, y + 0.55, -d / 2, 0, 0.12, 0.85, d), {
       masks: [0.5, 0.5, 0.2],
@@ -774,7 +771,7 @@ export function balcony(
     });
   } else {
     const bar = BOX_THIN(A);
-    const rk = opts.railKey ?? 'metal_rust';
+    const rk = 'metal_rust';
     // top and mid rails
     A.add(rk, bar, LL(pm, x, y + 1.0, -d + 0.04, 0, w, 0.05, 0.05), { masks: [0.9, 0.45, 0] });
     A.add(rk, bar, LL(pm, x, y + 0.52, -d + 0.04, 0, w, 0.035, 0.035), { masks: [0.9, 0.45, 0] });
@@ -815,7 +812,6 @@ export function balcony(
       }
     }
   }
-  return { x, y, w, d };
 }
 
 // ================================================================= parapet ==
@@ -1329,6 +1325,7 @@ export function spallPatch(rng: Rng, w: number, h: number, depth = 0.03): THREE.
     out[1] = 0.55 + 0.3 * (1 - Math.abs(nz));
     out[2] = 0.5 * (1 - Math.abs(nz)) + 0.2;
   });
+  g.userData.visualOnly = true; // surface finish, never a ledge
   return g;
 }
 
@@ -1364,7 +1361,7 @@ export function rubbleMound(
         rng.range(-0.4, 0.4),
         rng.range(-0.4, 0.4)
       ),
-      { masks: [0.3, 0.75, 0.45] }
+      { masks: [0.3, 0.75, 0.45], visualOnly: true }
     );
   }
 }

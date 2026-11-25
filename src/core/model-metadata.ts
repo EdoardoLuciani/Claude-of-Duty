@@ -3,6 +3,9 @@ import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 import { isRecord } from './guards.ts';
 
+/** Optional RGB multiplier in static world meshes, separate from COLOR_0 surface masks. */
+export const WORLD_BATCH_TINT = '_batchtint';
+
 // Parsed optional metadata may be present as undefined; it is not a state patch.
 export type ModelVec3 = [number, number, number];
 export interface SoldierWeapon {
@@ -75,8 +78,32 @@ export interface WorldIntelMarker {
   tag?: string | undefined;
   position: ModelVec3;
 }
+export interface WorldRangeStation {
+  x: number;
+  z: number;
+}
+export interface CourseGate {
+  action: string;
+  position: ModelVec3;
+  radius: number;
+  hint: string;
+}
+export interface WorldRangeTarget {
+  label?: string | undefined;
+  x: number;
+  y: number;
+  z: number;
+  width: number;
+  height: number;
+}
+interface WorldMarkers {
+  COURSE?: CourseGate[] | undefined;
+  INTEL?: WorldIntelMarker[] | undefined;
+  RANGE_STATION?: WorldRangeStation | undefined;
+  RANGE_TARGETS?: readonly WorldRangeTarget[] | undefined;
+}
 interface WorldMarkerData {
-  MARKERS?: { INTEL?: WorldIntelMarker[] | undefined } | undefined;
+  MARKERS?: WorldMarkers | undefined;
 }
 interface WorldStreet {
   halfWidth: number;
@@ -89,10 +116,16 @@ interface WorldQueryData {
   street?: WorldStreet | undefined;
   alleys?: Array<{ rect: [number, number, number, number]; surface: string }> | undefined;
 }
+/** Labels for the baked minimap image, which covers the manifest's world bounds. */
+export interface WorldMinimap {
+  labels: { x: number; z: number; w: number; code: string; text: string | null }[];
+}
 export interface WorldManifest {
   version: 2;
+  mapId: string;
   sourceHash: string;
-  assets: { visual: string; collision: string; nav: string };
+  assets: { visual: string; collision: string; minimap: string; nav?: string | undefined };
+  minimap: WorldMinimap;
   navigation?:
     | {
         version: number;
@@ -130,6 +163,8 @@ export interface WorldPrefetch {
   meta: WorldManifest;
   visual: GLTF;
   collision: GLTF;
+  navBytes: ArrayBuffer | undefined;
+  minimapPng: Promise<Blob>;
 }
 
 /** JSON is unknown until each field consumed by runtime has been checked. */
@@ -205,17 +240,80 @@ export function parseSoldierMetadata(value: unknown): SoldierMetadata {
     },
   };
 }
-export function parseWorldAssets(value: unknown): WorldManifest['assets'] {
+function parseWorldAssets(value: unknown): WorldManifest['assets'] {
   const source = object(value);
   if (source.version !== 2)
     throw new Error(`[models] unsupported world manifest version ${String(source.version)}`);
   const assets = object(source.assets);
-  if (!assets.nav) throw new Error('[models] missing navigation asset');
   return {
     ...assets,
     visual: string(assets.visual),
     collision: string(assets.collision),
-    nav: string(assets.nav),
+    minimap: string(assets.minimap),
+    nav: optional(assets.nav, string),
+  };
+}
+function parseWorldMarkers(value: unknown): WorldMarkers {
+  const markers = object(value);
+  return {
+    ...markers,
+    INTEL: optional(markers.INTEL, (value): WorldIntelMarker[] =>
+      array(value, (value): WorldIntelMarker => {
+        const marker = object(value);
+        return {
+          ...marker,
+          id: string(marker.id),
+          tag: optional(marker.tag, string),
+          position: vec3(marker.position),
+        };
+      })
+    ),
+    COURSE: optional(markers.COURSE, (value): CourseGate[] =>
+      array(value, (value): CourseGate => {
+        const gate = object(value);
+        return {
+          action: string(gate.action),
+          position: vec3(gate.position),
+          radius: number(gate.radius),
+          hint: string(gate.hint),
+        };
+      })
+    ),
+    RANGE_STATION: optional(markers.RANGE_STATION, (value): WorldRangeStation => {
+      const marker = object(value);
+      return { x: number(marker.x), z: number(marker.z) };
+    }),
+    RANGE_TARGETS: optional(markers.RANGE_TARGETS, (value): WorldRangeTarget[] =>
+      array(value, (value): WorldRangeTarget => {
+        const marker = object(value);
+        const width = number(marker.width);
+        const height = number(marker.height);
+        if (width <= 0 || height <= 0) throw new Error('[models] invalid range target size');
+        return {
+          x: number(marker.x),
+          y: number(marker.y),
+          z: number(marker.z),
+          label: optional(marker.label, string),
+          width,
+          height,
+        };
+      })
+    ),
+  };
+}
+function parseMinimap(value: unknown): WorldMinimap {
+  const source = object(value);
+  return {
+    labels: array(source.labels, (value): WorldMinimap['labels'][number] => {
+      const label = object(value);
+      return {
+        x: number(label.x),
+        z: number(label.z),
+        w: number(label.w),
+        code: string(label.code),
+        text: label.text === null ? null : string(label.text),
+      };
+    }),
   };
 }
 export function parseWorldManifest(value: unknown): WorldManifest {
@@ -223,55 +321,12 @@ export function parseWorldManifest(value: unknown): WorldManifest {
     assets = parseWorldAssets(source);
   const bounds = object(source.bounds),
     stats = object(source.stats);
-  const world = optional(
-    source.WORLD,
-    (
-      value
-    ): {
-      MARKERS:
-        | { INTEL: { id: string; tag: string | undefined; position: ModelVec3 }[] | undefined }
-        | undefined;
-    } => {
-      const world = object(value);
-      return {
-        ...world,
-        MARKERS: optional(
-          world.MARKERS,
-          (
-            value
-          ): {
-            INTEL: { id: string; tag: string | undefined; position: ModelVec3 }[] | undefined;
-          } => {
-            const markers = object(value);
-            return {
-              ...markers,
-              INTEL: optional(
-                markers.INTEL,
-                (value): { id: string; tag: string | undefined; position: ModelVec3 }[] =>
-                  array(
-                    value,
-                    (value): { id: string; tag: string | undefined; position: ModelVec3 } => {
-                      const marker = object(value);
-                      return {
-                        ...marker,
-                        id: string(marker.id),
-                        tag: optional(marker.tag, string),
-                        position: vec3(marker.position),
-                      };
-                    }
-                  )
-              ),
-            };
-          }
-        ),
-      };
-    }
-  );
   const transform = array(source.transform, number);
   if (transform.length !== 16) throw new Error('[models] expected world transform matrix');
   return {
     ...source,
     version: 2,
+    mapId: string(source.mapId),
     sourceHash: string(source.sourceHash),
     navigation: optional(source.navigation, (value): NonNullable<WorldManifest['navigation']> => {
       const navigation = object(value);
@@ -285,6 +340,7 @@ export function parseWorldManifest(value: unknown): WorldManifest {
       };
     }),
     assets,
+    minimap: parseMinimap(source.minimap),
     transform,
     bounds: { ...bounds, min: vec3(bounds.min), max: vec3(bounds.max) },
     stats: {
@@ -360,7 +416,10 @@ export function parseWorldManifest(value: unknown): WorldManifest {
         };
       })
     ),
-    WORLD: world,
+    WORLD: optional(source.WORLD, (value): WorldMarkerData => {
+      const world = object(value);
+      return { ...world, MARKERS: optional(world.MARKERS, parseWorldMarkers) };
+    }),
     query: optional(source.query, (value): NonNullable<WorldManifest['query']> => {
       const query = object(value);
       return {

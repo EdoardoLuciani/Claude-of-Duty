@@ -7,7 +7,7 @@ remains in the blend.
 
 ## Build and inspect
 
-Use Blender **5.2.2**, AgX color management and the pinned **gltfpack 1.3**.
+Use Blender **5.3.0**, AgX color management and the pinned **gltfpack 1.3**.
 Run from the repository root after `bun ci`:
 
 ```sh

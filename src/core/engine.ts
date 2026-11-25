@@ -36,10 +36,13 @@ export class Engine {
   private _gameplaySuspended = false;
   /** One-shot rendered-frame boundary; graph warmup never calls step(). */
   onFirstRender: (() => void) | null = null;
+  /** Called before each system's `init`, in dependency order. */
+  onSystemInit: ((id: string) => void) | null = null;
   _onResize: () => void;
+  private _frame: number | null = null;
   _loop = (now: number): void => {
     if (!this._running) return;
-    requestAnimationFrame(this._loop);
+    this._frame = requestAnimationFrame(this._loop);
     this.step(now);
   };
 
@@ -105,11 +108,13 @@ export class Engine {
   async init(): Promise<this> {
     const order = this.registry.resolve();
     for (const sys of order) {
+      const { id } = describeSystem(sys);
       const t0 = performance.now();
+      this.onSystemInit?.(id);
       await sys.init?.(this.ctx);
       if (this.error) throw new Error(this.error.message);
       const ms = performance.now() - t0;
-      if (ms > 50) console.info(`[engine] ${describeSystem(sys).id} init ${ms.toFixed(0)}ms`);
+      if (ms > 50) console.info(`[engine] ${id} init ${ms.toFixed(0)}ms`);
     }
     this.input.attach();
     addEventListener('resize', this._onResize);
@@ -147,11 +152,13 @@ export class Engine {
     if (this._running || this.error) return;
     this._running = true;
     this._last = performance.now();
-    requestAnimationFrame(this._loop);
+    this._frame = requestAnimationFrame(this._loop);
   }
 
   stop(): void {
     this._running = false;
+    if (this._frame !== null) cancelAnimationFrame(this._frame);
+    this._frame = null;
   }
 
   get running(): boolean {
@@ -258,8 +265,12 @@ export class Engine {
   async dispose(): Promise<void> {
     this.stop();
     removeEventListener('resize', this._onResize);
-    this.input.detach();
     const errors = [];
+    try {
+      await this.input.detach();
+    } catch (error) {
+      errors.push(error);
+    }
     try {
       for (const sys of [...this.registry.ordered].reverse()) {
         try {

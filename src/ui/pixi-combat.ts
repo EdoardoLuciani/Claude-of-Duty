@@ -1,4 +1,4 @@
-import { Container, Graphics, Text } from 'pixi.js';
+import { Container, Graphics, type BitmapText } from 'pixi.js';
 
 import type { AmmoPanel } from './ammo.ts';
 import type { Compass } from './compass.ts';
@@ -7,7 +7,7 @@ import type { DamageArcs } from './damage.ts';
 import { KINDS, R_IN, R_OUT } from './hitmarkers.ts';
 import type { Hitmarkers, HitmarkerKind } from './hitmarkers.ts';
 import { accessoryIcon } from './pixi-accessory-icons.ts';
-import { HUD_TYPE, poseHudNode, writeHudText } from './pixi-type.ts';
+import { HUD_TYPE, hudText, poseHudNode, writeHudText } from './pixi-type.ts';
 
 export interface CombatModels {
   hit: Hitmarkers;
@@ -59,7 +59,7 @@ interface HitSlot {
 }
 interface EquipmentView {
   node: Container;
-  label: Text;
+  label: BitmapText;
   symbol: Graphics;
   count: number;
 }
@@ -67,16 +67,7 @@ export class PixiCombat {
   readonly hits = new Container();
   readonly arcs = new Container();
   readonly equipment = new Container();
-  readonly fps = new Text({
-    text: '— FPS',
-    style: {
-      fontFamily: 'monospace',
-      fontSize: 12,
-      fontWeight: '600',
-      fill: 0xe7f2ef,
-      stroke: { color: 0x080c10, width: 1.5 },
-    },
-  });
+  readonly fps = hudText('— FPS', 0, 0, HUD_TYPE.label);
   readonly hitSlots = Array.from({ length: 10 }, (): HitSlot => {
     const node = new Container(),
       mark = glyph();
@@ -97,19 +88,9 @@ export class PixiCombat {
   constructor() {
     this.fps.anchor.set(1, 0);
     this.slots = Array.from({ length: 2 }, (_, i): EquipmentView => {
-      const label = new Text({
-        text: '',
-        style: {
-          fontFamily: 'Arial',
-          fontSize: HUD_TYPE.secondary,
-          fontWeight: '600',
-          fill: 0xffffff,
-          stroke: { color: 0x080c10, width: 1.5 },
-        },
-      });
+      const label = hudText('', 26, 0, HUD_TYPE.secondary, 0xffffff);
       const symbol = accessoryIcon(i),
         node = new Container();
-      label.position.set(26, 0);
       node.addChild(symbol, label);
       this.equipment.addChild(node);
       return { node, label, symbol, count: -1 };

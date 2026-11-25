@@ -32,11 +32,14 @@ assert.ok(labels.has('Mouse') && labels.has('Mouse wheel'), 'mouse reference ret
 // owns canonical labels, DOM accessibility, pause/focus and contextual prompts.
 const events: ['ui:pause', { paused: boolean }][] = [];
 const controlChanges: boolean[] = [];
-let locks = 0;
+const lockRequests: string[] = [];
 const providers: TestProviders = {};
 const input = createTestInput();
 input.requestPointerLock = (): void => {
-  locks++;
+  lockRequests.push('pointer');
+};
+input.requestFullscreen = (): void => {
+  lockRequests.push('fullscreen');
 };
 const ctx = createTestContext({ input, providers });
 ctx.time.scale = 0.5;
@@ -117,7 +120,7 @@ menu.show(); // idempotent: do not overwrite the pre-pause scale
 menu.close();
 assert.equal(menu.root.open, false);
 assert.equal(ctx.time.scale, 0.5);
-assert.equal(locks, 1);
+assert.deepEqual(lockRequests, ['pointer', 'fullscreen'], 'resume requests mouse capture first');
 assert.deepEqual(controlChanges, [false, true]);
 assert.deepEqual(
   events.filter(([name]): boolean => name === 'ui:pause'),

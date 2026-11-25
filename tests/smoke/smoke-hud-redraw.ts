@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict';
 
-import { Container, Text } from 'pixi.js';
+import { BitmapText, Container } from 'pixi.js';
 
-import { Rng } from '../../src/core/rng.ts';
 import { AmmoPanel } from '../../src/ui/ammo.ts';
 import type { AmmoState } from '../../src/ui/ammo.ts';
 import { Compass, ScoreBar } from '../../src/ui/compass.ts';
@@ -13,7 +12,6 @@ import type { HealthState } from '../../src/ui/health.ts';
 import { Hitmarkers } from '../../src/ui/hitmarkers.ts';
 import { Killfeed } from '../../src/ui/killfeed.ts';
 import { MarketCountdown } from '../../src/ui/market.ts';
-import { Minimap } from '../../src/ui/minimap.ts';
 import type { PixiHud } from '../../src/ui/pixi-hud.ts';
 import { Banner, Prompt } from '../../src/ui/prompts.ts';
 import { createRetainedHud, installUiDocument, deleteGlobal } from '../lib/ui-fixture.ts';
@@ -30,7 +28,7 @@ try {
   Object.defineProperty(hud.renderer, 'resolution', { value: 1 });
   hud.renderer.render = (): void => {};
   const measure = (node: Container): void => {
-    if (node instanceof Text)
+    if (node instanceof BitmapText)
       Object.defineProperty(node, 'width', {
         get: (): number => node.text.length * 8 * node.scale.x,
       });
@@ -51,8 +49,6 @@ try {
     magSize: 30,
     time: 0,
   };
-  const map = new Minimap(new Rng(1));
-  map.viewSpan = 60;
   const mapState = { x: 0, z: 0, heading: 0, fov: 80 };
   const models = {
     hit: new Hitmarkers(),
@@ -68,7 +64,7 @@ try {
   };
   const frame = (dt = 1 / 60, opacity = 1): void => {
     state.time += dt;
-    activeHud.update(dt, state, health, crosshair, map, mapState, opacity, models);
+    activeHud.update(dt, state, health, crosshair, mapState, opacity, models);
   };
   frame();
   const initial = hud.draws;
@@ -195,6 +191,22 @@ try {
     frame();
     assert.equal(hud.draws, before + 1, 'unchanged presentation settles again');
   }
+  // Magazine fill follows the removal/seating beats, not the progress bar.
+  state.ammo = 9;
+  state.reloading = true;
+  state.reloadProgress = 0.1;
+  frame();
+  const magazineFill = hud.ammo['magFill'].scale;
+  assert.equal(magazineFill.x, 0.3);
+  state.magazineOut = true;
+  state.reloadProgress = 0.8;
+  frame();
+  assert.equal(magazineFill.x, 0);
+  state.magazineOut = false;
+  state.ammo = 30;
+  frame();
+  assert.equal(magazineFill.x, 1, 'a seated magazine may fill before the clip ends');
+  state.reloading = false;
   state.ammo = 0;
   frame();
   const empty = hud.draws;

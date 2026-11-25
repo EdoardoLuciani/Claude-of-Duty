@@ -9,6 +9,14 @@ changing authored assets.
 
 ## Source and products
 
+The map chooser and loading screen share [Last Light](../public/images/last-light.webp),
+a static WebP backdrop. It was painted with OpenAI GPT Image 2.6 Sunburst using
+the [Survival night capture](screenshots/after-dark.webp) as the reference. Dev
+and build serve the artwork directly without baking it.
+
+Keep model and gameplay texture recipes and text inputs in Git, not their
+generated products. Attach review screenshots rather than adding them to the source tree.
+
 - **`tools/`**: offline generation, inspection and cooking. Each Blender recipe
   directory in `tools/blender/` holds its Python source, README (asset contract)
   and authored reference/calibration JSON.
@@ -59,7 +67,7 @@ blender -b /tmp/m4-review/m4a1-block-ii.blend --python-exit-code 1 \
 bun build/models.ts m4 /tmp/m4-review
 ```
 
-Blender 5.2.2 and the pinned gltfpack encoder are needed by `bun run dev` /
+Blender 5.3.0 and the pinned gltfpack encoder are needed by `bun run dev` /
 `bun run build` whenever a Blender step is stale (see below). See the
 [shared authoring workflow](../tools/blender/README.md) and
 [cooking recipe](../build/README.md). Committed weapon manifests may name old tool

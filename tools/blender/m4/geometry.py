@@ -339,13 +339,12 @@ def build_geometry(materials):
     profile('A2 finger ledge',[(.030,-.019),(.025,-.028),(.043,-.031),(.047,-.023)],.032,polymer,bevel=.0015,rounded=True)
     # Diamond checkering is mapped below; no tessellated/fictitious stripe ribs.
     cyl('A2 grip screw',(0,-.059,.071),.0048,.002,steel,axis='Y',sides=24)
-    # SOPMOD storage chambers sit inside the cheek shell, below/outboard of the buffer bore.
+    # SOPMOD storage needs only the shallow recess at each visible cap.
     cheek=[(-.003,.091),(.003,.091),(.013,.087),(.024,.076),(.0325,.060),(.033,.049),(.029,.040),(.018,.0385),(.009,.048),(-.009,.048),(-.018,.0385),(-.029,.040),(-.033,.049),(-.0325,.060),(-.024,.076),(-.013,.087)]
     stock_body=loft('LMT SOPMOD body',[[(x,y,z) for x,y in cheek] for z in (.095,.112,.261,.274)],polymer,bevel=.001,rounded=True)
     cut(stock_body,cyl('CUT',(0,BORE,.174),.01475,.185,None,None,'Z',48,0))
     for side in (-1,1):
-        cut(stock_body,cyl('CUT',(side*.023,.052,.174),.0089,.185,None,None,'Z',40,0))
-        tube('LMT storage tube',(side*.023,.052,.179),.0088,.0079,.160,polymer,axis='Z',sides=40)
+        cut(stock_body,cyl('CUT',(side*.023,.052,.096),.0089,.011,None,None,'Z',40,0))
         cyl('LMT storage cap',(side*.023,.052,.098),.0088,.005,polymer,axis='Z',sides=40)
         profile('LMT cap turn tab',[(.094,.049),(.094,.055),(.096,.057),(.102,.055),(.102,.049)],.0038,polymer,x=side*.023,bevel=.0004,rounded=True)
     # LMT side reference: pad square to the buffer axis, not raked.
@@ -361,7 +360,6 @@ def build_geometry(materials):
     cyl('LMT adjustment pin',(0,.017,.164),.0038,.009,steel,axis='Y',sides=24)
     pad=[(-.029,.090),(.029,.090),(.032,.066),(.027,.040),(.014,.027),(.013,-.034),(-.013,-.034),(-.014,.027),(-.027,.040),(-.032,.066)]
     loft('SOPMOD rubber buttpad',[[(x,y,z) for x,y in pad] for z in (.274,.284)],rubber,bevel=.0018,rounded=True)
-    for y in np.arange(-.030,.087,.0045):box('Buttpad traction',(0,float(y),.284),(.020 if y<.027 else .050,.0014,.001),rubber,bevel=.00015)
 
     # MaTech: seated steel base, range wedge, windage drum, open peep and stalk.
     before_rear=set(asset.objects)
@@ -434,7 +432,6 @@ def build_geometry(materials):
     for word,loc in [('SAFE',(-.0176,.050,.053)),('SEMI',(-.0176,.058,.035)),('AUTO',(-.0176,.049,.004))]:text(word,loc,.0022)
     text('DANIEL DEFENSE',( -.0198,.084,-.400),.0024,mat=marking)
     text('M4A1 RIS II FSP',(-.0198,.080,-.400),.0020,mat=marking)
-    for n,y in [('200',.113),('300',.115),('400',.117),('450',.119),('500',.121),('550',.123),('600',.125)]:text(n,(-.0103,y,.019),.0016,parent=irons_root)
     text('OKAY',(-.01255,-.052,-.085),.0023,mat=magmat,parent=mag)
     for name,pos in [('MOUNT_optic',(0,BORE+.0286,-.067)),('SOCKET_muzzle',(0,BORE,FH_TIP)),('SOCKET_ejection',(.023,.081,-.052)),('SOCKET_sight',(0,SIGHT_Y,.034)),('SOCKET_front_post',(0,SIGHT_Y,GAS-.007)),('SOCKET_bolt_face',(0,BORE,BOLT_FACE)),('SOCKET_barrel_crown',(0,BORE,CROWN))]:empty(name,pos,rig)
     # Conform markings to the actual shaped surface, not a floating label plane.
@@ -451,7 +448,7 @@ def build_geometry(materials):
     # including mounting screws, rather than hiding them in a receiver primitive.
     for o in asset.objects:
         if o.type!='MESH' or o.parent!=body:continue
-        parent=guard_root if o.name.startswith('RIS II') else stock_root if o.name.startswith(('LMT ','SOPMOD ','Buttpad ')) else None
+        parent=guard_root if o.name.startswith('RIS II') else stock_root if o.name.startswith(('LMT ','SOPMOD ')) else None
         if parent:o.parent=parent;o.matrix_parent_inverse=parent.matrix_world.inverted()
     # Share exact magazine geometry/UVs for the fresh magazine after applying radii.
     for o in list(asset.objects):

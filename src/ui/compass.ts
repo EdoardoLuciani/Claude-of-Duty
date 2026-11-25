@@ -52,6 +52,7 @@ interface ScoreState {
 }
 /** Survival run status: one player score, current wave and enemy count. */
 export class ScoreBar {
+  visible = true;
   score = '000000';
   wave = '1';
   credits = '000000';

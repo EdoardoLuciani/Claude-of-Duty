@@ -18,7 +18,7 @@ bun tools/blender/spent_hull/cook.ts "$out/spent12g.glb" "$out/spent12g.runtime.
 cmp "$out/spent12g.glb" "$out/spent12g.runtime.glb"
 ```
 
-Use Blender 5.2.2 and its native glTF exporter. Repeat in a second empty directory
+Use Blender 5.3.0 and its native glTF exporter. Repeat in a second empty directory
 and compare the native exports with `cmp`. `bun tools/build-assets.ts` / `bun run dev` /
 `bun run build` run the standalone `spent-hull` step when its inputs change or a
 product is missing. Normal builds write the `.blend` and native `.glb` next to

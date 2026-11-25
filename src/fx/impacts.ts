@@ -182,6 +182,7 @@ function bulletHole(fx: ImpactFx, p: Vec3Like, n: Vec3Like, o: BulletHoleOptions
   const rng = fx.rng;
   const size = rng.range(o.min, o.max) * (0.9 + (o.e ?? 1) * 0.1);
   fx.addDecal(p, n, {
+    primaryImpact: true,
     tile: o.tile,
     size,
     life: o.life ?? 90,
@@ -634,6 +635,7 @@ function metal(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: number)
 
   if (grazing > 0.6) {
     fx.addDecal(p, n, {
+      primaryImpact: true,
       tile: D.SCRAPE,
       size: rng.range(0.16, 0.28),
       life: 70,
@@ -855,6 +857,7 @@ function glass(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like): void {
     fx.emitLit(s);
   }
   fx.addDecal(p, n, {
+    primaryImpact: true,
     tile: rng.float() < 0.5 ? D.GLASS_CRACK : D.HOLE_GLASS,
     size: rng.range(0.3, 0.55),
     life: 120,
@@ -1094,6 +1097,7 @@ function soft(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, rubber: boo
     fx.emitLit(s);
   }
   fx.addDecal(p, n, {
+    primaryImpact: true,
     tile: D.TEAR,
     size: rng.range(0.09, 0.15),
     life: 80,

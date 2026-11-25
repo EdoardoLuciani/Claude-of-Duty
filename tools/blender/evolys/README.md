@@ -33,7 +33,7 @@ support hold sits behind the rail with glove-pad contact on the molded cover, an
 reload/inspection routes keep the fingers curled until below/outboard of the rail.
 The handguard owns the rail; the stock is rigid with no authored fold clip.
 
-Run from the repository root with Blender 5.2.2 and gltfpack 1.3:
+Run from the repository root with Blender 5.3.0 and gltfpack 1.3:
 
 ```sh
 blender -b -t 2 --python-exit-code 1 --python tools/blender/evolys/build.py
@@ -62,8 +62,6 @@ normal-encoding exceptions are bounded in the source map.
 
 Ordinary rebuilds treat hand calibration and shared review arms as inputs. Refit intentionally with
 `bun tools/blender/evolys/hand-reference.ts`, never during ordinary rebuilds.
-[`../review_hands.py`](../review_hands.py) owns shared review-arm baking for EVOLYS
-and MPX.
 Save editable sparse actions before export. Fire/Last_Shot last 60/700 s;
 preserve held endpoint samples, matching NLA names and TRS resets.
 
