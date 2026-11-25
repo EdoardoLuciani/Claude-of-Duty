@@ -12,7 +12,6 @@ export type WeaponMode = 'auto' | 'burst' | 'semi';
 export type WeaponClass = 'carbine' | 'smg' | 'pistol' | 'lmg' | 'shotgun' | 'sniper';
 type TuningVector = [number, number, number];
 
-/** Authored tuning is checked against this contract, not inferred into one. */
 export type AmmoPack = 'magazine' | 'belt' | 'shell bundle';
 
 /** What one spare holds: tube guns load loose shells, LMGs carry belts. */
@@ -21,6 +20,7 @@ export function ammoPack(def: Pick<WeaponDef, 'class' | 'reloadStyle'>): AmmoPac
   return def.class === 'lmg' ? 'belt' : 'magazine';
 }
 
+/** Authored tuning is checked against this contract, not inferred into one. */
 export interface WeaponDef {
   id: WeaponId;
   label: string;
