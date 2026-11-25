@@ -200,30 +200,31 @@ def build(root):
     ocular.node_tree.nodes.get('Principled BSDF').inputs['Specular IOR Level'].default_value = .18
     X, Y, Z = (1,0,0), (0,1,0), (0,0,1)
 
-    # Seat the 18 mm clear aperture just forward of the ocular; the forward
-    # bore is relieved so the rear eye sees one dark rim, not a long cone.
+    # Open the internal window for the single-camera ADS view. Both ends of
+    # the bore matter in perspective; the exterior and sight datum stay fixed.
+    bore = [(37.3,13.6),(32.3,13.5),(27,13.35),(-19,12),(-25,11),(-26,10.6),
+            (-27,10.6),(-29,11.2),(-31,11.6),(-34,12),(-36.4,12.5)]
     tube = turned('Forged tube and end shoulders', (0,0,AXIS), Y,
            [(-36.4,13),(-37,14),(-36.6,15),(-30.7,15),(-29.4,15.9),(-27.4,16.1),
-            (26.6,16.1),(28.5,15.5),(30,14.8),(36.7,14.8),(37.3,14.1),(37.3,12.8),
-            (32.3,12.5),(27,11.9),(-19,11.2),(-25,9.8),(-26,9),(-27,9),(-29,10.35),
-            (-31,11.1),(-34,11.5),(-36.4,12.5)], body, root, 96)
+            (26.6,16.1),(28.5,15.5),(30,14.8),(36.7,14.8),(37.3,14.1),*bore], body, root, 96)
     tube.data.materials.append(baffle)
     for face in tube.data.polygons[11*96:]:
         face.material_index = 1
-    for side, radius in [(-1,11.3),(1,11.9)]:
+    for side, radius in [(-1,11.6),(1,13.35)]:
         turned('Stepped inner retaining ring', (0,side*34,AXIS), Y,
-               [(-1.3,radius+.6),(-1.6,radius+.9),(1.6,radius+.9),
-                (1.8,radius+.5),(1.8,radius),(-1.3,radius)], baffle, root)
-    glass('Warm coated front objective', (0,28,AXIS), (0,.993,.118), 11.9, 1.5, objective, root)
-    glass('Recessed rear ocular', (0,-30,AXIS), (0,-1,0), 10.8, .9, ocular, root)
+               [(-1.3,radius+.35),(-1.6,radius+.6),(1.6,radius+.6),
+                (1.8,radius+.3),(1.8,radius),(-1.3,radius)], baffle, root)
+    glass('Warm coated front objective', (0,28,AXIS), (0,.993,.118), 13.4, 1.5, objective, root)
+    glass('Recessed rear ocular', (0,-30,AXIS), (0,-1,0), 11.4, .9, ocular, root)
 
     # The top guard sweeps forward into the tube, leaving a U around the dial.
+    bore_neighbors = []
     for x in (-7.9,7.9):
         side = lambda a,b,c: (a,b,c)
-        prism('Swept forward elevation guard', [(-7.5,29.8),(-7.5,38.9),(-3.4,38.9),
-               (2.5,35.3),(14,32.9),(16,29.8)], x-2.4,x+2.4, side, body,root,.58)
-        prism('Rear elevation guard', [(-26.5,30),(-26.5,38),(-24,39),(-20,39),(-20,30)],
-               x-2.4,x+2.4, side, body,root,.53)
+        bore_neighbors.append(prism('Swept forward elevation guard', [(-7.5,29.8),(-7.5,38.9),(-3.4,38.9),
+               (2.5,35.3),(14,32.9),(16,29.8)], x-2.4,x+2.4, side, body,root,.58))
+        bore_neighbors.append(prism('Rear elevation guard', [(-26.5,30),(-26.5,38),(-24,39),(-20,39),(-20,30)],
+               x-2.4,x+2.4, side, body,root,.53))
     disc('Recessed elevation well', (0,-14,35), Z, 6.2, 1.4, steel, root)
     disc('Knurled elevation cap', (0,-14,37), Z, 5.7, 4.1, saddle, root, 80, .34)
     box('Elevation tool face', (0,-14,39.12), (7.4,.55,.18), etch, root, .08)
@@ -231,7 +232,7 @@ def build(root):
     disc('Knurled windage cap', (17.2,-16,20.5), X, 7.2, 3, saddle, root, 80, .27)
     for z in (18.8,22.1):
         disc('Windage cap tool detail', (18.76,-16.2,z), X, .62, .22, etch, root, 16)
-    disc('Control-side reinforced boss', (14,6.9,19.4), X, 15.1, 4.3, body, root)
+    bore_neighbors.append(disc('Control-side reinforced boss', (14,6.9,19.4), X, 15.1, 4.3, body, root))
     disc('Knurled intensity and battery dial', (22,7,19.4), X, 14.9, 8.0, saddle, root, 144, .39)
     lid = disc('Inset battery lid face', (26.15,7,19.4), X, 14.2, .46, body, root)
     slot_center = (26.49,7,19.4)
@@ -256,7 +257,18 @@ def build(root):
             theta-math.pi/2, 0, math.pi/2)
 
     # Low standard mount: continuous floor, fixed jaw and removable side plate.
-    box('Integral receiver foot', (0,0,5.9), (23.4,53,6.2), body, root, .86)
+    bore_neighbors.append(box('Integral receiver foot', (0,0,5.9), (23.4,53,6.2), body, root, .86))
+    # Trim the concealed overlap of the foot, dial boss and guards against
+    # the bore so none intrude into the wider window. Leave their shells intact.
+    cutter = turned('Bore machining tool', (0,0,AXIS), Y,
+                    [(37.3,.01),*((d,r-.04) for d,r in bore),(-36.4,.01)], baffle, root, 96)
+    for part in bore_neighbors:
+        active(part)
+        cut = part.modifiers.new('Clear optical path', 'BOOLEAN')
+        cut.object, cut.material_mode = cutter, 'TRANSFER'
+        bpy.ops.object.modifier_apply(modifier=cut.name)
+    bpy.data.objects.remove(cutter, do_unlink=True)
+
     clamp = box('Low saddle with fixed jaw', (-1.05,0,.45), (24.1,54,8.9), saddle, root, .56)
     jaw = box('Moving clamp jaw', (11.2,0,.25), (6.2,20,8.3), saddle, root, .48)
     picatinny.cut_channel([clamp,jaw], Matrix.Identity(4), -.029,.029)
@@ -271,10 +283,11 @@ def build(root):
     # rear nearly upright with a clear centre. Both retain their hinge seams.
     for side in (1,-1):
         p = (0,side*34.7,AXIS)
+        lip = 13.6 if side == 1 else 12.45
         turned(('Front' if side == 1 else 'Rear')+' snap-on cover collar', p, (0,side,0),
                [(-4,14.35),(-4.2,15.4),(-3.6,16.1),(.9,16.1),(1.4,15.85),(1.65,15.18),
                 (2.15,15.18),(2.4,15.86),(3.45,15.75),(4.25,15.25),(4.5,14.64),
-                (4.3,13.3),(2.8,12.45),(-3.9,13.65)], caps, root, 80)
+                (4.3,max(13.3,lip)),(2.8,lip),(-3.9,13.65)], caps, root, 80)
         hinge = (0,side*33.4,AXIS+16.1)
         for x in (-9.1,9.1):
             def ear(a, b, c):

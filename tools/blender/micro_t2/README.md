@@ -2,9 +2,9 @@
 
 Original Blender-authored game art for the Supply Market red-dot slot. The optic
 uses the low standard Picatinny saddle, an open circular bore with recessed
-lenses, and fixed open dust covers (opaque front, clear rear). A short matte
-aperture near the rear lens keeps the bore wall subdued in ADS. The P320 has no
-optic fit.
+lenses, and fixed open dust covers (opaque front, clear rear). The internal
+window is widened for the single-camera ADS view without changing the outside
+silhouette. The P320 has no optic fit.
 
 ```sh
 blender -b --python-exit-code 1 --python tools/blender/micro_t2/build.py
