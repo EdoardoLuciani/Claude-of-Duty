@@ -92,10 +92,10 @@ try {
   const redDot = model();
   const configured = fixture(async (_id, config): Promise<TrackedModel> => {
     requests.push(config);
-    return config?.optic === 'rmr' ? redDot : base;
+    return config?.optic === 'railway' ? redDot : base;
   });
   configured.reset = MarketInspection.prototype.reset.bind(configured);
-  const config = { ...BASE_ATTACHMENTS, optic: 'rmr' } as const;
+  const config = { ...BASE_ATTACHMENTS, optic: 'railway' } as const;
   await configured.select('rifle', 'Rifle', BASE_ATTACHMENTS);
   configured.camera.position.set(2, 1, 1);
   const orbit = configured.camera.position.clone();

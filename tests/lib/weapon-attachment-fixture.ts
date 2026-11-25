@@ -21,7 +21,7 @@ function datum(scene: THREE.Object3D, name: string): THREE.Vector3 {
 }
 
 /** Owned optic record without a GLB: `MOUNT_base` and `SOCKET_sight` datums. */
-export function opticAsset(scene = datums('MOUNT_base', 'SOCKET_sight')): Assets['rmr'] {
+export function opticAsset(scene = datums('MOUNT_base', 'SOCKET_sight')): Assets['railway'] {
   const mount = datum(scene, 'MOUNT_base');
   return { scene, mount, sight: datum(scene, 'SOCKET_sight'), dispose(): void {} };
 }

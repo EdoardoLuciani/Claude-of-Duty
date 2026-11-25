@@ -1,7 +1,7 @@
 import { hasOwn, isRecord } from '../core/guards.ts';
 import { WEAPON_DEFS, type WeaponDef, type WeaponId } from './defs.ts';
 
-export const OPTIC_IDS = ['rmr', 'acog', 'scope', 'exps3'] as const;
+export const OPTIC_IDS = ['railway', 'acog', 'scope', 'exps3'] as const;
 export type OpticId = (typeof OPTIC_IDS)[number];
 export type RailId = 'laser';
 export type MuzzleId = 'suppressor';
@@ -66,10 +66,10 @@ export const OPTICS: Record<
     optic: { apertureR: 0.011, dotMoa: 1, ringMoa: 68, minDotPixels: 2, dotOpacity: 0.9 },
     glass: { prefix: '10 |', opacity: 0.13 },
   },
-  rmr: {
+  railway: {
     adsFovScale: 0.62,
     adsSensScale: 0.62,
-    optic: { apertureR: 0.0055, dotMoa: 3.25, minDotPixels: 5, dotOpacity: 0.9 },
+    optic: { apertureR: 0.0145, dotMoa: 4, minDotPixels: 4, dotOpacity: 0.9 },
     glass: { prefix: '10 |', opacity: 0.13 },
   },
   acog: {
@@ -108,7 +108,7 @@ const HANDLING: Record<
   NonNullable<AttachmentConfig[keyof AttachmentConfig]>,
   { adsTime?: number; recoil?: number }
 > = {
-  rmr: {},
+  railway: {},
   exps3: { adsTime: 1.04 },
   acog: { adsTime: 1.1 },
   scope: { adsTime: 1.18 },

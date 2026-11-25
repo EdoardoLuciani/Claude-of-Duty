@@ -197,7 +197,7 @@ for name in ('IRON_sights_removed','MUZZLE_device_removed'):
 bpy.context.view_layer.update()
 mounted = {}
 loaded = []
-for id,slot in [('rmr','optic'),('acog','optic'),('scope','optic'),('exps3','optic'),('srd762ti','muzzle'),('laser','rail')]:
+for id,slot in [('railway','optic'),('acog','optic'),('scope','optic'),('exps3','optic'),('srd762ti','muzzle'),('laser','rail')]:
     objects,base = attachment_source.load(id)
     mesh = [o for o in objects if o.type == 'MESH']
     seating = bpy.data.objects['MOUNT_'+slot].matrix_world @ base.matrix_world.inverted()

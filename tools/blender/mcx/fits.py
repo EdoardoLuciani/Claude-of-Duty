@@ -40,7 +40,7 @@ def check_attachment_fits():
     hands = [o for o in bpy.data.collections['MCX | authored hands (shared appearance)'].objects if o.type == 'MESH']
     attachments = []
     loaded = []
-    for id, slot in [('rmr','optic'),('acog','optic'),('scope','optic'),('exps3','optic'),('srd762ti','muzzle'),('laser','rail')]:
+    for id, slot in [('railway','optic'),('acog','optic'),('scope','optic'),('exps3','optic'),('srd762ti','muzzle'),('laser','rail')]:
         objects = attachment_source.seat(id, bpy.data.objects['MOUNT_'+slot])
         loaded.extend(objects)
         meshes = [o for o in objects if o.type == 'MESH' and
@@ -109,4 +109,4 @@ def check_attachment_fits():
         for obj in loaded:
             bpy.data.objects.remove(obj,do_unlink=True)
         select_review_clip('Idle')
-    print('MCX_ATTACHMENT_FITS_OK:',count,'120Hz poses; RMR/ACOG installed irons, PM II folded irons; all optics + suppressor; mechanisms and both review arms')
+    print('MCX_ATTACHMENT_FITS_OK:',count,'120Hz poses; Railway/ACOG installed irons, PM II folded irons; all optics + suppressor; mechanisms and both review arms')

@@ -128,7 +128,7 @@ const STANDALONE_TOOLS: Partial<Record<ModelId, string[]>> = {
     'tools/blender/mcx/finishes.py',
   ],
   scope: ['tools/blender/scope'],
-  rmr: ['tools/blender/rmr'],
+  railway: ['tools/blender/railway', 'tools/blender/exps3/build.py'],
   exps3: ['tools/blender/exps3'],
   tor_mini: ['tools/blender/tor_mini'],
   field_radio: ['tools/blender/field_radio/build.py'],
