@@ -1,9 +1,16 @@
 import type { Vector3Like as Vec3Like } from 'three';
 
-import { TAU } from '../core/math.ts';
+import { TAU, clamp } from '../core/math.ts';
 import { P } from './atlas.ts';
 import type { FxSystem } from './index.ts';
-import { resetSpawn, setSpawnColorRamp, setSpawnPosition, setSpawnVelocity } from './particles.ts';
+import {
+  PARTICLE_FADE_IN,
+  resetSpawn,
+  setSpawnColorRamp,
+  setSpawnPosition,
+  setSpawnVelocity,
+  type SP,
+} from './particles.ts';
 import { V, C, C2, basis, blackbody, clampCone, cone, towardHemi, COS55 } from './util.ts';
 
 /** Muzzle flash layers a small incandescent core, asymmetric tongues, gas jet, grains and smoke.
@@ -109,9 +116,10 @@ const VIEW = {
   maxFrame: 1 / 30,
   spill: 0.5, // world spill peak; local and brief so nearby surfaces don't strobe in a burst
   reach: 0.7, // world spill cutoff distance
-  // Flame sprites are drawn once, at this fraction of their life: past the shader's
-  // fade-in (particles.ts, first 4.5% of life) so the pulse shows on the firing frame.
-  drawAge: 0.06,
+  // Flame sprites are drawn once, at this fraction of their life: just past the
+  // shader's fade-in so the pulse shows on the firing frame.
+  drawAge: PARTICLE_FADE_IN + 0.015,
+  alphaCurve: 1.5, // any frame sampling the end of the pulse sees only a faint tail
 };
 
 function profileFor(weapon?: string | MuzzleWeapon): MuzzleProfile {
@@ -128,12 +136,12 @@ function profileFor(weapon?: string | MuzzleWeapon): MuzzleProfile {
 /** First-person flame lives one pulse, so it is drawn on a single frame near birth: each
  * layer's life, growth, drag, spin and end radiance only shape the third-person flash.
  */
-function emitFlame(fx: MuzzleFx, s: ReturnType<typeof resetSpawn>, view: boolean): void {
+function emitFlame(fx: MuzzleFx, s: typeof SP, view: boolean): void {
   if (view) {
     s.life = VIEW_FLASH_TIME;
     s.delay = -VIEW.drawAge * s.life;
-    s.alphaCurve = 1.5; // Any frame sampling the end of the pulse sees only a faint tail.
-    fx.emitViewAdd(s, VIEW_FLASH_TIME);
+    s.alphaCurve = VIEW.alphaCurve;
+    fx.emitViewAdd(s);
   } else {
     fx.emitAdd(s);
   }
@@ -152,8 +160,9 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
   const view = o.view === true;
   // Approximate averaging a brief pulse over the frame. At low FPS, the
   // displayed frame persists longer, so show less glare rather than more.
-  const frame = Math.min(VIEW.maxFrame, Math.max(VIEW_FLASH_TIME, fx.ctx.time.dt));
-  const exposure = view ? VIEW_FLASH_TIME / frame : 1;
+  const exposure = view
+    ? VIEW_FLASH_TIME / clamp(fx.ctx.time.dt, VIEW_FLASH_TIME, VIEW.maxFrame)
+    : 1;
   const lightGain = gain * (o.light ?? 1) * exposure;
   // Scale enemy embers with flash gain instead of retaining player-strength streaks.
   const emberGain = 0.22 + 0.78 * Math.min(1, gain);
@@ -161,7 +170,8 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
   const sc = prof.scale * (o.scale ?? o.intensity ?? 1) * (0.88 + rng.float() * 0.24);
   const flashSize = view ? VIEW.size : 1;
   const flameScale = sc * flashSize;
-  const flameGain = gain * (view ? VIEW.radiance * exposure : 1);
+  const radiance = gain * (view ? VIEW.radiance : 1);
+  const flameGain = radiance * exposure;
   const emitLit = view ? fx.emitViewLit : fx.emitLit;
   const temp = prof.temp * (0.96 + rng.float() * 0.09);
   // Blackbody ramp: 3800-4400 K at the crown, cooling to 2200 K at the lobe tips.
@@ -208,7 +218,7 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
   s.life = 0.046;
   s.drag = 12;
   setSpawnColorRamp(s, cr, cg, cb, gr, gg, gb);
-  const coreGain = view ? gain * VIEW.radiance * exposure ** VIEW.coreExposure : flameGain;
+  const coreGain = radiance * exposure ** VIEW.coreExposure;
   s.i0 = 38 * coreGain;
   s.i1 = 6 * flameGain;
   s.alphaCurve = 0.6;

@@ -46,6 +46,8 @@ import type { JoinNode, TextureNode, UniformNode } from 'three/webgpu';
  */
 
 export const STRIDE = 32;
+/** Sprites fade in over this fraction of their life. */
+export const PARTICLE_FADE_IN = 0.045;
 
 // interleaved slot offsets
 const O_PS = 0; // pos.xyz, size0
@@ -349,10 +351,9 @@ function buildParticleMaterial(o: ParticleOptions): {
       inten.mul(float(0.72).add(float(0.28).mul(sin(t.mul(63.0).add(ph.mul(9.0)))))),
       inten
     );
-    // First-person muzzle flame starts past this fade-in (VIEW.drawAge in muzzle.ts).
     const a = aMisc.z
       .mul(pow(max(float(1.0).sub(n), 0.0), max(aMisc.w, 0.02)))
-      .mul(smoothstep(0.0, 0.045, n));
+      .mul(smoothstep(0.0, PARTICLE_FADE_IN, n));
     vCol.assign(vec4(col.mul(inten), select(alive, a, 0.0)));
 
     const clip = cameraProjectionMatrix.mul(mv);

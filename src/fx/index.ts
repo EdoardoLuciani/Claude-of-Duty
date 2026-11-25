@@ -287,9 +287,10 @@ export class FxSystem {
   emitAdd = (s: typeof SP): number => this.add.emit(s, this.now);
   emitLit = (s: typeof SP): number => this.lit.emit(s, this.now);
   emitMote = (s: typeof SP): number => this.motes.emit(s, this.now);
-  emitViewAdd = (s: typeof SP, minLife?: number): number => {
+  /** View flame may be as brief as the muzzle pulse, below the default life floor. */
+  emitViewAdd = (s: typeof SP): number => {
     this._attachView();
-    return this.viewAdd.emit(s, this.now, minLife);
+    return this.viewAdd.emit(s, this.now, VIEW_FLASH_TIME);
   };
   emitViewLit = (s: typeof SP): number => {
     this._attachView();
@@ -381,6 +382,7 @@ export class FxSystem {
     const pool = this.viewLights;
     if (!pool) return;
     const key = this.render?.viewLightLevel ?? this.render?.viewSun.intensity ?? 2.5;
+    // Peak candela per key unit, before the muzzle's exposure carried in `strength`.
     const peak = key * 0.4 * clamp(strength, 0, 2.2);
     // Lift 4 cm off the bore: an on-axis source grazes the receiver (N.L ~0.15).
     pool.flash(x, y + 0.04, z, r, g, b, peak, VIEW_FLASH_TIME, VIEW_FLASH_DECAY, 1.6, 2);
