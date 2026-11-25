@@ -7,7 +7,7 @@ visual/animation/gameplay acceptance is pending.
 [Shared workflow](../README.md)
 
 The adapter converts +X-forward/+Z-up/−Y-right once and samples eight clips with
-unchanged timelines/events and calibrated grip endpoints. Draw/holster support-hand
+calibrated grip endpoints. The two-sided inspect keeps both hands on the weapon. Draw/holster support-hand
 approaches move below/outboard of the PM II; holster releases early and returns
 after the objective clears. Ordinary meshes retain independent mechanisms,
 magazines and rounds.

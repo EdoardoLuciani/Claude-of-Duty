@@ -9,7 +9,7 @@
     "primitives": 16,
     "materials": 1,
     "images": 3,
-    "bytes": 6537520
+    "bytes": 6678660
   },
   "clips": {
     "Idle": {
@@ -147,12 +147,12 @@
     "Inspect": {
       "frames": [
         0,
-        348.0
+        480
       ],
-      "duration": 2.9,
+      "duration": 4,
       "events": [
         {
-          "time": 2.8999,
+          "time": 3.9999,
           "event": "end"
         }
       ]

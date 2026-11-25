@@ -25,7 +25,7 @@ assert set(clips) == required
 for name in ['MPX_RIG', 'bolt', 'trigger', 'magazine', 'magazine_spare', 'hand_L', 'hand_R', 'MPX_arm_left', 'MPX_arm_right']:
     assert {t.name for t in bpy.data.objects[name].animation_data.nla_tracks} == required, name
 assert clips['Reload_Tactical']['duration'] == 1.85 and clips['Reload_Empty']['duration'] == 2.5
-assert clips['Inspect']['duration'] == 2.9 and clips['Draw']['duration'] == .52 and clips['Holster']['duration'] == .34
+assert clips['Inspect']['duration'] == 4 and clips['Draw']['duration'] == .52 and clips['Holster']['duration'] == .34
 assert not any(e['event'] == 'magdrop' for e in clips['Reload_Tactical']['events'])
 assert sum(e['event'] == 'magdrop' for e in clips['Reload_Empty']['events']) == 1
 scene.frame_set(0)
