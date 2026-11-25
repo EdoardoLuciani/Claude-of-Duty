@@ -58,17 +58,10 @@ const ROWS: ReadonlyArray<{
     format: degrees,
   },
   {
-    label: 'Vertical recoil',
-    title: 'Upward sightline kick before the shot pattern and stance modifiers.',
+    label: 'Base recoil',
+    title: 'Vertical sightline kick before the shot pattern and stance modifiers.',
     better: -1,
     value: (def): number => def.recoil.pitch / DEG,
-    format: degrees,
-  },
-  {
-    label: 'Lateral recoil',
-    title: 'Side-to-side sightline kick scale before the shot pattern and stance modifiers.',
-    better: -1,
-    value: (def): number => def.recoil.yaw / DEG,
     format: degrees,
   },
   {

@@ -129,8 +129,8 @@ rail path on all seven weapons.
 Each suppressor can has its own Blender recipe and cook id
 (`tools/blender/suppressor/` for the shared SRD762Ti, `suppressor9mm/`,
 `suppressor338/`, `suppressor12g/`); all share scene, lathe, bore-gauge and export
-helpers in `tools/blender/can.py`. The [Crest and Vector brakes](../tools/blender/muzzle_brakes/README.md)
-are independent recipes with a shared M4A1 fit check. Weapon fit checks load built
+helpers in `tools/blender/can.py`. The [M4-72 Brake](../tools/blender/muzzle_brakes/README.md)
+has a standalone recipe and an M4A1 fit check. Weapon fit checks load built
 attachments through `tools/blender/attachment_source.py`.
 
 Normal `bun run dev` / `bun run build` run `tools/build-assets.ts` (also runnable

@@ -8,8 +8,8 @@ import { loadWeaponGLTF } from './asset-loader.ts';
 import { convertWeaponScene, type WeaponSceneMaterials } from './asset-material.ts';
 import {
   fittedMuzzleModel,
-  MUZZLE_MODELS,
   isAttachmentConfig,
+  MUZZLE_MODELS,
   OPTIC_IDS,
   OPTICS,
   SLOTS,
@@ -255,7 +255,8 @@ export function mountAttachments(
     if (!nodes) continue;
     const fitted = config[slot] !== null;
     nodes.bare.visible = !fitted;
-    if (nodes.fitted) nodes.fitted.visible = fitted;
+    if (nodes.fitted)
+      nodes.fitted.visible = slot === 'muzzle' ? config.muzzle === 'suppressor' : fitted;
   }
   return {
     opticGroup: opticSlot.group,

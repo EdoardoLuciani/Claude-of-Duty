@@ -396,7 +396,7 @@ artwork is mapped in `src/ui/market-art.ts`; its provenance lives in
 `optic: null` uses irons. Viewmodel entries hold the mounted instances and their
 resolved data, never a copy of the build.
 `src/weapons/attachment-rules.ts` owns the finite catalog (`railway | acog | scope | exps3`
-optics, TOR Mini `laser`, and `suppressor | crest_brake | vector_brake` for the muzzle),
+optics, TOR Mini `laser`, and `suppressor | m4_72` for the muzzle),
 compatibility and effective-definition resolution without importing weapon loading or mounting.
 `src/weapons/attachments.ts` owns asset loading and the shared gameplay/inspection mount solver.
 `src/market/attachments.ts` owns prices, not compatibility. Market holds one
@@ -408,15 +408,15 @@ ownership, so a rejected build never drops the old gun.
 `WeaponDef.fits` is a per-slot partial record keyed by attachment ID: each entry
 enables a verified fit and holds its data (`fits.optic[id].eyeRelief`, optional
 `railSlots` at `PICATINNY_PITCH`, `fits.muzzle[id].model`; rail entries are empty).
-The suppressor shares a catalog ID across its can models. Both brake fits are verified
-only on the M4A1; stock, suppressor and either brake are mutually exclusive.
+The suppressor shares a catalog ID across its can models. The M4-72 Brake is verified
+on the M4A1; stock, suppressor and brake are mutually exclusive.
 `isAttachmentConfig()` is the shared compatibility rule for gameplay, URL/debug input
 (narrowed once in `src/dev/attachments.ts` before prewarm) and `tools/capture.ts`; reject
 unverified fits, never silently change them. `removableIrons` swaps required `IRON_sights`
 for optional `IRON_sights_removed` with any optic; fixed irons stay and must clear it.
-`removableMuzzleDevice` similarly swaps required `MUZZLE_device` for optional
-`MUZZLE_device_removed`; permanent hardware stays when fitted. Missing required nodes
-fail loading.
+`removableMuzzleDevice` hides required `MUZZLE_device` for any muzzle attachment;
+only a suppressor reveals the optional `MUZZLE_device_removed` adapter. Permanent hardware
+stays when fitted. Missing required nodes fail loading.
 
 `loadAttachments()` returns assets keyed by optic/rail ID or muzzle model. A failed
 asset disables only that key, never the base weapon. Weapons own shared assets;
@@ -435,7 +435,7 @@ Attachment multipliers multiply across slots from the authored definition, never
 previous build, and never change ballistics. Only the suppressor changes shot report/FX.
 `WeaponSystem` updates the gun's private definition in place (the viewmodel shares it)
 and rebuilds its recoil pattern. The market compares owned and draft definitions from
-the same resolver against the authored base, including separate vertical and lateral recoil.
+the same resolver against the authored base.
 Frame-time reticle, ADS, laser and fire consumers allocate nothing.
 
 Optics define `MOUNT_base` and `SOCKET_sight`; rigid attachments define

@@ -4,14 +4,13 @@ import { WEAPON_DEFS, type WeaponDef, type WeaponId } from './defs.ts';
 export const OPTIC_IDS = ['railway', 'acog', 'scope', 'exps3'] as const;
 export type OpticId = (typeof OPTIC_IDS)[number];
 export type RailId = 'laser';
-export type MuzzleId = 'suppressor' | 'crest_brake' | 'vector_brake';
+export type MuzzleId = 'suppressor' | 'm4_72';
 export const MUZZLE_MODELS = [
   'srd762ti',
   'suppressor9mm',
   'suppressor338',
   'suppressor12g',
-  'crest_brake',
-  'vector_brake',
+  'm4_72',
 ] as const;
 export type MuzzleModel = (typeof MUZZLE_MODELS)[number];
 
@@ -115,7 +114,7 @@ export function fittedMuzzleModel(
  * presentation live with their own data, not here. */
 const HANDLING: Record<
   NonNullable<AttachmentConfig[keyof AttachmentConfig]>,
-  { adsTime?: number; recoil?: number; verticalRecoil?: number; lateralRecoil?: number }
+  { adsTime?: number; recoil?: number; verticalRecoil?: number }
 > = {
   railway: {},
   exps3: { adsTime: 1.04 },
@@ -123,8 +122,7 @@ const HANDLING: Record<
   scope: { adsTime: 1.18 },
   // Can mass at the muzzle slows aiming; its gas trap softens every shot.
   suppressor: { adsTime: 1.08, recoil: 0.88 },
-  crest_brake: { adsTime: 1.16, verticalRecoil: 0.68 },
-  vector_brake: { adsTime: 1.08, lateralRecoil: 0.55 },
+  m4_72: { adsTime: 1.16, verticalRecoil: 0.68 },
   laser: {},
 };
 /** Kick magnitudes a recoil effect scales; spring, bracing and pattern shape stay authored. */
@@ -144,7 +142,6 @@ export function buildDef(id: WeaponId, config: AttachmentConfig): BuiltWeaponDef
   let adsTime = base.adsTime;
   let recoilScale = 1;
   let verticalScale = 1;
-  let lateralScale = 1;
   for (const slot of SLOTS) {
     const attachment = config[slot];
     if (attachment === null) continue;
@@ -152,14 +149,11 @@ export function buildDef(id: WeaponId, config: AttachmentConfig): BuiltWeaponDef
     adsTime *= effect.adsTime ?? 1;
     recoilScale *= effect.recoil ?? 1;
     verticalScale *= effect.verticalRecoil ?? 1;
-    lateralScale *= effect.lateralRecoil ?? 1;
   }
   const recoil = { ...base.recoil };
   for (const key of RECOIL_MAGNITUDES) recoil[key] *= recoilScale;
   recoil.pitch *= verticalScale;
   recoil.kickUp *= verticalScale;
-  recoil.yaw *= lateralScale;
-  recoil.roll *= lateralScale;
   return {
     ...base,
     suppressed: config.muzzle === 'suppressor',

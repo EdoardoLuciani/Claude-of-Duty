@@ -87,8 +87,8 @@ export interface WeaponDef {
   /** Authored `IRON_sights` are hidden whenever an optic is mounted (an optional
    * `IRON_sights_removed` part replaces them); unset keeps fixed irons under an optic. */
   removableIrons?: true;
-  /** Authored `MUZZLE_device` is hidden whenever a muzzle attachment is mounted (an optional
-   * `MUZZLE_device_removed` part replaces it); unset keeps permanent muzzle hardware. */
+  /** A muzzle attachment hides `MUZZLE_device`. Only a suppressor reveals the optional
+   * `MUZZLE_device_removed` adapter; unset keeps permanent muzzle hardware. */
   removableMuzzleDevice?: true;
   sprintPos: TuningVector;
   sprintRot: TuningVector;
@@ -240,8 +240,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     fits: {
       muzzle: {
         suppressor: { model: 'srd762ti' },
-        crest_brake: { model: 'crest_brake' },
-        vector_brake: { model: 'vector_brake' },
+        m4_72: { model: 'm4_72' },
       },
       optic: {
         ...OPTIC_FITS,
