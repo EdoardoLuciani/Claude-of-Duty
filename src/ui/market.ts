@@ -57,7 +57,6 @@ export class MarketOverlay {
   stats: MarketStats;
   quote: { baseCost: HTMLElement; total: HTMLElement; discardWarning: HTMLElement };
   buildStatus: HTMLElement;
-  private readonly sightWarning: HTMLElement;
   confirm: HTMLButtonElement;
   _selectedId: string | null = null;
   cards: MarketCard[] = [];
@@ -137,16 +136,9 @@ export class MarketOverlay {
       'p',
       'ow-market-inspect-help',
       this.buildPanel,
-      'Choose one sight. Alternate irons use physical aiming marks; optics change ADS zoom. The suppressor quiets ' +
+      'Alternate irons use physical aiming marks. Optics replace removable irons and magnify the aimed view. The suppressor quiets ' +
         'shots and shrinks the muzzle flash; the laser beam does not predict spread or drop.'
     );
-    this.sightWarning = el(
-      'p',
-      'ow-market-build-warning',
-      this.buildPanel,
-      'The M590 suppressor blocks the default iron sightline. Choose a compatible optic for a clear aimed view.'
-    );
-    this.sightWarning.hidden = true;
     this.stats = new MarketStats(this.buildPanel);
     const baseCost = el('div', 'ow-market-build-base', this.buildPanel);
     const discardWarning = el('p', 'ow-market-build-warning', this.buildPanel);
@@ -364,8 +356,6 @@ export class MarketOverlay {
     this.buildPanel.hidden = !build;
     if (!build) return;
     this.stats.update(build.id, build.current, build.config, build.owned);
-    this.sightWarning.hidden =
-      build.id !== 'shotgun' || build.config.muzzle !== 'suppressor' || build.config.sight !== null;
     let discarded = '';
     for (let i = 0; i < this.buildControls.length; i++) {
       // Controls and quote lines share SLOTS order.

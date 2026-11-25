@@ -1,19 +1,18 @@
-# Iron sight fits
+# TROY iron sight fits
 
-The Supply Market's **Sight** menu has one active choice. Default sights are
-free; alternate irons use the weapon's physical sight axis rather than an
-optical overlay or magnification. Choosing a sight never changes the weapon's
-ballistic tuning. Drafts change only the inspection model until confirmed.
+The Supply Market's **Sight** menu has one active choice: free default irons,
+the TROY set on compatible weapons, or an optic. TROY uses physical aiming
+geometry without extra zoom or stat changes. Drafts change only the inspection
+model until confirmed.
 
-| Weapon       | Default                                             | TROY alternate fit                                                                                  |
-| ------------ | --------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| SIG MPX      | Factory-style folding peep and guarded front post   | Yes. The pair replaces the deployed set at two grooves on its continuous top rail.                  |
-| MCX VIRTUS   | Folding aperture and protected post                 | Yes. The stock leaves, feet and hinges stay together in the default or optic state, not under TROY. |
-| EVOLYS       | Game-authored rail aperture and guarded post        | Yes. Both feet seat on its top rail; the kit clears the feed cover and charging controls.           |
-| AX338        | Game-authored rail aperture and guarded post        | Yes. Both feet seat on its top rail; the kit clears the bolt and the authored hands.                |
-| M4A1         | A2 front tower/post, MaTech rear                    | No. Keeps the A2/MaTech pair as its only iron-sight setup.                                          |
-| P320 Compact | SIGLITE square-notch, three-dot pair                | No. Keeps the stock slide sights; there is no alternate or optic.                                   |
-| M590         | Integrated low ghost ring and protected front blade | No. The receiver optic rail has no matching forward seat at the barrel-mounted blade.               |
+| Weapon     | TROY fit                                                       |
+| ---------- | -------------------------------------------------------------- |
+| SIG MPX    | Both feet use grooves on its continuous top rail.              |
+| MCX VIRTUS | TROY replaces the stock leaves, feet and hinges.               |
+| EVOLYS     | The top-rail pair clears the feed cover and charging controls. |
+| AX338      | The top-rail pair clears the bolt and the authored hands.      |
+
+The M4A1, P320 Compact and M590 do not offer TROY.
 
 ## TROY art and review
 
@@ -48,13 +47,3 @@ bun tools/capture.ts --weapon=smg --sight=troy --shot=ads --out=/tmp/mpx-troy.pn
 [rear-envelope]: https://www.wingtactical.com/accessories/optics-sights/sights/troy-industries-doa-di-optic-aperture-folding-rear-battlesight/
 [front-face]: https://worldoftroy.com/wp-content/uploads/2023/11/SSIG-FBS-FHBT-00_01_R01_C01-scaled.jpg
 [front-envelope]: https://www.wingtactical.com/accessories/optics-sights/sights/troy-industries-hk-style-folding-front-battle-sight/
-
-## M590 suppressor
-
-The default ghost-ring line is open bare but blocked by the mounted expansion
-can. RMR, EXPS3, ACOG and PM II all aim above the can, with or without the TOR
-Mini laser. Selecting the can does not select an optic automatically; the market
-warns when the draft retains the blocked default sight. A contrasting front
-stripe does not restore the occluded line. The [M590 source check](../tools/blender/m590/muzzle.py)
-probes the actual mounted meshes and aiming rays; the current model and fits
-remain unchanged.

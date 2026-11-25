@@ -417,7 +417,7 @@ URL/debug input (narrowed once in `src/dev/attachments.ts` before prewarm) and
 `tools/capture.ts`; reject unverified fits, never silently change them.
 A fitted alternate selects only its weapon-local `IRON_<id>` instead of the
 base `IRON_sights`. ADS uses its `SOCKET_<id>` from the authored rest pose;
-meshes follow their rail or slide, with the same iron ADS settings and zeroing
+meshes follow their rail, with the same iron ADS settings and zeroing
 as the base, not an optical reticle or magnification preset. With an optic,
 `removableIrons` swaps required `IRON_sights` for optional `IRON_sights_removed`;
 fixed irons stay and must clear it. `removableMuzzleDevice` similarly

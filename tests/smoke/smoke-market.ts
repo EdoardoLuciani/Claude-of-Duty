@@ -380,21 +380,28 @@ assert(
 );
 const alternate = { ...BASE_ATTACHMENTS, sight: 'troy' } as const;
 assert(!market.setBuild(alternate));
-assert(market.setBuild({ ...BASE_ATTACHMENTS, rail: 'laser', muzzle: 'suppressor' }));
-assert.equal(weapons.getAttachments('pistol'), BASE_ATTACHMENTS, 'draft preserves the live gun');
+for (const optic of OPTIC_IDS)
+  assert(
+    !market.setBuild({ ...BASE_ATTACHMENTS, sight: optic }),
+    `${optic} cannot replace pistol irons`
+  );
+assert(
+  market.setBuild({ sight: null, rail: 'laser', muzzle: 'suppressor' }),
+  'pistol laser and suppressor remain compatible together'
+);
+assert.equal(weapons.getAttachments('pistol'), BASE_ATTACHMENTS, 'draft preserves pistol irons');
 market.cancelBuild();
 assert.deepEqual(
   WEAPON_IDS.filter((id): boolean => isAttachmentConfig(alternate, id)),
   ['smg', 'lmg', 'sniper', 'mcx']
 );
-market.credits = 1350;
 const redDotLaser = { ...BASE_ATTACHMENTS, sight: 'railway', rail: 'laser' } as const;
 assert(market.beginBuild('rifle') && market.setBuild(redDotLaser));
 assert.equal(market.getHudState().build?.total, 450, 'owned gun charges attachments only');
-assert.deepEqual(weapons.getAttachments('rifle'), BASE_ATTACHMENTS, 'draft does not equip');
+assert.equal(weapons.getAttachments('rifle'), BASE_ATTACHMENTS, 'draft does not equip');
 market.cancelBuild();
 assert.equal(market.credits, 1350);
-assert.deepEqual(weapons.getAttachments('rifle'), BASE_ATTACHMENTS);
+assert.equal(weapons.getAttachments('rifle'), BASE_ATTACHMENTS);
 assert(!market.confirmBuild());
 assert(market.beginBuild('lmg') && market.setBuild(redDotLaser));
 const hudBuild = market.getHudState().build;
