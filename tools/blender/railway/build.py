@@ -25,6 +25,7 @@ AXIS = BASE_BOTTOM + HEIGHT - RIM_HEIGHT_R
 WINDOW = GLASS_DIAMETER/2
 LENS_Y = 46.9
 LENS_TILT = math.radians(7)
+LENS_SEGMENTS = 96
 CLAMP_POCKETS = [(-27.8,30.8),(17.6,34.7)]
 OUT = Path(__file__).resolve().parents[3]/'.cache/blender/attachments/c-more-railway'
 
@@ -57,7 +58,8 @@ def pocket_edges(obj):
 
 
 def fastener(name, center, radius, depth, metal, mask, root, axis='X', side=1):
-    head = cylinder(name, center, radius, depth, metal,root,axis=axis,sides=32,bevel=.12)
+    sides = 16 if radius < 1.8 else 24
+    head = cylinder(name, center, radius, depth, metal,root,axis=axis,sides=sides,bevel=.12)
     bit = Vector(center)
     bit[0 if axis == 'X' else 2] += side*depth*.45
     boolean(head,cylinder('Hex socket tool',bit,radius*.46,depth*.65,mask,root,axis=axis,sides=6,bevel=0))
@@ -65,7 +67,8 @@ def fastener(name, center, radius, depth, metal, mask, root, axis='X', side=1):
 
 
 def slotted_head(name, center, radius, depth, metal, mask, root, axis='X', side=1):
-    head = cylinder(name,center,radius,depth,metal,root,axis=axis,sides=40,bevel=.13)
+    sides = 16 if radius < 1.8 else 24
+    head = cylinder(name,center,radius,depth,metal,root,axis=axis,sides=sides,bevel=.13)
     bit = Vector(center)
     i = 0 if axis == 'X' else 2
     bit[i] += side*depth*.47
@@ -173,7 +176,7 @@ def ring(root, mat):
     profile = [(43.1,.67,0,23.2),(43.8,.22,0,24.38),(44.7,0,0,25.3),
                (49.7,0,0,10.65),(51.25,.26,0,4),(51.85,.85,0,0),
                (51.85,0,1,0),(49.85,0,1,0),(45.6,0,1,2),(43.1,0,1,4)]
-    n = 120
+    n = LENS_SEGMENTS
     vertices = []
     for y,bevel,inner,sweep in profile:
         for i in range(n):
@@ -189,6 +192,24 @@ def ring(root, mat):
     faces = [(j*n+i,j*n+(i+1)%n,((j+1)%len(profile))*n+(i+1)%n,((j+1)%len(profile))*n+i)
              for j in range(len(profile)) for i in range(n)]
     return finish(mesh('Thin round lens surround', vertices, faces, mat, root), width=0)
+
+
+def brightness_dial(root, mat):
+    # The flutes are the wall itself, not intersecting beveled cylinders.
+    n = 64
+    profile = [(20.20,2.82,0),(20.44,3.06,0),(20.78,3.26,.34),
+               (25.85,3.26,.34),(26.10,3.04,0),(26.36,2.82,0)]
+    points = []
+    for z,r,flute in profile:
+        for i in range(n):
+            a = i*math.tau/n
+            radius = r-flute if i%4 in (0,3) else r
+            points.append((radius*math.cos(a),-48+radius*math.sin(a),z))
+    last = len(points)-n
+    faces = [tuple(reversed(range(n))),tuple(range(last,last+n))]
+    faces += [(j*n+i,j*n+(i+1)%n,(j+1)*n+(i+1)%n,(j+1)*n+i)
+              for j in range(len(profile)-1) for i in range(n)]
+    finish(mesh('Fluted brightness dial',points,faces,mat,root),width=0)
 
 
 def build(root):
@@ -276,8 +297,8 @@ def build(root):
                              axis='X',sides=52,bevel=.20),'UNION')
     boolean(shell,opening)
     pocket_edges(shell)
-    # One pane, no tube or second rim, exported with the shared thin-glass convention.
-    n = 96
+    # Match the rim's tessellation so the single pane reaches the aperture edge.
+    n = LENS_SEGMENTS
     points = [(0,LENS_Y+.88,AXIS)]
     for r in (.3,.6,1):
         for i in range(n):
@@ -291,11 +312,7 @@ def build(root):
     finish(mesh('Single dished coated lens',points,faces,pane,root),width=0)
 
     cylinder('Dial collar',(0,-48,20.64),4.4,.74,body,root,axis='Z')
-    cylinder('Brightness dial',(0,-48,23.3),3.05,6.25,inset,root,axis='Z',sides=48,bevel=.24)
-    for i in range(16):
-        a = i*math.tau/16
-        cylinder('Dial grip flute',(3.02*math.cos(a),-48+3.02*math.sin(a),23.3),.31,5.25,
-                 inset,root,axis='Z',sides=10,bevel=.08)
+    brightness_dial(root,inset)
     cap = [(-5.9,19.4),(5.9,19.4),(5.9,22.95)]
     cap += [(5.9*math.cos(i*math.pi/24),22.95+4.05*math.sin(i*math.pi/24)) for i in range(1,24)]
     cap += [(-5.9,22.95)]
@@ -370,6 +387,36 @@ def check_pockets(root):
     print('RAILWAY_POCKETS_OK: six visible floor rays',flush=True)
 
 
+def batch_finishes(obj):
+    """Bake opaque tints into the runtime mesh; glass keeps its own primitive."""
+    data = obj.data
+    source = list(data.materials)
+    tints = [tuple(mat.node_tree.nodes.get('Principled BSDF').inputs['Base Color'].default_value)
+             for mat in source]
+    glass = next(mat for mat in source if mat.name.startswith('10 |'))
+    polymer = next(mat for mat in source if mat.name.startswith('02 |'))
+    anodized = next(mat for mat in source if mat.name.startswith('03 |'))
+    targets = [2 if mat == glass else 1 if mat.name[:2] in {'03','04','08','09'} else 0
+               for mat in source]
+    colors = data.color_attributes.new(name='RailwayTint',type='FLOAT_COLOR',domain='CORNER')
+    old_indices = [face.material_index for face in data.polygons]
+    data.materials.clear()
+    for mat in (polymer,anodized,glass):
+        data.materials.append(mat)
+    for face,i in zip(data.polygons,old_indices):
+        face.material_index = targets[i]
+        tint = (1,1,1,1) if targets[i] == 2 else tints[i]
+        for loop in face.loop_indices:
+            colors.data[loop].color = tint
+    for mat in (polymer,anodized):
+        nodes = mat.node_tree.nodes
+        tint = nodes.new('ShaderNodeVertexColor')
+        tint.layer_name = colors.name
+        bsdf = nodes.get('Principled BSDF')
+        bsdf.inputs['Base Color'].default_value = (1,1,1,1)
+        mat.node_tree.links.new(tint.outputs['Color'],bsdf.inputs['Base Color'])
+
+
 def render(output):
     scene = bpy.context.scene
     scene.render.engine = 'BLENDER_EEVEE'
@@ -422,7 +469,9 @@ if __name__ == '__main__':
     triangles = joined.modifiers.new('Runtime triangle tangents','TRIANGULATE')
     triangles.keep_custom_normals = True
     bpy.ops.object.modifier_apply(modifier=triangles.name)
+    batch_finishes(joined)
     bpy.ops.export_scene.gltf(filepath=str(options.output/'railway.glb'),export_format='GLB',
-                              export_animations=False,export_yup=True,export_tangents=True)
+                              export_animations=False,export_yup=True,export_tangents=True,
+                              export_vertex_color='NAME',export_vertex_color_name='RailwayTint')
     if options.render:
         render(options.output)

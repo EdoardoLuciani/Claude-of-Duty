@@ -14,9 +14,12 @@ bun tools/capture.ts --weapon=rifle --optic=railway --shot=ads
 Dev/build generate the editable blend and runtime GLB. The build measures the
 evaluated mesh envelope and lens diameter against the manufacturer's **RW**
 specification table. The table does not specify the individual molded parts;
-their contours follow the photos. Source meshes stay separate in the blend
-and batch by material on export. The packed micro-grain is generated from a
-fixed seed. `MOUNT_base` is the rail-contact frame and `SOCKET_sight` is the
+their contours follow the photos. Source meshes and finishes stay separate in
+Blender. Export bakes small-part tints into vertex colors and batches them into
+polymer and metal primitives, with a separate glass primitive. The runtime cook
+simplifies the geometry with locked mesh borders to keep the pane edge intact.
+The opaque materials share one seeded micro-grain normal map. `MOUNT_base` is
+the rail-contact frame and `SOCKET_sight` is the
 lens centre, following the [attachment contract](../../../ARCHITECTURE.md#models).
 The EVOLYS fit seats forward to keep the long saddle outside the reload-hand sweep.
 
