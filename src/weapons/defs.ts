@@ -12,6 +12,14 @@ export type WeaponMode = 'auto' | 'burst' | 'semi';
 export type WeaponClass = 'carbine' | 'smg' | 'pistol' | 'lmg' | 'shotgun' | 'sniper';
 type TuningVector = [number, number, number];
 
+export type AmmoPack = 'magazine' | 'belt' | 'shell bundle';
+
+/** What one spare holds: tube guns load loose shells, LMGs carry belts. */
+export function ammoPack(def: Pick<WeaponDef, 'class' | 'reloadStyle'>): AmmoPack {
+  if (def.reloadStyle === 'tube') return 'shell bundle';
+  return def.class === 'lmg' ? 'belt' : 'magazine';
+}
+
 /** Authored tuning is checked against this contract, not inferred into one. */
 export interface WeaponDef {
   id: WeaponId;
@@ -29,7 +37,6 @@ export interface WeaponDef {
   action?: 'pump';
   reloadStyle?: 'tube';
   magSize: number;
-  reserve: number;
   pellets?: number;
   fireAnimationSpeed?: number;
   muzzleVelocity: number;
@@ -117,7 +124,6 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     rpm: 800,
     modes: ['auto', 'semi'],
     magSize: 30,
-    reserve: 180,
     fireAnimationSpeed: 2.5, // finish carrier return before the next 75 ms shot
     // Subsonic game load: more drop than the M4, not a reskinned 5.56.
     muzzleVelocity: 305,
@@ -183,7 +189,6 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     burstDelay: 0.16,
     /* --- ammunition --- */
     magSize: 30,
-    reserve: 210,
     /* --- terminal ballistics --- */
     muzzleVelocity: 880,
     damage: 33,
@@ -267,7 +272,6 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     burstRpm: 1100,
     burstDelay: 0.14,
     magSize: 30,
-    reserve: 224,
     muzzleVelocity: 400,
     damage: 24,
     penetration: 0.45,
@@ -336,8 +340,6 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     modes: ['auto', 'semi'],
     // FN technical data sheet: free belt or MINIMI pouch — 100 or 200 rounds.
     magSize: 100,
-    // One spare 100-round pouch (keeps the 1.5x carry ratio of the 50/75 era).
-    reserve: 150,
     // 7.62x51 from the 406 mm barrel: heavier, slower and more penetrative.
     muzzleVelocity: 780,
     damage: 48,
@@ -411,7 +413,6 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     rpm: 460,
     modes: ['semi'],
     magSize: 15,
-    reserve: 60,
     muzzleVelocity: 360,
     damage: 28,
     penetration: 0.35,
@@ -479,7 +480,6 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     rpm: 120,
     modes: ['semi'],
     magSize: 6,
-    reserve: 30,
     pellets: 8,
     muzzleVelocity: 400,
     damage: 22,
@@ -555,7 +555,6 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     boltAction: true,
     boltTime: 1.1,
     magSize: 10,
-    reserve: 30,
     muzzleVelocity: 880,
     damage: 145,
     penetration: 2.1,

@@ -39,8 +39,9 @@ const HUD_DEFAULTS = {
   pulse: 0,
   credits: 0,
   marketIn: 0,
-  ammo: 30,
-  reserve: 210,
+  spares: [30, 30] as readonly number[],
+  nextSpare: 0,
+  loadedRounds: 30,
   magSize: 30,
   reloading: false,
   magazineOut: false,
@@ -261,7 +262,11 @@ export class UiSystem {
       }
     });
     on('ammo:pickup', (e): void => {
-      this.banner.show('Ammunition Recovered', `+${e.amount} ROUNDS`, 1.5);
+      this.banner.show(
+        'Ammunition Recovered',
+        e.replacedSpare ? 'Lowest spare replaced' : `+1 full ${e.pack}`,
+        1.5
+      );
       this.sfx('objective', 0.45);
     });
     on('intel:available', (e): void => {
@@ -385,8 +390,9 @@ export class UiSystem {
     this.menu.close();
     this.killfeed.clear();
     this.clearPrompt();
-    const rifle = this.ctx.peek('weapons')?.states.get('rifle');
-    if (rifle) rifle.reserve = Math.round(rifle.def.reserve * 0.4);
+    const weapons = this.ctx.peek('weapons');
+    const rifle = weapons?.states.get('rifle');
+    if (rifle) weapons?.fillSpares(rifle, 1);
     const hp = this.ctx.peek('player')?.health;
     if (hp) hp.armour = 50;
     const m = this.ctx.peek('market');
@@ -446,8 +452,9 @@ export class UiSystem {
     if (ws) {
       s.weaponName = ws.name;
       s.fireMode = ws.mode;
-      s.ammo = ws.ammo;
-      s.reserve = ws.reserve;
+      s.spares = ws.spares;
+      s.nextSpare = ws.nextSpare;
+      s.loadedRounds = ws.loadedRounds;
       s.magSize = ws.magSize;
       s.reloading = ws.reloading;
       s.magazineOut = ws.magazineOut;

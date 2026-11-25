@@ -420,7 +420,6 @@ for (const motion of [
   initializeWeaponStates(wp, {
     label: 'test',
     magSize: 30,
-    reserve: 90,
     modes: ['auto'],
     rpm: 700,
   });
@@ -437,17 +436,14 @@ for (const motion of [
   wp.tryFire();
   check('tryFire cancels healing', wp.healing === false);
   rifle.chambered = true;
-  wp.beginHeal();
-  wp.reload();
+  assert(wp.beginHeal());
+  assert(wp.reload());
   check('reload cancels healing', wp.healing === false);
-  wp.beginHeal();
-  wp.inspect();
-  check('inspect cancels healing', wp.healing === false);
-  const s = rifle;
-  s.mag = 10;
-  s.reserve = 80;
-  wp.viewmodel.play('reloadTac');
   check('cannot start during reload', wp.canBeginHeal() === false);
+  wp.viewmodel.stopClip();
+  assert(wp.beginHeal());
+  assert(wp.inspect());
+  check('inspect cancels healing', wp.healing === false);
   wp.viewmodel.stopClip();
   input._pressed.add('KeyG');
   wp._updateGrenade(0, input, true);

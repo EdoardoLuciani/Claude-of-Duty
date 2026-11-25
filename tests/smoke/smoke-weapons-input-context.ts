@@ -205,15 +205,61 @@ for (const [primary, first, second] of [
   assert(wp.applyBuild(second, BASE_ATTACHMENTS) && !wp.owns(first));
   assert.deepEqual(wp.weaponIds, primary ? [second, 'pistol'] : ['rifle', second]);
   assert(!wp.reloading && wp.tryFire(), 'mid-reload purchase is immediately usable');
-  weaponState(wp, first).reserve = 0;
-  wp.state.reserve = 1;
+  weaponState(wp, first).spares.length = 0;
+  wp.state.spares.splice(0, wp.state.spares.length, 1);
   wp.refillAmmo();
-  assert.equal(wp.state.reserve, wp.current.reserve);
+  assert.equal(wp.state.spares.length, 4);
   assert.equal(weaponState(wp, first).reserve, 0, 'refill ignores unowned weapons');
   assert.equal(wp.ammoFraction(), 1);
   wp.resetForNewGame();
   assert.deepEqual(wp.weaponIds, ['rifle', 'pistol']);
   assert.equal(wp.activeId, 'rifle');
+}
+// Persistent magazines transfer once at the seating beat and stay with their weapon.
+{
+  const { wp } = makeHarness();
+  const capacity = wp.current.magSize;
+  assert.deepEqual(
+    wp.getHudState().spares,
+    [capacity, capacity],
+    'the rifle starts with two full spares'
+  );
+  wp.state.spares.splice(0, 2, capacity, 12);
+  wp.state.mag = 7;
+  const total = wp.ammo.total;
+  assert(wp.reload());
+  wp._onClipEvent('magout', 'reloadTac');
+  assert(wp.setWeaponImmediate('pistol'));
+  const sidearmSize = wp.current.magSize;
+  assert.deepEqual(wp.getHudState().spares, [sidearmSize, sidearmSize]);
+  assert(wp.setWeaponImmediate('rifle'));
+  assert.equal(wp.ammo.total, total, 'swap before seating leaves both magazines unchanged');
+  assert.equal(wp.ammo.inMag, 7);
+
+  assert(wp.reload());
+  wp._onClipEvent('magin', 'reloadTac');
+  wp.viewmodel.stopClip();
+  assert.equal(wp.ammo.mag, capacity + 1, 'tactical reload keeps its chambered round');
+  assert.equal(wp.ammo.total, total, 'partial mag is retained, not duplicated or lost');
+  assert.deepEqual(wp.getHudState().spares, [12, 7], 'HUD lists spares fullest first');
+  assert(wp.reload(), 'a shorter spare is still accepted');
+  wp._onClipEvent('magin', 'reloadTac');
+  wp.viewmodel.stopClip();
+  assert.equal(wp.ammo.inMag, 12);
+  assert.equal(wp.ammo.total, total, 'swapping down preserves the previous magazine');
+
+  wp.state.mag = 0;
+  assert.equal(wp.getHudState().loadedRounds, 1, 'a lone chambered round still shows as loaded');
+  wp.state.chambered = false;
+  assert(wp.reload());
+  assert.equal(wp.viewmodel.clipName, 'reloadEmpty');
+  wp._onClipEvent('magin', 'reloadEmpty');
+  wp.viewmodel.stopClip();
+  assert.equal(wp.ammo.mag, capacity, 'empty reload chambers one of the selected mag’s rounds');
+  assert.equal(wp.ammo.total, capacity + 7);
+  assert.deepEqual(wp.getHudState().spares, [7], 'the retained partial can be used again');
+  wp.fillSpares(wp.state, 4);
+  assert.equal(wp.collectAmmoBox(), 0, 'no box is used if all four spares are full');
 }
 // Mounted laser switches belong to the gun, not the flashlight or active slot.
 {
@@ -372,7 +418,7 @@ for (const [primary, first, second] of [
   wp.viewmodel = vm;
   vm.onClipEvent = (name, clip): void => wp._onClipEvent(name, clip);
   wp.state.mag = 0;
-  wp.state.reserve = 2;
+  wp.state.spares.splice(0, 2, 2);
   const phases: string[] = [];
   wp.ctx.events.on('weapon:reload', ({ phase }): void => {
     phases.push(phase);
@@ -1018,7 +1064,7 @@ for (const blocked of ['disabled', 'frozen', 'dead', 'controls', 'input']) {
 // Ammo prompt and hold use the same canonical T binding; F does not resupply.
 {
   const { wp, frame, prompts } = makeHarness();
-  wp.state.reserve = 0;
+  wp.state.spares.length = 0;
   const pickups = ammoPickupFixture(wp);
   wp.pickups = pickups;
   try {

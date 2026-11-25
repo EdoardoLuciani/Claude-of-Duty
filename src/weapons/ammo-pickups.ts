@@ -10,6 +10,7 @@ import type { EngineEventMap } from '../core/events.ts';
 import type { Rng } from '../core/rng.ts';
 import { isMesh, isSingleMaterialMesh, isTexture } from '../core/three-guards.ts';
 import { loadWeaponGLTF } from './asset-loader.ts';
+import { ammoPack } from './defs.ts';
 import type { WeaponSystem } from './index.ts';
 
 const PICKUP_RADIUS = 2.05;
@@ -36,7 +37,8 @@ type AmmoOwner = Pick<
   | 'radioEquipped'
   | 'state'
   | 'current'
-  | 'addReserve'
+  | 'ammoBoxGain'
+  | 'collectAmmoBox'
 >;
 
 function isPosition(value: unknown): value is Pick<THREE.Vector3, 'x' | 'y' | 'z'> {
@@ -287,7 +289,8 @@ export class AmmoPickups {
 
     const pos = player.feetPosition;
     const state = this.owner.state;
-    if (!state || state.reserve >= state.def.reserve) {
+    const gain = this.owner.ammoBoxGain;
+    if (!state || gain <= 0) {
       this._clearInteraction();
       return;
     }
@@ -314,12 +317,13 @@ export class AmmoPickups {
     if (this.ctx.input.action('use')) this._hold = Math.min(HOLD_TIME, this._hold + dt);
     else this._hold = Math.max(0, this._hold - dt * 2.5);
 
-    const amount = Math.min(state.def.reserve - state.reserve, Math.ceil(state.def.magSize * 1.5));
+    const pack = ammoPack(state.def);
+    const replacedSpare = gain < state.def.magSize;
     this.ctx.peek('ui')?.setPrompt(
       {
         key: bindingLabel('use'),
         text: 'Resupply ammunition',
-        sub: `+${amount} rounds · hold`,
+        sub: replacedSpare ? 'Replace lowest spare · hold' : `+1 full ${pack} · hold`,
         progress: this._hold / HOLD_TIME,
       },
       'ammo'
@@ -327,17 +331,17 @@ export class AmmoPickups {
     this._prompting = true;
 
     if (this._hold < HOLD_TIME) return;
-    const taken = this.owner.addReserve(amount);
+    const taken = this.owner.collectAmmoBox();
     const point = nearest.group.position.clone();
     this._remove(nearest);
     this._clearInteraction();
-    if (taken > 0) {
-      this.ctx.events.emit('ammo:pickup', {
-        amount: taken,
-        weapon: this.owner.current,
-        position: point,
-      });
-    }
+    this.ctx.events.emit('ammo:pickup', {
+      amount: taken,
+      pack,
+      replacedSpare,
+      weapon: this.owner.current,
+      position: point,
+    });
   }
 
   _clearInteraction(): void {

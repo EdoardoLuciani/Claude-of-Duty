@@ -75,8 +75,8 @@ function harness(): AmmoHarness {
   });
   const weapons = new WeaponSystem();
   const state = weapons._makeState('rifle');
-  state.reserve = 0;
-  state.def = { ...state.def, reserve: 90 };
+  state.spares.length = 0;
+  weapons.states.set('rifle', state);
   const owner = {
     ctx,
     rng: new Rng(123),
@@ -87,10 +87,10 @@ function harness(): AmmoHarness {
     disabled: false,
     grenadeEquipped: false,
     radioEquipped: false,
-    addReserve(n: number): number {
-      this.state.reserve += n;
-      return n;
+    get ammoBoxGain(): number {
+      return weapons.ammoBoxGain;
     },
+    collectAmmoBox: weapons.collectAmmoBox.bind(weapons),
   };
   return {
     pickups: ammoPickupFixture(owner),
@@ -291,10 +291,13 @@ function matricesMatch(pickups: AmmoPickups): void {
   block(ctx.time, 'scale', 0);
   block(h.player.healCtrl, 'active', true);
   pickups.update(0.45);
-  assert.equal(owner.state.reserve, 45);
+  assert.deepEqual(owner.state.spares, [owner.current.magSize]);
+  assert.equal(prompts.at(-1)?.sub, '+1 full magazine · hold');
   assert.equal(pickups.items.length, 0);
   assert.equal(events[0].name, 'ammo:pickup');
-  assert.equal(events[0].payload.amount, 45);
+  assert.equal(events[0].payload.amount, owner.current.magSize);
+  assert.equal(events[0].payload.pack, 'magazine');
+  assert.equal(events[0].payload.replacedSpare, false);
   assert.equal(events[0].payload.weapon, owner.current);
   assert.equal(owner.current.id, 'rifle');
   assert(events[0].payload.position.equals(first.group.position));
@@ -305,6 +308,22 @@ function matricesMatch(pickups: AmmoPickups): void {
   pickups.update(0.1);
   assert.equal(pickups._nearest, null);
   assert.equal(pickups._prompting, false);
+  pickups.dispose();
+}
+
+// The pickup prompt distinguishes a replacement from adding a spare.
+{
+  const { pickups, input, owner, prompts, events } = harness();
+  const capacity = owner.current.magSize;
+  owner.state.spares.push(capacity, capacity, capacity, 2);
+  pickups.spawn({ x: 0, y: 0, z: 0 });
+  input.use = true;
+  pickups.update(0.45);
+  assert.equal(prompts.at(-1)?.sub, 'Replace lowest spare · hold');
+  assert.deepEqual(owner.state.spares, Array<number>(4).fill(capacity));
+  assert.equal(events[0].payload.amount, capacity - 2);
+  assert.equal(events[0].payload.replacedSpare, true);
+  assert.equal(pickups.items.length, 0);
   pickups.dispose();
 }
 

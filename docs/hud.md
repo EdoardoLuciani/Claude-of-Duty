@@ -33,9 +33,11 @@ with range targets add a target reset.
   countdown uses raw time and its own anchor, independent of interaction prompts.
 - The minimap shows the map's exported PNG and draws labels and live markers over it;
   [ARCHITECTURE.md](../ARCHITECTURE.md#physics-and-world) covers the bake and prefetch.
-- The magazine bar empties at the removal beat and jumps to the actual ammo count
-  when the new magazine seats. Tube reloads update the count one shell at a time.
-  The separate progress bar tracks the active reload clip.
+- Ammo uses a coarse fill silhouette for the loaded magazine, belt, or tube
+  and each spare. The loaded icon empties at the removal beat and updates
+  when a new magazine seats. Tube reloads update as shells are inserted.
+  The separate progress bar tracks the active reload clip. The spare count and
+  next-spare marker are visible; a crossed-out silhouette means no spares.
 - Keep the simple icons and bottom-readout tiers. There is no radio inventory or
   panel; the held radio's LCD is its interface.
 - Required HUD initialization failures propagate to the native boot/reload dialog,

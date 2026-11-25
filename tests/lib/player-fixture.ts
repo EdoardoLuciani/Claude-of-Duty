@@ -8,7 +8,6 @@ import { Health } from '../../src/player/health.ts';
 import { PlayerSystem } from '../../src/player/index.ts';
 import { Movement } from '../../src/player/movement.ts';
 import type { ArmAsset } from '../../src/weapons/arm-asset.ts';
-import { BASE_ATTACHMENTS, buildDef } from '../../src/weapons/attachment-rules.ts';
 import { ProjectileSim } from '../../src/weapons/ballistics.ts';
 import { Clip } from '../../src/weapons/clips.ts';
 import { buildRecoilPattern, WEAPON_IDS } from '../../src/weapons/defs.ts';
@@ -76,18 +75,12 @@ export function initializeWeaponStates(
   // These state-machine tests intentionally do not load authored model assets.
   weapons._hasMesh = (): boolean => true;
   for (const id of WEAPON_IDS) {
-    const def = { ...buildDef(id, BASE_ATTACHMENTS), ...patch };
-    weapons.states.set(id, {
-      def,
-      attachments: BASE_ATTACHMENTS,
-      laserEnabled: false,
-      pattern: buildRecoilPattern(def, Rng),
-      mag: def.magSize,
-      chambered: true,
-      reserve: def.reserve,
-      mode: def.modes[0],
-      modeIndex: 0,
-    });
+    const state = weapons._makeState(id);
+    Object.assign(state.def, patch);
+    state.pattern = buildRecoilPattern(state.def, Rng);
+    weapons['resetWeaponAmmo'](state);
+    state.mode = state.def.modes[0];
+    weapons.states.set(id, state);
   }
 }
 

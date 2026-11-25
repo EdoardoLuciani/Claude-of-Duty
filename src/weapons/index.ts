@@ -55,6 +55,9 @@ import type { ViewModel } from './viewmodel.ts';
 const GRENADES_PER_LIFE = 2;
 const GRENADES_MAX = 6; // bought at the market, +1 per pack
 const SLOT_IDS = [...PRIMARY_IDS, ...SECONDARY_IDS];
+const STARTING_SPARES = 2;
+const MAX_SPARES = 4;
+const byFullest = (a: number, b: number): number => b - a;
 /** Catch-up bound for held AUTO/BURST fire within one frame. The engine clamps
  *  dt to 0.1 s, which needs at most two 1100 rpm rounds; due rounds beyond the
  *  bound are dropped rather than banked into later frames. */
@@ -86,8 +89,10 @@ type WeaponPoseState = Required<ViewState>;
 interface WeaponHudState {
   name: string;
   mode: WeaponMode;
-  ammo: number;
-  reserve: number;
+  spares: readonly number[];
+  /** Index of the spare the next reload draws from. */
+  nextSpare: number;
+  loadedRounds: number;
   magSize: number;
   reloading: boolean;
   magazineOut: boolean;
@@ -260,8 +265,9 @@ export class WeaponSystem {
   _hudState: WeaponHudState = {
     name: '',
     mode: 'auto',
-    ammo: 0,
-    reserve: 0,
+    spares: [],
+    nextSpare: 0,
+    loadedRounds: 0,
     magSize: 0,
     reloading: false,
     magazineOut: false,
@@ -402,10 +408,26 @@ export class WeaponSystem {
       pattern: buildRecoilPattern(def, Rng),
       mag: def.magSize,
       chambered: true,
-      reserve: def.reserve,
+      spares: Array<number>(STARTING_SPARES).fill(def.magSize),
+      get reserve(): number {
+        let rounds = 0;
+        for (const spare of this.spares) rounds += spare;
+        return rounds;
+      },
       mode: def.modes[0],
       modeIndex: 0,
     };
+  }
+
+  fillSpares(s: WeaponState, count: number): void {
+    s.spares.length = count;
+    s.spares.fill(s.def.magSize);
+  }
+
+  private resetWeaponAmmo(s: WeaponState): void {
+    s.mag = s.def.magSize;
+    s.chambered = true;
+    this.fillSpares(s, STARTING_SPARES);
   }
 
   /** Read-only market inspection; never mounts or animates the equipped model. */
@@ -443,9 +465,7 @@ export class WeaponSystem {
     for (const weapon of primary.includes(id) ? PRIMARY_IDS : SECONDARY_IDS)
       if (weapon !== id && this.owned.delete(weapon)) this._resetAttachments(weapon);
     this.owned.add(id);
-    state.mag = state.def.magSize;
-    state.chambered = true;
-    state.reserve = state.def.reserve;
+    this.resetWeaponAmmo(state);
     this.setWeaponImmediate(id);
     return true;
   }
@@ -647,7 +667,7 @@ export class WeaponSystem {
     this.states.forEach((s, id): void => {
       if (!this.owned.has(id)) return;
       have += s.reserve;
-      max += s.def.reserve;
+      max += s.def.magSize * MAX_SPARES;
     });
     return max > 0 ? have / max : 1;
   }
@@ -655,7 +675,7 @@ export class WeaponSystem {
   /** Market: top every owned weapon's reserve back to full. */
   refillAmmo(): void {
     this.states.forEach((s, id): void => {
-      if (this.owned.has(id)) s.reserve = s.def.reserve;
+      if (this.owned.has(id)) this.fillSpares(s, MAX_SPARES);
     });
   }
 
@@ -665,13 +685,14 @@ export class WeaponSystem {
       return { mag: 0, inMag: 0, chambered: false, reserve: 0, magSize: 0, total: 0, empty: true };
     const mag = s.mag;
     const ch = s.chambered ? 1 : 0;
+    const reserve = s.reserve;
     return {
       mag: mag + ch,
       inMag: mag,
       chambered: s.chambered,
-      reserve: s.reserve,
+      reserve,
       magSize: s.def.magSize,
-      total: mag + ch + s.reserve,
+      total: mag + ch + reserve,
       empty: mag + ch === 0,
     };
   }
@@ -738,14 +759,15 @@ export class WeaponSystem {
     const h = this._hudState;
     const s = this.state;
     if (!s) return h;
-    const a = this.ammo;
     const vm = this._viewmodel;
     h.name = s.def.label;
     h.mode = s.mode;
-    // The readout counts the chambered round but caps at magazine capacity.
-    h.ammo = Math.min(a.mag, a.magSize);
-    h.reserve = a.reserve;
-    h.magSize = a.magSize;
+    h.spares = s.spares;
+    // Tube reloads finish the open bundle; magazine swaps take the fullest spare.
+    h.nextSpare = s.def.reloadStyle === 'tube' ? s.spares.length - 1 : 0;
+    // A lone chambered round still shows as loaded.
+    h.loadedRounds = s.mag || (s.chambered ? 1 : 0);
+    h.magSize = s.def.magSize;
     h.reloading = this.reloading;
     // Only detachable magazines (and belt pouches) have out/in beats.
     h.magazineOut = h.reloading && this._magazineOut;
@@ -764,13 +786,22 @@ export class WeaponSystem {
     return h;
   }
 
-  /** Add rounds to reserve without bypassing the weapon's authored cap. */
-  addReserve(amount: number, id = this.activeId): number {
-    const s = this.states.get(id);
-    if (!s || amount <= 0) return 0;
-    const before = s.reserve;
-    s.reserve = Math.min(s.def.reserve, s.reserve + Math.floor(amount));
-    return s.reserve - before;
+  /** Net reserve rounds from a box for the equipped weapon. Zero leaves the box alone. */
+  get ammoBoxGain(): number {
+    const s = this.state;
+    if (!s) return 0;
+    const spares = s.spares;
+    return s.def.magSize - (spares.length === MAX_SPARES ? spares[spares.length - 1] : 0);
+  }
+
+  collectAmmoBox(): number {
+    const s = this.state;
+    const gain = this.ammoBoxGain;
+    if (!s || gain <= 0) return 0;
+    const spares = s.spares;
+    if (spares.length === MAX_SPARES) spares.pop();
+    spares.unshift(s.def.magSize);
+    return gain;
   }
 
   /** Buy carpet-bomb strikes at the market: +n up to the cap. */
@@ -783,9 +814,7 @@ export class WeaponSystem {
     this._viewmodel?.armAsset.blood.setHealthFraction(1);
     for (const [id, s] of this.states) {
       this._resetAttachments(id);
-      s.mag = s.def.magSize;
-      s.chambered = true;
-      s.reserve = s.def.reserve;
+      this.resetWeaponAmmo(s);
       s.modeIndex = 0;
       s.mode = s.def.modes[0];
     }
@@ -873,12 +902,13 @@ export class WeaponSystem {
     if (this.disabled || !s || this.reloading || this.switching || this.cycling || this.pumping)
       return false;
     if (this._hands.state !== 'weapon') return false;
-    if (s.reserve <= 0) return false;
-    if (s.chambered && s.mag >= s.def.magSize) return false;
+    if (s.spares.length === 0) return false;
+    const tube = s.def.reloadStyle === 'tube';
+    if (tube && s.chambered && s.mag >= s.def.magSize) return false;
     this.viewmodel.stopClip();
     const empty = !s.chambered && (s.mag === 0 || s.def.boltAction);
     this.viewmodel.play(empty ? 'reloadEmpty' : 'reloadTac');
-    this._tubeLoop = s.def.reloadStyle === 'tube';
+    this._tubeLoop = tube;
     return true;
   }
 
@@ -1113,7 +1143,7 @@ export class WeaponSystem {
         }
         break;
       case 'magdrop':
-        if (isReload) this._dropMagazine();
+        if (isReload && this.state?.mag === 0) this._dropMagazine();
         break;
       case 'magin':
         if (isReload) {
@@ -1172,18 +1202,20 @@ export class WeaponSystem {
     }
   }
 
-  /**
-   * The chambered-round model: a tactical reload keeps the round in the chamber
-   * and gives you magSize+1; an empty reload has to feed one out of the fresh
-   * magazine, so you end up with exactly magSize.
-   */
+  /** A tactical reload keeps the chambered round; an empty reload feeds one from the spare. */
   _completeReload(empty: boolean): void {
     const s = this.state;
     if (!s) return;
-    const want = s.def.magSize - s.mag;
-    const take = Math.min(want, s.reserve);
-    s.reserve -= take;
-    s.mag += take;
+    const spares = s.spares;
+    // Commit both sides of the swap at magin. Cancelling before it changes neither.
+    const next = spares[0];
+    if (!next) return;
+    if (s.mag === 0) spares.shift();
+    else {
+      spares[0] = s.mag;
+      spares.sort(byFullest);
+    }
+    s.mag = next;
     if (empty && !s.chambered && s.mag > 0) {
       s.mag--;
       s.chambered = true;
@@ -1200,23 +1232,22 @@ export class WeaponSystem {
 
   _insertShell(): boolean {
     const s = this.state;
-    if (!s || s.reserve <= 0) return false;
-    if (!s.chambered) {
-      s.reserve--;
-      s.chambered = true;
-      this._shotIndex = 0;
-      return true;
-    }
-    if (s.mag >= s.def.magSize) return false;
-    s.reserve--;
-    s.mag++;
+    if (!s || (s.chambered && s.mag >= s.def.magSize)) return false;
+    const spares = s.spares;
+    const last = spares.length - 1;
+    if (last < 0) return false;
+    // Finish the open shell bundle before opening another one.
+    if (spares[last] === 1) spares.pop();
+    else spares[last]--;
+    if (s.chambered) s.mag++;
+    else s.chambered = true;
     this._shotIndex = 0;
     return true;
   }
 
   _continueTubeReload(): void {
     const s = this.state;
-    if (!this._tubeLoop || !s || s.reserve <= 0 || s.mag >= s.def.magSize) {
+    if (!this._tubeLoop || !s || s.spares.length === 0 || s.mag >= s.def.magSize) {
       this._tubeLoop = false;
       return;
     }
@@ -1859,9 +1890,8 @@ export class WeaponSystem {
         : (s.def.spreadHip ?? s.def.spreadAds)
       : 0;
     if (s) {
-      s.mag = kind === 'fire' ? 22 : s.def.magSize;
-      s.chambered = true;
-      s.reserve = s.def.reserve;
+      this.resetWeaponAmmo(s);
+      if (kind === 'fire') s.mag = 22;
     }
 
     if (kind === 'ads') {

@@ -22,7 +22,10 @@ export interface WeaponState {
   pattern: Float32Array;
   mag: number;
   chambered: boolean;
-  reserve: number;
+  /** Sum of the spare packs; never stored separately. */
+  readonly reserve: number;
+  /** Nonempty spare magazines, belts, or shell bundles (see `ammoPack`), fullest first. */
+  readonly spares: number[];
   mode: WeaponMode;
   modeIndex: number;
 }

@@ -43,21 +43,7 @@ weapons.ctx = context;
 weapons.player = player;
 weapons._hasMesh = (): boolean => true;
 weapons.setWeaponImmediate = (): boolean => true;
-const reserves: Record<WeaponId, [number, number]> = {
-  rifle: [30, 90],
-  mcx: [180, 180],
-  pistol: [40, 68],
-  smg: [60, 224],
-  lmg: [150, 150],
-  shotgun: [30, 30],
-  sniper: [30, 30],
-};
-for (const id of WEAPON_IDS) {
-  const state = weapons._makeState(id);
-  state.reserve = reserves[id][0];
-  state.def = { ...state.def, reserve: reserves[id][1] };
-  weapons.states.set(id, state);
-}
+for (const id of WEAPON_IDS) weapons.states.set(id, weapons._makeState(id));
 providers.weapons = weapons;
 providers.player = player;
 
@@ -149,15 +135,15 @@ check('unaffordable purchase is unchanged', !market.buy('armour') && player.heal
 
 // ---- ammo refill ---------------------------------------------------------
 check(
-  'ammo reports 44% and rejects insufficient credits',
-  item('ammo').level === 44 && !market.buy('ammo')
+  'two starting spares report half capacity and reject insufficient credits',
+  item('ammo').level === 50 && !market.buy('ammo')
 );
 market.credits = 99999;
 check('ammo is buyable below full', item('ammo').affordable && market.buy('ammo'));
 check(
   'refill tops reserves and disables itself',
-  weaponState('rifle').reserve === 90 &&
-    weaponState('pistol').reserve === 68 &&
+  weaponState('rifle').spares.length === 4 &&
+    weaponState('pistol').spares.length === 4 &&
     !item('ammo').affordable &&
     !market.buy('ammo') &&
     item('ammo').action === 'max'
@@ -304,7 +290,7 @@ for (const previous of ['smg', 'shotgun'] as const) {
   const pistol = weaponState('pistol');
   pistol.mag = 0;
   pistol.chambered = false;
-  pistol.reserve = 0;
+  pistol.spares.length = 0;
   market.credits = 399;
   check(
     'P320 unaffordable below 400 without charging or swapping',
@@ -330,7 +316,7 @@ for (const previous of ['smg', 'shotgun'] as const) {
     'P320 purchase refreshes ammo and disables duplicate purchase',
     pistol.mag === pistol.def.magSize &&
       pistol.chambered &&
-      pistol.reserve === pistol.def.reserve &&
+      pistol.reserve === 2 * pistol.def.magSize &&
       item('pistol').action === 'equipped' &&
       !item('pistol').affordable &&
       !buyGun('pistol')

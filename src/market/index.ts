@@ -79,7 +79,7 @@ const CATALOG = [
     max: 100,
     unit: 'pct',
     slot: 'kit',
-    blurb: 'Reserve · full mags',
+    blurb: 'Refill all spares',
   },
   {
     id: 'grenade',

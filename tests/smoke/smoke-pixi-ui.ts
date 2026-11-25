@@ -12,7 +12,7 @@ import { Killfeed } from '../../src/ui/killfeed.ts';
 import { MarketCountdown } from '../../src/ui/market.ts';
 import type { MarketOverlay } from '../../src/ui/market.ts';
 import type { PauseMenu } from '../../src/ui/menu.ts';
-import { PixiAmmoView, AMMO_HEIGHT } from '../../src/ui/pixi-ammo-view.ts';
+import { PixiAmmoView } from '../../src/ui/pixi-ammo-view.ts';
 import { initPixiRenderer } from '../../src/ui/pixi-device.ts';
 import { PixiHud } from '../../src/ui/pixi-hud.ts';
 import { PixiMinimap } from '../../src/ui/pixi-minimap.ts';
@@ -176,7 +176,7 @@ for (const failure of [null, 'injury', 'stage', 'renderer']) {
   hud.dispose();
   hud.update(
     0,
-    { ammo: 0, magSize: 0, reserve: 0 },
+    { magSize: 0, loadedRounds: 0, spares: [] },
     new HealthFx(),
     new Crosshair(),
     {},
@@ -257,7 +257,7 @@ dprHud.setVisible(true);
 const hiddenFrame = (): void =>
   dprHud.update(
     0,
-    { ammo: 0, magSize: 0, reserve: 0 },
+    { magSize: 0, loadedRounds: 0, spares: [] },
     new HealthFx(),
     new Crosshair(),
     {},
@@ -321,10 +321,15 @@ assert.equal(mapView['pulses'][1].text.resolution, 2);
 textProbe.onViewUpdate = viewUpdate;
 textStage.destroy({ children: true });
 const ammoView = new PixiAmmoView();
-assert.equal(AMMO_HEIGHT - ammoView['magFill'].y, 8, 'magazine shares armour-bar bottom inset');
 assert(ammoView['prompt'].y >= 0 && ammoView['prompt'].y + 16 <= ammoView['bar'].y);
 assert(ammoView['bar'].y + 3 < ammoView['mode'].y, 'reload feedback stays above the readout');
-ammoView.update(0, { ammo: 0, magSize: 30, reserve: 210, reloading: true, reloadProgress: 0.5 });
+ammoView.update(0, {
+  magSize: 30,
+  loadedRounds: 0,
+  spares: [30, 30],
+  reloading: true,
+  reloadProgress: 0.5,
+});
 assert(ammoView['bar'].visible && ammoView['fill'].scale.x === 0.5);
 assert.equal(ammoView['prompt'].text, 'RELOADING');
 ammoView.stage.destroy({ children: true });
