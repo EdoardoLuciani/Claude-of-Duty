@@ -13,7 +13,7 @@ import { explode } from './explosions.ts';
 import { HazeSystem } from './haze.ts';
 import { spawnImpact, spawnExit, spawnIntelSparks } from './impacts.ts';
 import { LightPool } from './lights.ts';
-import { muzzleFlash } from './muzzle.ts';
+import { muzzleFlash, VIEW_FLASH_DECAY, VIEW_FLASH_TIME } from './muzzle.ts';
 import {
   ParticleLayer,
   resetSpawn,
@@ -287,9 +287,10 @@ export class FxSystem {
   emitAdd = (s: typeof SP): number => this.add.emit(s, this.now);
   emitLit = (s: typeof SP): number => this.lit.emit(s, this.now);
   emitMote = (s: typeof SP): number => this.motes.emit(s, this.now);
+  /** View flame may be as brief as the muzzle pulse, below the default life floor. */
   emitViewAdd = (s: typeof SP): number => {
     this._attachView();
-    return this.viewAdd.emit(s, this.now);
+    return this.viewAdd.emit(s, this.now, VIEW_FLASH_TIME);
   };
   emitViewLit = (s: typeof SP): number => {
     this._attachView();
@@ -375,17 +376,16 @@ export class FxSystem {
 
   /** View-scene spill tracks the viewmodel key for consistent relative brightness.
    * Inverse-square falloff gives a bright crown and a softer wash toward the magwell.
-   * The 90 ms lifetime and 8/s decay keep it visible across several frames.
    */
   viewFlash(x: number, y: number, z: number, r: number, g: number, b: number, strength = 1): void {
     this._attachView();
     const pool = this.viewLights;
     if (!pool) return;
     const key = this.render?.viewLightLevel ?? this.render?.viewSun.intensity ?? 2.5;
-    // 0.72 cd per key unit keeps the handguard's warm gradient legible.
-    const peak = Math.max(0.04, key * 0.72 * clamp(strength, 0.05, 2.2));
+    // Peak candela per key unit, before the muzzle's exposure carried in `strength`.
+    const peak = key * 0.4 * clamp(strength, 0, 2.2);
     // Lift 4 cm off the bore: an on-axis source grazes the receiver (N.L ~0.15).
-    pool.flash(x, y + 0.04, z, r, g, b, peak, 0.09, 8, 1.6, 2);
+    pool.flash(x, y + 0.04, z, r, g, b, peak, VIEW_FLASH_TIME, VIEW_FLASH_DECAY, 1.6, 2);
   }
 
   get physics(): EngineSystems['physics'] | undefined {

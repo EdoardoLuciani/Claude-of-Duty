@@ -1,15 +1,22 @@
 import type { Vector3Like as Vec3Like } from 'three';
 
-import { TAU } from '../core/math.ts';
+import { TAU, clamp } from '../core/math.ts';
 import { P } from './atlas.ts';
 import type { FxSystem } from './index.ts';
-import { resetSpawn, setSpawnColorRamp, setSpawnPosition, setSpawnVelocity } from './particles.ts';
+import {
+  PARTICLE_FADE_IN,
+  resetSpawn,
+  setSpawnColorRamp,
+  setSpawnPosition,
+  setSpawnVelocity,
+  type SP,
+} from './particles.ts';
 import { V, C, C2, basis, blackbody, clampCone, cone, towardHemi, COS55 } from './util.ts';
 
 /** Muzzle flash layers a small incandescent core, asymmetric tongues, gas jet, grains and smoke.
  * FLASH_LOBE is a one-sided tongue rooted at -X, never a radial star. Independently roll
  * lobes about the bore and pitch them 23-49 degrees; keep surrounding gas dimmer than the core.
- * Burning lasts 40-62 ms; the light/haze are brief and smoke persists.
+ * First-person flame and light are brief; smoke lingers on its own.
  */
 
 interface MuzzleProfile {
@@ -94,6 +101,27 @@ const PROFILE_ENTRIES: ReadonlyArray<[string, MuzzleProfile]> = Object.entries(M
 /** The `light` a rifle carries, i.e. the reference the view flash is scaled on. */
 const REF_LIGHT = MUZZLE_PROFILES.rifle.light;
 
+// The measured rifle pulse in Pemčák et al. (2024), Fig. 6, is nearly gone by 6 ms.
+// https://doi.org/10.3849/aimt.01843
+export const VIEW_FLASH_TIME = 0.005;
+export const VIEW_FLASH_DECAY = 2 / VIEW_FLASH_TIME;
+
+/** First-person flash relative to the third-person recipe. */
+const VIEW = {
+  size: 0.64, // flame sprite size
+  radiance: 0.56, // flame sprite radiance, before exposure
+  // The few-pixel core keeps this power of exposure so it still reads in daylight at low FPS.
+  coreExposure: 0.5,
+  // Frame time cap for exposure, so a hitch on the firing frame doesn't swallow the shot.
+  maxFrame: 1 / 30,
+  spill: 0.5, // world spill peak; local and brief so nearby surfaces don't strobe in a burst
+  reach: 0.7, // world spill cutoff distance
+  // Flame sprites are drawn once, at this fraction of their life: just past the
+  // shader's fade-in so the pulse shows on the firing frame.
+  drawAge: PARTICLE_FADE_IN + 0.015,
+  alphaCurve: 1.5, // any frame sampling the end of the pulse sees only a faint tail
+};
+
 function profileFor(weapon?: string | MuzzleWeapon): MuzzleProfile {
   if (!weapon) return MUZZLE_PROFILES.rifle;
   if (typeof weapon !== 'string' && weapon.suppressed) return MUZZLE_PROFILES.suppressed;
@@ -103,6 +131,20 @@ function profileFor(weapon?: string | MuzzleWeapon): MuzzleProfile {
   const k = key.toLowerCase();
   for (const [name, profile] of PROFILE_ENTRIES) if (k.includes(name)) return profile;
   return MUZZLE_PROFILES.rifle;
+}
+
+/** First-person flame lives one pulse, so it is drawn on a single frame near birth: each
+ * layer's life, growth, drag, spin and end radiance only shape the third-person flash.
+ */
+function emitFlame(fx: MuzzleFx, s: typeof SP, view: boolean): void {
+  if (view) {
+    s.life = VIEW_FLASH_TIME;
+    s.delay = -VIEW.drawAge * s.life;
+    s.alphaCurve = VIEW.alphaCurve;
+    fx.emitViewAdd(s);
+  } else {
+    fx.emitAdd(s);
+  }
 }
 
 /** Muzzle crown is world-space; bore direction is unit length. view selects first-person layers.
@@ -115,13 +157,21 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
   const p = o.position;
   const d = o.direction;
   const gain = (o.intensity ?? 1) * (0.86 + rng.float() * 0.28); // shot-to-shot
-  const lightGain = gain * (o.light ?? 1);
+  const view = o.view === true;
+  // Approximate averaging a brief pulse over the frame. At low FPS, the
+  // displayed frame persists longer, so show less glare rather than more.
+  const exposure = view
+    ? VIEW_FLASH_TIME / clamp(fx.ctx.time.dt, VIEW_FLASH_TIME, VIEW.maxFrame)
+    : 1;
+  const lightGain = gain * (o.light ?? 1) * exposure;
   // Scale enemy embers with flash gain instead of retaining player-strength streaks.
   const emberGain = 0.22 + 0.78 * Math.min(1, gain);
   // Roll size jitter once, independently of radiance jitter in `gain`.
   const sc = prof.scale * (o.scale ?? o.intensity ?? 1) * (0.88 + rng.float() * 0.24);
-  const view = o.view === true;
-  const emitAdd = view ? fx.emitViewAdd : fx.emitAdd;
+  const flashSize = view ? VIEW.size : 1;
+  const flameScale = sc * flashSize;
+  const radiance = gain * (view ? VIEW.radiance : 1);
+  const flameGain = radiance * exposure;
   const emitLit = view ? fx.emitViewLit : fx.emitLit;
   const temp = prof.temp * (0.96 + rng.float() * 0.09);
   // Blackbody ramp: 3800-4400 K at the crown, cooling to 2200 K at the lobe tips.
@@ -140,46 +190,43 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
   const tg = C2.g;
   const tb = C2.b;
 
-  // Nested crown sprites: 20-60 radiance drives bloom without bleaching the lobes.
+  // Keep the hottest part centred on the barrel crown.
   let s = resetSpawn();
-  // No lead offset: even centimetres separate the flash visibly from the crown.
   setSpawnPosition(s, p.x, p.y, p.z);
   s.tile = P.FLASH_CORE;
-  // Core diameter in metres, large enough to read as the source of the light spill.
-  s.size0 = 0.085 * sc;
-  s.size1 = 0.135 * sc;
+  s.size0 = 0.085 * flameScale;
+  s.size1 = 0.135 * flameScale;
   s.sizeCurve = 0.35;
-  // Extend the physical ~2 ms flash across several frames so it is reliably visible.
   s.life = 0.062;
   s.drag = 10;
   setSpawnColorRamp(s, gr, gg, gb, tr, tg, tb);
-  s.i0 = 17 * gain;
-  // A nonzero tail keeps cooling gas visible between automatic-fire rounds.
-  s.i1 = 4.5 * gain;
+  s.i0 = 17 * flameGain;
+  s.i1 = 4.5 * flameGain;
   s.alphaCurve = 0.7;
   s.soft = 0.15;
   s.rot = rng.float() * TAU; // per-shot roll: the churn never repeats
   s.spin = rng.signed() * 3.0;
   s.seed = rng.float();
-  emitAdd(s);
-  // the white-hot heart: a third of the diameter, twice the radiance, gone first
+  emitFlame(fx, s, view);
+  // Smaller, brighter heart inside the surrounding gas.
   s = resetSpawn();
   setSpawnPosition(s, p.x, p.y, p.z);
   s.tile = P.FLASH_CORE;
-  s.size0 = 0.036 * sc;
-  s.size1 = 0.056 * sc;
+  s.size0 = 0.036 * flameScale;
+  s.size1 = 0.056 * flameScale;
   s.sizeCurve = 0.4;
   s.life = 0.046;
   s.drag = 12;
   setSpawnColorRamp(s, cr, cg, cb, gr, gg, gb);
-  s.i0 = 38 * gain;
-  s.i1 = 6 * gain;
+  const coreGain = radiance * exposure ** VIEW.coreExposure;
+  s.i0 = 38 * coreGain;
+  s.i1 = 6 * flameGain;
   s.alphaCurve = 0.6;
   s.soft = 0.12;
   s.rot = rng.float() * TAU;
   s.spin = rng.signed() * 4.0;
   s.seed = rng.float();
-  emitAdd(s);
+  emitFlame(fx, s, view);
 
   // Petal count, roll and choke vary per shot to avoid a symmetric starburst.
   basis(BORE, d.x, d.y, d.z);
@@ -203,16 +250,15 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
     const push = rng.range(0.6, 2.2) * choke;
     s = resetSpawn();
     s.tile = P.FLASH_LOBE;
-    s.size0 = (0.06 + 0.05 * rng.float()) * sc * choke;
-    // 0.18-0.32 m, skewed toward mid-length with occasional long tongues.
-    s.size1 = (0.18 + 0.14 * Math.pow(rng.float(), 1.5)) * sc * choke;
+    s.size0 = (0.06 + 0.05 * rng.float()) * flameScale * choke;
+    s.size1 = (0.18 + 0.14 * Math.pow(rng.float(), 1.5)) * flameScale * choke;
     // The sprite's root is at its -X edge, so slide the centre out along the
     // petal direction to sit that root exactly on the crown.
     const off = 0.34 * s.size1;
     setSpawnPosition(s, p.x + LOBE.x * off, p.y + LOBE.y * off, p.z + LOBE.z * off);
     setSpawnVelocity(s, LOBE.x * push, LOBE.y * push, LOBE.z * push);
     s.sizeCurve = 0.35;
-    s.life = 0.04 + rng.float() * 0.02; // 2.5-3.5 frames at 60 Hz
+    s.life = 0.04 + rng.float() * 0.02;
     s.drag = 12;
     s.rot = screenAngle(fx, view, LOBE.x, LOBE.y, LOBE.z) + rng.signed() * 0.1;
     s.spin = rng.signed() * 1.6; // a lazy curl, not a spinning pinwheel
@@ -220,12 +266,12 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
     // white, the gas around it stays fire-coloured. Only a strong channel
     // *ratio* survives the tone curve as amber rather than as more white.
     setSpawnColorRamp(s, gr, gg, gb, tr, tg, tb);
-    s.i0 = (8 + rng.float() * 6) * gain * choke;
-    s.i1 = 1.6 * gain * choke;
+    s.i0 = (8 + rng.float() * 6) * flameGain * choke;
+    s.i1 = 1.6 * flameGain * choke;
     s.alphaCurve = 0.75;
     s.soft = 0.15;
     s.seed = rng.float();
-    emitAdd(s);
+    emitFlame(fx, s, view);
   }
 
   // forward gas jet: velocity-aligned, so it stretches down the bore
@@ -233,23 +279,24 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
   setSpawnPosition(s, p.x + d.x * 0.04, p.y + d.y * 0.04, p.z + d.z * 0.04);
   setSpawnVelocity(s, d.x * 7, d.y * 7, d.z * 7);
   s.tile = P.STREAK;
-  s.size0 = 0.045 * sc * prof.jet;
-  s.size1 = 0.018 * sc * prof.jet;
+  s.size0 = 0.045 * flameScale * prof.jet;
+  s.size1 = 0.018 * flameScale * prof.jet;
   // Short: a long velocity-aligned streak off the crown reads as a hard spike.
   s.stretch = 0.28 * prof.jet;
   s.life = 0.044;
   s.drag = 14;
   setSpawnColorRamp(s, 1, 0.8, 0.5, 1, 0.4, 0.1);
-  s.i0 = 9 * gain;
+  s.i0 = 9 * flameGain;
   s.i1 = 0;
   s.alphaCurve = 0.6;
   s.soft = 0.12;
   s.seed = rng.float();
-  emitAdd(s);
+  emitFlame(fx, s, view);
 
   // Forward-constrained powder cools from ~2600 K to 1200 K; velocity controls
   // streak length so fast grains streak and slower ones remain specks.
-  const nSpark = Math.round(prof.sparks * fx.pScale);
+  // Next to the camera they read as a spray across the view, so first person has none.
+  const nSpark = view ? 0 : Math.round(prof.sparks * fx.pScale);
   blackbody(C, 2600 * temp);
   blackbody(C2, 1200);
   for (let i = 0; i < nSpark; i++) {
@@ -279,7 +326,7 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
     s.alphaCurve = 0.5;
     s.soft = 0.05;
     s.seed = rng.float();
-    emitAdd(s);
+    fx.emitAdd(s);
   }
 
   // Delay the small crown-smoke puff so fire reads before smoke, not as one beige cloud.
@@ -306,20 +353,20 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
     setSpawnPosition(s, px, py, pz);
     setSpawnVelocity(s, vx, vy, vz);
     s.tile = tile;
-    s.size0 = size0 * 0.9;
-    s.size1 = size1 * 0.75;
+    s.size0 = size0 * 0.9 * flashSize;
+    s.size1 = size1 * 0.75 * flashSize;
     s.sizeCurve = 0.5;
     s.life = 0.05 + rng.float() * 0.03;
     s.drag = 7;
     s.rot = rot;
     s.spin = spin;
     setSpawnColorRamp(s, 1, 0.5, 0.17, 1, 0.26, 0.05);
-    s.i0 = (0.5 + rng.float() * 0.7) * gain;
+    s.i0 = (0.5 + rng.float() * 0.7) * flameGain;
     s.i1 = 0;
     s.alphaCurve = 1.1;
     s.soft = 0.2;
     s.seed = seed;
-    emitAdd(s);
+    emitFlame(fx, s, view);
 
     s = resetSpawn();
     setSpawnPosition(s, px, py, pz);
@@ -375,10 +422,9 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
     emitLit(s);
   }
 
-  // World spill belongs to ctx.scene, separate from the first-person light.
+  // World spill belongs to ctx.scene, separate from the first-person weapon light.
   // Rifle reference peak is 36 cd before lightGain, with a 5*sc metre cutoff: Three's window
   // (1-(d/cutoff)^4)^2 / d^2 confines the warm pool without bleaching distant walls.
-  // A 0.09 s lifetime and 16/s decay retain spill across successive frames.
   const lp = o.lightPos ?? p;
   fx.lights.flash(
     lp.x + d.x * 0.1,
@@ -387,10 +433,10 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
     cr,
     cg,
     cb,
-    prof.light * lightGain * 0.18,
-    0.09,
-    16,
-    5 * sc,
+    prof.light * lightGain * 0.18 * (view ? VIEW.spill : 1),
+    view ? VIEW_FLASH_TIME : 0.09,
+    view ? VIEW_FLASH_DECAY : 16,
+    5 * sc * (view ? VIEW.reach : 1),
     2
   );
 

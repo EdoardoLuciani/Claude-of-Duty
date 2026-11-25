@@ -46,6 +46,8 @@ import type { JoinNode, TextureNode, UniformNode } from 'three/webgpu';
  */
 
 export const STRIDE = 32;
+/** Sprites fade in over this fraction of their life. */
+export const PARTICLE_FADE_IN = 0.045;
 
 // interleaved slot offsets
 const O_PS = 0; // pos.xyz, size0
@@ -351,7 +353,7 @@ function buildParticleMaterial(o: ParticleOptions): {
     );
     const a = aMisc.z
       .mul(pow(max(float(1.0).sub(n), 0.0), max(aMisc.w, 0.02)))
-      .mul(smoothstep(0.0, 0.045, n));
+      .mul(smoothstep(0.0, PARTICLE_FADE_IN, n));
     vCol.assign(vec4(col.mul(inten), select(alive, a, 0.0)));
 
     const clip = cameraProjectionMatrix.mul(mv);
@@ -527,7 +529,7 @@ export class ParticleLayer {
    * Write one particle. `s` is the shared {@link SP} descriptor — pass it after
    * resetSpawn() so nothing leaks between call sites.
    */
-  emit(s: typeof SP, now: number): number {
+  emit(s: typeof SP, now: number, minLife = 0.016): number {
     const i = this.cursor;
     this.cursor = i + 1;
     if (this.cursor >= this.capacity) {
@@ -538,7 +540,7 @@ export class ParticleLayer {
 
     const a = this.array;
     const b = i * STRIDE;
-    const life = Math.max(0.016, s.life);
+    const life = Math.max(minLife, s.life);
     const birth = now + s.delay;
 
     a[b + O_PS] = s.x;

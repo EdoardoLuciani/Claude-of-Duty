@@ -267,8 +267,8 @@ export function installShotApi(
 
   /**
    * `opts.grabFrame` is how many frames the harness will pump before it presses
-   * the shutter. Shots whose subject is a transient (a muzzle flash lives ~52 ms)
-   * need it so they can land the event on the captured frame instead of guessing.
+   * the shutter. Transient shots like muzzle flash use it to land the event on
+   * the captured frame instead of guessing.
    */
   window.__APPLY_SHOT__ = (
     name: string,

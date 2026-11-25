@@ -1873,14 +1873,10 @@ export class WeaponSystem {
     }
     this._state.sprint = false;
     this._state.speed = 0;
-    // At the harness's fixed 60 Hz, early rounds populate smoke, brass and tracers.
-    // A two-frame tail overlaps flash lifetimes across the uncertain grab window:
-    // --settle controls grabFrame, but harness rAF and screenshot RPC can drift.
+    // Stage smoke and brass first, then fire on the exact lockstep capture frame.
     if (kind === 'fire') {
       const grab = Math.round(opts.grabFrame ?? 90);
-      const frames = [grab - 26, grab - 19, grab - 12];
-      for (let f = grab - 6; f <= grab + 18; f += 2) frames.push(f);
-      this._scriptFrames = frames.filter((f): boolean => f >= 2);
+      this._scriptFrames = [grab - 21, grab - 14, grab - 7, grab].filter((f): boolean => f >= 2);
     } else {
       this._scriptFrames = null;
     }

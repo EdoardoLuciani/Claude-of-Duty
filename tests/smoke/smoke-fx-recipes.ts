@@ -56,6 +56,13 @@ try {
   layer.flush(3);
   assert.equal(layer.mesh.visible, false);
   assert.equal(layer.ibuf.version, version, 'time-only frames do not republish slot data');
+  // A sub-frame flame must draw at emission and expire before the next 120 Hz frame.
+  const flash = { ...defaults, life: 0.005, delay: -0.0003 };
+  layer.emit(flash, 3, 0.005);
+  layer.flush(3);
+  assert.equal(layer.mesh.visible, true);
+  layer.flush(3 + 1 / 120);
+  assert.equal(layer.mesh.visible, false);
   assert.equal(layer.material.blendSrcAlpha, THREE.ZeroFactor);
   assert.equal(layer.material.blendDstAlpha, THREE.OneFactor);
 } finally {
