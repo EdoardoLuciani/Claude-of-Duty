@@ -191,7 +191,9 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
   s.life = 0.046;
   s.drag = 12;
   setSpawnColorRamp(s, cr, cg, cb, gr, gg, gb);
-  s.i0 = 38 * flameGain;
+  // Preserve the tiny core against bright backgrounds, without boosting the lobes or spill.
+  const coreGain = view ? gain * 0.56 * Math.sqrt(exposure) : flameGain;
+  s.i0 = 38 * coreGain;
   s.i1 = 6 * flameGain;
   s.alphaCurve = 0.6;
   s.soft = 0.12;
@@ -265,9 +267,8 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
   s.seed = rng.float();
   emitFlame(fx, s, view);
 
-  // Forward-constrained powder cools from ~2600 K to 1200 K; velocity controls
-  // streak length so fast grains streak and slower ones remain specks.
-  const nSpark = Math.round(prof.sparks * fx.pScale);
+  // Near the camera, powder grains read as brief specks rather than a spray of streaks.
+  const nSpark = Math.round(prof.sparks * fx.pScale * (view ? 0.18 : 1));
   blackbody(C, 2600 * temp);
   blackbody(C2, 1200);
   for (let i = 0; i < nSpark; i++) {
@@ -280,19 +281,16 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
     s = resetSpawn();
     setSpawnPosition(s, p.x + d.x * 0.012, p.y + d.y * 0.012, p.z + d.z * 0.012);
     setSpawnVelocity(s, V.x * sp, V.y * sp, V.z * sp);
-    s.tile = P.STREAK;
-    s.size0 = rng.range(0.005, 0.011);
+    s.tile = view ? P.SPARK : P.STREAK;
+    s.size0 = rng.range(0.005, 0.011) * (view ? 0.65 : 1);
     s.size1 = s.size0 * 0.4;
-    // Length ∝ velocity (the shader multiplies by |view velocity|), with a
-    // slightly super-linear coefficient so a fast grain reads as a streak and a
-    // slow one as an ember rather than everything being the same capsule.
-    s.stretch = 0.16 + sp * 0.045;
-    s.life = rng.range(0.1, 0.4);
+    s.stretch = view ? 0 : 0.16 + sp * 0.045;
+    s.life = view ? rng.range(0.03, 0.06) : rng.range(0.1, 0.4);
     s.drag = 3.2;
     s.gravity = -11;
     setSpawnColorRamp(s, C.r, C.g, C.b, C2.r, C2.g, C2.b);
-    s.i0 = rng.range(5, 11) * emberGain;
-    s.i1 = 0.15;
+    s.i0 = rng.range(5, 11) * emberGain * (view ? 0.4 : 1);
+    s.i1 = view ? 0 : 0.15;
     s.flags = 1;
     s.alphaCurve = 0.5;
     s.soft = 0.05;
