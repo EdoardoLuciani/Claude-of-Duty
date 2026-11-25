@@ -15,11 +15,13 @@ forward, +Z up; glTF uses −Z forward, +Y up.
 From the repository root:
 
 ```sh
-bun tools/build-assets.ts
-for host in m4a1-block-ii mcx-virtus fn-evolys-762 ax338; do
-  blender -b ".cache/blender/weapons/$host/$host.blend" -t 2 \
-    --python-exit-code 1 --python tools/blender/muzzle_brakes/check.py || exit
-done
+(
+  bun tools/build-assets.ts || exit
+  for host in m4a1-block-ii mcx-virtus fn-evolys-762 ax338; do
+    blender -b ".cache/blender/weapons/$host/$host.blend" -t 2 \
+      --python-exit-code 1 --python tools/blender/muzzle_brakes/check.py || exit
+  done
+)
 ```
 
 The check seats the authored mesh and samples clips for hand and weapon

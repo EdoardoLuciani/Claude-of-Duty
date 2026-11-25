@@ -20,8 +20,10 @@ HOSTS = {
 collection = HOSTS[Path(bpy.data.filepath).stem]
 scene = bpy.context.scene
 mount = bpy.data.objects['MOUNT_muzzle']
-hidden_parts = {obj for key in ('MUZZLE_device', 'MUZZLE_device_removed')
-                if key in bpy.data.objects for obj in bpy.data.objects[key].children_recursive}
+hidden_parts = set(bpy.data.objects['MUZZLE_device'].children_recursive)
+adapter = bpy.data.objects.get('MUZZLE_device_removed')
+if adapter is not None:
+    hidden_parts.update(adapter.children_recursive)
 weapon = [o for o in bpy.data.collections[f'{collection} | authored components'].objects
           if o.type == 'MESH' and o not in hidden_parts]
 hands = [o for o in scene.objects if o.type == 'MESH' and
@@ -53,13 +55,12 @@ faces = [tuple(t.vertices) for t in shell.data.loop_triangles
          if any(points[i].y > 1e-6 for i in t.vertices)]
 surface = BVHTree.FromPolygons(points, faces, all_triangles=True)
 low, high = [tuple(f(p[i] for p in points) for i in range(3)) for f in (min, max)]
-exit_position = inverse @ brake_exit.matrix_world.translation
-assert (exit_position - Vector((0, high[1], 0))).length < 1e-6
+assert (inverse @ brake_exit.matrix_world.translation - Vector((0, high[1], 0))).length < 1e-6
 assert (inverse.to_3x3() @ brake_exit.matrix_world.to_3x3() @ forward - forward).length < 1e-6
-for name in ('SOCKET_sight', 'SOCKET_front_post'):
-    if name in bpy.data.objects:
-        sight = inverse @ bpy.data.objects[name].matrix_world.translation
-        assert surface.ray_cast(sight, forward, 1)[0] is None, ('blocked sight', name)
+for sight in (bpy.data.objects['SOCKET_sight'], bpy.data.objects.get('SOCKET_front_post')):
+    if sight is not None:
+        origin = inverse @ sight.matrix_world.translation
+        assert surface.ray_cast(origin, forward, 1)[0] is None, ('blocked sight', sight.name)
 
 count = 0
 for name, clip in json.loads(scene['clips']).items():
