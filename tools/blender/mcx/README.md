@@ -14,6 +14,9 @@ Preserve STEP magazine visibility, attachment seating and reload/fold clearance.
 The opaque finish uses vertex pigments and a stable canonical UV1 scalar lookup,
 with original UV0 detail maps; no glass remains in the base weapon. Do not compensate with lighting.
 
+During `Inspect` the support hand clears the fore-end for both receiver angles,
+then regrips below the rail as the rifle returns to ready.
+
 Run from the repository root with Blender 5.3.0 and gltfpack 1.3:
 
 ```sh
