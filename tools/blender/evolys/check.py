@@ -67,7 +67,7 @@ assert abs(sight.x)<1e-6 and abs(front.x)<1e-6 and abs(front.y-sight.y)<1e-6
 assert abs(sight.y-rail_top-.026)<.000002
 irons=bpy.data.objects['IRON_sights_mesh']
 assert irons.parent==bpy.data.objects['IRON_sights']
-assert not any('RMR' in o.name or o.name=='optic' for o in asset.objects)
+assert not any(o.name.startswith('ATTACHMENT_') or o.name=='optic' for o in asset.objects)
 assert not any(m.name.startswith('10 |') for o in asset.objects if o.type=='MESH' for m in o.data.materials if m)
 ps=points(irons)
 for z in (sight.z,front.z):
@@ -179,7 +179,7 @@ def rig_tree(objects):
 fixed_irons=rig_tree([irons]);rail_tree=rig_tree([bpy.data.objects['receiver_mesh']]);attachments={}
 bpy.data.objects['MUZZLE_device_removed'].hide_viewport=False
 bpy.context.view_layer.update()
-for attachment_id,seat in [('rmr',mount),('acog',mount),('scope',mount),('exps3',mount),('srd762ti',muzzle_mount),('laser',rail)]:
+for attachment_id,seat in [('micro_t2',mount),('acog',mount),('scope',mount),('exps3',mount),('srd762ti',muzzle_mount),('laser',rail)]:
     objects=attachment_source.seat(attachment_id,seat,weapon='evolys')
     meshes=[o for o in objects if o.type=='MESH']
     attachments[attachment_id]=rig_tree(meshes)
@@ -246,7 +246,7 @@ for name,info in clips.items():
                 assert not tree.overlap(target),(name,frame,obj.name,attachment_id,'attachment collision')
             assert not tree.overlap(fixed_irons),(name,frame,obj.name,'iron collision')
 print('EVOLYS_FREE_HAND_CLEARANCE_OK:',free_poses,'native free-motion poses; both hands against visible pouch instances')
-print(f'EVOLYS_ATTACHMENT_CLEARANCE_OK: {poses} native poses, rmr/acog with irons, scope with irons removed, SRD762Ti and TOR Mini; cover, charging, stock, belt and both deformed hands; bipod N/A (not authored), sprint uses the same rigid mount')
+print(f'EVOLYS_ATTACHMENT_CLEARANCE_OK: {poses} native poses, micro_t2/acog with irons, scope with irons removed, SRD762Ti and TOR Mini; cover, charging, stock, belt and both deformed hands; bipod N/A (not authored), sprint uses the same rigid mount')
 print('EVOLYS_CHECK_OK: mesh envelope, barrel, vents, packed maps, aligned removable irons, closed stock joints, one-pitch native feed, belt/solid clearance, enclosed tail and synchronized DCC wrists/skins')
 
 # Actual shared rail attachment, independent of the optic catalog.

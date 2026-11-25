@@ -12,9 +12,9 @@ from mathutils.bvhtree import BVHTree
 import picatinny
 
 ROOT = Path(__file__).resolve().parents[2]
-OPTICS = ('rmr', 'acog', 'scope', 'exps3')
+OPTICS = ('micro_t2', 'acog', 'scope', 'exps3')
 SOURCES = {
-    'rmr': 'trijicon-rmr/rmr.blend',
+    'micro_t2': 'aimpoint-micro-t2/micro-t2.blend',
     'acog': 'trijicon-acog/acog.blend',
     'scope': 'schmidt-bender-pm-ii/scope.blend',
     'exps3': 'eotech-exps3-0/exps3-0.blend',

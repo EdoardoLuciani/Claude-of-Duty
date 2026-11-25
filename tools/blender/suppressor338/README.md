@@ -18,7 +18,7 @@ old brake. Removal restores the brake.
 
 `tools/blender/ax338/muzzle.py` (also run by AX338's `check.py`) checks the actual
 can and adapter against every weapon component, the review glove/sleeve across all
-clips, and the mounted RMR, ACOG, PM II and TOR Mini. The only allowed adapter/barrel
+clips, and the mounted T-2, ACOG, PM II and TOR Mini. The only allowed adapter/barrel
 contact is their shared crown plane. AX338 has no authored bipod.
 
 ## Build and review

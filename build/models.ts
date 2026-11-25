@@ -76,7 +76,7 @@ export const MODEL_COOKS = {
   srd762ti: attachment('sig-srd762ti', 'suppressor.glb', 'srd762ti'),
   acog: attachment('trijicon-acog', 'acog.glb', 'acog'),
   scope: attachment('schmidt-bender-pm-ii', 'scope.glb', 'scope'),
-  rmr: attachment('trijicon-rmr', 'rmr.glb', 'rmr'),
+  micro_t2: attachment('aimpoint-micro-t2', 'micro-t2.glb', 'micro_t2'),
   m67: {
     directory: '.cache/blender/weapons/m67',
     source: 'm67.glb',

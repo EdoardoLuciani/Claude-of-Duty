@@ -37,7 +37,7 @@ Game-frame metres, +Y up / -Z forward, under `AX338_RIG`:
 | `MOUNT_muzzle` | Barrel-crown seating plane for the dedicated .338 can; identity, unit scale                 |
 | `MOUNT_rail`   | Right-side KeySlot/Picatinny adapter ahead of the support hand; local +Y points inward (-X) |
 
-Irons are one removable `IRON_sights` assembly with no replacement part. RMR and
+Irons are one removable `IRON_sights` assembly with no replacement part. T-2 and
 ACOG clear the installed irons; the PM II crosses the rear aperture, and any mounted
 optic hides the irons at runtime.
 

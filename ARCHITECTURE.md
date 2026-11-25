@@ -388,7 +388,7 @@ artwork is mapped in `src/ui/market-art.ts`; its provenance lives in
 `{ optic, muzzle, rail }` snapshot; null slots retain the base weapon, and
 `optic: null` uses irons. Viewmodel entries hold the mounted instances and their
 resolved data, never a copy of the build.
-`src/weapons/attachment-rules.ts` owns the finite catalog (`rmr | acog | scope | exps3`
+`src/weapons/attachment-rules.ts` owns the finite catalog (`micro_t2 | acog | scope | exps3`
 optics, TOR Mini `laser`, one `suppressor`), compatibility and effective-definition
 resolution without importing weapon loading or mounting. `src/weapons/attachments.ts`
 owns asset loading and the shared gameplay/inspection mount solver.

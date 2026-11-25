@@ -107,7 +107,7 @@ def check_mounts(manifest, rig, meshes, review, pose, tree, point, basis):
     # that frame throughout every clip, while the laser rail stays on the fixed magazine-tube clamps.
     receiver_mount = rig.matrix_world.inverted() @ mounts['optic'].matrix_world
     optics = {}
-    for optic, stations in (('rmr', (7, 10)), ('acog', (5, 12)), ('scope', (1, 3, 14, 16)), ('exps3', (7, 10))):
+    for optic, stations in (('micro_t2', (7, 10)), ('acog', (5, 12)), ('scope', (1, 3, 14, 16)), ('exps3', (7, 10))):
         objects = attachment_source.seat(optic, mounts['optic'])
         # The muzzle check reads each mounted optic back from this collection.
         collection = bpy.data.collections.new('M590 check | mounted ' + optic)
@@ -192,4 +192,4 @@ def check_mounts(manifest, rig, meshes, review, pose, tree, point, basis):
                 assert not optic_tree.overlap(moving_tree), (optic, name, frame, 'mounted optic crosses mechanism or hand')
             count += 1
     pose('Idle')
-    print('M590_ATTACHMENT_CLEARANCE_OK:', count, '120Hz poses; RMR/ACOG/PM II real optics; both hands, pump, bolt, trigger and visible insertion shell; dedicated 12g suppressor and TOR Mini checked separately')
+    print('M590_ATTACHMENT_CLEARANCE_OK:', count, '120Hz poses; T-2/ACOG/PM II real optics; both hands, pump, bolt, trigger and visible insertion shell; dedicated 12g suppressor and TOR Mini checked separately')

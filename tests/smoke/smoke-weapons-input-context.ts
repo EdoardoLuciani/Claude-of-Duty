@@ -218,7 +218,9 @@ for (const [primary, first, second] of [
 // Mounted laser switches belong to the gun, not the flashlight or active slot.
 {
   const { wp, input, tap, frame, player } = makeHarness();
-  Object.assign(wp, { _attachments: { rmr: opticAsset(), laser: rigidAsset('SOCKET_laser') } });
+  Object.assign(wp, {
+    _attachments: { micro_t2: opticAsset(), laser: rigidAsset('SOCKET_laser') },
+  });
   Object.assign(wp.viewmodel, {
     reticle: new THREE.Object3D(),
     scopeOverlay: new THREE.Object3D(),
@@ -245,7 +247,7 @@ for (const [primary, first, second] of [
   tap('KeyL');
   wp.setWeaponImmediate('rifle');
   assert(!wp.state.laserEnabled, 'switching away and back preserves the per-gun switch');
-  assert(wp.setAttachments('rifle', { ...config, optic: 'rmr' }));
+  assert(wp.setAttachments('rifle', { ...config, optic: 'micro_t2' }));
   assert(!wp.state.laserEnabled, 'optic changes preserve an off switch');
   for (const gate of ['frozen', 'disabled', 'dead', 'control']) {
     input.frozen = gate === 'frozen';
@@ -281,7 +283,7 @@ for (const [primary, first, second] of [
     (): void => wp.resetForNewGame(),
   ]) {
     wp.resetForNewGame();
-    assert(wp.setAttachments('rifle', { ...config, optic: 'rmr' }));
+    assert(wp.setAttachments('rifle', { ...config, optic: 'micro_t2' }));
     assert(wp.state.laserEnabled);
     assert(!irons.visible, 'a mounted optic replaces the removable irons');
     assert(wp.state.def.adsFovScale !== undefined, 'the stored build drives ADS magnification');

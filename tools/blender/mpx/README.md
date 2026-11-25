@@ -45,7 +45,7 @@ folded flat for any mounted optic.
 | Rail   | `MOUNT_rail`, bore-forward        | TOR Mini `laser`               |
 
 Optic and muzzle frames rotate Blender +Y forward onto weapon +X; the adapter
-preserves canonical shared-attachment locals at all three mount boundaries. RMR and
+preserves canonical shared-attachment locals at all three mount boundaries. T-2 and
 ACOG clear the deployed irons; the PM II needs them folded. The can swaps
 `MUZZLE_device` (thread protector) for `MUZZLE_device_removed` (an adapter sleeve
 bridging the crown to the shared rear mount); see the
