@@ -396,9 +396,9 @@ artwork is mapped in `src/ui/market-art.ts`; its provenance lives in
 `optic: null` uses irons. Viewmodel entries hold the mounted instances and their
 resolved data, never a copy of the build.
 `src/weapons/attachment-rules.ts` owns the finite catalog (`railway | acog | scope | exps3`
-optics, TOR Mini `laser`, one `suppressor`), compatibility and effective-definition
-resolution without importing weapon loading or mounting. `src/weapons/attachments.ts`
-owns asset loading and the shared gameplay/inspection mount solver.
+optics, TOR Mini `laser`, and `suppressor | m4_72` for the muzzle),
+compatibility and effective-definition resolution without importing weapon loading or mounting.
+`src/weapons/attachments.ts` owns asset loading and the shared gameplay/inspection mount solver.
 `src/market/attachments.ts` owns prices, not compatibility. Market holds one
 unconfirmed build; selecting, inspecting or editing never changes gameplay or credits.
 Confirmation rechecks credits, shop state and asset readiness, applies
@@ -407,17 +407,18 @@ ownership, so a rejected build never drops the old gun.
 
 `WeaponDef.fits` is a per-slot partial record keyed by attachment ID: each entry
 enables a verified fit and holds its data (`fits.optic[id].eyeRelief`, optional
-`railSlots` at `PICATINNY_PITCH`, `fits.muzzle.suppressor.model`; rail entries
-are empty). The player-facing muzzle ID is always `suppressor`; assets are keyed by
-can model. `isAttachmentConfig()` is the shared compatibility rule for gameplay,
-URL/debug input (narrowed once in `src/dev/attachments.ts` before prewarm) and
-`tools/capture.ts`; reject unverified fits, never silently change them.
-`removableIrons` swaps required `IRON_sights` for optional `IRON_sights_removed`
-with any optic; fixed irons stay and must clear it. `removableMuzzleDevice` similarly
-swaps required `MUZZLE_device` for optional `MUZZLE_device_removed`; permanent
-hardware stays under the can. Missing required nodes fail loading.
+`railSlots` at `PICATINNY_PITCH`, `fits.muzzle[id].model`; rail entries are empty).
+The suppressor shares a catalog ID across its can models. The M4-72 Brake is verified
+on the M4A1; stock, suppressor and brake are mutually exclusive.
+`isAttachmentConfig()` is the shared compatibility rule for gameplay, URL/debug input
+(narrowed once in `src/dev/attachments.ts` before prewarm) and `tools/capture.ts`; reject
+unverified fits, never silently change them. `removableIrons` swaps required `IRON_sights`
+for optional `IRON_sights_removed` with any optic; fixed irons stay and must clear it.
+`removableMuzzleDevice` hides required `MUZZLE_device` for any muzzle attachment;
+only a suppressor reveals the optional `MUZZLE_device_removed` adapter. Permanent hardware
+stays when fitted. Missing required nodes fail loading.
 
-`loadAttachments()` returns assets keyed by optic/rail ID or can model. A failed
+`loadAttachments()` returns assets keyed by optic/rail ID or muzzle model. A failed
 asset disables only that key, never the base weapon. Weapons own shared assets;
 mounts and inspection clones own transforms only. `weapons.setAttachments(id, config)`
 changes an owned, loaded weapon synchronously outside the frame loop.
@@ -431,7 +432,7 @@ follows the live mount. The mount commit resolves the sight datum, eye relief,
 `buildDef(id, config)` resolves suppression, optic ADS FOV/sensitivity (undefined
 defers to player config), ADS time and recoil from the authored `WeaponDef`.
 Attachment multipliers multiply across slots from the authored definition, never onto a
-previous build, and never change ballistics.
+previous build, and never change ballistics. Only the suppressor changes shot report/FX.
 `WeaponSystem` updates the gun's private definition in place (the viewmodel shares it)
 and rebuilds its recoil pattern. The market compares owned and draft definitions from
 the same resolver against the authored base.
@@ -441,8 +442,8 @@ Optics define `MOUNT_base` and `SOCKET_sight`; rigid attachments define
 `SOCKET_mount` plus `SOCKET_laser` or `SOCKET_muzzle`, in metres, -Z forward,
 +Y up, unit scale. Catalog `OpticData` owns magnification, sensitivity, reticle,
 glass and scope presentation, not weapon class. Mounting resolves the active bore
-exit (a can's endcap, else the weapon's `SOCKET_muzzle`) once; `viewmodel.muzzleWorld()`
-reads it for ballistics/FX; ejection stays at `SOCKET_ejection`. A can's endcap shares
+exit (fitted device, else the weapon's `SOCKET_muzzle`) once; `viewmodel.muzzleWorld()`
+reads it for ballistics/FX; ejection stays at `SOCKET_ejection`. Fitted exits share
 the `SOCKET_muzzle` name, so the weapon's own socket is held from load as
 `baseMuzzleSocket`, never looked up by name on a mounted rig.
 Prewarm covers every loaded attachment and both iron/muzzle hardware states.

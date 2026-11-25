@@ -2,7 +2,7 @@
  * zeroRange is the sight-line crossing; learned sightline recoil is separate from random spread.
  */
 
-import type { CanModel, MuzzleId, OpticId, RailId } from './attachment-rules.ts';
+import type { MuzzleId, MuzzleModel, OpticId, RailId } from './attachment-rules.ts';
 
 export const WEAPON_IDS = ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper', 'mcx'] as const;
 export type WeaponId = (typeof WEAPON_IDS)[number];
@@ -82,13 +82,13 @@ export interface WeaponDef {
   fits?: {
     optic?: Partial<Record<OpticId, { eyeRelief: number; railSlots?: number }>>;
     rail?: Partial<Record<RailId, Record<string, never>>>;
-    muzzle?: Partial<Record<MuzzleId, { model: CanModel }>>;
+    muzzle?: Partial<Record<MuzzleId, { model: MuzzleModel }>>;
   };
   /** Authored `IRON_sights` are hidden whenever an optic is mounted (an optional
    * `IRON_sights_removed` part replaces them); unset keeps fixed irons under an optic. */
   removableIrons?: true;
-  /** Authored `MUZZLE_device` is hidden whenever a can is mounted (an optional
-   * `MUZZLE_device_removed` part replaces it); unset keeps permanent muzzle hardware. */
+  /** A muzzle attachment hides `MUZZLE_device`. Only a suppressor reveals the optional
+   * `MUZZLE_device_removed` adapter; unset keeps permanent muzzle hardware. */
   removableMuzzleDevice?: true;
   sprintPos: TuningVector;
   sprintRot: TuningVector;
@@ -238,7 +238,10 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     // Bring the eye closer to open the rear aperture; its bore and aim datum stay authored.
     eyeRelief: 0.03,
     fits: {
-      muzzle: { suppressor: { model: 'srd762ti' } },
+      muzzle: {
+        suppressor: { model: 'srd762ti' },
+        m4_72: { model: 'm4_72' },
+      },
       optic: {
         ...OPTIC_FITS,
         // Forward rail slots clear the ocular from the charging hand; eye relief

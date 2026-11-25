@@ -45,10 +45,10 @@ export interface WeaponEntry {
   opticGroup: THREE.Group;
   railGroup: THREE.Group;
   muzzleGroup: THREE.Group;
-  /** The weapon's own `SOCKET_muzzle`, resolved before any can (whose endcap shares
-   * that name) is mounted. Never look the bore exit up by name afterwards. */
+  /** The weapon's own `SOCKET_muzzle`, resolved before mounting any muzzle device
+   * that shares the socket name. Never look the bore exit up by name afterwards. */
   readonly baseMuzzleSocket: THREE.Object3D;
-  /** Active bore exit: a mounted can's endcap, else `baseMuzzleSocket`. */
+  /** Active bore exit: the fitted device's exit, else `baseMuzzleSocket`. */
   muzzleSocket: THREE.Object3D;
   readonly ejectionSocket: THREE.Object3D;
   laserEmitter: THREE.Object3D | null;

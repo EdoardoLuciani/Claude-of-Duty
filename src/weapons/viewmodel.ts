@@ -554,7 +554,7 @@ export class Viewmodel {
     });
     // Adapters expose only detachable, cartridge-free magazine shells here.
     const parts = { magazine: animation.magazineBody };
-    // Before any can mounts: its endcap shares this name under MOUNT_muzzle.
+    // Before fitting a muzzle device: its exit shares this name under MOUNT_muzzle.
     const muzzleSocket = requiredNode(model.root, 'SOCKET_muzzle');
 
     const entry: WeaponEntry = {

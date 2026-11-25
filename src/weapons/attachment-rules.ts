@@ -4,10 +4,15 @@ import { WEAPON_DEFS, type WeaponDef, type WeaponId } from './defs.ts';
 export const OPTIC_IDS = ['railway', 'acog', 'scope', 'exps3'] as const;
 export type OpticId = (typeof OPTIC_IDS)[number];
 export type RailId = 'laser';
-export type MuzzleId = 'suppressor';
-/** Calibre-specific can models; each weapon's muzzle fit names the one it mounts. */
-export const CAN_MODELS = ['srd762ti', 'suppressor9mm', 'suppressor338', 'suppressor12g'] as const;
-export type CanModel = (typeof CAN_MODELS)[number];
+export type MuzzleId = 'suppressor' | 'm4_72';
+export const MUZZLE_MODELS = [
+  'srd762ti',
+  'suppressor9mm',
+  'suppressor338',
+  'suppressor12g',
+  'm4_72',
+] as const;
+export type MuzzleModel = (typeof MUZZLE_MODELS)[number];
 
 /** Null means the authored base weapon (`optic: null` aims through its irons). */
 export interface AttachmentConfig {
@@ -96,8 +101,11 @@ export const SLOTS = [
   'rail',
 ] as const satisfies readonly (keyof AttachmentConfig)[];
 
-/** The can model a weapon mounts for a muzzle id; null without a muzzle, undefined without that fit. */
-export function fittedCan(id: WeaponId, muzzle: MuzzleId | null): CanModel | null | undefined {
+/** The model a weapon mounts for a muzzle id; null for stock, undefined for no verified fit. */
+export function fittedMuzzleModel(
+  id: WeaponId,
+  muzzle: MuzzleId | null
+): MuzzleModel | null | undefined {
   return muzzle && WEAPON_DEFS[id].fits?.muzzle?.[muzzle]?.model;
 }
 
@@ -106,7 +114,7 @@ export function fittedCan(id: WeaponId, muzzle: MuzzleId | null): CanModel | nul
  * presentation live with their own data, not here. */
 const HANDLING: Record<
   NonNullable<AttachmentConfig[keyof AttachmentConfig]>,
-  { adsTime?: number; recoil?: number }
+  { adsTime?: number; recoil?: number; verticalRecoil?: number }
 > = {
   railway: {},
   exps3: { adsTime: 1.04 },
@@ -114,6 +122,7 @@ const HANDLING: Record<
   scope: { adsTime: 1.18 },
   // Can mass at the muzzle slows aiming; its gas trap softens every shot.
   suppressor: { adsTime: 1.08, recoil: 0.88 },
+  m4_72: { adsTime: 1.16, verticalRecoil: 0.68 },
   laser: {},
 };
 /** Kick magnitudes a recoil effect scales; spring, bracing and pattern shape stay authored. */
@@ -132,18 +141,22 @@ export function buildDef(id: WeaponId, config: AttachmentConfig): BuiltWeaponDef
   const optic = config.optic === null ? undefined : OPTICS[config.optic];
   let adsTime = base.adsTime;
   let recoilScale = 1;
+  let verticalScale = 1;
   for (const slot of SLOTS) {
     const attachment = config[slot];
     if (attachment === null) continue;
     const effect = HANDLING[attachment];
     adsTime *= effect.adsTime ?? 1;
     recoilScale *= effect.recoil ?? 1;
+    verticalScale *= effect.verticalRecoil ?? 1;
   }
   const recoil = { ...base.recoil };
   for (const key of RECOIL_MAGNITUDES) recoil[key] *= recoilScale;
+  recoil.pitch *= verticalScale;
+  recoil.kickUp *= verticalScale;
   return {
     ...base,
-    suppressed: config.muzzle !== null,
+    suppressed: config.muzzle === 'suppressor',
     adsFovScale: optic?.adsFovScale,
     adsSensScale: optic?.adsSensScale,
     adsTime,

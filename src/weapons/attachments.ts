@@ -7,14 +7,14 @@ import { isGroup, isMesh } from '../core/three-guards.ts';
 import { loadWeaponGLTF } from './asset-loader.ts';
 import { convertWeaponScene, type WeaponSceneMaterials } from './asset-material.ts';
 import {
-  CAN_MODELS,
-  fittedCan,
+  fittedMuzzleModel,
   isAttachmentConfig,
+  MUZZLE_MODELS,
   OPTIC_IDS,
   OPTICS,
   SLOTS,
   type AttachmentConfig,
-  type CanModel,
+  type MuzzleModel,
   type OpticId,
   type RailId,
 } from './attachment-rules.ts';
@@ -71,7 +71,7 @@ function makeOpticModel(
 type OpticModel = ReturnType<typeof makeOpticModel>;
 
 /** Owned rigid attachment with an authored `SOCKET_mount` origin and an output socket:
- * `SOCKET_laser` (TOR Mini beam emitter) or `SOCKET_muzzle` (can endcap bore exit). */
+ * `SOCKET_laser` (TOR Mini beam emitter) or `SOCKET_muzzle` (fitted bore exit). */
 function makeRigidAttachment(
   gltf: GLTF,
   output: string
@@ -90,9 +90,9 @@ function makeRigidAttachment(
 }
 type RigidAttachmentModel = ReturnType<typeof makeRigidAttachment>;
 
-/** Loaded assets keyed by optic/rail id or can model; a missing entry makes it unavailable. */
+/** Loaded assets keyed by optic/rail id or muzzle model; a missing entry makes it unavailable. */
 export type AttachmentAssets = Partial<
-  Record<OpticId, OpticModel> & Record<RailId | CanModel, RigidAttachmentModel>
+  Record<OpticId, OpticModel> & Record<RailId | MuzzleModel, RigidAttachmentModel>
 >;
 
 /** Load every attachment in parallel; a failure only makes that attachment unavailable. */
@@ -115,7 +115,7 @@ export async function loadAttachments(
       load(id, (gltf): OpticModel => makeOpticModel(gltf, id))
     ),
     load('laser', (gltf): RigidAttachmentModel => makeRigidAttachment(gltf, 'SOCKET_laser')),
-    ...CAN_MODELS.map((id): Promise<void> =>
+    ...MUZZLE_MODELS.map((id): Promise<void> =>
       load(id, (gltf): RigidAttachmentModel => makeRigidAttachment(gltf, 'SOCKET_muzzle'))
     ),
   ]);
@@ -128,11 +128,11 @@ export function hasAttachmentAssets(
   config: AttachmentConfig,
   assets: AttachmentAssets
 ): boolean {
-  const can = fittedCan(id, config.muzzle);
+  const muzzle = fittedMuzzleModel(id, config.muzzle);
   return (
     (config.optic === null || assets[config.optic] !== undefined) &&
     (config.rail === null || assets[config.rail] !== undefined) &&
-    (can === null || (can !== undefined && assets[can] !== undefined))
+    (muzzle === null || (muzzle !== undefined && assets[muzzle] !== undefined))
   );
 }
 
@@ -228,9 +228,9 @@ export function mountAttachments(
   const slots = opticId ? (WEAPON_DEFS[model.id].fits?.optic?.[opticId]?.railSlots ?? 0) : 0;
   opticSlot.group.position.z = -slots * PICATINNY_PITCH;
   const rail = stageMount(model, 'rail', config.rail, config.rail && assets[config.rail]);
-  // isAttachmentConfig guarantees a fitted can for any installed muzzle.
-  const can = fittedCan(model.id, config.muzzle) ?? null;
-  const muzzle = stageMount(model, 'muzzle', can, can && assets[can]);
+  // isAttachmentConfig guarantees a model for any installed muzzle attachment.
+  const muzzleModel = fittedMuzzleModel(model.id, config.muzzle) ?? null;
+  const muzzle = stageMount(model, 'muzzle', muzzleModel, muzzleModel && assets[muzzleModel]);
   const visuals = SLOTS.map((slot): SlotVisuals | undefined => slotVisuals(model, slot));
   let mountedOptic: WeaponEntry['mountedOptic'] = null;
   const sight = new THREE.Vector3().fromArray(model.nodes.sight);
@@ -255,7 +255,8 @@ export function mountAttachments(
     if (!nodes) continue;
     const fitted = config[slot] !== null;
     nodes.bare.visible = !fitted;
-    if (nodes.fitted) nodes.fitted.visible = fitted;
+    if (nodes.fitted)
+      nodes.fitted.visible = slot === 'muzzle' ? config.muzzle === 'suppressor' : fitted;
   }
   return {
     opticGroup: opticSlot.group,

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import * as THREE from 'three';
 
-import { BASE_ATTACHMENTS, OPTIC_IDS } from '../../src/weapons/attachment-rules.ts';
+import { BASE_ATTACHMENTS, buildDef, OPTIC_IDS } from '../../src/weapons/attachment-rules.ts';
 import type { WeaponEntry } from '../../src/weapons/runtime-types.ts';
 import type { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { fixture } from '../lib/fixture.ts';
@@ -362,6 +362,7 @@ Object.assign(weapons, {
     acog: opticAsset(),
     laser: rigidAsset('SOCKET_laser'),
     srd762ti: rigidAsset('SOCKET_muzzle'),
+    m4_72: rigidAsset('SOCKET_muzzle'),
   },
 });
 market.openShop();
@@ -394,6 +395,48 @@ market.cancelBuild();
 assert.equal(market.credits, 1350);
 assert.equal(weapons.getAttachments('rifle'), BASE_ATTACHMENTS);
 assert(!market.confirmBuild());
+
+const rifle = weaponState('rifle');
+const rifleBase = buildDef('rifle', BASE_ATTACHMENTS);
+const { pitch, yaw } = rifleBase.recoil;
+const riflePattern = rifle.pattern.slice();
+const rifleScene = entries.get('rifle')?.model.scene;
+const rifleMount = rifleScene?.getObjectByName('MOUNT_muzzle');
+const rifleStock = rifleScene?.getObjectByName('MUZZLE_device');
+assert(rifleScene && rifleMount && rifleStock);
+const adapter = Object.assign(new THREE.Object3D(), { name: 'MUZZLE_device_removed' });
+adapter.visible = false;
+rifleScene.add(adapter);
+
+const brake = { ...BASE_ATTACHMENTS, muzzle: 'm4_72' } as const;
+assert(market.beginBuild('pistol') && !market.setBuild(brake), 'no unverified brake fits');
+assert(market.beginBuild('rifle') && market.setBuild(brake));
+assert.equal(rifle.attachments.muzzle, null, 'draft never equips');
+const preview = buildDef('rifle', brake);
+assert(preview.recoil.pitch < pitch);
+assert.equal(preview.recoil.yaw, yaw);
+assert(preview.adsTime > rifleBase.adsTime);
+assert.equal(preview.damage, rifleBase.damage);
+assert.equal(preview.muzzleVelocity, rifleBase.muzzleVelocity);
+assert.equal(preview.suppressed, false);
+assert(market.confirmBuild());
+assert.equal(market.credits, 1050);
+assert.deepEqual(rifle.def, preview, 'market draft and gameplay share tuning');
+assert.equal(rifleMount.children.length, 1);
+assert(!rifleStock.visible && !adapter.visible, 'the brake does not use the can adapter');
+assert(Math.abs(rifle.pattern[0] / riflePattern[0] - preview.recoil.pitch / pitch) < 1e-6);
+assert.equal(rifle.pattern[1], riflePattern[1]);
+
+assert(market.setBuild({ ...BASE_ATTACHMENTS, muzzle: 'suppressor' }) && market.confirmBuild());
+assert.equal(rifleMount.children.length, 1, 'switching replaces rather than stacking a muzzle');
+assert(!rifleStock.visible && adapter.visible, 'the suppressor still uses its adapter');
+assert(market.setBuild(BASE_ATTACHMENTS) && market.confirmBuild());
+assert(rifleStock.visible && !adapter.visible);
+assert.deepEqual(rifle.def, rifleBase);
+assert.deepEqual(rifle.pattern, riflePattern);
+assert.equal(rifleMount.children.length, 0);
+market.credits = 1350;
+
 assert(market.beginBuild('lmg') && market.setBuild(redDotLaser));
 const hudBuild = market.getHudState().build;
 assert(hudBuild);
