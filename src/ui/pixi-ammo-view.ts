@@ -18,6 +18,9 @@ export class PixiAmmoView {
   readonly stage = new Container();
   private current: BitmapText;
   private reserve: BitmapText;
+  private next = new Container();
+  private nextFill = new Graphics().rect(0, -16, 10, 16).fill(INK);
+  private noSpare = new Graphics().moveTo(3, 20).lineTo(14, 3).stroke({ color: MUTED, width: 2 });
   private name: BitmapText;
   private mode: BitmapText;
   private prompt: BitmapText;
@@ -30,6 +33,7 @@ export class PixiAmmoView {
   dirty = true;
   private lastAmmo = -1;
   private lastReserve = -1;
+  private lastNext = -1;
   private lastMode: AmmoState['fireMode'] | null = null;
 
   constructor() {
@@ -42,6 +46,19 @@ export class PixiAmmoView {
     this.current.anchor.set(1, 1);
     this.reserve = this.text('/ 210', 131, 96, HUD_TYPE.secondary, MUTED);
     this.reserve.anchor.y = 1;
+    this.next.position.set(132, 64);
+    this.next.visible = false;
+    this.nextFill.position.set(3, 20);
+    this.next.addChild(
+      new Graphics()
+        .poly([0, 0, 15, 0, 15, 12, 19, 24, 5, 24, 0, 12])
+        .fill(0x111b22)
+        .stroke({ color: MUTED, width: 1.5 }),
+      this.nextFill,
+      this.noSpare,
+      hudText('NEXT', 26, 5, HUD_TYPE.label, MUTED)
+    );
+    this.stage.addChild(this.next);
     // Warnings/reload feedback live above the readout, not below the bottom bar.
     this.prompt = this.text('', WIDTH / 2, 4, HUD_TYPE.label, AMBER);
     this.prompt.anchor.x = 0.5;
@@ -70,7 +87,27 @@ export class PixiAmmoView {
       mode = s.fireMode ?? 'auto';
     // Build per-frame label strings only when their source value changes.
     if (ammo !== this.lastAmmo) this.label(this.current, String((this.lastAmmo = ammo)));
-    if (reserve !== this.lastReserve) this.label(this.reserve, `/ ${(this.lastReserve = reserve)}`);
+    const next = s.nextMagazine;
+    // Approximate the spare's fill; reserve the full silhouette for a full magazine.
+    const level =
+      next == null
+        ? -1
+        : next === 0
+          ? 0
+          : next >= mag
+            ? 4
+            : Math.max(1, Math.min(3, Math.round((4 * next) / mag)));
+    if (level !== this.lastNext) {
+      this.lastNext = level;
+      this.next.visible = level >= 0;
+      this.reserve.visible = level < 0;
+      this.noSpare.visible = level === 0;
+      this.nextFill.visible = level > 0;
+      this.nextFill.scale.y = Math.max(0, level) / 4;
+      this.dirty = true;
+    }
+    if (level < 0 && reserve !== this.lastReserve)
+      this.label(this.reserve, `/ ${(this.lastReserve = reserve)}`);
     this.label(this.name, s.weaponName ?? 'M4A1', 166);
     if (mode !== this.lastMode) this.label(this.mode, (this.lastMode = mode).toUpperCase());
     const color = ammo === 0 ? RED : ammo / mag <= 0.34 ? AMBER : INK;
@@ -86,7 +123,16 @@ export class PixiAmmoView {
       this.magFill.tint = color;
       this.dirty = true;
     }
-    this.label(this.prompt, reloading ? 'RELOADING' : ammo === 0 ? 'PRESS R TO RELOAD' : '');
+    this.label(
+      this.prompt,
+      reloading
+        ? 'RELOADING'
+        : ammo === 0
+          ? level === 0
+            ? 'NO SPARE MAG'
+            : 'PRESS R TO RELOAD'
+          : ''
+    );
     const alpha =
       !reloading && ammo === 0
         ? Math.round((0.55 + 0.45 * Math.abs(Math.sin((s.time ?? 0) * 3.8))) * 1000) / 1000

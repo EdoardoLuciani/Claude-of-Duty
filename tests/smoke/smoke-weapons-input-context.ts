@@ -52,7 +52,7 @@ interface WeaponHarness {
   player: PlayerSystem;
   shots: { live: number; fired: number; impacts: number };
 }
-function makeHarness(): WeaponHarness {
+function makeHarness(persistentMags = false): WeaponHarness {
   const input = new Input(fixture<HTMLCanvasElement>({}), { sensitivity: 1, invertY: false });
   input.pointerLocked = true;
   input._pollGamepad = (): void => {};
@@ -61,7 +61,7 @@ function makeHarness(): WeaponHarness {
       throw new Error(`weapons must not query raw ${method}`);
     };
   }
-  const wp = new ArmedWeaponSystem();
+  const wp = new ArmedWeaponSystem(persistentMags);
   wp.createGrenade = (): THREE.Mesh => new THREE.Mesh();
   const clips: string[] = [],
     prompts: Array<Parameters<UiSystem['setPrompt']>[0] & { owner: unknown }> = [],
@@ -214,6 +214,45 @@ for (const [primary, first, second] of [
   wp.resetForNewGame();
   assert.deepEqual(wp.weaponIds, ['rifle', 'pistol']);
   assert.equal(wp.activeId, 'rifle');
+}
+// Persistent magazines transfer once at the seating beat and stay with the M4.
+{
+  const { wp } = makeHarness(true);
+  const capacity = wp.current.magSize;
+  wp.state.reserve = capacity + 12;
+  wp.state.mag = 7;
+  const total = wp.ammo.total;
+  assert(wp.reload());
+  wp._onClipEvent('magout', 'reloadTac');
+  assert(wp.setWeaponImmediate('pistol'));
+  assert.equal(wp.getHudState().nextMagazine, null, 'sidearm still uses pooled ammo');
+  assert(wp.setWeaponImmediate('rifle'));
+  assert.equal(wp.ammo.total, total, 'swap before seating leaves both magazines unchanged');
+  assert.equal(wp.ammo.inMag, 7);
+
+  assert(wp.reload());
+  wp._onClipEvent('magin', 'reloadTac');
+  wp.viewmodel.stopClip();
+  assert.equal(wp.ammo.mag, capacity + 1, 'tactical reload keeps its chambered round');
+  assert.equal(wp.ammo.total, total, 'partial mag is retained, not duplicated or lost');
+  assert.equal(wp.getHudState().nextMagazine, 12, 'the fullest remaining spare is next');
+  assert(!wp.reload(), 'cannot swap down to a shorter magazine');
+
+  wp.state.mag = 0;
+  wp.state.chambered = false;
+  assert(wp.reload());
+  assert.equal(wp.viewmodel.clipName, 'reloadEmpty');
+  wp._onClipEvent('magin', 'reloadEmpty');
+  wp.viewmodel.stopClip();
+  assert.equal(wp.ammo.mag, 12, 'empty reload chambers one of the selected mag’s rounds');
+  assert.equal(wp.ammo.total, 19);
+  assert.equal(wp.getHudState().nextMagazine, 7, 'the retained partial can be used again');
+  assert.equal(wp.addReserve(5), 5);
+  assert.equal(wp.getHudState().nextMagazine, 12, 'pickups fill the fullest spare first');
+  wp.refillAmmo();
+  assert.equal(wp.ammo.reserve, wp.current.reserve);
+  assert.equal(wp.getHudState().nextMagazine, capacity);
+  assert.equal(wp.ammo.mag, 12, 'market refills spare stock, not the loaded magazine');
 }
 // Mounted laser switches belong to the gun, not the flashlight or active slot.
 {

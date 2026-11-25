@@ -117,7 +117,7 @@ async function bootSession(map: PlayableMap): Promise<void> {
     .add(WorldSystem)
     .add(PhysicsSystem)
     .add(PlayerSystem)
-    .add(WeaponSystem)
+    .add(WeaponSystem, survivalSystems && params.get('persistentMags') === '1')
     .add(FxSystem)
     .add(MarketSystem)
     .add(RadioSystem);

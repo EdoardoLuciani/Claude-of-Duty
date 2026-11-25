@@ -52,6 +52,13 @@ Survival.
 
 Open **Esc → Controls** for the full reference. If you die, choose **New Game** to try again.
 
+**Survival playtest:** Add `?persistentMags=1` to the game URL and keep the starting M4A1.
+Reloading saves the old magazine if it still has rounds and selects the fullest spare if it holds
+more than the current magazine. The `NEXT` icon replaces the reserve count and shows the spare's
+approximate fill; a crossed-out magazine means there is no spare. Pickups top up spare magazines
+starting with the fullest, and the market fills your spare stock. Remove the query parameter to
+play with pooled reserves.
+
 ## Run locally
 
 Install the Bun version in [`package.json`](package.json), **Blender 5.3.0** and

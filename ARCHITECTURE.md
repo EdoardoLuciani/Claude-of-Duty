@@ -337,8 +337,11 @@ consume that data without executing gameplay or rewriting calibration.
 against the schema. Key internal state by `WeaponId`; narrow DOM/URL/debug strings
 with `isWeaponId`. Adapter IDs and the loader table check complete per-ID coverage.
 `weapons.ammo` always returns a complete snapshot; `mag` includes
-the chamber, `inMag` excludes it. Preserve shared IK, ADS/sway/recoil and pooled
-casings. Weapons force physical materials and borrow source maps; arms use one
+the chamber, `inMag` excludes it. The opt-in Survival M4 playtest stores spare
+magazines fullest first and derives reserve rounds from them. The swap commits at
+`magin`, preserving a tactical reload's chambered round and returning any partial
+magazine to the spares. Preserve shared IK, ADS/sway/recoil and pooled casings.
+Weapons force physical materials and borrow source maps; arms use one
 opaque material per skeleton with packed texture arrays.
 
 `src/weapons/asset-loader.ts` fetches models concurrently, bounds parsing memory and

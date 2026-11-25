@@ -23,6 +23,8 @@ export interface WeaponState {
   mag: number;
   chambered: boolean;
   reserve: number;
+  /** Nonempty spare magazines, fullest first, for the Survival spike. */
+  spareMagazines?: number[] | undefined;
   mode: WeaponMode;
   modeIndex: number;
 }

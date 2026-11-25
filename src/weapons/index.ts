@@ -88,6 +88,7 @@ interface WeaponHudState {
   mode: WeaponMode;
   ammo: number;
   reserve: number;
+  nextMagazine: number | null;
   magSize: number;
   reloading: boolean;
   magazineOut: boolean;
@@ -262,6 +263,7 @@ export class WeaponSystem {
     mode: 'auto',
     ammo: 0,
     reserve: 0,
+    nextMagazine: null,
     magSize: 0,
     reloading: false,
     magazineOut: false,
@@ -275,7 +277,7 @@ export class WeaponSystem {
     crosshair: false,
   };
 
-  constructor() {
+  constructor(private readonly persistentMags = false) {
     for (let i = 0; i < 8; i++) {
       this._shellQueue.push({ t: -1, weapon: null });
     }
@@ -395,17 +397,44 @@ export class WeaponSystem {
 
   _makeState(id: WeaponId): WeaponState {
     const def = buildDef(id, BASE_ATTACHMENTS);
-    return {
+    const spareMagazines: number[] | undefined =
+      this.persistentMags && id === 'rifle' ? [] : undefined;
+    let pooledReserve = def.reserve;
+    const state: WeaponState = {
       def,
       attachments: BASE_ATTACHMENTS,
       laserEnabled: false,
       pattern: buildRecoilPattern(def, Rng),
       mag: def.magSize,
       chambered: true,
-      reserve: def.reserve,
+      spareMagazines,
+      get reserve(): number {
+        return spareMagazines?.reduce((sum, rounds): number => sum + rounds, 0) ?? pooledReserve;
+      },
+      set reserve(rounds: number) {
+        if (!spareMagazines) {
+          pooledReserve = rounds;
+          return;
+        }
+        let remaining = rounds - this.reserve;
+        if (remaining < 0) {
+          // A debug override replaces the stock; gameplay resupply only adds rounds.
+          spareMagazines.length = 0;
+          remaining = rounds;
+        }
+        // Top up existing spares from fullest first, then supply new mags.
+        for (let i = 0; remaining > 0; i++) {
+          const current = spareMagazines[i] ?? 0;
+          const added = Math.min(remaining, this.def.magSize - current);
+          spareMagazines[i] = current + added;
+          remaining -= added;
+        }
+      },
       mode: def.modes[0],
       modeIndex: 0,
     };
+    state.reserve = def.reserve;
+    return state;
   }
 
   /** Read-only market inspection; never mounts or animates the equipped model. */
@@ -665,13 +694,14 @@ export class WeaponSystem {
       return { mag: 0, inMag: 0, chambered: false, reserve: 0, magSize: 0, total: 0, empty: true };
     const mag = s.mag;
     const ch = s.chambered ? 1 : 0;
+    const reserve = s.reserve;
     return {
       mag: mag + ch,
       inMag: mag,
       chambered: s.chambered,
-      reserve: s.reserve,
+      reserve,
       magSize: s.def.magSize,
-      total: mag + ch + s.reserve,
+      total: mag + ch + reserve,
       empty: mag + ch === 0,
     };
   }
@@ -745,6 +775,7 @@ export class WeaponSystem {
     // The readout counts the chambered round but caps at magazine capacity.
     h.ammo = Math.min(a.mag, a.magSize);
     h.reserve = a.reserve;
+    h.nextMagazine = s.spareMagazines ? (s.spareMagazines[0] ?? 0) : null;
     h.magSize = a.magSize;
     h.reloading = this.reloading;
     // Only detachable magazines (and belt pouches) have out/in beats.
@@ -873,7 +904,7 @@ export class WeaponSystem {
     if (this.disabled || !s || this.reloading || this.switching || this.cycling || this.pumping)
       return false;
     if (this._hands.state !== 'weapon') return false;
-    if (s.reserve <= 0) return false;
+    if (s.spareMagazines ? (s.spareMagazines[0] ?? 0) <= s.mag : s.reserve <= 0) return false;
     if (s.chambered && s.mag >= s.def.magSize) return false;
     this.viewmodel.stopClip();
     const empty = !s.chambered && (s.mag === 0 || s.def.boltAction);
@@ -1112,9 +1143,11 @@ export class WeaponSystem {
           this._emitReload('magout');
         }
         break;
-      case 'magdrop':
-        if (isReload) this._dropMagazine();
+      case 'magdrop': {
+        const s = this.state;
+        if (isReload && (!s?.spareMagazines || s.mag === 0)) this._dropMagazine();
         break;
+      }
       case 'magin':
         if (isReload) {
           this._magazineOut = false;
@@ -1180,10 +1213,23 @@ export class WeaponSystem {
   _completeReload(empty: boolean): void {
     const s = this.state;
     if (!s) return;
-    const want = s.def.magSize - s.mag;
-    const take = Math.min(want, s.reserve);
-    s.reserve -= take;
-    s.mag += take;
+    const spares = s.spareMagazines;
+    if (spares) {
+      // Commit both sides of the swap at magin. Cancelling before it changes neither.
+      const next = spares[0] ?? 0;
+      if (next <= s.mag) return;
+      if (s.mag === 0) spares.shift();
+      else {
+        spares[0] = s.mag;
+        spares.sort((a, b): number => b - a);
+      }
+      s.mag = next;
+    } else {
+      const want = s.def.magSize - s.mag;
+      const take = Math.min(want, s.reserve);
+      s.reserve -= take;
+      s.mag += take;
+    }
     if (empty && !s.chambered && s.mag > 0) {
       s.mag--;
       s.chambered = true;
