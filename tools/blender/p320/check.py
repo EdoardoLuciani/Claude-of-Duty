@@ -17,8 +17,8 @@ def check_inspect_grip(end):
     frame = bpy.data.objects['Frame | continuous compact medium polymer shell']
     trigger = bpy.data.objects['Trigger | original curved blade']
     glove = bpy.data.objects['P320_right_Charcoal_woven_glove_skin']
-    digits = [(v.index, glove.vertex_groups[max(v.groups, key=lambda g: g.weight).group].name)
-              for v in glove.data.vertices if v.groups]
+    digits = [(v.index, bone) for v in glove.data.vertices if v.groups
+              if (bone := glove.vertex_groups[max(v.groups, key=lambda g: g.weight).group].name).startswith('finger_')]
     # Sample the one-handed presentation, not the blends to/from two-handed ready.
     for f in range(end // 10, end * 9 // 10, end // 10):
         s.frame_set(f)
@@ -27,8 +27,6 @@ def check_inspect_grip(end):
         muzzle = rig.matrix_world.to_3x3() @ Vector((0, 1, 0))
         on_trigger = False
         for i, bone in digits:
-            if not bone.startswith('finger_'):
-                continue
             p = evaluated.matrix_world @ evaluated.data.vertices[i].co
             hit, normal, _, _ = shell.find_nearest(p)
             assert (p - hit).dot(normal) > -.0007, (f, bone, 'finger through P320 frame/guard')

@@ -170,9 +170,7 @@ def author_actions(root,asset,rig,parts,mag,spare,slide,barrel,trigger,catch,rou
         clips[name]['events']=[{'time':28/60,'event':'magazine_out'},{'time':103/60,'event':'magazine_in'}]
         if empty_reload:clips[name]['events'].append({'time':129/60,'event':'bolt_forward'})
         finish(name,end)
-    # CS2 Glock-18 motion reference: see the P320 authoring README.
-    inspect_end=372
-    begin('Inspect',inspect_end)
+    begin('Inspect',372)
     for f,loc,rot in [
         (6,(0,-.010,-.010),(-4,0,2)),
         (17,(.039,-.068,.080),(10,5,46)),
@@ -210,7 +208,8 @@ def author_actions(root,asset,rig,parts,mag,spare,slide,barrel,trigger,catch,rou
     # Leave the grip outboard before the turn. While detached, key the wrist in
     # ready space so it drops below view instead of orbiting with the slide.
     left=ref['sides']['left']
-    x,y,z,w=left['quaternion'];lq=Quaternion((w,x,y,z))
+    lq=Quaternion((left['quaternion'][3],*left['quaternion'][:3]))
+    C4,CI4=C.to_4x4(),CI.to_4x4()
     loose=relaxed('left')
     pose('left',5,(-.060,-.059,.079))
     for f,pos,p in [
@@ -221,11 +220,11 @@ def author_actions(root,asset,rig,parts,mag,spare,slide,barrel,trigger,catch,rou
         (338,(-.105,-.128,.097),loose),
     ]:
         scene.frame_set(f)
-        unrotate=CI.to_4x4()@rig.matrix_basis.inverted()@C.to_4x4()
+        unrotate=CI4@rig.matrix_basis.inverted()@C4
         pose('left',f,unrotate@Vector(pos),unrotate.to_quaternion()@lq,p)
     pose('left',351,(-.065,-.065,.083))
     pose('left',365)
-    finish('Inspect',inspect_end)
+    finish('Inspect',372)
     for name,end,drawing in [('Draw',30,True),('Holster',24,False)]:
         begin(name,end)
         for f,k in ([(0,1),(8,.76),(21,.04),(30,0)] if drawing else [(0,0),(7,.08),(18,.80),(24,1)]):
