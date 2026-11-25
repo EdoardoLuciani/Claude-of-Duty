@@ -30,16 +30,31 @@ export function uiSound(
   const t0 = o.when ?? actx.currentTime;
   const out = gain(actx, 1);
   const lvl = o.level ?? 1;
+  const tone = (
+    type: OscillatorType,
+    frequency: number,
+    start: number,
+    stop: number,
+    level: number,
+    attack: number | null,
+    decay: number,
+    lowpass?: number,
+    q?: number
+  ): void => {
+    const source = osc(actx, type, frequency);
+    const g = gain(actx, 0);
+    const filter = lowpass === undefined ? null : biquad(actx, 'lowpass', lowpass, q);
+    source.connect(g);
+    if (filter) series(g, filter).connect(out);
+    else g.connect(out);
+    if (attack === null) hit(g.gain, start, level * lvl, decay);
+    else ad(g.gain, start, level * lvl, attack, decay);
+    source.start(start);
+    source.stop(stop);
+  };
   switch (kind) {
     case 'hitmarker': {
-      const o1 = osc(actx, 'square', 2400);
-      const g = gain(actx, 0);
-      const lp = biquad(actx, 'lowpass', 5200, 0.7);
-      o1.connect(g);
-      series(g, lp).connect(out);
-      hit(g.gain, t0, 0.55 * lvl, 0.022);
-      o1.start(t0);
-      o1.stop(t0 + 0.06);
+      tone('square', 2400, t0, t0 + 0.06, 0.55, null, 0.022, 5200, 0.7);
       break;
     }
     case 'headshot': {
@@ -58,13 +73,8 @@ export function uiSound(
     }
     case 'kill': {
       for (let i = 0; i < 3; i++) {
-        const o1 = osc(actx, 'triangle', 900 * Math.pow(1.5, i));
-        const g = gain(actx, 0);
-        o1.connect(g);
-        g.connect(out);
-        ad(g.gain, t0 + i * 0.055, 0.3 * lvl, 0.004, 0.09);
-        o1.start(t0 + i * 0.055);
-        o1.stop(t0 + i * 0.055 + 0.2);
+        const t = t0 + i * 0.055;
+        tone('triangle', 900 * Math.pow(1.5, i), t, t + 0.2, 0.3, 0.004, 0.09);
       }
       break;
     }
@@ -86,25 +96,9 @@ export function uiSound(
     }
     case 'market_buy': {
       // Shop tick: two-tone blip plus a wood drawer thunk.
-      const tick = (t: number, f: number, g0: number, decay: number): void => {
-        const o = osc(actx, 'square', f);
-        const gg = gain(actx, 0);
-        const lp = biquad(actx, 'lowpass', 4200, 0.8);
-        o.connect(gg);
-        series(gg, lp).connect(out);
-        ad(gg.gain, t, g0 * lvl, 0.003, decay);
-        o.start(t);
-        o.stop(t + decay + 0.05);
-      };
-      tick(t0, 620, 0.3, 0.05);
-      tick(t0 + 0.08, 930, 0.22, 0.07);
-      const thump = osc(actx, 'sine', 140);
-      const tg = gain(actx, 0);
-      thump.connect(tg);
-      tg.connect(out);
-      ad(tg.gain, t0, 0.22 * lvl, 0.004, 0.07);
-      thump.start(t0);
-      thump.stop(t0 + 0.14);
+      tone('square', 620, t0, t0 + 0.05 + 0.05, 0.3, 0.003, 0.05, 4200, 0.8);
+      tone('square', 930, t0 + 0.08, t0 + 0.08 + 0.07 + 0.05, 0.22, 0.003, 0.07, 4200, 0.8);
+      tone('sine', 140, t0, t0 + 0.14, 0.22, 0.004, 0.07);
       break;
     }
     case 'market_open': {
@@ -117,19 +111,8 @@ export function uiSound(
       g.connect(out);
       ad(g.gain, t0, 0.42 * lvl, 0.005, 0.14);
       src.start(t0, src._offset, 0.35);
-      const fifth = (t: number, f: number, g0: number): void => {
-        const o = osc(actx, 'triangle', f);
-        const og = gain(actx, 0);
-        const lp = biquad(actx, 'lowpass', 2400, 0.8);
-        o.connect(og);
-        og.connect(lp);
-        lp.connect(out);
-        ad(og.gain, t, g0 * lvl, 0.006, 0.18);
-        o.start(t);
-        o.stop(t + 0.32);
-      };
-      fifth(t0 + 0.1, 294, 0.16);
-      fifth(t0 + 0.2, 440, 0.12);
+      tone('triangle', 294, t0 + 0.1, t0 + 0.1 + 0.32, 0.16, 0.006, 0.18, 2400, 0.8);
+      tone('triangle', 440, t0 + 0.2, t0 + 0.2 + 0.32, 0.12, 0.006, 0.18, 2400, 0.8);
       break;
     }
     case 'market_close': {
@@ -155,14 +138,7 @@ export function uiSound(
       break;
     }
     case 'market_hover': {
-      const o = osc(actx, 'square', 1760);
-      const gg = gain(actx, 0);
-      const lp = biquad(actx, 'lowpass', 3600, 0.8);
-      o.connect(gg);
-      series(gg, lp).connect(out);
-      ad(gg.gain, t0, 0.12 * lvl, 0.002, 0.03);
-      o.start(t0);
-      o.stop(t0 + 0.06);
+      tone('square', 1760, t0, t0 + 0.06, 0.12, 0.002, 0.03, 3600, 0.8);
       break;
     }
     case 'market_deny': {
@@ -175,39 +151,20 @@ export function uiSound(
       ad(g.gain, t0, 0.32 * lvl, 0.005, 0.12);
       o1.start(t0);
       o1.stop(t0 + 0.24);
-      const o2 = osc(actx, 'sawtooth', 104);
-      const g2 = gain(actx, 0);
-      o2.connect(g2);
-      g2.connect(out);
-      ad(g2.gain, t0 + 0.1, 0.22 * lvl, 0.005, 0.12);
-      o2.start(t0 + 0.1);
-      o2.stop(t0 + 0.32);
+      tone('sawtooth', 104, t0 + 0.1, t0 + 0.32, 0.22, 0.005, 0.12);
       break;
     }
     case 'grenade_warn': {
       // Three rising beeps — reads as "danger", not as a notification.
       for (let i = 0; i < 3; i++) {
         const bt = t0 + i * 0.14;
-        const o1 = osc(actx, 'square', 1150 * Math.pow(1.19, i));
-        const lp = biquad(actx, 'lowpass', 4200, 0.8);
-        const g = gain(actx, 0);
-        o1.connect(g);
-        series(g, lp).connect(out);
-        ad(g.gain, bt, 0.3 * lvl, 0.004, 0.07);
-        o1.start(bt);
-        o1.stop(bt + 0.16);
+        tone('square', 1150 * Math.pow(1.19, i), bt, bt + 0.16, 0.3, 0.004, 0.07, 4200, 0.8);
       }
       break;
     }
     case 'radio_open': {
       // Physical switch/static are required recordings; retain the functional tone.
-      const o = osc(actx, 'square', 880);
-      const og = gain(actx, 0);
-      o.connect(og);
-      og.connect(out);
-      ad(og.gain, t0 + 0.11, 0.14 * lvl, 0.004, 0.06);
-      o.start(t0 + 0.11);
-      o.stop(t0 + 0.28);
+      tone('square', 880, t0 + 0.11, t0 + 0.28, 0.14, 0.004, 0.06);
       break;
     }
     case 'radio_denied': {
@@ -220,26 +177,14 @@ export function uiSound(
       ad(g.gain, t0, 0.4 * lvl, 0.006, 0.16);
       o1.start(t0);
       o1.stop(t0 + 0.32);
-      const o2 = osc(actx, 'sawtooth', 112);
-      const g2 = gain(actx, 0);
-      o2.connect(g2);
-      g2.connect(out);
-      ad(g2.gain, t0 + 0.14, 0.3 * lvl, 0.006, 0.14);
-      o2.start(t0 + 0.14);
-      o2.stop(t0 + 0.42);
+      tone('sawtooth', 112, t0 + 0.14, t0 + 0.42, 0.3, 0.006, 0.14);
       break;
     }
     case 'radio_strike': {
       // Recorded transmission texture is composed with these acknowledgment tones.
       for (let i = 0; i < 2; i++) {
         const bt = t0 + 0.16 + i * 0.13;
-        const o = osc(actx, 'square', 660 * Math.pow(1.35, i));
-        const og = gain(actx, 0);
-        o.connect(og);
-        og.connect(out);
-        ad(og.gain, bt, 0.26 * lvl, 0.004, 0.09);
-        o.start(bt);
-        o.stop(bt + 0.2);
+        tone('square', 660 * Math.pow(1.35, i), bt, bt + 0.2, 0.26, 0.004, 0.09);
       }
       break;
     }
@@ -282,34 +227,16 @@ export function uiSound(
       // Recorded receive texture is separate; keep all three useful rising beeps.
       for (let i = 0; i < 3; i++) {
         const bt = t0 + 0.08 + i * 0.16;
-        const o = osc(actx, 'square', 720 * Math.pow(1.28, i));
-        const og = gain(actx, 0);
-        o.connect(og);
-        og.connect(out);
-        ad(og.gain, bt, 0.7 * lvl, 0.004, 0.1);
-        o.start(bt);
-        o.stop(bt + 0.18);
+        tone('square', 720 * Math.pow(1.28, i), bt, bt + 0.18, 0.7, 0.004, 0.1);
       }
       break;
     }
     case 'lowhealth': {
-      const o1 = osc(actx, 'sine', 92);
-      const g = gain(actx, 0);
-      o1.connect(g);
-      g.connect(out);
-      ad(g.gain, t0, 0.45 * lvl, 0.05, 0.55);
-      o1.start(t0);
-      o1.stop(t0 + 0.9);
+      tone('sine', 92, t0, t0 + 0.9, 0.45, 0.05, 0.55);
       break;
     }
     default: {
-      const o1 = osc(actx, 'sine', 1200);
-      const g = gain(actx, 0);
-      o1.connect(g);
-      g.connect(out);
-      hit(g.gain, t0, 0.26 * lvl, 0.03);
-      o1.start(t0);
-      o1.stop(t0 + 0.08);
+      tone('sine', 1200, t0, t0 + 0.08, 0.26, null, 0.03);
     }
   }
   return { node: out, end: t0 + 0.9, send: 0 };
