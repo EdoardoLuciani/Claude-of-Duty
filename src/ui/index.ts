@@ -121,6 +121,7 @@ export class UiSystem {
 
   async init(ctx: UiContext): Promise<void> {
     this.ctx = ctx;
+    ctx.rng.fork(); // Keeps the seeds of systems that fork after the UI stable.
     installStyles();
 
     const host = document.getElementById('ui') ?? document.body;
@@ -279,6 +280,7 @@ export class UiSystem {
     });
 
     on('game:restart', (): void => {
+      this.shop.hide(); // The restart owner hands control back.
       this.banner.clear();
       this.killfeed.clear();
       this.arcs.clear();

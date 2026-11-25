@@ -376,6 +376,11 @@ export class AudioSystem {
       if (this.actx !== actx) return false;
       this.running = true;
       this.stats.started = true;
+      // The shop may have opened while the graph was loading.
+      if (this.ctx.peek('market')?.open) {
+        void tentRadio.start().catch((): void => {});
+        mixer.setShopMix(true);
+      }
       this.stats.contextState = actx.state;
       console.info(`[audio] online @ ${actx.sampleRate} Hz`);
       return true;

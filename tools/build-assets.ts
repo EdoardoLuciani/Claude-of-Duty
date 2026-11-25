@@ -202,7 +202,6 @@ function inputHash(step: AssetStep): string {
 let blenderChecked = false;
 function checkBlender(): void {
   if (blenderChecked) return;
-  blenderChecked = true;
   const result = spawnSync(BLENDER, ['--version'], { encoding: 'utf8' });
   if (result.error)
     throw new Error(
@@ -210,10 +209,10 @@ function checkBlender(): void {
         'BLENDER; use `bun run build:ci` for a code-only build.'
     );
   const version = result.stdout.split('\n')[0].trim();
+  // Cache stamps key on the pinned version, so another Blender must not write products.
   if (!version.startsWith(`Blender ${BLENDER_VERSION}`))
-    console.warn(
-      `[assets] expected Blender ${BLENDER_VERSION}, found ${version}; outputs may differ`
-    );
+    throw new Error(`[assets] expected Blender ${BLENDER_VERSION}, found ${version}`);
+  blenderChecked = true;
 }
 
 const run = ([command, ...args]: [string, ...string[]], stdio: StdioOptions): Promise<number> =>
