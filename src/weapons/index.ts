@@ -379,6 +379,12 @@ export class WeaponSystem {
       )
     );
     this._off.push(ctx.events.on('game:restart', (): void => this.resetForNewGame()));
+    // The shop suspends lateUpdate; shots already fired must not play with a later weapon.
+    this._off.push(
+      ctx.events.on('market:open', (): void => {
+        if (this._viewmodel) this._emitPendingShots(this._viewmodel);
+      })
+    );
 
     this.stats = { tris, drawCalls: 0, live: 0, fired: 0 };
     console.info(
@@ -1725,6 +1731,19 @@ export class WeaponSystem {
     return st.sprint ? base * SPREAD_MODS.sprinting : base;
   }
 
+  private _emitPendingShots(vm: ViewModel): void {
+    if (this._pendingShots === 0) return;
+    const def = this.current;
+    vm.muzzleWorld(this._firePayload.origin);
+    vm.boreDir(this._firePayload.dir);
+    if (def) this._firePayload.weapon = def;
+    for (let i = 0; i < this._pendingShots; i++) {
+      this._firePayload.seed = this._shotSeeds[i];
+      this.ctx.events.emit('weapon:fire', this._firePayload);
+    }
+    this._pendingShots = 0;
+  }
+
   lateUpdate(dt: number, ctx: EngineContext): void {
     const vm = this._viewmodel;
     if (!vm) return;
@@ -1734,17 +1753,7 @@ export class WeaponSystem {
     vm.update(dt, this._state);
 
     // ---- muzzle flash / audio, now that the pose is final ---------------
-    if (this._pendingShots > 0) {
-      const def = this.current;
-      vm.muzzleWorld(this._firePayload.origin);
-      vm.boreDir(this._firePayload.dir);
-      if (def) this._firePayload.weapon = def;
-      for (let i = 0; i < this._pendingShots; i++) {
-        this._firePayload.seed = this._shotSeeds[i];
-        ctx.events.emit('weapon:fire', this._firePayload);
-      }
-      this._pendingShots = 0;
-    }
+    this._emitPendingShots(vm);
 
     this.player?.applyFireVibe(vm.anchor);
 
