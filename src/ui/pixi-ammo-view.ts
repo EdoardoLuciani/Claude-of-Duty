@@ -129,7 +129,8 @@ export class PixiAmmoView {
   update(_dt: number, s: AmmoState): void {
     const mode = s.fireMode ?? 'auto';
     const spares = s.spareMagazines;
-    this.updateSpares(spares, s.magSize, s.magazineOut ? 0 : s.loadedRounds, !!s.tubeFed);
+    const loaded = s.magazineOut ? 0 : Math.max(s.loadedRounds, s.empty ? 0 : 1);
+    this.updateSpares(spares, s.magSize, loaded, !!s.tubeFed);
     this.label(this.name, s.weaponName ?? 'M4A1', 166);
     if (mode !== this.lastMode) this.label(this.mode, (this.lastMode = mode).toUpperCase());
     const reloading = !!s.reloading,

@@ -332,7 +332,6 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     modes: ['auto', 'semi'],
     // FN technical data sheet: free belt or MINIMI pouch — 100 or 200 rounds.
     magSize: 100,
-    // One spare 100-round pouch (keeps the 1.5x carry ratio of the 50/75 era).
     // 7.62x51 from the 406 mm barrel: heavier, slower and more penetrative.
     muzzleVelocity: 780,
     damage: 48,

@@ -220,8 +220,10 @@ try {
   frame();
   assert.equal(hud.ammo['lastLoadedLevel'], 4, 'a seated magazine fills before the clip ends');
   state.reloading = false;
-  state.empty = true;
   state.loadedRounds = 0;
+  frame();
+  assert.equal(hud.ammo['lastLoadedLevel'], 1, 'a chambered round still shows a loaded icon');
+  state.empty = true;
   frame();
   const empty = hud.draws;
   frame(0.1);

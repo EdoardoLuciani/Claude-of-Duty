@@ -1199,11 +1199,7 @@ export class WeaponSystem {
     }
   }
 
-  /**
-   * The chambered-round model: a tactical reload keeps the round in the chamber
-   * and gives you magSize+1; an empty reload has to feed one out of the fresh
-   * magazine, so you end up with exactly magSize.
-   */
+  /** A tactical reload keeps the chambered round; an empty reload feeds one from the spare. */
   _completeReload(empty: boolean): void {
     const s = this.state;
     if (!s) return;

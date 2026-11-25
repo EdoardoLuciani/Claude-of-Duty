@@ -263,7 +263,11 @@ export class UiSystem {
       }
     });
     on('ammo:pickup', (e): void => {
-      this.banner.show('Ammunition Recovered', `+1 FULL ${e.pack.toUpperCase()}`, 1.5);
+      this.banner.show(
+        'Ammunition Recovered',
+        e.replacedSpare ? 'Lowest spare replaced' : `+1 full ${e.pack}`,
+        1.5
+      );
       this.sfx('objective', 0.45);
     });
     on('intel:available', (e): void => {

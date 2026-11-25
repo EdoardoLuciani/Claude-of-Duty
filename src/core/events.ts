@@ -198,6 +198,7 @@ export interface EngineEventMap {
   'ammo:pickup': {
     amount: number;
     pack: 'magazine' | 'belt' | 'shell bundle';
+    replacedSpare: boolean;
     weapon: EventWeapon;
     position: Vector3;
   };

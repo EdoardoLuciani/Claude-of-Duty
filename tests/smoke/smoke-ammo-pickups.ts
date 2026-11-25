@@ -297,6 +297,7 @@ function matricesMatch(pickups: AmmoPickups): void {
   assert.equal(events[0].name, 'ammo:pickup');
   assert.equal(events[0].payload.amount, owner.current.magSize);
   assert.equal(events[0].payload.pack, 'magazine');
+  assert.equal(events[0].payload.replacedSpare, false);
   assert.equal(events[0].payload.weapon, owner.current);
   assert.equal(owner.current.id, 'rifle');
   assert(events[0].payload.position.equals(first.group.position));
@@ -321,6 +322,7 @@ function matricesMatch(pickups: AmmoPickups): void {
   assert.equal(prompts.at(-1)?.sub, 'Replace lowest spare · hold');
   assert.deepEqual(owner.state.spareMagazines, Array<number>(4).fill(capacity));
   assert.equal(events[0].payload.amount, capacity - 2);
+  assert.equal(events[0].payload.replacedSpare, true);
   assert.equal(pickups.items.length, 0);
   pickups.dispose();
 }

@@ -322,11 +322,12 @@ export class AmmoPickups {
         : state.def.id === 'lmg'
           ? 'belt'
           : 'magazine';
+    const replacedSpare = gain < state.def.magSize;
     this.ctx.peek('ui')?.setPrompt(
       {
         key: bindingLabel('use'),
         text: 'Resupply ammunition',
-        sub: gain < state.def.magSize ? 'Replace lowest spare · hold' : `+1 full ${pack} · hold`,
+        sub: replacedSpare ? 'Replace lowest spare · hold' : `+1 full ${pack} · hold`,
         progress: this._hold / HOLD_TIME,
       },
       'ammo'
@@ -342,6 +343,7 @@ export class AmmoPickups {
     this.ctx.events.emit('ammo:pickup', {
       amount: taken,
       pack,
+      replacedSpare,
       weapon: this.owner.current,
       position: point,
     });
