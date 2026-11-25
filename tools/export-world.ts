@@ -124,8 +124,7 @@ function cacheReady(out: string, map: PlayableMap, sourceHash: string): boolean 
       !isRecord(manifest) ||
       manifest.sourceHash !== sourceHash ||
       manifest.mapId !== map.id ||
-      !isRecord(manifest.assets) ||
-      typeof manifest.assets.minimap !== 'string'
+      !isRecord(manifest.assets)
     )
       return false;
     // The compiler decides which assets a map has; the validator below checks that set.

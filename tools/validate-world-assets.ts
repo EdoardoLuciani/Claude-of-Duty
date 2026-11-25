@@ -75,6 +75,13 @@ const fail = (message: string): number => errors.push(message);
 const finite = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value);
 
+/** Product names end in `.<first 12 hex of sha256(bytes)>.<ext>`, like the exporter's. */
+function checkContentHash(file: string, bytes: Uint8Array, kind: string, ext: string): void {
+  const hash = createHash('sha256').update(bytes).digest('hex').slice(0, 12);
+  if (!basename(file).endsWith(`.${hash}.${ext}`))
+    fail(`${kind} filename does not match its content hash: ${basename(file)}`);
+}
+
 function parseGlbGzip(file: string | null, kind: string): GlbAsset | null {
   if (!file) return null;
   if (!existsSync(file)) {
@@ -92,15 +99,7 @@ function parseGlbGzip(file: string | null, kind: string): GlbAsset | null {
     return null;
   }
 
-  const hashMatch = basename(file).match(/\.([a-f0-9]{12})\.glb\.gz$/);
-  if (!hashMatch) {
-    fail(`${kind} filename must contain a 12-character content hash: ${basename(file)}`);
-  } else {
-    const actual = createHash('sha256').update(compressed).digest('hex').slice(0, 12);
-    if (actual !== hashMatch[1]) {
-      fail(`${kind} filename hash is ${hashMatch[1]}, but its content hash is ${actual}`);
-    }
-  }
+  checkContentHash(file, compressed, kind, 'glb.gz');
 
   if (glb.length < 20 || glb.toString('ascii', 0, 4) !== 'glTF') {
     fail(`${kind} asset is not a binary glTF file`);
@@ -390,21 +389,11 @@ if (meta) {
 
 function validateMinimap(file: string | null, meta: WorldManifest | null): void {
   if (!file || !meta) return;
-  const { minimap, bounds } = meta;
-  if (
-    minimap.minX !== bounds.min[0] ||
-    minimap.maxX !== bounds.max[0] ||
-    minimap.minZ !== bounds.min[2] ||
-    minimap.maxZ !== bounds.max[2]
-  )
-    fail('minimap rectangle disagrees with the world bounds');
   try {
     const bytes = readFileSync(file);
-    const hash = createHash('sha256').update(bytes).digest('hex').slice(0, 12);
-    if (basename(file) !== `level-minimap.${hash}.png`)
-      fail(`minimap filename does not match its content hash: ${basename(file)}`);
+    checkContentHash(file, bytes, 'minimap', 'png');
     const image = PNG.sync.read(bytes);
-    const { width, height } = minimapSize(minimap);
+    const { width, height } = minimapSize(meta.bounds);
     if (image.width !== width || image.height !== height)
       fail(`minimap PNG dimensions must be ${width}×${height}`);
   } catch (error) {
@@ -429,15 +418,7 @@ async function parseNavGzip(
     fail(`nav asset is not a readable gzip stream: ${errorMessage(error)}`);
     return null;
   }
-  const hashMatch = basename(file).match(/\.([a-f0-9]{12})\.bin\.gz$/);
-  if (!hashMatch) {
-    fail(`nav filename must contain a 12-character content hash: ${basename(file)}`);
-  } else {
-    const actual = createHash('sha256').update(compressed).digest('hex').slice(0, 12);
-    if (actual !== hashMatch[1]) {
-      fail(`nav filename hash is ${hashMatch[1]}, but its content hash is ${actual}`);
-    }
-  }
+  checkContentHash(file, compressed, 'nav', 'bin.gz');
   try {
     const navigation = object(manifest.navigation);
     if (

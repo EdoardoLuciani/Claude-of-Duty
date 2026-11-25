@@ -23,11 +23,15 @@ export class RangeSystem {
   private queries!: EngineSystems['world']['queries'];
   private player!: EngineSystems['player'];
   private ui!: EngineSystems['ui'];
+  private weapons!: EngineSystems['weapons'];
+  private market!: EngineSystems['market'];
 
   init(ctx: EngineContext): void {
     this.queries = ctx.get('world').queries;
     this.player = ctx.get('player');
     this.ui = ctx.get('ui');
+    this.weapons = ctx.get('weapons');
+    this.market = ctx.get('market');
     const { course } = this.queries;
     if (!course.length) return;
     for (const [index, gate] of course.entries()) {
@@ -71,11 +75,11 @@ export class RangeSystem {
       const near =
         rangeStation &&
         (feet.x - rangeStation.x) ** 2 + (feet.z - rangeStation.z) ** 2 <= STATION_RADIUS ** 2;
-      if (near && !ctx.get('weapons').grenadeEquipped) {
+      if (near && !this.weapons.grenadeEquipped) {
         if (input.actionPressed('use')) {
           // The open market suspends gameplay, so update() cannot clear this later.
           ui.clearPrompt(PROMPT_OWNER);
-          ctx.get('market').openShop();
+          this.market.openShop();
         } else ui.setPrompt(STATION_PROMPT, PROMPT_OWNER);
         return;
       }

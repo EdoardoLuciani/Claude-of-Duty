@@ -292,7 +292,7 @@ export class UiSystem {
     const { PixiHud } = await import('./pixi-hud.ts');
     const { meta, minimapPng } = await ctx.get('models').worldPrefetch;
     this.pixiHud = await PixiHud.create(this.root, this.centreLayer, ctx.get('render').renderer);
-    await this.pixiHud.minimap.setTerrain(await minimapPng, meta.minimap);
+    await this.pixiHud.minimap.setTerrain(await minimapPng, meta.minimap, meta.bounds);
     this.pixiHud.resize(this.vw, this.vh, this.k);
   }
 

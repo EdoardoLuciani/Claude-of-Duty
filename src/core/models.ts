@@ -41,15 +41,14 @@ export class ModelSystem {
 
   async _prefetchWorld(): Promise<WorldPrefetch> {
     const base = [BASE, 'world', this.map.bundleDirectory].filter(Boolean).join('/');
-    const manifestResponse = await fetch(`${base}/level.json`, { cache: 'no-cache' });
-    if (!manifestResponse.ok) {
-      throw new Error(`[models] failed to load world manifest: HTTP ${manifestResponse.status}`);
-    }
-    const meta = parseWorldManifest(await manifestResponse.json());
+    const manifest = await this._fetch(`${base}/level.json`, { cache: 'no-cache' });
+    const meta = parseWorldManifest(await manifest.json());
     if (meta.mapId !== this.map.id)
       throw new Error(`[models] unexpected world manifest map ID at ${base}/level.json`);
     const { visual, collision, minimap, nav } = meta.assets;
-    const minimapPng = watch(this._loadMinimapPng(`${base}/${minimap}`));
+    const minimapPng = watch(
+      this._fetch(`${base}/${minimap}`).then((r): Promise<Blob> => r.blob())
+    );
     const [visualGlb, collisionGlb, navBytes] = await Promise.all([
       this._loadWorldGLB(`${base}/${visual}`),
       this._loadWorldGLB(`${base}/${collision}`),
@@ -58,10 +57,10 @@ export class ModelSystem {
     return { meta, visual: visualGlb, collision: collisionGlb, navBytes, minimapPng };
   }
 
-  async _loadMinimapPng(url: string): Promise<Blob> {
-    const response = await fetch(url);
+  async _fetch(url: string, init?: RequestInit): Promise<Response> {
+    const response = await fetch(url, init);
     if (!response.ok) throw new Error(`[models] failed to load ${url}: HTTP ${response.status}`);
-    return response.blob();
+    return response;
   }
 
   async _loadWorldBytes(url: string): Promise<ArrayBuffer> {
@@ -95,12 +94,6 @@ export class ModelSystem {
     });
   }
 
-  async _loadJSON(url: string): Promise<unknown> {
-    const r = await fetch(url);
-    if (!r.ok) throw new Error(`[models] failed to fetch ${url}: HTTP ${r.status}`);
-    return r.json();
-  }
-
   /**
    * @param {string} name  variant name ('vanguard' | 'irregular' | 'breacher')
    * @returns {Promise<object>} soldier record:
@@ -117,7 +110,7 @@ export class ModelSystem {
   async _loadSoldier(name: string): Promise<SoldierRecord> {
     const [gltf, metadata] = await Promise.all([
       this._loadGLB(`${BASE}/soldiers/${name}.glb`),
-      this._loadJSON(`${BASE}/soldiers/${name}.json`),
+      this._fetch(`${BASE}/soldiers/${name}.json`).then((r): Promise<unknown> => r.json()),
     ]);
 
     const meta = parseSoldierMetadata(metadata);

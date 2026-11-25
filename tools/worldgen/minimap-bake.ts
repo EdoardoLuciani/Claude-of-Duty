@@ -3,7 +3,7 @@ import { Matrix4, Vector3 } from 'three';
 import type { Box3 } from 'three';
 
 import { clamp01, lerp } from '../../src/core/math.ts';
-import type { WorldMinimap } from '../../src/core/model-metadata.ts';
+import type { WorldManifest, WorldMinimap } from '../../src/core/model-metadata.ts';
 import type { StaticWorld } from '../../src/physics/bvh.ts';
 import { makeHitRecord } from '../../src/physics/math.ts';
 import { MASK, surfaceIndex } from '../../src/physics/surfaces.ts';
@@ -19,12 +19,13 @@ const MASS_HI = [68, 79, 90];
 const WALL = [36, 45, 53];
 const SAND_SURFACE = surfaceIndex('sand');
 
-export function minimapSize({ minX, minZ, maxX, maxZ }: Omit<WorldMinimap, 'labels'>): {
+/** Pixel size of the minimap image covering the manifest's world bounds. */
+export function minimapSize({ min, max }: WorldManifest['bounds']): {
   width: number;
   height: number;
 } {
-  const spanX = maxX - minX,
-    spanZ = maxZ - minZ,
+  const spanX = max[0] - min[0],
+    spanZ = max[2] - min[2],
     ppm = LONG_EDGE / Math.max(spanX, spanZ);
   return {
     width: Math.max(1, Math.round(spanX * ppm)),
@@ -41,8 +42,11 @@ export function bakeMinimap(
   const { x: minX, z: minZ } = bounds.min,
     { x: maxX, z: maxZ } = bounds.max;
   if (minX >= maxX || minZ >= maxZ) throw new Error('[minimap bake] empty world rectangle');
-  const metadata: WorldMinimap = { minX, minZ, maxX, maxZ, labels: [] };
-  const { width, height } = minimapSize(metadata);
+  const metadata: WorldMinimap = { labels: [] };
+  const { width, height } = minimapSize({
+    min: bounds.min.toArray(),
+    max: bounds.max.toArray(),
+  });
   const image = new PNG({ width, height });
   const heights = new Float32Array(width * height).fill(-Infinity);
   const stepX = (maxX - minX) / width,
