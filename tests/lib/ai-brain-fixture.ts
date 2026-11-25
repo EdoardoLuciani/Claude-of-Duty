@@ -1,8 +1,10 @@
 import * as THREE from 'three';
 
+import { STATE, type Agent } from '../../src/ai/agent.ts';
 import { Animator } from '../../src/ai/animator.ts';
 import { AiSystem } from '../../src/ai/index.ts';
 import type { BakedCoverPoint } from '../../src/ai/nav-format.ts';
+import { CoverMap } from '../../src/ai/nav.ts';
 import { RIG } from '../../src/ai/rig.ts';
 import type { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
@@ -11,6 +13,7 @@ import { PhysicsSystem } from '../../src/physics/index.ts';
 import { Health } from '../../src/player/health.ts';
 import { PlayerSystem } from '../../src/player/index.ts';
 import { Movement } from '../../src/player/movement.ts';
+import { makeAgent, makeAi } from './agent-fixture.ts';
 import { createTestContext } from './context.ts';
 
 /** Presentation is inert in brain tests, but retains the actual animator state contract. */
@@ -31,6 +34,43 @@ export function brainPhysics(sight = true): PhysicsSystem {
   const physics = new PhysicsSystem();
   physics.lineOfSight = (): boolean => sight;
   return physics;
+}
+
+export function makeCombatAgent(
+  defaults: Partial<Agent>,
+  overrides: Partial<Agent>
+): { agent: Agent; cover: CoverMap } {
+  const ai = makeAi();
+  const phys = brainPhysics();
+  const cover = new CoverMap(null, phys);
+  ai.cover = cover;
+  const agent = makeAgent({
+    id: 1,
+    alive: true,
+    state: STATE.COMBAT,
+    stateTime: 2,
+    hasTarget: true,
+    lastKnownKind: 'visual',
+    wantFire: false,
+    desiredSpeed: 0,
+    health: 100,
+    hasGrenade: false,
+    grenadeCooldown: 99,
+    role: 'pin',
+    wrapWait: 0,
+    _wrapDone: true,
+    repathTimer: 5,
+    suppression: 0,
+    squad: null,
+    ai,
+    phys,
+    ...defaults,
+    ...overrides,
+  });
+  cover.protects = (): boolean => true;
+  cover.release = (): void => {};
+  if (overrides.cover) agent.coverPos.set(overrides.cover.x, overrides.cover.y, overrides.cover.z);
+  return { agent, cover };
 }
 
 export function coverPoint(over: Partial<BakedCoverPoint> = {}): BakedCoverPoint {
