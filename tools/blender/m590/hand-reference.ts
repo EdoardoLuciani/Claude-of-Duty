@@ -8,7 +8,9 @@ import * as THREE from 'three';
 import { Arm } from '../../../src/weapons/hands.ts';
 import {
   basis,
+  fitFinger,
   handPose,
+  snapshotFingers,
   type GripFrame,
   type Side,
   type HandSideReference,
@@ -27,62 +29,6 @@ const grips: Record<Side, GripFrame> = {
     back: [-0.473, -0.873, 0.12],
   },
 };
-function fitFinger(
-  arm: Arm,
-  i: number,
-  target: THREE.Vector3Tuple,
-  index = false,
-  surface: ((point: THREE.Vector3) => number) | null = null
-): void {
-  const f = arm.fingers[i],
-    point = new THREE.Vector3(),
-    goal = new THREE.Vector3(...target);
-  const patch = index
-    ? [0, -0.006 * arm.scale, -0.013 * arm.scale]
-    : [0, -arm._segRadius[i][3] * 1.05, -arm._segLength[i][2] * 0.5];
-  const limits = [
-    [-1.5, 0.2],
-    [-1.65, 0.1],
-    [-1.35, 0.1],
-    [-0.6, 0.6],
-  ];
-  arm.root.updateMatrixWorld(true);
-  for (let pass = 0; pass < 12; pass++)
-    for (let j = 0; j < 4; j++) {
-      const rotation = j < 3 ? f.joints[j].rotation : f.root.rotation,
-        axis = j < 3 ? 'x' : 'y';
-      const [lo, hi] = limits[j],
-        centre = rotation[axis],
-        radius = 0.1 * 2 ** (7 - pass);
-      let best = centre,
-        cost = Infinity;
-      for (let n = 0; n <= 48; n++) {
-        const angle =
-          pass < 7
-            ? lo + ((hi - lo) * n) / 48
-            : THREE.MathUtils.clamp(centre + radius * ((2 * n) / 48 - 1), lo, hi);
-        rotation[axis] = angle;
-        f.joints[2].updateWorldMatrix(true, false);
-        point.fromArray(patch).applyMatrix4(f.joints[2].matrixWorld);
-        const c = surface
-          ? surface(point) ** 2 + 0.015 * point.distanceToSquared(goal)
-          : point.distanceToSquared(goal);
-        if (c < cost) {
-          cost = c;
-          best = angle;
-        }
-      }
-      rotation[axis] = best;
-    }
-  f.joints[2].updateWorldMatrix(true, false);
-  point.fromArray(patch).applyMatrix4(f.joints[2].matrixWorld);
-  assert(
-    surface
-      ? surface(point) < 0.002 && point.distanceTo(goal) < 0.04
-      : point.distanceTo(goal) < 0.002,
-    `M590 finger ${i}: unreachable patch ${point.distanceTo(goal)}; got ${point.toArray().join(',')}, target ${target.join(',')}`
-  );
-}
 
 function measure(arm: Arm): {
   pads: THREE.Vector3Tuple[];
@@ -147,7 +93,7 @@ for (const side of ['right', 'left'] as const) {
   arm.setPose('m590');
   for (const [i, p] of measure(arm).pads.entries()) {
     if (i === 0) {
-      fitFinger(arm, i, [-0.001, 0.004, -0.457]);
+      fitFinger(arm, i, [-0.001, 0.004, -0.457], 'M590');
       continue;
     }
     const r = Math.hypot(p[0], p[1] - 0.0348);
@@ -159,14 +105,12 @@ for (const side of ['right', 'left'] as const) {
         0.0348 + ((p[1] - 0.0348) * 0.0225) / r,
         THREE.MathUtils.clamp(p[2], -0.49, -0.298),
       ],
+      'M590',
       false,
       (point): number => Math.abs(Math.hypot(point.x, point.y - 0.0348) - 0.0225)
     );
   }
-  handPose(arm, 'm590').fingers = arm.fingers.map((f): number[] =>
-    f.joints.map((j): number => -j.rotation.x)
-  );
-  handPose(arm, 'm590').fingerSpread = arm.fingers.map((f): number => f.root.rotation.y);
+  Object.assign(handPose(arm, 'm590'), snapshotFingers(arm));
   // Palmar pad, not just thumb-centre: fit to the tri-rail surface.
   const goal = new THREE.Vector3(-0.0223, 0.0378, -0.385);
   const centre = goal.clone().add(new THREE.Vector3(-0.006, 0.006, 0));
@@ -200,11 +144,8 @@ arm.fitToCylinder(arm.hand.position, arm.hand.quaternion, [0, -0.0281, 0], [0, 0
   poseName: 'shell',
 });
 for (const [i, z] of [-0.025, -0.042, -0.058, -0.073].entries())
-  fitFinger(arm, i, [0.0096, -0.0281, z]);
-handPose(arm, 'shell').fingers = arm.fingers.map((f): number[] =>
-  f.joints.map((j): number => -j.rotation.x)
-);
-handPose(arm, 'shell').fingerSpread = arm.fingers.map((f): number => f.root.rotation.y);
+  fitFinger(arm, i, [0.0096, -0.0281, z], 'M590');
+Object.assign(handPose(arm, 'shell'), snapshotFingers(arm));
 arm.fitGrip('shell', { thumb: [-0.0064, -0.034, -0.04], thumbPole: [-1, 0, 0] });
 arm.setPose('shell');
 const shell = {

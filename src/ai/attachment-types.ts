@@ -1,11 +1,12 @@
 import type { Vector3, Vector3Like } from 'three';
 
+import { isRecord } from '../core/guards.ts';
 import type { CharacterController } from '../physics/character.ts';
 import type { QuerySnapshot } from '../physics/query-snapshot.ts';
 import { MASK } from '../physics/surfaces.ts';
 import { LADDER, LADDER_MOTOR_VERSION, ladderMoveBudget } from './ladder.ts';
 import type { LadderDescriptor, LadderDirection, LadderCursor } from './ladder.ts';
-import { isRecord, isNumber, isNumberArray, parseFinitePoint } from './validation.ts';
+import { isNumber, isNumberArray, parseFinitePoint } from './validation.ts';
 
 export interface AttachmentOracle {
   physics: {

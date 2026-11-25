@@ -5,7 +5,7 @@ import type { SystemId, EngineContext, EngineSystems } from '../core/context.ts'
 import type { EngineEventMap, EngineEventName, EventWeapon } from '../core/events.ts';
 import { clamp } from '../core/math.ts';
 import type { Rng } from '../core/rng.ts';
-import type { SurfaceName } from '../physics/surfaces.ts';
+import type { FxStage } from '../dev/fx-stage.ts';
 import { Ambience } from './ambience.ts';
 import { loadFxAtlases, P, D } from './atlas.ts';
 import { DecalSystem } from './decals.ts';
@@ -38,7 +38,6 @@ export type FxContext = Pick<
   EngineContext,
   'scene' | 'viewScene' | 'camera' | 'viewCamera' | 'config' | 'time' | 'rng' | 'events' | 'peek'
 >;
-type DecalWorld = NonNullable<Parameters<DecalSystem['add']>[0]['world']>;
 type DecalOptions = Parameters<DecalSystem['add']>[0];
 /** Projection inputs and world/time bookkeeping belong to FX, not its callers. */
 export type FxDecalOptions = Partial<
@@ -47,18 +46,6 @@ export type FxDecalOptions = Partial<
   noFallback?: boolean;
   primaryImpact?: boolean;
 };
-interface FxTargetFrame {
-  point: THREE.Vector3;
-  normal: THREE.Vector3;
-  tangent: THREE.Vector3;
-  bitangent: THREE.Vector3;
-  surface: SurfaceName;
-  world: DecalWorld | null;
-  distance: number;
-  spanU: number;
-  spanV: number;
-}
-
 export class FxSystem {
   declare ctx: FxContext;
   declare rng: Rng;
@@ -106,16 +93,11 @@ export class FxSystem {
   declare _camPos: THREE.Vector3;
   declare _decalOpts: DecalOptions;
   declare _off: Array<() => void>;
-  declare _script: Array<{ t: number; fn: () => void }>;
-  declare _scriptTime: number;
-  declare _scriptPeriod: number;
+  _captureStage: FxStage | null = null;
   declare stats: { spawned: number; decals: number; live: number };
   declare _sunFactor: number;
   _sunW: { x: number; y: number; z: number } = { x: 0, y: 1, z: 0 };
   declare _suppressDecals: boolean;
-  declare _targetSupport: number | undefined;
-  declare _target: FxTargetFrame | undefined;
-  declare _probes: Float32Array | undefined;
   _warmScene: THREE.Scene | null = null;
   static readonly id = 'fx';
   static readonly deps: SystemId[] = ['render', 'materials'];
@@ -258,10 +240,7 @@ export class FxSystem {
     on('player:land', (e): void => this.onLand(e));
     on('player:footstep', (e): void => this.onFootstep(e));
 
-    // dev burst script
-    this._script = [];
-    this._scriptTime = 0;
-    this._scriptPeriod = 0;
+    this._captureStage?.clear();
 
     this.stats = { spawned: 0, decals: 0, live: 0 };
 
@@ -797,7 +776,7 @@ export class FxSystem {
     this._syncLighting(ctx);
     this.lights.update(dt);
     this.viewLights?.update(dt);
-    this._runScript(dt);
+    this._captureStage?.tick(dt);
     this.ambience.sunFactor = this._sunFactor;
     this.ambience.update(dt, this.now, ctx.camera);
   }
@@ -887,372 +866,6 @@ export class FxSystem {
     l.uniforms.uFog.value.copy(this._fog);
   }
 
-  /** Loop staged FX across the capture's ~90-frame settle window, retaining old
-   * decals/dust alongside fresh flashes instead of letting a single burst expire.
-   */
-  debugBurst(kind = 'wall'): { staged: string; at?: number[]; surface?: string } {
-    // 'none' stops a previously staged loop. The capture harness applies shots
-    // back to back in one session, so a burst staged for `impacts` would
-    // otherwise still be walking rounds across a wall during every later shot.
-    if (kind === 'none' || kind === 'clear' || kind === 'off') {
-      this._script.length = 0;
-      this._scriptTime = 0;
-      this._scriptPeriod = 0;
-      return { staged: 'none' };
-    }
-    this.now = this.ctx.time.elapsed;
-    const cam = this.ctx.camera;
-    cam.updateMatrixWorld();
-    this._camPos.setFromMatrixPosition(cam.matrixWorld);
-    const target = this._findTarget();
-    this._script.length = 0;
-    this._scriptTime = 0;
-    this._scriptPeriod = 1.56;
-
-    const rng = this.rng;
-    const at = (t: number, fn: () => void): number => this._script.push({ t, fn });
-
-    if (kind === 'explosion') {
-      // Two detonations per loop, half a period apart, so whenever the harness
-      // presses the shutter one of them is inside its first half second —
-      // fireball and shockwave rather than only the smoke afterwards.
-      this._scriptPeriod = 1.1;
-      const boom = (side: number): void => {
-        this._tmpA
-          .copy(target.point)
-          .addScaledVector(target.normal, 1.1)
-          .addScaledVector(target.tangent, side * 1.6);
-        this.explosion({ position: this._tmpA, radius: 3.6, damage: 120 });
-      };
-      at(0.02, (): void => boom(-1));
-      at(0.56, (): void => boom(1));
-      this._stageWallHits(at, target, 6, 0.1, 0.95);
-      return { staged: 'explosion', at: target.point.toArray() };
-    }
-
-    if (kind === 'muzzle') {
-      // Cyclic rate shorter than the flash lifetime: a flash is always lit.
-      this._scriptPeriod = 0.44;
-      for (let i = 0; i < 8; i++) {
-        const t = i * 0.055;
-        at(t, (): void => this._stageMuzzle());
-        if (i % 3 === 0) at(t + 0.01, (): void => this._stageShell());
-        if (i % 2 === 0) at(t + 0.004, (): void => this._stageTracer(target));
-      }
-      return { staged: 'muzzle' };
-    }
-
-    if (kind === 'combat' || kind === 'firefight') {
-      this._scriptPeriod = 1.6;
-      this._stageWallHits(at, target, 9, 0.04, 1.2);
-      at(1.3, (): void =>
-        this._impactAt(target, rng.signed() * 0.7, rng.range(-0.2, 0.5), 'metal')
-      );
-      at(1.42, (): void => this._impactAt(target, rng.signed() * 0.6, rng.range(-0.2, 0.5), null));
-      at(1.5, (): void =>
-        this._impactAt(target, rng.signed() * 0.5, rng.range(-0.1, 0.6), 'metal')
-      );
-      at(1.36, (): void => this._stageTracer(target));
-      at(1.44, (): void => this._stageCrossfire());
-      at(1.12, (): void => this._stageShell());
-      at(1.34, (): void => this._stageShell());
-      at(1.52, (): void => this._stageMuzzle());
-      return { staged: 'combat' };
-    }
-
-    // Impacts: walk sustained fire across a wall every 50 ms on a 0.9 s loop,
-    // retaining fresh sparks, expanding dust and accumulated decals at any grab phase.
-    this._scriptPeriod = 0.9;
-    // 50 ms cadence against a 75 ms flash: strictly shorter than the flash
-    // lifetime, so there is *always* a hot impact somewhere in the frame.
-    this._stageWallHits(at, target, 18, 0.0, 0.85);
-    console.info(
-      `[fx] burst target ${target.surface} at ${target.distance.toFixed(2)}m ` +
-        `n=(${target.normal.x.toFixed(2)},${target.normal.y.toFixed(2)},${target.normal.z.toFixed(2)}) ` +
-        `support=${this._targetSupport ?? -1} span=${target.spanU.toFixed(2)}x${target.spanV.toFixed(2)}`
-    );
-    at(0.3, (): void => this._stageCrossfire());
-    at(0.74, (): void => this._stageCrossfire());
-    at(0.18, (): void => this._stageShell());
-    at(0.52, (): void => this._stageShell());
-    return { staged: kind, at: target.point.toArray(), surface: target.surface };
-  }
-
-  _stageWallHits(
-    at: (time: number, fn: () => void) => number,
-    target: FxTargetFrame,
-    count: number,
-    t0: number,
-    t1: number
-  ): void {
-    const rng = this.rng;
-    for (let i = 0; i < count; i++) {
-      const f = i / Math.max(1, count - 1);
-      const t = t0 + (t1 - t0) * f;
-      // A gunner walking rounds across the wall: a broad sweep with a wobble,
-      // so the group reads as aimed fire rather than a scatter plot.
-      const su = Math.min(1.35, target.spanU * 0.88);
-      const sv = Math.min(0.36, target.spanV * 0.7);
-      const u = Math.sin(f * 3.9 + 0.4) * su + rng.signed() * su * 0.13;
-      const v = Math.cos(f * 2.4) * sv + rng.signed() * sv * 0.35;
-      const surf = i % 3 === 2 ? 'metal' : null;
-      at(t, (): void => this._impactAt(target, u, v, surf));
-    }
-  }
-
-  /** Fake a bullet:impact at an offset on the staged surface. */
-  _impactAt(
-    target: FxTargetFrame,
-    u: number,
-    v: number,
-    surfaceOverride?: SurfaceName | null
-  ): void {
-    this._p
-      .copy(target.point)
-      .addScaledVector(target.tangent, u)
-      .addScaledVector(target.bitangent, v);
-    this._n.copy(target.normal);
-    if (target.world && this.physics?.raycast) {
-      // Re-trace so the hit sits on the real surface (and picks up its normal
-      // and material) rather than on the plane through the first hit.
-      this._tmpA.copy(this._p).addScaledVector(this._n, 1.2);
-      this._tmpB.copy(this._n).multiplyScalar(-1);
-      const hit = this.physics.raycast(this._tmpA, this._tmpB, 2.6, this.physics.MASK.WORLD);
-      if (hit.hit) {
-        this._p.copy(hit.point);
-        this._n.copy(hit.normal);
-      }
-    }
-    this._d.copy(this._n).multiplyScalar(-1);
-    // give the incoming round a believable oblique angle
-    this._d.x += this.rng.signed() * 0.35;
-    this._d.y -= 0.18;
-    this._d.z += this.rng.signed() * 0.35;
-    this._d.normalize();
-    this._suppressDecals = target.world === null;
-    spawnImpact(this, this._p, this._n, this._d, surfaceOverride ?? target.surface, 1.15);
-    this._suppressDecals = false;
-  }
-
-  /** Stage view-space muzzle FX to match real first-person firing and reach viewFlash lighting.
-   * Use the weapon's muzzle transform; only FX-only scenes fall back to an eye-relative offset.
-   */
-  _stageMuzzle(): void {
-    const cam = this.ctx.camera;
-    cam.updateMatrixWorld();
-    const wp = this.ctx.peek('weapons');
-    let welded = false;
-    if (typeof wp?.muzzleWorld === 'function') {
-      wp.muzzleWorld(this._tmpA);
-      welded = this._tmpA.lengthSq() > 1e-6;
-    }
-    if (!welded) this._tmpA.set(0.16, -0.13, -0.72).applyMatrix4(cam.matrixWorld);
-    this._tmpB.set(0, 0, -1).transformDirection(cam.matrixWorld);
-    this.muzzleFlash({
-      position: this._tmpA,
-      direction: this._tmpB,
-      weapon: 'rifle',
-      view: true,
-    });
-  }
-
-  _stageShell(): void {
-    const cam = this.ctx.camera;
-    cam.updateMatrixWorld();
-    this._tmpA.set(0.2, -0.1, -0.45).applyMatrix4(cam.matrixWorld);
-    this._tmpB.set(this.rng.range(1.3, 2.1), this.rng.range(1.2, 2.0), this.rng.range(-0.4, 0.4));
-    this._tmpB.applyMatrix4(cam.matrixWorld).sub(cam.position);
-    this.spawnShell(this._tmpA, this._tmpB);
-  }
-
-  _stageTracer(target: FxTargetFrame): void {
-    const cam = this.ctx.camera;
-    this._tmpA.set(0.18, -0.12, -0.7).applyMatrix4(cam.matrixWorld);
-    const rng = this.rng;
-    this._tmpB
-      .copy(target.point)
-      .addScaledVector(target.tangent, rng.signed() * Math.min(1.2, target.spanU * 0.45))
-      .addScaledVector(target.bitangent, rng.signed() * Math.min(0.35, target.spanV * 0.4));
-    // Stop on the wall: soft-depth clipping hides the entire anchored quad as
-    // soon as its head passes behind the surface. The capture-only 100 ms
-    // flight keeps the incoming streak readable without inventing hidden
-    // lifetime.
-    this.tracer(this._tmpA, this._tmpB, 250, _stagedTracerOpts);
-  }
-
-  /** Incoming round crossing the frame — reads as a firefight, not a range. */
-  _stageCrossfire(): void {
-    const cam = this.ctx.camera;
-    const rng = this.rng;
-    this._tmpA
-      .set(rng.range(-14, -9), rng.range(-1.2, 1.4), rng.range(-16, -8))
-      .applyMatrix4(cam.matrixWorld);
-    this._tmpB
-      .set(rng.range(9, 15), rng.range(-1.4, 1.2), rng.range(-18, -9))
-      .applyMatrix4(cam.matrixWorld);
-    this.tracer(this._tmpA, this._tmpB, 280);
-  }
-
-  /** Surface name per probe hit; sized once, reused (see `_findTarget`). */
-  _probeSurf = new Array<SurfaceName>(63).fill('concrete');
-  _probeCount = 0;
-
-  _findTarget(): FxTargetFrame {
-    const cam = this.ctx.camera;
-    const t = (this._target ??= {
-      point: new THREE.Vector3(),
-      normal: new THREE.Vector3(),
-      tangent: new THREE.Vector3(),
-      bitangent: new THREE.Vector3(),
-      surface: 'concrete',
-      world: null,
-      distance: 0,
-      spanU: 3,
-      spanV: 1.2,
-    });
-    this._camPos.setFromMatrixPosition(cam.matrixWorld);
-    const ph = this.physics;
-    let best: Pick<FxTargetFrame, 'point' | 'normal' | 'surface' | 'distance'> | null = null;
-    let bestDist = Infinity;
-    if (ph?.raycast && ph.staticWorld.triCount > 0) {
-      // Dense 9x7 probes find facing walls rather than skipping to grazing props.
-      // Record hits, then score coplanar support so a broad wall beats a centred
-      // post or narrow pillar. Prefer targets in the 1.5-9 m screenshot band.
-      const probes = this._probes ?? (this._probes = new Float32Array(63 * 8));
-      let np = 0;
-      for (let i = 0; i < 63; i++) {
-        const yaw = ((i % 9) - 4) * 0.075;
-        const pitch = (Math.floor(i / 9) - 3) * 0.08;
-        this._tmpB.set(0, 0, -1).applyAxisAngle(_axisX, pitch).applyAxisAngle(_axisY, yaw);
-        this._tmpB.transformDirection(cam.matrixWorld);
-        const hit = ph.raycast(this._camPos, this._tmpB, 40, ph.MASK.WORLD);
-        if (!hit.hit) continue;
-        const d = hit.distance;
-        // A grazing hit on a thin prop makes a poor showcase.
-        const face = -this._tmpB.dot(hit.normal);
-        if (d < 1.2 || face < 0.3) continue;
-        const b = np * 8;
-        probes[b] = hit.point.x;
-        probes[b + 1] = hit.point.y;
-        probes[b + 2] = hit.point.z;
-        probes[b + 3] = hit.normal.x;
-        probes[b + 4] = hit.normal.y;
-        probes[b + 5] = hit.normal.z;
-        probes[b + 6] = d;
-        probes[b + 7] = Math.abs(d - 5) + (Math.abs(yaw) + Math.abs(pitch)) * 7 + (1 - face) * 3;
-        this._probeSurf[np] = hit.surface;
-        np++;
-      }
-      this._probeCount = np;
-      for (let i = 0; i < np; i++) {
-        const a = i * 8;
-        const nx = probes[a + 3];
-        const ny = probes[a + 4];
-        const nz = probes[a + 5];
-        const pd = probes[a] * nx + probes[a + 1] * ny + probes[a + 2] * nz;
-        let support = 0;
-        for (let j = 0; j < np; j++) {
-          if (j === i) continue;
-          const c = j * 8;
-          if (probes[c + 3] * nx + probes[c + 4] * ny + probes[c + 5] * nz < 0.96) continue;
-          const off = probes[c] * nx + probes[c + 1] * ny + probes[c + 2] * nz - pd;
-          if (off > -0.12 && off < 0.12) support++;
-        }
-        // Each co-planar neighbour is worth a metre of framing error: 6+ of them
-        // (a broad face) beats a perfectly centred sliver every time.
-        const score = probes[a + 7] - Math.min(support, 12) * 1.0;
-        if (score < bestDist) {
-          bestDist = score;
-          this._targetSupport = support;
-          best = best ?? {
-            point: new THREE.Vector3(),
-            normal: new THREE.Vector3(),
-            surface: 'concrete',
-            distance: 0,
-          };
-          best.point.set(probes[a], probes[a + 1], probes[a + 2]);
-          best.normal.set(nx, ny, nz);
-          best.surface = this._probeSurf[i];
-          best.distance = probes[a + 6];
-        }
-      }
-    }
-    // Real geometry always beats the virtual plane: decals at 20 m still read as
-    // bullet holes, a burst with no decals at all does not.
-    if (best && best.distance < 22) {
-      t.point.copy(best.point);
-      t.normal.copy(best.normal);
-      t.surface = best.surface;
-      t.world = ph?.staticWorld ?? null;
-      t.distance = best.distance;
-    } else {
-      // Nothing close enough to shoot: stage the burst on a virtual plane in
-      // front of the camera and skip decals (there is nothing to stick to).
-      this._tmpB.set(0, 0, -1).transformDirection(cam.matrixWorld);
-      t.point.copy(this._camPos).addScaledVector(this._tmpB, 3.2);
-      t.normal.copy(this._tmpB).multiplyScalar(-1);
-      t.surface = 'concrete';
-      t.world = null;
-      t.distance = 3.2;
-    }
-    // tangent frame on the surface, biased so 'up' on the wall is world up
-    this._tmpA.set(0, 1, 0);
-    if (Math.abs(t.normal.y) > 0.9) this._tmpA.set(1, 0, 0);
-    t.bitangent.copy(this._tmpA).addScaledVector(t.normal, -t.normal.dot(this._tmpA)).normalize();
-    t.tangent.crossVectors(t.bitangent, t.normal).normalize();
-
-    // Measure coplanar support in the surface frame to keep the staged burst
-    // on the selected face rather than spraying past narrow pillars.
-    t.spanU = 0.35;
-    t.spanV = 0.25;
-    const pr = this._probes;
-    if (pr && this._probeCount > 0 && t.world) {
-      const pd = t.point.dot(t.normal);
-      let uMin = 0;
-      let uMax = 0;
-      let vMin = 0;
-      let vMax = 0;
-      for (let i = 0; i < this._probeCount; i++) {
-        const b = i * 8;
-        if (pr[b + 3] * t.normal.x + pr[b + 4] * t.normal.y + pr[b + 5] * t.normal.z < 0.96)
-          continue;
-        const off = pr[b] * t.normal.x + pr[b + 1] * t.normal.y + pr[b + 2] * t.normal.z - pd;
-        if (off < -0.12 || off > 0.12) continue;
-        this._tmpA.set(pr[b], pr[b + 1], pr[b + 2]).sub(t.point);
-        const u = this._tmpA.dot(t.tangent);
-        const v = this._tmpA.dot(t.bitangent);
-        if (u < uMin) uMin = u;
-        if (u > uMax) uMax = u;
-        if (v < vMin) vMin = v;
-        if (v > vMax) vMax = v;
-      }
-      t.spanU = Math.max(0.35, Math.min(uMax, -uMin));
-      t.spanV = Math.max(0.25, Math.min(vMax, -vMin));
-    }
-    return t;
-  }
-
-  _runScript(dt: number): void {
-    if (!this._script.length) return;
-    const period = this._scriptPeriod;
-    const prev = this._scriptTime;
-    let now = prev + dt;
-    if (now < period) {
-      this._fire(prev, now);
-    } else {
-      // Fire the tail of this loop and the head of the next one, so a wrap
-      // never silently swallows the events that straddle it.
-      this._fire(prev, period);
-      now -= period;
-      this._fire(-1e-6, now);
-    }
-    this._scriptTime = now;
-  }
-
-  _fire(from: number, to: number): void {
-    for (const e of this._script) if (e.t > from && e.t <= to) e.fn();
-  }
-
   // Engine teardown disposes every system, even one whose init never ran or failed.
   /* oxlint-disable typescript/no-unnecessary-condition */
   dispose(): void {
@@ -1281,9 +894,5 @@ export class FxSystem {
   }
   /* oxlint-enable typescript/no-unnecessary-condition */
 }
-
-const _axisX = new THREE.Vector3(1, 0, 0);
-const _axisY = new THREE.Vector3(0, 1, 0);
-const _stagedTracerOpts = Object.freeze({ flightTime: 0.1 });
 
 const clampI = (v: number, a: number, b: number): number => Math.round(clamp(v, a, b));

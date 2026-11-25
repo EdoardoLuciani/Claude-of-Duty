@@ -26,7 +26,12 @@ import { Squad } from '../../src/ai/squad.ts';
 import { COMBAT } from '../../src/ai/tuning.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
 import { makeAgent, makeAi } from '../lib/agent-fixture.ts';
-import { midpointRng, brainPhysics, brainAnimator, coverPoint } from '../lib/ai-brain-fixture.ts';
+import {
+  midpointRng,
+  brainAnimator,
+  makeCombatAgent,
+  coverPoint,
+} from '../lib/ai-brain-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
 import { FRAME_SOURCES } from '../lib/frame-sources.ts';
 import { testNav } from '../lib/test-nav.ts';
@@ -42,68 +47,44 @@ const DT = 1 / 60;
 const rng = midpointRng();
 
 function stubAgent(over: Partial<Agent> = {}): Agent {
-  const ai = makeAi();
-  const phys = brainPhysics();
-  const cover = new CoverMap(null, phys);
-  ai.cover = cover;
-  const a = makeAgent({
-    id: 1,
-    alive: true,
-    state: STATE.COMBAT,
-    stateTime: 2,
-    hasTarget: true,
-    targetVisible: true,
-    // Navigation wait contracts apply outside the new close-defense interrupt.
-    lastKnown: new THREE.Vector3(0, 1.1, -10),
-    lastKnownAge: 0.2,
-    lastKnownKind: 'visual',
-    position: new THREE.Vector3(0, 0, 10),
-    yaw: Math.PI,
-    targetYaw: Math.PI,
-    peekTimer: 9,
-    wantFire: false,
-    crouch: false,
-    aimWeight: 1,
-    desiredSpeed: 0,
-    speed: 0,
-    aimTarget: new THREE.Vector3(0, 1.1, -10),
-    health: 100,
-    weaponRange: COMBAT.viewRange,
-    fireRate: COMBAT.fireRate,
-    spread: 0,
-    magSize: 30,
-    ammo: 30,
-    burstLeft: 0,
-    fireCooldown: 0,
-    burstCooldown: 0,
-    suppression: 0,
-    hasGrenade: false,
-    grenadeCooldown: 99,
-    role: 'pin',
-    wrapWait: 0,
-    _wrapDone: true,
-    repathTimer: 5,
-    eyeHeight: 1.62,
-    squad: null,
-    rng,
-    ctx: createTestContext(),
-    ai,
-    phys,
-    animator: brainAnimator({
-      muzzleWorld: new THREE.Vector3(0.15, 1.42, 10),
-      muzzleDir: new THREE.Vector3(0, 0, -1),
-    }),
-    ...over,
-  });
+  const { agent: a, cover } = makeCombatAgent(
+    {
+      targetVisible: true,
+      // Navigation wait contracts apply outside the new close-defense interrupt.
+      lastKnown: new THREE.Vector3(0, 1.1, -10),
+      lastKnownAge: 0.2,
+      position: new THREE.Vector3(0, 0, 10),
+      yaw: Math.PI,
+      targetYaw: Math.PI,
+      peekTimer: 9,
+      crouch: false,
+      aimWeight: 1,
+      speed: 0,
+      aimTarget: new THREE.Vector3(0, 1.1, -10),
+      weaponRange: COMBAT.viewRange,
+      fireRate: COMBAT.fireRate,
+      spread: 0,
+      magSize: 30,
+      ammo: 30,
+      burstLeft: 0,
+      fireCooldown: 0,
+      burstCooldown: 0,
+      eyeHeight: 1.62,
+      rng,
+      ctx: createTestContext(),
+      animator: brainAnimator({
+        muzzleWorld: new THREE.Vector3(0.15, 1.42, 10),
+        muzzleDir: new THREE.Vector3(0, 0, -1),
+      }),
+    },
+    over
+  );
 
   cover.pick = (): null => null;
-  cover.protects = (): boolean => true;
-  cover.release = (): void => {};
   cover.peekOffset = (c, _t, _e, out): number => {
     out.copy(a.coverPos);
     return 0;
   };
-  if (over.cover) a.coverPos.set(over.cover.x, over.cover.y, over.cover.z);
   a.ai.agents = [a];
   return a;
 }

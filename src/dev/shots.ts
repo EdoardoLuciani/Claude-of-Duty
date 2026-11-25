@@ -1,9 +1,12 @@
 import * as THREE from 'three';
 
+import type { AiStats } from '../ai/index.ts';
 import type { Engine } from '../core/engine.ts';
 import type { WeaponSystem } from '../weapons/index.ts';
 import type { ViewModel } from '../weapons/viewmodel.ts';
+import { stageAi } from './ai-stage.ts';
 import { field } from './diagnostic-values.ts';
+import { stageFxBurst } from './fx-stage.ts';
 import { rendererCounters } from './render-info.ts';
 
 type ShotOptions = NonNullable<Parameters<WeaponSystem['debugPose']>[1]>;
@@ -195,8 +198,10 @@ export const SHOTS: Record<string, ShotDefinition> = {
     look: [-6, 1.7, -4],
     fov: 80,
     time: 16.5,
-    apply: (e): import('../ai/index.ts').AiStats | undefined =>
-      e.ctx.peek('ai')?.debugStage('firefight'),
+    apply: (e): AiStats | undefined => {
+      const ai = e.ctx.peek('ai');
+      return ai ? stageAi(ai, 'firefight') : undefined;
+    },
     doc: 'Enemies mid-firefight — character quality, animation, impact FX.',
   },
   impacts: {
@@ -207,8 +212,10 @@ export const SHOTS: Record<string, ShotDefinition> = {
     look: [-1.8, 1.5, 9.0],
     fov: 60,
     time: 16.5,
-    apply: (e): { staged: string; at?: number[]; surface?: string } | undefined =>
-      e.ctx.peek('fx')?.debugBurst('wall'),
+    apply: (e): ReturnType<typeof stageFxBurst> | undefined => {
+      const fx = e.ctx.peek('fx');
+      return fx ? stageFxBurst(fx, 'wall') : undefined;
+    },
     doc: 'Bullet impacts on a wall — decals, debris, dust puffs, sparks.',
   },
 };
@@ -301,7 +308,8 @@ export function installShotApi(
     // previous shot's looping debug state before staging the next one.
     engine.ctx.peek('weapons')?.debugPose('idle');
     engine.ctx.peek('radio')?.clearStrike();
-    engine.ctx.peek('fx')?.debugBurst('none');
+    const fx = engine.ctx.peek('fx');
+    if (fx) stageFxBurst(fx, 'none');
 
     if (shot.time !== undefined) engine.ctx.peek('sky')?.setTimeOfDay(shot.time);
     shot.apply?.(engine, readShotOptions(options));

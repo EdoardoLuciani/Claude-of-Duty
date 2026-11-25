@@ -27,6 +27,7 @@ import {
   brainAi,
   brainPhysics,
   brainAnimator,
+  makeCombatAgent,
   coverPoint,
 } from '../lib/ai-brain-fixture.ts';
 import { NativeWorker } from '../lib/attachment-worker-fixture.ts';
@@ -67,55 +68,31 @@ function fireAt(
 }
 
 function stubAgent(over: Partial<Agent> = {}): Agent {
-  const ai = fixtureAi();
-  const phys = brainPhysics();
-  const cover = new CoverMap(null, phys);
-  ai.cover = cover;
-  const a = makeAgent({
-    id: 1,
-    alive: true,
-    state: STATE.COMBAT,
-    stateTime: 2,
-    hasTarget: true,
-    targetVisible: false,
-    lastKnown: new THREE.Vector3(0, 1, 12),
-    lastKnownAge: 0.3,
-    lastKnownKind: 'visual',
-    position: new THREE.Vector3(),
-    cover: coverPoint({ x: 0, y: 0, z: 0, dx: 0, dz: 1, high: false }),
-    peekTimer: 0,
-    wantFire: false,
-    crouch: true,
-    aimWeight: 0,
-    desiredSpeed: 0,
-    health: 100,
-    weaponRange: 80,
-    hasGrenade: false,
-    grenadeCooldown: 99,
-    role: 'pin',
-    wrapWait: 0,
-    _wrapDone: true,
-    repathTimer: 5,
-    suppression: 0,
-    eyeHeight: 1.5,
-    squad: null,
-    rng,
-    ai,
-    phys,
-    animator: brainAnimator({
-      muzzleWorld: new THREE.Vector3(0.95, 1.4, 0.2),
-    }),
-    ...over,
-  });
+  const { agent: a, cover } = makeCombatAgent(
+    {
+      targetVisible: false,
+      lastKnown: new THREE.Vector3(0, 1, 12),
+      lastKnownAge: 0.3,
+      position: new THREE.Vector3(),
+      cover: coverPoint({ x: 0, y: 0, z: 0, dx: 0, dz: 1, high: false }),
+      peekTimer: 0,
+      crouch: true,
+      aimWeight: 0,
+      weaponRange: 80,
+      eyeHeight: 1.5,
+      rng,
+      animator: brainAnimator({
+        muzzleWorld: new THREE.Vector3(0.95, 1.4, 0.2),
+      }),
+    },
+    over
+  );
 
   cover.pick = (): BakedCoverPoint | null => a.cover;
-  cover.protects = (): boolean => true;
-  cover.release = (): void => {};
   cover.peekOffset = (c, _t, _e, out): number => {
     out.set(c.x + 0.95, c.y, c.z);
     return 1;
   };
-  if (over.cover) a.coverPos.set(over.cover.x, over.cover.y, over.cover.z);
   return a;
 }
 

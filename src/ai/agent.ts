@@ -20,7 +20,13 @@ import { INFANTRY, vaultPoint } from './capabilities.ts';
 import type { AiSystem } from './index.ts';
 import type { AiVariant } from './index.ts';
 import { isBannedCover, FRIENDLY_HOLD, GRENADE_CLOSE_SPEED, LONG_RANGE } from './intent.ts';
-import { LADDER, LadderMotor, ladderMoveBudget } from './ladder.ts';
+import {
+  LADDER,
+  LadderMotor,
+  ladderMoveBudget,
+  ladderPhase,
+  ladderTraversalPoint,
+} from './ladder.ts';
 import type { LadderDescriptor, LadderCursor } from './ladder.ts';
 import type { BakedCoverPoint } from './nav-format.ts';
 import type { CoverMap, NavCache, SurfaceNav, NavRoute, NavLadderStep } from './nav.ts';
@@ -338,20 +344,25 @@ export class Agent {
   _failWait: number = 0;
   _failStreak: number = 0;
   _holdMove: boolean = false;
-  declare lodIrrelevant: boolean;
-  declare _animSkip: number;
-  declare _animAccum: number;
-  declare _v: THREE.Vector3;
-  declare _v2: THREE.Vector3;
-  declare _v3: THREE.Vector3;
-  declare _eye: THREE.Vector3;
-  declare _dir: THREE.Vector3;
-  declare _steer: THREE.Vector3;
-  declare _boneA: THREE.Vector3;
-  declare _boneB: THREE.Vector3;
-  declare _muzzleDir: THREE.Vector3;
-  declare _stepPayload: EngineEventMap['ai:footstep'];
-  declare clip: string;
+  /** set by AiSystem._updateRelevance: nothing this actor does reaches a pixel */
+  lodIrrelevant: boolean = false;
+  _animSkip: number = 0;
+  _animAccum: number = 0;
+  _v: THREE.Vector3 = new THREE.Vector3();
+  _v2: THREE.Vector3 = new THREE.Vector3();
+  _v3: THREE.Vector3 = new THREE.Vector3();
+  _eye: THREE.Vector3 = new THREE.Vector3();
+  _dir: THREE.Vector3 = new THREE.Vector3();
+  _steer: THREE.Vector3 = new THREE.Vector3();
+  _boneA: THREE.Vector3 = new THREE.Vector3();
+  _boneB: THREE.Vector3 = new THREE.Vector3();
+  _muzzleDir: THREE.Vector3 = new THREE.Vector3();
+  _stepPayload: EngineEventMap['ai:footstep'] = {
+    position: new THREE.Vector3(),
+    surface: 'concrete',
+    gait: 'walk',
+  };
+  clip: string = 'idle';
   declare _searchPending: boolean;
   _searchGeometry: Float64Array = new Float64Array(24);
   declare _searchGeometryCount: number;
@@ -483,25 +494,6 @@ export class Agent {
     this._recoveryOrigin = this.position.clone();
     this._safePosition = this.position.clone();
     this._clearSearch();
-
-    /** set by AiSystem._updateRelevance: nothing this actor does reaches a pixel */
-    this.lodIrrelevant = false;
-    this._animSkip = 0;
-    this._animAccum = 0;
-
-    this._v = new THREE.Vector3();
-    this._v2 = new THREE.Vector3();
-    this._v3 = new THREE.Vector3();
-    this._eye = new THREE.Vector3();
-    this._dir = new THREE.Vector3();
-    this._steer = new THREE.Vector3();
-    this._boneA = new THREE.Vector3();
-    this._boneB = new THREE.Vector3();
-    this._muzzleDir = new THREE.Vector3();
-
-    this._stepPayload = { position: new THREE.Vector3(), surface: 'concrete', gait: 'walk' };
-
-    this.clip = 'idle';
   }
 
   get _coverMap(): CoverMap {
@@ -2053,9 +2045,8 @@ export class Agent {
     const c = this.controller;
     if (!c) return false;
     for (let segment = 0; segment < 3; segment++) {
-      const i = l.step.direction === 'up' ? segment : 3 - segment;
-      const a = l.descriptor.points[i],
-        b = l.descriptor.points[l.step.direction === 'up' ? i + 1 : i - 1];
+      const a = ladderTraversalPoint(l.descriptor, l.step.direction, segment),
+        b = ladderTraversalPoint(l.descriptor, l.step.direction, segment + 1);
       const dx = b.x - a.x,
         dy = b.y - a.y,
         dz = b.z - a.z;
@@ -2219,8 +2210,7 @@ export class Agent {
       !l.hold && !l.finished,
       l.travel,
       l.step.direction,
-      l.motor?.phase ??
-        (l.cursor.segment === 1 ? 'shaft' : l.cursor.segment === 2 ? 'dismount' : 'align')
+      l.motor?.phase ?? ladderPhase(l.cursor.segment) ?? 'align'
     );
   }
 

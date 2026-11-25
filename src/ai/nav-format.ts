@@ -2,9 +2,10 @@
 // Kept separate from the WASM module so invalid assets fail before native import.
 import type { Vector3Like } from 'three';
 
+import { isRecord } from '../core/guards.ts';
 import { INFANTRY } from './capabilities.ts';
 import { LADDER, LADDER_MOTOR_VERSION, type LadderDescriptor } from './ladder.ts';
-import { isRecord, isNumberArray, parseFinitePoint } from './validation.ts';
+import { isNumberArray, parseFinitePoint } from './validation.ts';
 export const NAV_VERSION = 2;
 export const NAV_LADDER_FLAG = 2,
   NAV_LINK_RADIUS = 0.7;

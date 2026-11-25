@@ -4,6 +4,7 @@ import { MeshBasicNodeMaterial } from 'three/webgpu';
 import type { Node, UniformNode } from 'three/webgpu';
 
 import { Spring, TAU, clamp, clamp01, damp, lerp, smootherstep } from '../core/math.ts';
+import { isMesh } from '../core/three-guards.ts';
 import { loadArmAsset } from './arm-asset.ts';
 import type { AttachmentConfig } from './attachment-rules.ts';
 import {
@@ -1493,7 +1494,3 @@ export class Viewmodel {
 }
 
 export type ViewModel = Viewmodel;
-
-function isMesh(object: THREE.Object3D): object is THREE.Mesh {
-  return 'isMesh' in object && object.isMesh === true;
-}

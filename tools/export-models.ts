@@ -9,19 +9,18 @@
  * Runtime retains canonical RIG joints, FLOAT attributes and nine surface groups.
  */
 
-import { randomUUID } from 'node:crypto';
-import { writeFileSync, mkdirSync, renameSync, readFileSync, rmSync, existsSync } from 'node:fs';
+import { readFileSync, rmSync, existsSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { RIG } from '../src/ai/rig.ts';
 import { VARIANTS } from '../src/ai/soldier.ts';
-import { isRecord } from '../src/core/guards.ts';
 import {
   loadCommittedSoldiers,
   soldierInputPaths,
   soldierProductPaths,
 } from './blender/soldiers/export.ts';
+import { withLock, writeAtomic } from './lib/lock.ts';
 import { hashFiles, sourceClosure } from './lib/source-hash.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -30,104 +29,9 @@ const OUT = join(ROOT, 'public', 'models');
 // sees it. mkdir is atomic, which makes it a usable mutex; ownership and an
 // init grace period make the mutex safe (see withLock).
 const LOCK_DIR = join(ROOT, 'node_modules', '.cache', 'claude-of-duty-models.lock');
-const LOCK_OWNER = join(LOCK_DIR, 'owner.json');
 const HASH_STAMP = join(ROOT, 'node_modules', '.cache', 'claude-of-duty-models.hash');
-const LOCK_TIMEOUT_MS = 60000;
-/** How long a lock with no owner.json is presumed to be initialising.
- *  Overridable so tests can exercise the grace path quickly. */
+/** Overridable so tests can exercise the missing-owner grace period quickly. */
 const LOCK_GRACE_MS = Number(process.env.MODELS_LOCK_GRACE_MS ?? 10000);
-
-/** Write through a temp file + atomic rename: readers never see partial data. */
-function writeAtomic(file: string, data: string | Uint8Array): void {
-  mkdirSync(dirname(file), { recursive: true });
-  const tmp = `${file}.tmp-${process.pid}`;
-  writeFileSync(tmp, data);
-  renameSync(tmp, file);
-}
-
-const sleep = (ms: number): Promise<void> =>
-  new Promise((r): void => {
-    setTimeout(r, ms);
-  });
-
-/** A pid is conclusively stale only when ESRCH says it is gone; EPERM means
- *  alive-but-inaccessible, which must keep waiting. */
-function pidAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (err) {
-    return isRecord(err) && err.code === 'EPERM';
-  }
-}
-
-/**
- * Serialise exporter runs.
- *
- * Protocol: mkdir(LOCK_DIR) is the atomic claim; the winner then writes
- * owner.json `{ pid, token, createdAt }`. Contenders never delete a lock
- * immediately:
- *  - no owner.json  -> the winner is between mkdir and owner.json; treat the
- *    lock as active for LOCK_GRACE_MS before declaring it crashed mid-init
- *  - owner pid alive -> wait
- *  - owner pid ESRCH -> conclusively stale, steal
- * On release the owner removes the lock ONLY if owner.json still carries its
- * own token, so a late-releasing old owner cannot delete a replacement owner's
- * freshly-created lock.
- */
-async function withLock(fn: () => Promise<void>): Promise<void> {
-  const token = `${process.pid}-${randomUUID()}`;
-  const t0 = Date.now();
-  mkdirSync(dirname(LOCK_DIR), { recursive: true }); // ensure .cache exists
-  for (;;) {
-    try {
-      mkdirSync(LOCK_DIR); // non-recursive: atomic, throws EEXIST on contention
-      writeFileSync(LOCK_OWNER, JSON.stringify({ pid: process.pid, token, createdAt: Date.now() }));
-      break;
-    } catch (err) {
-      if (!isRecord(err) || err.code !== 'EEXIST') throw err;
-      // Contention: is the incumbent conclusively dead?
-      let owner: unknown = null;
-      try {
-        owner = JSON.parse(readFileSync(LOCK_OWNER, 'utf8'));
-      } catch {
-        owner = null; // missing or half-written owner.json
-      }
-      const waitingMs = Date.now() - t0;
-      const pid =
-        isRecord(owner) &&
-        typeof owner.pid === 'number' &&
-        Number.isSafeInteger(owner.pid) &&
-        owner.pid > 0
-          ? owner.pid
-          : null;
-      const stale = pid === null ? waitingMs > LOCK_GRACE_MS : !pidAlive(pid);
-      if (stale) {
-        rmSync(LOCK_DIR, { recursive: true, force: true });
-        continue;
-      }
-      if (waitingMs > LOCK_TIMEOUT_MS) {
-        throw new Error(
-          `[models] exporter lock held for >${LOCK_TIMEOUT_MS / 1000}s by pid ${pid ?? '<unknown>'} — remove ${LOCK_DIR}`,
-          { cause: err }
-        );
-      }
-      await sleep(200);
-    }
-  }
-  try {
-    return await fn();
-  } finally {
-    // Release only our own lock: if a contender stole it after we died (or a
-    // new owner took over), the token will not match and the lock must stay.
-    try {
-      const own: unknown = JSON.parse(readFileSync(LOCK_OWNER, 'utf8'));
-      if (isRecord(own) && own.token === token) rmSync(LOCK_DIR, { recursive: true, force: true });
-    } catch {
-      /* lock already gone or replaced */
-    }
-  }
-}
 
 /* ====================================================================== */
 /*  soldiers                                                              */
@@ -177,7 +81,8 @@ const FORCE = process.argv.includes('--force');
 const tStart = performance.now();
 console.log('[models] exporting to', OUT);
 
-await withLock(async (): Promise<void> => {
+const lockOptions = { label: 'models', graceMs: LOCK_GRACE_MS, timeoutMs: 60000, pollMs: 200 };
+await withLock(LOCK_DIR, lockOptions, async (): Promise<void> => {
   // Authored replacements must remove stale procedural outputs on cache hits.
   for (const id of ['lmg', 'smg', 'sniper', 'shotgun']) {
     for (const ext of ['glb', 'json'])

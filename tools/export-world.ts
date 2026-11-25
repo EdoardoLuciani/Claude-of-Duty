@@ -2,15 +2,7 @@
 /** Compile the authored worlds and cook meshoptimizer collision. */
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  renameSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -31,6 +23,7 @@ import type { MaterialOptions } from '../src/materials/index.ts';
 import { PhysicsSystem } from '../src/physics/index.ts';
 import { surfaceIndex } from '../src/physics/surfaces.ts';
 import { exportGlb } from './lib/export-glb.ts';
+import { withLock, writeAtomic } from './lib/lock.ts';
 import { buildCollision } from './worldgen/pack.ts';
 import { PLAYABLE_MAP_BUILDERS } from './worldgen/playable-builds.ts';
 import { worldSourceHash } from './worldgen/source-hash.ts';
@@ -40,66 +33,7 @@ const { values: args } = parseArgs({
   options: { out: { type: 'string' }, force: { type: 'boolean' }, check: { type: 'boolean' } },
 });
 const OUT = resolve(ROOT, args.out ?? 'public/models/world');
-const CACHE = resolve(ROOT, 'node_modules/.cache');
-const LOCK = join(CACHE, 'claude-of-duty-world.lock');
-const sleep = (ms: number): Promise<void> =>
-  new Promise((done): void => {
-    setTimeout(done, ms);
-  });
-
-function writeAtomic(file: string, data: string | Uint8Array): void {
-  mkdirSync(dirname(file), { recursive: true });
-  const temporary = `${file}.tmp-${process.pid}`;
-  writeFileSync(temporary, data);
-  renameSync(temporary, file);
-}
-
-async function withLock(fn: () => Promise<void>): Promise<void> {
-  mkdirSync(CACHE, { recursive: true });
-  const started = Date.now();
-  while (true) {
-    try {
-      mkdirSync(LOCK);
-      writeFileSync(
-        join(LOCK, 'owner.json'),
-        JSON.stringify({ pid: process.pid, started: Date.now() })
-      );
-      break;
-    } catch (error) {
-      if (!isRecord(error) || error.code !== 'EEXIST') throw error;
-      let stale = false;
-      try {
-        const owner: unknown = JSON.parse(readFileSync(join(LOCK, 'owner.json'), 'utf8'));
-        if (
-          !isRecord(owner) ||
-          typeof owner.pid !== 'number' ||
-          !Number.isSafeInteger(owner.pid) ||
-          owner.pid <= 0
-        )
-          throw new Error('invalid lock owner', { cause: error });
-        try {
-          process.kill(owner.pid, 0);
-        } catch (signalError) {
-          stale = isRecord(signalError) && signalError.code === 'ESRCH';
-        }
-      } catch {
-        stale = Date.now() - started > 10000;
-      }
-      if (stale) {
-        rmSync(LOCK, { recursive: true, force: true });
-        continue;
-      }
-      if (Date.now() - started > 120000)
-        throw new Error('[world] timed out waiting for export lock', { cause: error });
-      await sleep(150);
-    }
-  }
-  try {
-    return await fn();
-  } finally {
-    rmSync(LOCK, { recursive: true, force: true });
-  }
-}
+const LOCK = join(ROOT, 'node_modules', '.cache', 'claude-of-duty-world.lock');
 
 function run(command: string, commandArgs: string[]): Promise<void> {
   return new Promise((done, reject): void => {
@@ -265,7 +199,8 @@ async function compileWorld(
   }
 }
 
-await withLock(async (): Promise<void> => {
+const lockOptions = { label: 'world', timeoutMs: 120000, pollMs: 150 };
+await withLock(LOCK, lockOptions, async (): Promise<void> => {
   const sourceHash = worldSourceHash(ROOT);
   for (const map of PLAYABLE_MAPS) {
     const out = join(OUT, map.bundleDirectory);

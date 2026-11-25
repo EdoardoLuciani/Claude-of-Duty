@@ -8,7 +8,9 @@ import * as THREE from 'three';
 import { Arm } from '../../../src/weapons/hands.ts';
 import {
   basis,
+  fitFinger,
   handPose,
+  snapshotFingers,
   type GripFrame,
   type Side,
   type HandPose,
@@ -16,59 +18,10 @@ import {
 } from '../hand-reference.ts';
 
 const snapshot = (arm: Arm): HandPose => ({
-  fingers: arm.fingers.map((f): number[] => f.joints.map((j): number => -j.rotation.x)),
-  fingerSpread: arm.fingers.map((f): number => f.root.rotation.y),
+  ...snapshotFingers(arm),
   thumb: arm.thumb.joints.map((j): number => -j.rotation.x),
   thumbBase: [arm.thumb.root.rotation.x, arm.thumb.root.rotation.y, arm.thumb.root.rotation.z],
 });
-// Fit a palmar patch, not just a wrist or an infinite cylinder. Joint bounds
-// keep the solution out of hyper-flexed DIP and folded-back MCP configurations.
-function fitFinger(arm: Arm, i: number, target: THREE.Vector3Tuple, index = false): void {
-  const f = arm.fingers[i],
-    point = new THREE.Vector3(),
-    goal = new THREE.Vector3(...target);
-  const patch = index
-    ? [0, -0.006 * arm.scale, -0.013 * arm.scale]
-    : [0, -arm._segRadius[i][3] * 1.05, -arm._segLength[i][2] * 0.5];
-  const limits = [
-    [-1.5, 0.2],
-    [-1.65, 0.1],
-    [-1.35, 0.1],
-    [-0.6, 0.6],
-  ];
-  arm.root.updateMatrixWorld(true);
-  for (let pass = 0; pass < 12; pass++)
-    for (let j = 0; j < 4; j++) {
-      const rotation = j < 3 ? f.joints[j].rotation : f.root.rotation,
-        axis = j < 3 ? 'x' : 'y';
-      const [lo, hi] = limits[j],
-        centre = rotation[axis],
-        radius = 0.1 * 2 ** (7 - pass);
-      let best = centre,
-        cost = Infinity;
-      for (let n = 0; n <= 48; n++) {
-        const angle =
-          pass < 7
-            ? lo + ((hi - lo) * n) / 48
-            : THREE.MathUtils.clamp(centre + radius * ((2 * n) / 48 - 1), lo, hi);
-        rotation[axis] = angle;
-        f.joints[2].updateWorldMatrix(true, false);
-        point.fromArray(patch).applyMatrix4(f.joints[2].matrixWorld);
-        const c = point.distanceToSquared(goal);
-        if (c < cost) {
-          cost = c;
-          best = angle;
-        }
-      }
-      rotation[axis] = best;
-    }
-  f.joints[2].updateWorldMatrix(true, false);
-  point.fromArray(patch).applyMatrix4(f.joints[2].matrixWorld);
-  assert(
-    point.distanceTo(goal) < 0.002,
-    `MPX finger ${i}: unreachable patch ${point.distanceTo(goal)}`
-  );
-}
 function thumbPose(
   arm: Arm,
   name: string,
@@ -128,11 +81,11 @@ for (const side of ['right', 'left'] as const) {
       [-0.018, -0.105, 0.07],
       [-0.017, -0.127, 0.084],
     ];
-    for (let i = 0; i < 4; i++) fitFinger(arm, i, pads[i], i === 0);
+    for (let i = 0; i < 4; i++) fitFinger(arm, i, pads[i], 'MPX', i === 0);
     const thumb: THREE.Vector3Tuple = [-0.022, -0.067, 0.067],
       grip = thumbPose(arm, 'mpx', thumb);
     for (const joint of arm.fingers[0].joints) joint.rotation.x = -0.05;
-    fitFinger(arm, 0, [0.029, -0.039, -0.014], true);
+    fitFinger(arm, 0, [0.029, -0.039, -0.014], 'MPX', true);
     result.sides.right = {
       quaternion: arm.hand.quaternion.toArray(),
       grip,
@@ -155,7 +108,7 @@ const pads: THREE.Vector3Tuple[] = [
   [0.0145, -0.145, -0.1035],
   [0.0145, -0.164, -0.111],
 ];
-for (let i = 0; i < 4; i++) fitFinger(left, i, pads[i]);
+for (let i = 0; i < 4; i++) fitFinger(left, i, pads[i], 'MPX');
 const thumb: THREE.Vector3Tuple = [0.021, -0.11, -0.092];
 const magazineContact = {
   pos: magazine.pos,
