@@ -338,20 +338,25 @@ export class Agent {
   _failWait: number = 0;
   _failStreak: number = 0;
   _holdMove: boolean = false;
-  declare lodIrrelevant: boolean;
-  declare _animSkip: number;
-  declare _animAccum: number;
-  declare _v: THREE.Vector3;
-  declare _v2: THREE.Vector3;
-  declare _v3: THREE.Vector3;
-  declare _eye: THREE.Vector3;
-  declare _dir: THREE.Vector3;
-  declare _steer: THREE.Vector3;
-  declare _boneA: THREE.Vector3;
-  declare _boneB: THREE.Vector3;
-  declare _muzzleDir: THREE.Vector3;
-  declare _stepPayload: EngineEventMap['ai:footstep'];
-  declare clip: string;
+  /** set by AiSystem._updateRelevance: nothing this actor does reaches a pixel */
+  lodIrrelevant: boolean = false;
+  _animSkip: number = 0;
+  _animAccum: number = 0;
+  _v: THREE.Vector3 = new THREE.Vector3();
+  _v2: THREE.Vector3 = new THREE.Vector3();
+  _v3: THREE.Vector3 = new THREE.Vector3();
+  _eye: THREE.Vector3 = new THREE.Vector3();
+  _dir: THREE.Vector3 = new THREE.Vector3();
+  _steer: THREE.Vector3 = new THREE.Vector3();
+  _boneA: THREE.Vector3 = new THREE.Vector3();
+  _boneB: THREE.Vector3 = new THREE.Vector3();
+  _muzzleDir: THREE.Vector3 = new THREE.Vector3();
+  _stepPayload: EngineEventMap['ai:footstep'] = {
+    position: new THREE.Vector3(),
+    surface: 'concrete',
+    gait: 'walk',
+  };
+  clip: string = 'idle';
   declare _searchPending: boolean;
   _searchGeometry: Float64Array = new Float64Array(24);
   declare _searchGeometryCount: number;
@@ -483,25 +488,6 @@ export class Agent {
     this._recoveryOrigin = this.position.clone();
     this._safePosition = this.position.clone();
     this._clearSearch();
-
-    /** set by AiSystem._updateRelevance: nothing this actor does reaches a pixel */
-    this.lodIrrelevant = false;
-    this._animSkip = 0;
-    this._animAccum = 0;
-
-    this._v = new THREE.Vector3();
-    this._v2 = new THREE.Vector3();
-    this._v3 = new THREE.Vector3();
-    this._eye = new THREE.Vector3();
-    this._dir = new THREE.Vector3();
-    this._steer = new THREE.Vector3();
-    this._boneA = new THREE.Vector3();
-    this._boneB = new THREE.Vector3();
-    this._muzzleDir = new THREE.Vector3();
-
-    this._stepPayload = { position: new THREE.Vector3(), surface: 'concrete', gait: 'walk' };
-
-    this.clip = 'idle';
   }
 
   get _coverMap(): CoverMap {
