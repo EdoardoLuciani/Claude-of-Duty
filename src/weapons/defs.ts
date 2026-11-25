@@ -164,7 +164,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     eyeRelief: 0.06,
     fits: {
       optic: OPTIC_FITS,
-      muzzle: { suppressor: { model: 'srd762ti' } },
+      muzzle: { suppressor: { model: 'srd762ti' }, m4_72: { model: 'm4_72' } },
       rail: { laser: {} },
     },
     removableIrons: true,
@@ -395,7 +395,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
         acog: { ...OPTIC_FITS.acog, railSlots: 6 },
         scope: { ...OPTIC_FITS.scope, railSlots: 6 },
       },
-      muzzle: { suppressor: { model: 'srd762ti' } },
+      muzzle: { suppressor: { model: 'srd762ti' }, m4_72: { model: 'm4_72' } },
       rail: { laser: {} },
     },
     removableIrons: true,
@@ -593,7 +593,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     fits: {
       optic: OPTIC_FITS,
       rail: { laser: {} },
-      muzzle: { suppressor: { model: 'suppressor338' } },
+      muzzle: { suppressor: { model: 'suppressor338' }, m4_72: { model: 'm4_72' } },
     },
     removableIrons: true,
     removableMuzzleDevice: true,
