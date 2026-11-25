@@ -11,24 +11,29 @@ from mathutils.bvhtree import BVHTree
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import attachment_source
 
-HOSTS = {
-    'm4a1-block-ii': 'M4A1',
-    'mcx-virtus': 'MCX VIRTUS',
-    'fn-evolys-762': 'EVOLYS',
-    'ax338': 'AX338',
+HOST_COLLECTIONS = {
+    'm4a1-block-ii': 'M4A1 | authored components',
+    'mcx-virtus': 'MCX VIRTUS | authored components',
+    'fn-evolys-762': 'EVOLYS | authored components',
+    'ax338': 'AX338 | authored components',
+    'mpx': 'MPX | editable exterior components',
+    'm590': 'M590 | authored components',
 }
-collection = HOSTS[Path(bpy.data.filepath).stem]
+host = Path(bpy.data.filepath).stem
 scene = bpy.context.scene
 mount = bpy.data.objects['MOUNT_muzzle']
-hidden_parts = set(bpy.data.objects['MUZZLE_device'].children_recursive)
-adapter = bpy.data.objects.get('MUZZLE_device_removed')
-if adapter is not None:
-    hidden_parts.update(adapter.children_recursive)
-weapon = [o for o in bpy.data.collections[f'{collection} | authored components'].objects
+hidden_parts = set()
+if host != 'm590':  # The M-590 keeps its permanent front assembly.
+    hidden_parts.update(bpy.data.objects['MUZZLE_device'].children_recursive)
+    assert hidden_parts, 'empty stock muzzle assembly'
+    adapter = bpy.data.objects.get('MUZZLE_device_removed')
+    if adapter is not None:
+        hidden_parts.update(adapter.children_recursive)
+weapon = [o for o in bpy.data.collections[HOST_COLLECTIONS[host]].objects
           if o.type == 'MESH' and o not in hidden_parts]
 hands = [o for o in scene.objects if o.type == 'MESH' and
          any('authored hands' in c.name for c in o.users_collection)]
-assert hidden_parts and hands
+assert weapon and hands
 forward = Vector((0, 1, 0))
 
 
@@ -86,5 +91,5 @@ for name, clip in json.loads(scene['clips']).items():
             target = attachment_source.surface([obj], inverse)
             assert not surface.overlap(target), (name, sample, obj.name, 'intersects brake')
         count += 1
-print('M4_72_FIT_OK:', collection, count,
+print('M4_72_FIT_OK:', host, count,
       '120 Hz poses, aligned prop exit, clear sightline and no body/hand intersections')

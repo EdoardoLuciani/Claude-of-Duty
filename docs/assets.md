@@ -130,7 +130,7 @@ Each suppressor can has its own Blender recipe and cook id
 (`tools/blender/suppressor/` for the shared SRD762Ti, `suppressor9mm/`,
 `suppressor338/`, `suppressor12g/`); all share scene, lathe, bore-gauge and export
 helpers in `tools/blender/can.py`. The [M4-72 Brake](../tools/blender/muzzle_brakes/README.md)
-is a single asset shared by the verified rifle fits. Weapon fit checks load built
+is a single asset shared by its verified fits. Weapon fit checks load built
 attachments through `tools/blender/attachment_source.py`.
 
 Normal `bun run dev` / `bun run build` run `tools/build-assets.ts` (also runnable
