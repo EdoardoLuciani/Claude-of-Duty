@@ -8,9 +8,9 @@ Claude of Duty is a first-person survival shooter. Scout the market district bef
 wave, then hold out as enemy waves grow larger. Spend the credits you earn between waves on
 supplies, new weapons, and attachments. Or choose **Training Grounds** to try a build for free.
 
-The M4A1, MCX VIRTUS, EVOLYS-7.62 and AX-338 can fit a suppressor or an M4-72 Brake. The brake
-reduces upward kick at the cost of slower aiming and keeps the normal shot sound. Preview the
-fitted model and compare handling in the market before confirming.
+Every player weapon except the P320 Compact can fit the M4-72 Brake. It reduces upward kick at
+the cost of slower aiming and keeps the normal shot sound. Preview the fitted model and compare
+handling in the market before confirming.
 
 ![First-person view of the player firing a rifle down a sunlit market street](docs/screenshots/market-firefight.webp)
 
