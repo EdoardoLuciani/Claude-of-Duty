@@ -28,7 +28,15 @@ def pose(name,t=0):
             o.animation_data.action=None
             for track in o.animation_data.nla_tracks:track.mute=track.name!=name
     f=t*120;scene.frame_set(math.floor(f),subframe=f-math.floor(f));bpy.context.view_layer.update()
-def point(o):return CI@rig.matrix_world.inverted()@o.matrix_world.translation
+def rig_transform(o):
+    # Compose in rig space to avoid rounding from the animated world round trip.
+    transform=Matrix.Identity(4)
+    while o!=rig:
+        assert o.parent,o.name
+        transform=o.matrix_parent_inverse@o.matrix_basis@transform
+        o=o.parent
+    return transform
+def point(o):return CI@rig_transform(o).translation
 # Use evaluated rendered triangles, never Boolean-ngon fan approximations.
 def geometry(objects):
     vertices=[];faces=[];owners=[];deps=bpy.context.evaluated_depsgraph_get()
@@ -278,7 +286,7 @@ pose('Idle')
 # Mount checks append actual shared source optics only after the original
 # mechanism/skin gates, so they cannot alter those source selections.
 from m590.mounts import check_mounts
-check_mounts(manifest,rig,meshes,review,pose,tree,point,CI)
+check_mounts(manifest,rig,meshes,review,pose,tree,point,CI,rig_transform)
 print('M590_SOURCE_OK:',len(meshes),'editable component meshes;',len(controls),'native controls;',poses,'120Hz mechanism/contact poses;',len(seen),'distinct strokes;',skin_poses,'actual deformed glove clearance poses; rear clearance',minimum*1000,'mm; wrist/shell drift',max_drift*1000,'mm')
 
 # Actual shared rail attachment, independent of the optic catalog.

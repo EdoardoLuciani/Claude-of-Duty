@@ -11,7 +11,7 @@ from mathutils import Matrix, Vector
 import attachment_source
 
 
-def check_mounts(manifest, rig, meshes, review, pose, tree, point, basis):
+def check_mounts(manifest, rig, meshes, review, pose, tree, point, basis, rig_transform):
     pose('Idle')
     mounts = {slot: bpy.data.objects['MOUNT_' + slot] for slot in manifest['mounts']}
     for slot, data in manifest['mounts'].items():
@@ -105,7 +105,7 @@ def check_mounts(manifest, rig, meshes, review, pose, tree, point, basis):
 
     # Cached BVHs are in rig space. Receiver hardware must remain rigid in
     # that frame throughout every clip, while the laser rail stays on the fixed magazine-tube clamps.
-    receiver_mount = rig.matrix_world.inverted() @ mounts['optic'].matrix_world
+    receiver_mount = rig_transform(mounts['optic'])
     optics = {}
     for optic, stations in (('railway', (7, 10)), ('acog', (5, 12)), ('scope', (1, 3, 14, 16)), ('exps3', (7, 10))):
         objects = attachment_source.seat(optic, mounts['optic'])
@@ -179,11 +179,9 @@ def check_mounts(manifest, rig, meshes, review, pose, tree, point, basis):
     for name, clip in manifest['clips'].items():
         for frame in range(math.ceil(clip['duration'] * 120) + 1):
             pose(name, min(frame / 120, clip['duration']))
-            mounted = rig.matrix_world.inverted() @ mounts['optic'].matrix_world
+            mounted = rig_transform(mounts['optic'])
             assert all(abs(mounted[i][j] - receiver_mount[i][j]) < 2e-7 for i in range(4) for j in range(4)), (name, frame, 'receiver mount moved relative to cached hardware')
             # The fixed tube-mounted laser does not inherit pump travel.
-            # Inverting the animated rig adds up to 1.011e-7 m of float32
-            # error during Inspect; keep the same two-step numerical bound.
             assert (point(mounts['rail']) - Vector(manifest['mounts']['rail']['pos'])).length < 2e-7
             visible = [o for o in moving if o.parent.name != 'shell_insert' or o.parent.scale.x > .5]
             moving_tree = tree(visible + hands)
