@@ -62,7 +62,8 @@ assert abs((point(bpy.data.objects['DATUM_trigger_face'])-point(bpy.data.objects
 exterior=[];deps=bpy.context.evaluated_depsgraph_get()
 for o in meshes:
     if o.parent.name=='shell_insert' or o.name.startswith('12g adapter'):continue
-    ev=o.evaluated_get(deps);data=ev.to_mesh();exterior.extend((CI@rig.matrix_world.inverted()@ev.matrix_world@v.co).z for v in data.vertices);ev.to_mesh_clear()
+    ev=o.evaluated_get(deps);data=ev.to_mesh();matrix=CI@rig_transform(o)
+    exterior.extend((matrix@v.co).z for v in data.vertices);ev.to_mesh_clear()
 assert abs(max(exterior)-min(exterior)-39.5*.0254)<.0002,'manufacturer nominal OAL'
 print('M590_MANUFACTURER_ANCHORS_OK: SKU50774; OAL',max(exterior)-min(exterior),'barrel469.9mm; LOP352.425mm; local photo estimates not certified CAD')
 for o in controls:
@@ -248,7 +249,11 @@ for name in ('Pump','Reload_Empty'):
         seen.add(state)
         moving=tree(forend_objects)
         assert not moving.overlap(fixed),(name,frame,'pump/receiver/barrel intersection')
-        rear_z=max((CI@rig.matrix_world.inverted()@o.matrix_world@v.co).z for o in pick('Factory ribbed slide') for v in o.data.vertices)
+        rear_edges=[]
+        for o in pick('Factory ribbed slide'):
+            matrix=CI@rig_transform(o)
+            rear_edges.append(max((matrix@v.co).z for v in o.data.vertices))
+        rear_z=max(rear_edges)
         minimum=min(minimum,-.194-rear_z);assert -.194-rear_z>=.0055
 # Source wrists and shell paths are rigidly locked during declared contact beats.
 max_drift=0
@@ -259,7 +264,7 @@ for name in ('Reload_Tactical','Reload_Empty'):
     for frame in range(math.ceil(a*120),math.floor(b*120)+1):
         pose(name,frame/120);poses+=1
         shell=bpy.data.objects['shell_insert'];wrist=bpy.data.objects['hand_L']
-        matrix=CI@rig.matrix_world.inverted()@shell.matrix_world
+        matrix=CI@rig_transform(shell)
         local=Vector(ref['shell']['pos'])-Vector(ref['shell']['hullPosition'])
         expected=matrix@CI.inverted()@local;actual=point(wrist);drift=(actual-expected).length
         max_drift=max(max_drift,drift);assert drift<.00001,(name,frame,drift)
@@ -273,7 +278,7 @@ for name in ('Reload_Tactical','Reload_Empty'):
     a,b=ref['contactWindows'][name]['thumb']
     for frame in range(math.ceil(a*120),math.floor(b*120)+1):
         pose(name,frame/120)
-        matrix=CI@rig.matrix_world.inverted()@bpy.data.objects['shell_insert'].matrix_world
+        matrix=CI@rig_transform(bpy.data.objects['shell_insert'])
         local=Vector(ref['insertion']['pos'])-Vector(ref['shell']['hullPosition'])
         assert (point(bpy.data.objects['hand_L'])-matrix@CI.inverted()@local).length<.00001
     a,b=ref['contactWindows'][name]['insertionClearance']
@@ -286,7 +291,7 @@ pose('Idle')
 # Mount checks append actual shared source optics only after the original
 # mechanism/skin gates, so they cannot alter those source selections.
 from m590.mounts import check_mounts
-check_mounts(manifest,rig,meshes,review,pose,tree,point,CI,rig_transform)
+check_mounts(manifest,rig_transform,meshes,review,pose,tree,point,CI)
 print('M590_SOURCE_OK:',len(meshes),'editable component meshes;',len(controls),'native controls;',poses,'120Hz mechanism/contact poses;',len(seen),'distinct strokes;',skin_poses,'actual deformed glove clearance poses; rear clearance',minimum*1000,'mm; wrist/shell drift',max_drift*1000,'mm')
 
 # Actual shared rail attachment, independent of the optic catalog.
@@ -296,4 +301,4 @@ check_laser_mount('m590')
 
 # Dedicated large-bore can; independent of the receiver's optic/rail fit seam.
 from m590.muzzle import check_muzzle
-check_muzzle(manifest,rig,meshes,review,pose,tree,point,CI)
+check_muzzle(manifest,rig_transform,meshes,review,pose,tree,point,CI)

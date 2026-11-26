@@ -6,12 +6,12 @@ from mathutils import Vector
 import attachment_source
 
 
-def check_muzzle(manifest, rig, meshes, review, pose, tree, point, basis):
+def check_muzzle(manifest, rig_transform, meshes, review, pose, tree, point, basis):
     pose('Idle')
     mount = bpy.data.objects['MOUNT_muzzle']
     assert mount.parent.name == 'receiver'
     assert (point(mount)-Vector((0, .068, -.6672884763))).length < 1e-7
-    transform = basis @ rig.matrix_world.inverted() @ mount.matrix_world @ basis.inverted()
+    transform = basis @ rig_transform(mount) @ basis.inverted()
     assert all(abs(transform[i][j]-(1 if i == j else 0)) < 1e-7
                for i in range(3) for j in range(3)), 'unit bore-forward mount'
     loaded = attachment_source.seat('suppressor12g', mount)
@@ -46,17 +46,14 @@ def check_muzzle(manifest, rig, meshes, review, pose, tree, point, basis):
     moving = [o for o in meshes if o.parent.name in ('forend', 'bolt', 'trigger', 'shell_insert')]
     hands = [o for o in review.objects if o.type == 'MESH']
     count = 0
-    maximum_rounding = 0
     for name, clip in manifest['clips'].items():
         for frame in range(math.ceil(clip['duration']*120)+1):
             pose(name, min(frame/120, clip['duration']))
-            rounding = (point(exit)-expected).length
-            maximum_rounding = max(maximum_rounding, rounding)
-            assert rounding < 2.1e-7, (name, frame, 'can must follow receiver, not pump')
+            assert (point(exit)-expected).length < 1e-7, (name, frame, 'can must follow receiver, not pump')
             visible = [o for o in moving if o.parent.name != 'shell_insert' or o.parent.scale.x > .5]
             assert not can.overlap(tree(visible+hands)), (name, frame, 'can crosses mechanism/support or firing hand')
             count += 1
     pose('Idle')
     for obj in loaded + laser:
         bpy.data.objects.remove(obj, do_unlink=True)
-    print('M590_SUPPRESSOR12G_CLEARANCE_OK:', count, '120Hz poses; both deformed hands, full 89mm pump stroke, shell/bolt/trigger; front blade/cheeks, cap, lug, TOR Mini and clamps clear; exit', tuple(expected), 'max socket rounding m', maximum_rounding)
+    print('M590_SUPPRESSOR12G_CLEARANCE_OK:', count, '120Hz poses; both deformed hands, full 89mm pump stroke, shell/bolt/trigger; front blade/cheeks, cap, lug, TOR Mini and clamps clear; exit', tuple(expected))

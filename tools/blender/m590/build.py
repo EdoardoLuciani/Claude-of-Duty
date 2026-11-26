@@ -405,8 +405,9 @@ def build(output, render=False, quick=False):
         for name,cam in cams.items():
             scene.camera=cam;scene.render.filepath=str(render_dir/(name+'.png'));bpy.ops.render.render(write_still=True)
         hc.hide_render=False;scene.camera=cams['hands']
+        inspect_samples=[phase*clips['Inspect']['duration'] for phase in (.23,.48,.71)]
         for name,times in {'Pump':[0,.144,.2475,.369,.45],'Reload_Tactical':[0,.187,.32,.451,.462,.55],
-                           'Reload_Empty':[.209,.418,.57,.646,.665,.741,.836,.8835,.95],'Inspect':[1.1,2.3,3.4]}.items():
+                           'Reload_Empty':[.209,.418,.57,.646,.665,.741,.836,.8835,.95],'Inspect':inspect_samples}.items():
             for t in times:
                 pose(name,t);scene.render.filepath=str(render_dir/f'{name}-{t:.4f}.png');bpy.ops.render.render(write_still=True)
     # Restore identity/scale-one parents before copying, including the hidden hull.
