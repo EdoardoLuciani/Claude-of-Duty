@@ -113,6 +113,7 @@ const OPTIC_FITS = {
   scope: { eyeRelief: 0.09 },
   exps3: { eyeRelief: 0.2 },
 } satisfies NonNullable<WeaponDef['fits']>['optic'];
+const M4_72_FIT = { model: 'm4_72' } as const;
 
 export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
   mcx: {
@@ -164,7 +165,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     eyeRelief: 0.06,
     fits: {
       optic: OPTIC_FITS,
-      muzzle: { suppressor: { model: 'srd762ti' }, m4_72: { model: 'm4_72' } },
+      muzzle: { suppressor: { model: 'srd762ti' }, m4_72: M4_72_FIT },
       rail: { laser: {} },
     },
     removableIrons: true,
@@ -238,10 +239,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     // Bring the eye closer to open the rear aperture; its bore and aim datum stay authored.
     eyeRelief: 0.03,
     fits: {
-      muzzle: {
-        suppressor: { model: 'srd762ti' },
-        m4_72: { model: 'm4_72' },
-      },
+      muzzle: { suppressor: { model: 'srd762ti' }, m4_72: M4_72_FIT },
       optic: {
         ...OPTIC_FITS,
         // Forward rail slots clear the ocular from the charging hand; eye relief
@@ -319,7 +317,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     eyeRelief: 0.095,
     fits: {
       optic: OPTIC_FITS,
-      muzzle: { suppressor: { model: 'srd762ti' }, m4_72: { model: 'm4_72' } },
+      muzzle: { suppressor: { model: 'srd762ti' }, m4_72: M4_72_FIT },
       rail: { laser: {} },
     },
     removableIrons: true,
@@ -395,7 +393,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
         acog: { ...OPTIC_FITS.acog, railSlots: 6 },
         scope: { ...OPTIC_FITS.scope, railSlots: 6 },
       },
-      muzzle: { suppressor: { model: 'srd762ti' }, m4_72: { model: 'm4_72' } },
+      muzzle: { suppressor: { model: 'srd762ti' }, m4_72: M4_72_FIT },
       rail: { laser: {} },
     },
     removableIrons: true,
@@ -534,7 +532,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     fits: {
       optic: { ...OPTIC_FITS, acog: { eyeRelief: 0.1 } },
       rail: { laser: {} },
-      muzzle: { suppressor: { model: 'suppressor12g' }, m4_72: { model: 'm4_72' } },
+      muzzle: { suppressor: { model: 'suppressor12g' }, m4_72: M4_72_FIT },
     },
     sprintPos: [0.09, -0.27, -0.28],
     sprintRot: [-0.42, 0.58, 0.2],
@@ -593,7 +591,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     fits: {
       optic: OPTIC_FITS,
       rail: { laser: {} },
-      muzzle: { suppressor: { model: 'suppressor338' }, m4_72: { model: 'm4_72' } },
+      muzzle: { suppressor: { model: 'suppressor338' }, m4_72: M4_72_FIT },
     },
     removableIrons: true,
     removableMuzzleDevice: true,
