@@ -11,14 +11,14 @@ from mathutils import Matrix, Vector
 import attachment_source
 
 
-def check_mounts(manifest, rig, meshes, review, pose, tree, point, basis, rig_transform):
+def check_mounts(manifest, rig_transform, meshes, review, pose, tree, point, basis):
     pose('Idle')
     mounts = {slot: bpy.data.objects['MOUNT_' + slot] for slot in manifest['mounts']}
     for slot, data in manifest['mounts'].items():
         mount = mounts[slot]
         assert mount.parent.name == data['parent'], (slot, 'mount ownership')
         assert (point(mount) - Vector(data['pos'])).length < 1e-7
-        rotation = basis @ rig.matrix_world.inverted() @ mount.matrix_world @ basis.inverted()
+        rotation = basis @ rig_transform(mount) @ basis.inverted()
         expected = Matrix.Rotation(data['rot'][2], 4, 'Z')
         for axis in range(3):
             # Blender Euler/matrix conversion rounds the 90-degree rail turn
@@ -86,7 +86,8 @@ def check_mounts(manifest, rig, meshes, review, pose, tree, point, basis, rig_tr
     print('M590_CANTILEVER_BARREL_OK: nine paired surface rays; minimum gap mm', min(barrel_gaps) * 1000)
     tooth_z = []
     for tooth in seating_teeth:
-        z = [(basis @ rig.matrix_world.inverted() @ tooth.matrix_world @ v.co).z for v in tooth.data.vertices]
+        transform = basis @ rig_transform(tooth)
+        z = [(transform @ v.co).z for v in tooth.data.vertices]
         tooth_z.append((min(z) + max(z)) / 2)
     tooth_z.sort()
     assert all(abs(b - a - .0100076) < 1e-7 for a, b in zip(tooth_z, tooth_z[1:])), 'rail slot pitch'
@@ -141,7 +142,7 @@ def check_mounts(manifest, rig, meshes, review, pose, tree, point, basis, rig_tr
                 for obj in objects:
                     evaluated = obj.evaluated_get(deps)
                     data = evaluated.to_mesh()
-                    transform = basis @ rig.matrix_world.inverted() @ evaluated.matrix_world
+                    transform = basis @ rig_transform(obj)
                     result.extend(transform @ v.co for v in data.vertices)
                     evaluated.to_mesh_clear()
                 return result
@@ -180,9 +181,9 @@ def check_mounts(manifest, rig, meshes, review, pose, tree, point, basis, rig_tr
         for frame in range(math.ceil(clip['duration'] * 120) + 1):
             pose(name, min(frame / 120, clip['duration']))
             mounted = rig_transform(mounts['optic'])
-            assert all(abs(mounted[i][j] - receiver_mount[i][j]) < 2e-7 for i in range(4) for j in range(4)), (name, frame, 'receiver mount moved relative to cached hardware')
+            assert all(abs(mounted[i][j] - receiver_mount[i][j]) < 1e-7 for i in range(4) for j in range(4)), (name, frame, 'receiver mount moved relative to cached hardware')
             # The fixed tube-mounted laser does not inherit pump travel.
-            assert (point(mounts['rail']) - Vector(manifest['mounts']['rail']['pos'])).length < 2e-7
+            assert (point(mounts['rail']) - Vector(manifest['mounts']['rail']['pos'])).length < 1e-7
             visible = [o for o in moving if o.parent.name != 'shell_insert' or o.parent.scale.x > .5]
             moving_tree = tree(visible + hands)
             assert not additions.overlap(moving_tree), (name, frame, 'new rail/adapter crosses mechanism or hand')
