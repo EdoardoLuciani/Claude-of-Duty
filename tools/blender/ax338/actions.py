@@ -72,8 +72,6 @@ def author_actions(root,asset,rig,parts,mag,spare,bolt,trigger):
                                 point.interpolation='CONSTANT' if curve.data_path=='scale' else ('LINEAR' if fitted or holding else 'BEZIER')
                                 point.handle_left_type='AUTO_CLAMPED';point.handle_right_type='AUTO_CLAMPED'
             t=ad.nla_tracks.new();t.name=name;st=t.strips.new(name,0,a);st.action_frame_start=0;st.action_frame_end=math.ceil(clips[name]['frames'][1]);st.extrapolation='HOLD';st.blend_type='REPLACE';ad.action=None;t.mute=True
-    def relaxed(side):
-        p=copy.deepcopy(ref['sides'][side]['grip']);p['fingers']=[[.15,.25,.18],[.20,.30,.20],[.25,.32,.24],[.32,.36,.27]];p['thumb']=[.12,.20];return p
     def release_right(first,last,closing=False):
         right_ranges.append((first,last))
         for row in ref['rightRelease']:
@@ -176,15 +174,20 @@ def author_actions(root,asset,rig,parts,mag,spare,bolt,trigger):
         clips[name]['events']+=([{'time':.90*d,'event':'charge'},{'time':.917*d,'event':'boltrelease'}] if empty_reload else [{'time':.88*d,'event':'slap'}])
         clips[name]['events'].append({'time':.995*d,'event':'end'})
         finish(name,[(0,.025*d),((out-.055)*d,(out-.04)*d),((insert+.03)*d,(insert+.055)*d),(.94*d,.98*d)])
-    begin('Inspect',3.6)
-    for t,loc,rot in [(.55,(-.12,.095,-.14),(-2,52,6)),(1.2,(-.12,.100,-.14),(3,46,2)),(1.95,(.03,.10,-.26),(-2,125,-4)),(2.45,(.03,.10,-.26),(-2,125,-4)),(3.1,(-.12,.095,-.14),(-2,52,6)),(3.6,(0,0,0),(0,0,0))]:key(rig,t,loc,rot)
-    for t in (.20,.80,1.6,2.7,3.4):pose('right',t,p=ref['rightIndexed'])
-    release_right(0,.20);release_right(3.4,3.6,True)
-    for row in ref['release']:
-        pose('left',.12*row['t'],row['pos'],p=row['pose'])
-        pose('left',3.1+.3*(1-row['t']),row['pos'],p=row['pose'])
-    for t,pos in [(.3,[-.09,-.12,-.14]),(.65,[-.12,-.19,-.12]),(2.6,[-.12,-.19,-.12])]:pose('left',t,pos,p=relaxed('left'))
-    clips['Inspect']['events']=[{'time':.995*3.6,'event':'end'}];finish('Inspect',[(0,.12),(3.1,3.4)])
+    # Lead with the bolt side, then unwind without sweeping the long barrel.
+    d=4.8;begin('Inspect',d)
+    for phase,loc,rot in [
+        (.09,(.015,.017,-.080),(10,11,12)),
+        (.20,(.003,.038,-.166),(27,24,54)),
+        (.29,(-.015,.047,-.191),(34,31,72)),
+        (.45,(-.011,.044,-.185),(31,32,68)),
+        (.57,(.009,.039,-.166),(17,34,34)),
+        (.69,(.027,.048,-.179),(10,38,7)),
+        (.83,(.024,.043,-.170),(8,36,4)),
+        (.92,(.012,.019,-.087),(4,19,0)),
+        (.98,(0,0,0),(0,0,0)),
+    ]:key(rig,phase*d,loc,rot)
+    clips['Inspect']['events']=[{'time':.995*d,'event':'end'}];finish('Inspect')
     for name,d,drawing in [('Draw',.88,True),('Holster',.56,False)]:
         begin(name,d)
         for k,amount in ([(0,1),(.25,.78),(.78,.04),(.93,0),(1,0)] if drawing else [(0,0),(.20,.08),(.75,.8),(1,1)]):

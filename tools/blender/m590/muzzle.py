@@ -50,8 +50,6 @@ def check_muzzle(manifest, rig, meshes, review, pose, tree, point, basis):
     for name, clip in manifest['clips'].items():
         for frame in range(math.ceil(clip['duration']*120)+1):
             pose(name, min(frame/120, clip['duration']))
-            # The longer exit's world -> rig float32 round trip peaks at
-            # 2.035e-7m in Inspect frame 297 (not physical mount movement).
             rounding = (point(exit)-expected).length
             maximum_rounding = max(maximum_rounding, rounding)
             assert rounding < 2.1e-7, (name, frame, 'can must follow receiver, not pump')

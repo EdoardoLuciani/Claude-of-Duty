@@ -124,12 +124,12 @@
     "Inspect": {
       "frames": [
         0,
-        432.0
+        576.0
       ],
-      "duration": 3.6,
+      "duration": 4.8,
       "events": [
         {
-          "time": 3.582,
+          "time": 4.776,
           "event": "end"
         }
       ]
@@ -166,7 +166,7 @@
     "primitives": 12,
     "materials": 1,
     "images": 3,
-    "bytes": 9953196
+    "bytes": 9699984
   },
   "textureResolution": 1024,
   "contactGeometry": {

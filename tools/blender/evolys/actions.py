@@ -178,13 +178,21 @@ def author_actions(root,asset,rig,parts,belt,belt_pos):
             end.handle_left_type='FREE';end.handle_left=expected.keyframe_points[3].handle_left
             curve.update();bpy.data.actions.remove(reference)
 
-    begin('Inspect',3.6)
-    for t,loc,rot in [(.45,(-.02,.065,-.12),(-10,-40,12)),(1.20,(-.02,.065,-.12),(-10,-40,12)),(1.95,(-.03,.06,-.13),(6,40,-12)),(2.75,(-.03,.06,-.13),(6,40,-12)),(3.45,(0,0,0),(0,0,0))]:key(rig,t,loc,rot)
-    for t in (.2,.9,1.8,3.2):pose('right',t,p=indexed())
-    pose('left',.05,release)
-    pose('left',.12,outboard)
-    for t,pos in [(.35,[-.26,-.10,-.23]),(.8,[-.26,-.17,-.17]),(2.9,[-.26,-.17,-.17]),(3.1,outboard),(3.28,outboard),(3.38,release),(3.45,ref['grips']['left']['pos'])]:pose('left',t,pos,p=relaxed('left') if t<3.2 else None)
-    key(bolt,0,(0,0,.050));key(bolt,3.6,(0,0,.050));clips['Inspect']['events']=[{'time':3.582,'event':'end'}];finish('Inspect')
+    # Let the feed side settle before rolling the supported receiver over.
+    d=5;begin('Inspect',d)
+    for phase,loc,rot in [
+        (.07,(.010,-.019,-.064),(-6,8,2)),
+        (.18,(.020,.058,-.176),(7,47,-7)),
+        (.27,(.012,.067,-.179),(9,57,-13)),
+        (.43,(-.001,.058,-.175),(8,53,-8)),
+        (.54,(-.015,.039,-.174),(22,49,29)),
+        (.66,(-.036,.054,-.188),(42,44,79)),
+        (.79,(-.033,.054,-.180),(39,42,75)),
+        (.88,(-.009,.026,-.114),(23,33,39)),
+        (.97,(0,0,0),(0,0,0)),
+    ]:key(rig,phase*d,loc,rot)
+    key(bolt,0,(0,0,.050));key(bolt,d,(0,0,.050))
+    clips['Inspect']['events']=[{'time':.995*d,'event':'end'}];finish('Inspect')
     for name,d,drawing in [('Draw',.75,True),('Holster',.5,False)]:
         begin(name,d)
         for k,a in ([(0,1),(.25,.78),(.78,.04),(.93,0),(1,0)] if drawing else [(0,0),(.2,.08),(.75,.8),(1,1)]):

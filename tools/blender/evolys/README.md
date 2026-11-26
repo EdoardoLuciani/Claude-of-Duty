@@ -29,8 +29,9 @@ The TOR Mini mounts directly on the underside Picatinny rail, with no side brack
 The rail's exposed teeth below the molded covers follow FN's
 [studio profile](https://fnherstal.com/app/uploads/FN-EVOLYS-7.62-studio-001.png)
 and [bipod reference](https://fnherstal.com/app/uploads/STM7400-scaled.jpg). The
-support hold sits behind the rail with glove-pad contact on the molded cover, and
-reload/inspection routes keep the fingers curled until below/outboard of the rail.
+support hold sits behind the rail with glove-pad contact on the molded cover. Reload
+keeps the fingers curled until below and outboard of the rail. Inspect keeps the
+support grip planted while showing the feed cover and the opposite receiver side.
 The handguard owns the rail; the stock is rigid with no authored fold clip.
 
 Run from the repository root with Blender 5.3.0 and gltfpack 1.3:

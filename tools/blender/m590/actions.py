@@ -155,10 +155,22 @@ def author_actions(root,asset,rig,parts,forend,bolt,trigger,shell):
         # Empty reload opens BEFORE shell insertion, not at the return onset.
         events(name,d,[(.02,'start')]+([(.22,'pump')] if empty_reload else [])+[(accept,'shellin')]+([(.94,'boltrelease')] if empty_reload else [])+[(.995,'end')])
         finish(name)
-    begin('Inspect',3)
-    for t,rot in [(.5,(-10,-42,12)),(1.1,(-10,-42,12)),(1.7,(6,43,-12)),(2.4,(6,43,-12)),(2.92,(0,0,0))]:
-        key(rig,t,(-.02,.06,-.12) if t<2.92 else (0,0,0),rot)
-    events('Inspect',3,[(.995,'end')]);finish('Inspect')
+    # Move the gun as a unit; the support hand stays on the seated pump.
+    d=4.8;begin('Inspect',d)
+    turn=[
+        (0,(0,0,0,0,0,0)),
+        (.10,(.018,.035,-.066,9,20,1)),
+        (.22,(.026,.068,-.128,10,49,4)),
+        (.36,(.021,.064,-.132,8,47,6)),
+        (.48,(.001,.027,-.151,12,49,32)),
+        (.62,(-.033,.052,-.179,22,51,91)),
+        (.78,(-.026,.060,-.170,20,48,85)),
+        (.90,(.007,.031,-.075,10,23,30)),
+        (.98,(0,0,0,0,0,0)),
+    ]
+    for t in samples(d):
+        v=path(t/d,turn);key(rig,t,v[:3],v[3:])
+    events('Inspect',d,[(.995,'end')]);finish('Inspect')
     for name,d,drawing in [('Draw',.7,True),('Holster',.45,False)]:
         begin(name,d)
         for k,amount in ([(0,1),(.25,.78),(.78,.04),(.93,0),(1,0)] if drawing else [(0,0),(.2,.08),(.75,.8),(1,1)]):
