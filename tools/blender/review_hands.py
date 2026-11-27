@@ -30,7 +30,7 @@ def author_review_hands(root,rig,hand_controls,all_parts,clips,*,basis,label,fra
     objects=[o for o in loaded.objects if o];source=next(o for o in objects if o.type=='ARMATURE')
     meshes=[o for o in objects if o.type=='MESH' and any(m.type=='ARMATURE' for m in o.modifiers)]
     arms={}
-    for side in ('left','right'):
+    for side in hand_controls:
         arm=source.copy();arm.data=source.data.copy();arm.animation_data_clear();arm.name=label+'_arm_'+side;collection.objects.link(arm);arm.parent=rig;arm.matrix_parent_inverse=Matrix.Identity(4)
         arm.location=(0,0,0);arm.rotation_euler=orientation.to_euler();arm.scale=(-1,1,1) if side=='right' else (.97,.97,.97);arms[side]=arm
         for o in meshes:

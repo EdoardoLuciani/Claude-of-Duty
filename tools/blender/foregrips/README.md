@@ -41,9 +41,10 @@ Each bake produces an editable `.blend` and a standalone `.glb` with one mesh
 primitive and one opaque material. Vertex colors distinguish the finish tints
 without extra primitives or textures. Neither prop includes skinning or
 animation. The review cameras render isolated side, oblique, underside and end
-views without changing the saved scene. The
-runtime catalog must not list a grip on the strength of these renders or a rigid
-seat alone; each fit also needs its own left-hand contact and animation checks.
+views without changing the saved scene. The [M4 fit review](../m4/README.md#foregrip-fit-review)
+seats these props and checks draft idle poses without registering them in the game.
+The runtime catalog must not list a grip on the strength of these renders or a
+rigid seat alone; each fit also needs its own left-hand contact and animation checks.
 
 [magpul]: https://magpul.com/afg-2-angled-fore-grip.html
 [talos]: https://www.talosdefense.com/parts-upgrades/grips-stocks/magpul-angled-fore-grip-gen-2-afg2

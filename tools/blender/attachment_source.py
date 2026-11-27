@@ -24,6 +24,8 @@ SOURCES = {
     'suppressor338': 'suppressor-338/suppressor338.blend',
     'suppressor12g': '12g-suppressor/suppressor12g.blend',
     'm4_72': 'm4-72/m4-72.blend',
+    'afg2': 'afg2/afg2.blend',
+    'dd_vertical': 'dd_vertical/dd_vertical.blend',
 }
 # Whole forward grooves per weapon fit; mirrors `fits.optic[id].railSlots` in
 # src/weapons/defs.ts, which places the same optic at runtime.
