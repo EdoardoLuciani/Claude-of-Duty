@@ -24,9 +24,14 @@ def activate(obj):
     bpy.context.view_layer.objects.active = obj
 
 
-def mesh(name, points, faces, material):
+def loft(name, rings, material):
+    n = len(rings[0])
+    last = n * (len(rings) - 1)
+    faces = [tuple(reversed(range(n))), tuple(last + i for i in range(n))]
+    for base in range(0, last, n):
+        faces.extend((base + i, base + (i+1)%n, base + (i+1)%n + n, base + i + n) for i in range(n))
     data = bpy.data.meshes.new(name)
-    data.from_pydata(points, [], faces)
+    data.from_pydata([p for ring in rings for p in ring], [], faces)
     bm = bmesh.new()
     bm.from_mesh(data)
     bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
@@ -39,31 +44,31 @@ def mesh(name, points, faces, material):
     return obj
 
 
-def loft(name, rings, material):
-    n = len(rings[0])
-    last = n * (len(rings) - 1)
-    faces = [tuple(reversed(range(n))), tuple(last + i for i in range(n))]
-    for base in range(0, last, n):
-        faces.extend((base + i, base + (i+1)%n, base + (i+1)%n + n, base + i + n) for i in range(n))
-    return mesh(name, [p for ring in rings for p in ring], faces, material)
-
-
 def profile(name, outline, half_width, material, x=0):
     return loft(name, [[(u, y, z) for y, z in outline] for u in (x-half_width, x+half_width)], material)
 
 
-def round_edges(obj, width, segments=3):
+def bevel(obj, width, segments=3):
     activate(obj)
     mod = obj.modifiers.new('Molded edge radii', 'BEVEL')
     mod.width, mod.segments, mod.limit_method = width, segments, 'ANGLE'
     mod.harden_normals = True
     bpy.ops.object.modifier_apply(modifier=mod.name)
+    return obj
+
+
+def shade(obj):
+    activate(obj)
     for face in obj.data.polygons:
         face.use_smooth = True
     mod = obj.modifiers.new('Weighted normals', 'WEIGHTED_NORMAL')
     mod.keep_sharp = True
     bpy.ops.object.modifier_apply(modifier=mod.name)
     return obj
+
+
+def round_edges(obj, width, segments=3):
+    return shade(bevel(obj, width, segments))
 
 
 def recess(obj, cutter):
@@ -106,24 +111,19 @@ def round_afg_cheek(shell):
     bpy.ops.mesh.customdata_custom_splitnormals_clear()
     bm = bmesh.new()
     bm.from_mesh(shell.data)
-    normal = (0, -.582, 1)
-    for z in (-.035, -.032, -.030, -.028, -.0255, -.023, -.019, -.015, -.011, -.007):
+    planes = [((0, 0, z), (0, -.582, 1))
+              for z in (-.035, -.032, -.030, -.028, -.0255, -.023, -.019, -.015, -.011, -.007)]
+    planes += [((0, y, 0), (0, 1, 0)) for y in (-.056, -.048, -.038, -.018, -.006, .005)]
+    for co, no in planes:
         bmesh.ops.bisect_plane(bm, geom=[*bm.verts, *bm.edges, *bm.faces], dist=.000001,
-                              plane_co=(0, 0, z), plane_no=normal)
-    for y in (-.056, -.048, -.038, -.018, -.006, .005):
-        bmesh.ops.bisect_plane(bm, geom=[*bm.verts, *bm.edges, *bm.faces], dist=.000001,
-                              plane_co=(0, y, 0), plane_no=(0, 1, 0))
+                              plane_co=co, plane_no=no)
     bmesh.ops.triangulate(bm, faces=list(bm.faces))
     bm.to_mesh(shell.data)
     bm.free()
     recess(shell, afg_web_opening())
     for vert in shell.data.vertices:
         vert.co.x = afg_cheek(*vert.co)
-    for face in shell.data.polygons:
-        face.use_smooth = True
-    normals = shell.modifiers.new('Molded cheek normals', 'WEIGHTED_NORMAL')
-    normals.keep_sharp = True
-    bpy.ops.object.modifier_apply(modifier=normals.name)
+    shade(shell)
 
 
 def ribbed_pad(name, path, ribs, material, rib_run=None, back=None, crown=None):
@@ -196,12 +196,12 @@ def afg2():
         (-.066,-.019), (-.069,-.015)]
     shell = profile('Open triangular AFG-2 shell', outline, .0183, polymer)
     # Keep the exterior's prior effective bevel independent of the aperture blend.
-    round_edges(shell, .0010307768)
+    bevel(shell, .0010307768)
     for name,outline in (
         ('Shallow toe relief', [(.0535,-.030),(.0625,-.030),(.061,-.025),(.059,-.0239),(.055,-.0246)]),
         ('Shallow heel relief', [(-.052,-.066),(-.042,-.066),(-.044,-.0601),(-.048,-.0598),(-.051,-.061)]),
     ):
-        recess(shell, round_edges(profile(name, outline, .012, None), .0013, segments=2))
+        recess(shell, bevel(profile(name, outline, .012, None), .0013, segments=2))
     deck = [(-.068,-.006), (.060,-.006), (.059,.0008), (.056,.0015),
             (-.065,.0015), (-.068,.0005)]
     round_edges(loft('Shallow closed crown skin', [[(x, y, z-drop if i > 1 else z)
@@ -215,41 +215,32 @@ def afg2():
             round_edges(profile('Crown edge highlight', [(a,-.0059), (b,-.0059),
                 (b,-.0013), (b-.001,.0009), (a+.001,.0009), (a,-.0013)],
                 .0019, polymer, side*.0135), .0009, segments=1)
-        for y,z,r in [(-.0585,-.0163,.0036), (-.0485,-.0495,.0034), (.0596,-.0163,.0031),
-                      (.0006,-.0114,.0055)]:
-            is_large = r > .004
-            if is_large:
-                # Roll the cosmetic cup into the cheek instead of leaving a hard lip beside the mark.
-                sink = loft('Rolled center-mark cup', [[(side*x, y+radius*cos(i*tau/24),
-                    z+radius*sin(i*tau/24)) for i in range(24)]
-                    for x,radius in ((.0169,r), (.01766,r), (.01793,r+.00006),
-                        (.01812,r+.00019), (.0183,r+.00040), (.0197,r+.00040))], None)
-            else:
-                sink = cylinder('Fastener cup', (side*.0183, y, z), r, .0028, None, 16)
-            recess(shell, sink)
-            outer = .0189 if is_large else .0181
-            if is_large:
-                recess(brow, cylinder('Brow break', (side*.0192,y,z), r, .0032, None))
-            if is_large and side < 0:
-                round_edges(cylinder('Contrasting polygonal center mark',
-                    (side*(outer-.00072),y,z), r*.72, .0015, steel, 6), .00019, segments=2)
-                continue
-            screw = cylinder('Slotted face' if is_large else 'Socket face',
-                (side*(outer-.00072),y,z), r*.83, .0015, steel, 16)
-            if is_large:
-                slot = profile('Slot recess', [(y-.0044,z-.0019), (y+.0044,z+.0009),
-                    (y+.0044,z+.0019), (y-.0044,z-.0009)], .0008, None, side*outer)
-            else:
-                slot = cylinder('Dark hex recess', (side*outer,y,z), r*.39, .0018, None, 6)
-            recess(screw, slot)
+        for y,z,r in ((-.0585,-.0163,.0036), (-.0485,-.0495,.0034), (.0596,-.0163,.0031)):
+            recess(shell, cylinder('Fastener cup', (side*.0183, y, z), r, .0028, None, 16))
+            screw = cylinder('Socket face', (side*.01738,y,z), r*.83, .0015, steel, 16)
+            recess(screw, cylinder('Dark hex recess', (side*.0181,y,z), r*.39, .0018, None, 6))
             round_edges(screw, .00016, segments=1)
-            if not is_large:
-                matrix = screw.matrix_world
-                local = matrix.inverted()
-                for vert in screw.data.vertices:
-                    world = matrix @ vert.co
-                    world.x = afg_cheek(*world)
-                    vert.co = local @ world
+            matrix = screw.matrix_world
+            local = matrix.inverted()
+            for vert in screw.data.vertices:
+                world = matrix @ vert.co
+                world.x = afg_cheek(*world)
+                vert.co = local @ world
+        y, z, r = .0006, -.0114, .0055
+        # Roll the cosmetic cup into the cheek instead of leaving a hard lip beside the mark.
+        recess(shell, loft('Rolled center-mark cup', [[(side*x, y+radius*cos(i*tau/24),
+            z+radius*sin(i*tau/24)) for i in range(24)]
+            for x,radius in ((.0169,r), (.01766,r), (.01793,r+.00006),
+                (.01812,r+.00019), (.0183,r+.00040), (.0197,r+.00040))], None))
+        recess(brow, cylinder('Brow break', (side*.0192,y,z), r, .0032, None))
+        if side < 0:
+            round_edges(cylinder('Contrasting polygonal center mark',
+                (side*.01818,y,z), r*.72, .0015, steel, 6), .00019, segments=2)
+        else:
+            screw = cylinder('Slotted face', (side*.01818,y,z), r*.83, .0015, steel, 16)
+            recess(screw, profile('Slot recess', [(y-.0044,z-.0019), (y+.0044,z+.0009),
+                (y+.0044,z+.0019), (y-.0044,z-.0009)], .0008, None, side*.0189))
+            round_edges(screw, .00016, segments=1)
     round_afg_cheek(shell)
     shell.data.calc_loop_triangles()
     surface = BVHTree.FromPolygons([v.co for v in shell.data.vertices],
@@ -282,6 +273,13 @@ def afg2():
         (.0049,-.0265,.0109),(.0058,-.0244,.0110),(.0072,-.0224,.0111),
         (.0095,-.0205,.0112),(.012,-.0190,.0104),(.0133,-.0179,.0087)],
         4, grip, (.0079,.0124), back=lambda y: .60*y-.0238, crown=lambda y: .0033*ease((.010-y)/.004))
+    # Bake published length/width into the exterior; keep the side profile's
+    # proportions rather than treating the maker's over-rail height as total height.
+    length = .11938/.134752
+    envelope = Matrix.Diagonal((.034798/.0407314, length, length, 1))
+    for obj in bpy.context.scene.objects:
+        frame = obj.matrix_world
+        obj.data.transform(frame.inverted() @ envelope @ frame)
 
 
 def ellipse(z, x, y, squareness, steps=40):
@@ -314,12 +312,6 @@ def dd_vertical():
         (-.024,.0132,.01545,.69), (-.0265,.0127,.0148,.70))
     smooth(loft('Sculpted shoulder and tapered handle', [ellipse(z,x,y,shape)
         for z,x,y,shape in (*shoulder, *handle, (-.101,.0162,.0178,.83))], polymer))
-    # A closed, shallow crown with two molded edges. The top is only a visual cap.
-    for side in (-1, 1):
-        round_edges(profile('Rounded crown edge', [(-.024,-.007), (.024,-.007),
-            (.025,-.004), (.0239,-.0015), (.0215,.0005), (.006,.001),
-            (-.013,.001), (-.0215,.0005), (-.0239,-.0015)], .0030, polymer, side*.01335), .0015,
-            segments=2)
 
     def handle_section(z):
         a, b = next((a,b) for a,b in zip(handle, handle[1:]) if b[0] <= z <= a[0])
@@ -327,6 +319,11 @@ def dd_vertical():
         return tuple(v + (w-v)*t for v,w in zip(a[1:], b[1:]))
 
     for side in (-1, 1):
+        # A closed, shallow crown with two molded edges. The top is only a visual cap.
+        round_edges(profile('Rounded crown edge', [(-.024,-.007), (.024,-.007),
+            (.025,-.004), (.0239,-.0015), (.0215,.0005), (.006,.001),
+            (-.013,.001), (-.0215,.0005), (-.0239,-.0015)], .0030, polymer, side*.01335), .0015,
+            segments=2)
         # Keep the shoulder emblem without tessellating the tiny wordmark.
         data = bpy.data.curves.new('Shoulder emblem', 'FONT')
         data.body, data.align_x, data.align_y = 'D', 'CENTER', 'CENTER'
@@ -423,10 +420,9 @@ def dd_vertical():
         (-.1116,.0097,.0107,0,0,0)):
         ring = []
         for i,(u,v,w) in enumerate(ellipse(z,x,y,.87,steps=64)):
-            i *= 2  # Same scallop and notch phases, on a coarser ring.
-            offset = abs((i+8)%16-8)
+            offset = abs((2*i+8)%16-8)
             scale = 1 - depth*ease((half-offset)/1.9)
-            notch = ease((2.85-abs(i-112))/.95)
+            notch = ease((2.85-abs(2*i-112))/.95)
             ring.append((scale*u,scale*v,w+lip*.0032*notch))
         rings.append(ring)
     smooth(loft('Round-ended scallops and closed end dish', rings, polymer))
@@ -441,11 +437,12 @@ def export(asset, output):
     mount.parent = root
 
     # Encode the finish tints in vertex colors so the prop is one opaque primitive.
-    material = finish('Foregrip | opaque finishes', 1)
+    material = bpy.data.materials.new('Foregrip | opaque finishes')
+    material.use_backface_culling = True
     shader = material.node_tree.nodes.get('Principled BSDF')
     shader.inputs['Roughness'].default_value = .61
     color = material.node_tree.nodes.new('ShaderNodeVertexColor')
-    color.layer_name = 'Finish'
+    color.layer_name = 'FinishColor'
     material.node_tree.links.new(color.outputs['Color'], shader.inputs['Base Color'])
     for obj in batch:
         obj.parent = root
@@ -460,15 +457,6 @@ def export(asset, output):
         obj.select_set(True)
     bpy.ops.object.join()
     batch[0].name = asset
-    if asset == 'afg2':
-        # Bake published length/width into the exterior; keep the side profile's
-        # proportions rather than treating the maker's over-rail height as total height.
-        length = .11938/.134752
-        envelope = Matrix.Diagonal((.034798/.0407314, length, length, 1))
-        for obj in root.children:
-            if obj.type == 'MESH':
-                frame = obj.matrix_world
-                obj.data.transform(frame.inverted() @ envelope @ frame)
     output.mkdir(parents=True, exist_ok=True)
     bpy.context.preferences.filepaths.save_version = 0
     bpy.ops.wm.save_as_mainfile(filepath=str(output/f'{asset}.blend'))

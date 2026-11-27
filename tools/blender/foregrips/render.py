@@ -20,11 +20,10 @@ scene.render.engine = 'CYCLES'
 scene.cycles.samples = 24
 scene.cycles.use_denoising = True
 scene.render.resolution_x, scene.render.resolution_y = 840, 630
-scene.render.resolution_percentage = 100
 scene.render.film_transparent = True
 scene.world = bpy.data.worlds.new('Neutral review fill')
-scene.world.node_tree.nodes.get('Background').inputs['Color'].default_value = (.26, .26, .26, 1)
-scene.world.node_tree.nodes.get('Background').inputs['Strength'].default_value = .55
+background = scene.world.node_tree.nodes.get('Background').inputs
+background['Color'].default_value, background['Strength'].default_value = (.26, .26, .26, 1), .55
 for name, position, power, size in (
     ('Key softbox', (.28, -.12, .32), 2.6, .31),
     ('Grip fill', (.24, .11, -.22), 1.25, .26),
