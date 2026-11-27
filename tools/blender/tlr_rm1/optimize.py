@@ -44,7 +44,7 @@ def copy_evaluated(source, graph, collection):
 def low_mesh(source, collection, ratio):
     obj = bpy.data.objects.new(source.name, source.data.copy())
     collection.objects.link(obj)
-    active(obj)
+    bpy.context.view_layer.objects.active = obj
     source.data.calc_loop_triangles()
     if ratio < 1 and len(source.data.loop_triangles) > 48:
         mod = obj.modifiers.new('Reduce while retaining the main silhouette', 'DECIMATE')
@@ -75,7 +75,8 @@ def atlas_uv(obj):
             uv[loop].uv *= weight
     obj.data.attributes.remove(weights)
     bpy.ops.object.mode_set(mode='EDIT')
-    bpy.ops.uv.pack_islands(rotate=True, margin_method='FRACTION', margin=5 / ATLAS_SIZE)
+    # Bounding boxes avoid the expensive exact-shape search for these islands.
+    bpy.ops.uv.pack_islands(rotate=True, shape_method='AABB', margin_method='FRACTION', margin=5 / ATLAS_SIZE)
     bpy.ops.object.mode_set(mode='OBJECT')
 
 
@@ -90,7 +91,7 @@ def bake_maps(body, donor, output):
     scene = bpy.context.scene
     settings = scene.render.bake
     samples = scene.cycles.samples
-    scene.cycles.samples = 16
+    scene.cycles.samples = 4
     settings.use_selected_to_active = True
     settings.cage_extrusion, settings.max_ray_distance = .0011, .0023
     settings.margin, settings.margin_type = 8, 'EXTEND'
@@ -105,6 +106,8 @@ def bake_maps(body, donor, output):
     nodes, links = surface.node_tree.nodes, surface.node_tree.links
     shader = nodes.get('Principled BSDF')
     mats = [(m.node_tree.nodes, m.node_tree.links) for m in donor.data.materials if m is not None]
+    active(body)
+    donor.select_set(True)
     for name, color in [('base-color',(.018,.018,.019,1)), ('normal',(.5,.5,1,1)), ('orm',(1,.45,0,1))]:
         image = bpy.data.images.new('tlr-rm1-'+name, width=BAKE_SIZE, height=BAKE_SIZE, alpha=False)
         image.colorspace_settings.name = 'sRGB' if name == 'base-color' else 'Non-Color'
@@ -132,8 +135,6 @@ def bake_maps(body, donor, output):
                         channel(wires, orig.inputs[key], rgb.inputs[i])
                     wires.new(rgb.outputs[0], emit.inputs['Color'])
                 wires.new(emit.outputs[0],out)
-        active(body)
-        donor.select_set(True)
         print('TLR_RM1_BAKE', name, flush=True)
         try:
             bpy.ops.object.bake(type='NORMAL' if name == 'normal' else 'EMIT')
@@ -171,6 +172,8 @@ def optimize(collections, output):
     graph = bpy.context.evaluated_depsgraph_get()
     sources = [obj for collection in collections for obj in collection.objects if not obj.get('source_only')]
     donors = {obj: copy_evaluated(obj, graph, temporary) for obj in sources}
+    for collection in collections:
+        collection.hide_viewport = collection.hide_render = True
     # Donors share each source material's bake shader; restore it once per material.
     parts = []
     offsets = {}
@@ -203,8 +206,6 @@ def optimize(collections, output):
     body.data.attributes.remove(body.data.attributes['_rest'])
     body.data.update(calc_edges=True)
     body.data.name = 'TLR RM 1 optimized atlas mesh'
-    for collection in collections:
-        collection.hide_viewport = collection.hide_render = True
     active(body)
     print(f'TLR_RM1_OPTIMIZED {triangles:,} triangles; 1 material; 1 mesh', flush=True)
     return target

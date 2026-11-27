@@ -210,7 +210,6 @@ def model():
     marks = scene_collection('04  Markings')
     cutters = scene_collection('Temporary machining tools')
     anod = finish('Bead-blasted black anodized aluminum', (.055,.052,.050), .405, .56, .51)
-    pad_ink_bed = finish('Recessed bead-blasted pad-print surface', (.051,.048,.046), .43, .55, .51)
     clamp = finish('Satin black clamp', (.024,.023,.024), .35, .49, .18)
     cap = finish('Black satin head', (.035,.032,.033), .395, .52, .13)
     polymer = finish('Molded black engineering polymer', (.030,.029,.029), .48, .0, .53)
@@ -259,14 +258,17 @@ def model():
     turn(body, 'Lower socket rim', p, [(-.21,1.05),(-.12,1.16),(.11,1.23),(.11,.77),(-.21,.69)], steel,
          axis='X', sides=24, hollow=True)
     turn(body, 'Lower socket dark seat', p, [(.12,.77),(.47,1.11)], dark, axis='X', sides=24)
-    carrier.data.materials.append(pad_ink_bed)
+    pad_slot = carrier.data.materials.find(dark.name)
+    if pad_slot < 0:
+        pad_slot = len(carrier.data.materials)
+        carrier.data.materials.append(dark)
     pad_x = section_profile[-1][1] * MM
     for face in carrier.data.polygons:
         # The machined pad-print face is flat. Do not smooth it into the
         # perimeter or Boolean holes: that would create long diagonal glints.
         if abs(face.normal.x) > .999 and abs(abs(face.center.x)-pad_x) < 1e-6:
             face.use_smooth = False
-            face.material_index = 1
+            face.material_index = pad_slot
 
     # External rail saddle only. The open channel and lug are visual approximations.
     jaw = [(-8.6,3.76),(10.45,3.76),(11.5,3.50),(12.05,2.5),(12.05,-5.15),(11.65,-6.40),(10.6,-7.27),
