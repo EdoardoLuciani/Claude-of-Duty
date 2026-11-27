@@ -12,11 +12,7 @@ from mathutils import Vector
 ATLAS_SIZE = 1024
 BAKE_SIZE = 2 * ATLAS_SIZE  # Supersample the engraved and printed strokes, not the shipped maps.
 MAX_TRIANGLES = 8000
-LABEL = 'Underbody yellow warning plate'
-RECEIVER = 'Machined receiver — continuous radiused pocket and lower lip'
-JAW = 'Moving jaw — captive raised side plate'
-THROAT = 'Fixed throat'
-GLASS = 'Clear protective front window'
+PART_SPACING = .14
 
 
 def active(obj):
@@ -45,22 +41,10 @@ def copy_evaluated(source, graph, collection):
     return clone
 
 
-def low_mesh(source, collection):
+def low_mesh(source, collection, ratio):
     obj = bpy.data.objects.new(source.name, source.data.copy())
     collection.objects.link(obj)
     active(obj)
-    # Hold the rail-height silhouette and favor round optics and shallow bores.
-    # Small edge radii elsewhere are represented by the normal bake.
-    ratio = .21
-    for prefixes, value in [
-        (('Rounded upper saddle lip',), 1),
-        ((RECEIVER, 'HPL bezel', 'Visible shaped reflector', 'Thin exposed silver separator'), .35),
-        (('Optical gasket', 'Silver optical shoulder', 'Dark saddle bed'), .32),
-        (('Laser retaining collar', 'Rounded forward cheek'), .39),
-    ]:
-        if source.name.startswith(prefixes):
-            ratio = value
-            break
     source.data.calc_loop_triangles()
     if ratio < 1 and len(source.data.loop_triangles) > 48:
         mod = obj.modifiers.new('Reduce while retaining the main silhouette', 'DECIMATE')
@@ -73,17 +57,7 @@ def low_mesh(source, collection):
     return obj
 
 
-def decal_receiver(name):
-    if name.startswith(('Sample serial', 'Date marking', 'Battery outline')):
-        return JAW
-    if name.startswith('Face cap'):
-        return THROAT
-    if name.startswith(('Underbody warning', 'Warning plate microprint')):
-        return LABEL
-    return RECEIVER
-
-
-def atlas_uv(obj, density):
+def atlas_uv(obj):
     active(obj)
     for layer in list(obj.data.uv_layers):
         obj.data.uv_layers.remove(layer)
@@ -93,13 +67,13 @@ def atlas_uv(obj, density):
     bpy.ops.uv.smart_project(angle_limit=math.radians(68), island_margin=.002)
     bpy.ops.object.mode_set(mode='OBJECT')
     # Rescale whole parts (and thus whole UV islands), never individual faces.
-    rest, uv = obj.data.attributes['_rest'].data, obj.data.uv_layers.active.data
+    weights = obj.data.attributes['_uv_weight']
+    uv = obj.data.uv_layers.active.data
     for face in obj.data.polygons:
-        i = face.vertices[0]
-        shift = obj.data.vertices[i].co - rest[i].vector
-        weight = density.get(tuple(round(c/.14) for c in shift), 1)
+        weight = weights.data[face.index].value
         for loop in face.loop_indices:
             uv[loop].uv *= weight
+    obj.data.attributes.remove(weights)
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.uv.pack_islands(rotate=True, margin_method='FRACTION', margin=5 / ATLAS_SIZE)
     bpy.ops.object.mode_set(mode='OBJECT')
@@ -195,33 +169,31 @@ def optimize(collections, output):
     temporary = bpy.data.collections.new('Temporary bake materials and donors')
     scene.collection.children.link(temporary)
     graph = bpy.context.evaluated_depsgraph_get()
-    sources = {obj.name: obj for collection in collections for obj in collection.objects if obj.name != GLASS}
-    marks = set(collections[-1].objects.keys()) - {LABEL}
-    donors = {key: copy_evaluated(obj, graph, temporary) for key,obj in sources.items()}
-    # Do not copy materials by part: every donor that used the same material
-    # shares the same bake shader and restores it in one operation.
+    sources = [obj for collection in collections for obj in collection.objects if not obj.get('source_only')]
+    donors = {obj: copy_evaluated(obj, graph, temporary) for obj in sources}
+    # Donors share each source material's bake shader; restore it once per material.
     parts = []
     offsets = {}
-    for key, donor in donors.items():
-        if key in marks:
+    for source, donor in donors.items():
+        if source.get('decal_on') is not None:
             continue
-        i = len(parts)
-        offset = offsets[key] = Vector((.14*(i%9),.14*(i//9),0))
-        obj = low_mesh(donor, target)
+        row, column = divmod(len(parts), 9)
+        offset = offsets[source] = Vector((PART_SPACING*column,PART_SPACING*row,0))
+        obj = low_mesh(donor, target, source.get('bake_ratio', .21))
         rest = obj.data.attributes.new('_rest','FLOAT_VECTOR','POINT')
         for vertex, item in zip(obj.data.vertices, rest.data):
             item.vector = vertex.co
+        weights = obj.data.attributes.new('_uv_weight', 'FLOAT', 'FACE')
+        weights.data.foreach_set('value', [source.get('uv_weight', 1.0)] * len(weights.data))
         obj.location = offset
         parts.append(obj)
-    for key, donor in donors.items():
-        donor.location = offsets[decal_receiver(key) if key in marks else key]
+    for source, donor in donors.items():
+        donor.location = offsets[source.get('decal_on', source)]
     body = join(parts, 'TLR_RM1_optimized')
     triangles = len(body.data.polygons)
     if triangles > MAX_TRIANGLES:
         raise ValueError(f'{triangles:,} triangles exceeds {MAX_TRIANGLES:,} target')
-    density = {tuple(round(c/.14) for c in offsets[key]): weight
-               for key,weight in [(RECEIVER,1.7), (JAW,1.7), (LABEL,1.25)]}
-    atlas_uv(body, density)
+    atlas_uv(body)
     donor = join(list(donors.values()), 'Isolated high bake donor')
     bake_maps(body, donor, output)
     bpy.data.objects.remove(donor, do_unlink=True)

@@ -14,7 +14,7 @@ import bpy
 from mathutils import Matrix, Vector
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from studio import setup, render
+from studio import PLUG, setup, render
 
 MM = .001
 ENVELOPE = (30.0, 92.5, 38.1)  # X width, Y length, Z height
@@ -67,14 +67,14 @@ def mesh(collection, name, points, faces, material, bevel=0):
     for edge in bm.edges:
         if edge.is_manifold and edge.calc_face_angle() > math.radians(48):
             edge.smooth = False
+    for face in bm.faces:
+        face.smooth = True
     bm.to_mesh(data)
     bm.free()
     data.update()
     obj = bpy.data.objects.new(name, data)
     collection.objects.link(obj)
     data.materials.append(material)
-    for face in data.polygons:
-        face.use_smooth = True
     if bevel:
         b = obj.modifiers.new('Edge radius', 'BEVEL')
         b.width, b.segments = bevel * MM, 3
@@ -118,6 +118,11 @@ def box(collection, name, xyz, size, material, bevel=.25):
 def turn(collection, name, xyz, outline, material, *, axis='Y', sides=48, hollow=False,
          flutes=None):
     x, y, z = xyz
+    place = {
+        'Y': lambda a,b,t: (x+a,y+t,z+b),
+        'X': lambda a,b,t: (x+t,y+a,z+b),
+        'Z': lambda a,b,t: (x+a,y+b,z+t),
+    }[axis]
     rings = []
     for t, r in outline:
         ring = []
@@ -125,7 +130,7 @@ def turn(collection, name, xyz, outline, material, *, axis='Y', sides=48, hollow
             theta = math.tau * i / sides
             radius = r - (flutes(t, i) if flutes else 0)
             a, b = radius * math.cos(theta), radius * math.sin(theta)
-            ring.append({'Y': (x+a,y+t,z+b), 'X': (x+t,y+a,z+b), 'Z': (x+a,y+b,z+t)}[axis])
+            ring.append(place(a, b, t))
         rings.append(ring)
     return loft(collection, name, rings, material, closed=hollow)
 
@@ -139,7 +144,7 @@ def subtract(obj, cutter):
     bpy.data.objects.remove(cutter, do_unlink=True)
 
 
-def label(collection, name, words, side, x, y, z, height, width, material, weight=.035, shear=0):
+def label(collection, receiver, name, words, side, x, y, z, height, width, material, weight=.035, shear=0):
     data = bpy.data.curves.new(name, 'FONT')
     data.body, data.align_x, data.align_y = words, 'CENTER', 'CENTER'
     data.resolution_u, data.size = 5, height * MM
@@ -151,27 +156,30 @@ def label(collection, name, words, side, x, y, z, height, width, material, weigh
     bpy.context.view_layer.update()
     obj.scale.x = width * MM / obj.dimensions.x
     data.materials.append(material)
+    obj['decal_on'] = receiver
 
 
-def stroke(collection, name, yz, side, x, material, radius=.10, surface=None):
+def strokes(collection, receiver, name, paths, side, x, material, radius, *, conform=False):
     data = bpy.data.curves.new(name, 'CURVE')
     data.dimensions, data.bevel_depth, data.bevel_resolution = '3D', radius * MM, 1
     data.use_fill_caps = True
-    spline = data.splines.new('POLY')
-    spline.points.add(len(yz) - 1)
-    for point, (y,z) in zip(spline.points, yz):
-        at = (side*x*MM, y*MM, z*MM)
-        if surface is not None:
-            hit, pos, _, _ = surface.ray_cast(Vector((side*.018,at[1],at[2])), Vector((-side,0,0)))
-            if hit:
-                at = (pos.x + side*.00002, at[1], at[2])
-        point.co = (*at, 1)
+    for path in paths:
+        spline = data.splines.new('POLY')
+        spline.points.add(len(path) - 1)
+        for point, (y,z) in zip(spline.points, path):
+            at = (side*x*MM, y*MM, z*MM)
+            if conform:
+                hit, pos, _, _ = receiver.ray_cast(Vector((side*.018,at[1],at[2])), Vector((-side,0,0)))
+                if hit:
+                    at = (pos.x + side*.00002, at[1], at[2])
+            point.co = (*at, 1)
     obj = bpy.data.objects.new(name, data)
     collection.objects.link(obj)
     data.materials.append(material)
+    obj['decal_on'] = receiver
 
 
-def streamlight_mark(collection, material):
+def streamlight_mark(collection, receiver, material):
     # Rounded monoline artwork, drawn as paths rather than a photo texture.
     letters = [
         (1, [[(1,1),(.23,1),(.045,.89),(0,.75),(.15,.54),(.77,.54),(.98,.41),(.98,.16),(.82,0),(0,0)]]),
@@ -188,11 +196,11 @@ def streamlight_mark(collection, material):
         (1, [[(0,1),(1,1)],[(.49,1),(.49,0)]]),
     ]
     y = -8.05
+    artwork = []
     for advance, paths in letters:
-        for path in paths:
-            stroke(collection, 'Rounded Streamlight pad print', [(y+u*1.82,-15.02+v*1.74) for u,v in path],
-                   1, 12.50, material, .178)
+        artwork.extend([(y+u*1.82,-15.02+v*1.74) for u,v in path] for path in paths)
         y += advance*1.82 + .36
+    strokes(collection, receiver, 'Rounded Streamlight pad print', artwork, 1, 12.50, material, .178)
 
 
 def model():
@@ -235,18 +243,14 @@ def model():
     sections = [section(t,-x,left_pocket) for t,x in reversed(section_profile)]
     sections += [section(t,x,right_pocket) for t,x in section_profile]
     carrier = loft(body, 'Machined receiver — continuous radiused pocket and lower lip', sections, anod)
+    carrier['bake_ratio'], carrier['uv_weight'] = .35, 1.7
     saddle = box(cutters, 'Saddle clearance over receiver', (0,1.0,1.65), (19.55,23.9,4.55), dark, 0)
     subtract(carrier,saddle)
     aperture = (-5.0, 17.45, -29.6)
     subtract(carrier, turn(cutters, 'Laser aperture recess', aperture, [(-3.3,2.97),(1,2.97)], dark))
     turn(body, 'Rounded forward cheek surrounding the laser opening', aperture,
          [(-2.10,4.20),(-.63,4.20),(-.17,4.03),(.09,3.62),(.12,2.88),(-2.05,2.89)],
-         anod, sides=48, hollow=True)
-    turn(light, 'Laser retaining collar', aperture,
-         [(-1.95,2.91),(-.38,2.91),(.02,2.49),(.02,1.74),(-1.80,1.74)],
-         clamp, hollow=True)
-    turn(light, 'Laser optic, recessed and unlit', aperture, [(-1.28,1.50),(-1.15,1.51),(-1.05,1.22)],
-         finish('Laser window, dark violet AR coat', (.017,.010,.025), .12, .30, transmission=.15), sides=32)
+         anod, sides=48, hollow=True)['bake_ratio'] = .39
     p = (-12.6,-.2,-22.9)
     subtract(carrier, turn(cutters, 'Deep black side port', p, [(-1,1.44),(.88,1.44)], dark, axis='X', sides=32))
     turn(body, 'Black bed of adjustment port', p, [(.73,1.42),(.91,1.42)], dark, axis='X', sides=32)
@@ -256,10 +260,11 @@ def model():
          axis='X', sides=24, hollow=True)
     turn(body, 'Lower socket dark seat', p, [(.12,.77),(.47,1.11)], dark, axis='X', sides=24)
     carrier.data.materials.append(pad_ink_bed)
+    pad_x = section_profile[-1][1] * MM
     for face in carrier.data.polygons:
         # The machined pad-print face is flat. Do not smooth it into the
         # perimeter or Boolean holes: that would create long diagonal glints.
-        if abs(face.normal.x) > .999 and abs(abs(face.center.x)-.0126) < 1e-6:
+        if abs(face.normal.x) > .999 and abs(abs(face.center.x)-pad_x) < 1e-6:
             face.use_smooth = False
             face.material_index = 1
 
@@ -270,11 +275,13 @@ def model():
     moving = [(-9.6,3.4),(-7.4,3.76),(8.0,3.76),(10.8,3.35),(12.6,1.5),(13.3,-4.4),(12.5,-5.9),
               (11.0,-6.6),(7.9,-7.2),(-7.1,-7.2),(-9.41,-6.7),(-10.1,-5.52),(-10.1,1.5)]
     moving_jaw = profile(body, 'Moving jaw — captive raised side plate', moving, -14.16, -8.9, anod, .86)
+    moving_jaw['uv_weight'] = 1.7
     for obj, side in [(fixed_jaw,1),(moving_jaw,-1)]:
         flank = [(8.4,-.09),(10.57,1.06),(9.92,2.17),(8.32,4.68),(5,4.68),(5,-.09)]
         cutter = profile(cutters, 'Open saddle relief', [(side*x,z) for x,z in flank], -13, 14, dark, 0, axis='Y')
         subtract(obj,cutter)
     bed = box(body, 'Dark saddle bed', (0,1.6,-.15), (18.1,23.6,1.1), clamp, .31)
+    bed['bake_ratio'] = .32
     for y in (-4.5,3.4,9.1):
         subtract(bed, turn(cutters, 'Shallow saddle counterbore', (0,y,0), [(-.11,1.83),(.91,1.83)], dark,
                            axis='Z', sides=30))
@@ -282,7 +289,7 @@ def model():
     lip = [(9.2,2.48),(9.85,3.36),(10.25,3.77),(10.96,4.0),(12.10,4),(12.6,3.57),(12.4,2.75)]
     for side in (1,-1):
         profile(body, 'Rounded upper saddle lip', [(side*x,z) for x,z in lip], -7.6, 9.95,
-                clamp, .20, 'Y')
+                clamp, .20, 'Y')['bake_ratio'] = 1.0  # Preserve the authored rail height.
     pin = (14.22,.65,-2.95)
     turn(body, 'Right counterbore shadow', pin, [(-.24,2.96),(.10,2.94)], dark, axis='X')
     turn(body, 'Fine rim of right counterbore', pin, [(.10,2.94),(.16,2.91),(.16,2.77),(.095,2.76)],
@@ -297,11 +304,16 @@ def model():
                 [(-.60,4.06),(-.54,4.24),(-.38,4.33),(-.28,4.23)], steel, axis='X', sides=64)
     slot = box(cutters, 'Straight screwdriver slot', (-15.03,1.0,-1.78), (.46,9.0,1.05), dark, 0)
     subtract(head, slot)
+    turn(body, 'Laser retaining collar', aperture,
+         [(-1.95,2.91),(-.38,2.91),(.02,2.49),(.02,1.74),(-1.80,1.74)],
+         clamp, hollow=True)['bake_ratio'] = .39
+    turn(body, 'Laser optic, recessed and unlit', aperture, [(-1.28,1.50),(-1.15,1.51),(-1.05,1.22)],
+         finish('Laser window, dark violet AR coat', (.017,.010,.025), .12, .30, transmission=.15), sides=32)
 
     lamp = (0, 0, -15.6)
-    turn(light, 'Fixed throat', lamp, [(14.8,12.65),(16.30,13.30),(19.43,13.70)], anod, sides=80)
+    throat = turn(light, 'Fixed throat', lamp, [(14.8,12.65),(16.30,13.30),(19.43,13.70)], anod, sides=80)
     turn(light, 'Thin exposed silver separator band', lamp,
-         [(18.95,13.56),(19.05,13.72),(19.54,13.74),(19.66,13.62)], silver, sides=80)
+         [(18.95,13.56),(19.05,13.72),(19.54,13.74),(19.66,13.62)], silver, sides=80)['bake_ratio'] = .35
 
     def head_flutes(t, i):
         # Four interrupted reliefs, two visible in each side profile.
@@ -311,20 +323,20 @@ def model():
          [(19.61,13.64),(19.89,13.70),(21.9,13.70),(22.0,13.70),(22.04,13.70),(22.19,13.70),
           (28.5,13.70),(33.62,13.70),(33.8,13.70),(33.84,13.70),(34.24,13.66),(35.0,13.15),
           (35.0,11.04),(34.85,10.91),(34.6,10.65),(33.0,10.67),(30.55,10.59),(19.61,11.47)],
-         cap, sides=72, hollow=True, flutes=head_flutes)
+         cap, sides=72, hollow=True, flutes=head_flutes)['bake_ratio'] = .35
     seal = finish('Dark optical gasket', (.009,.012,.014), .26, .06)
     turn(light, 'Optical gasket', lamp,
          [(34.43,11.20),(34.48,11.19),(34.52,10.54),(34.40,10.45),(34.10,10.63),(34.10,11.22)],
-         seal, sides=72, hollow=True)
+         seal, sides=72, hollow=True)['bake_ratio'] = .32
     reflector = finish('Mirror-silver optic bowl', (.884,.897,.91), .122, .91)
     turn(light, 'Visible shaped reflector bowl', lamp,
          [(34.37,10.51),(33.74,10.35),(32.6,10.00),(31.50,9.51),(30.40,8.80),
           (29.0,7.68),(27.88,6.48),(26.56,4.71),(25.71,3.13),(25.47,2.23),
           (25.40,1.62),(25.06,1.65),(25.33,3.20),(27.30,6.2),(31.38,9.93),(34.37,10.57)],
-         reflector, sides=72, hollow=True)
+         reflector, sides=72, hollow=True)['bake_ratio'] = .35
     turn(light, 'Silver optical shoulder just inside the front seal', lamp,
          [(33.48,10.29),(34.1,10.54),(34.35,10.51),(34.08,10.15),(33.48,10.23)],
-         finish('Optical shoulder', (.77,.81,.83), .116, .85), sides=72, hollow=True)
+         finish('Optical shoulder', (.77,.81,.83), .116, .85), sides=72, hollow=True)['bake_ratio'] = .32
     turn(light, 'Frosted central optic', lamp, [(25.0,2.36),(28.2,2.36),(28.8,2.21),(29.13,1.73),(29.23,1.3)],
          finish('Diffuse milky optic centre', (.75,.75,.72), .39), sides=36)
     facet_metal = finish('Optic facet flashes', (.76,.82,.86), .17, .80)
@@ -344,11 +356,11 @@ def model():
     links.new(clear.outputs[0], mix.inputs[1])
     links.new(nodes.get('Principled BSDF').outputs[0], mix.inputs[2])
     links.new(mix.outputs[0], nodes.get('Material Output').inputs['Surface'])
-    turn(light, 'Clear protective front window', lamp, [(34.20,10.51),(34.36,10.51),(34.44,10.42)], glass, sides=72)
+    window = turn(light, 'Clear protective front window', lamp, [(34.20,10.51),(34.36,10.51),(34.44,10.42)],
+                  glass, sides=72)
+    window['source_only'] = True  # Keep the optimized atlas opaque.
     # The orthographic side photo sets the bezel diameter at about 23.6 mm.
     for obj in light.objects:
-        if obj.name.startswith('Laser'):
-            continue
         for v in obj.data.vertices:
             v.co.x *= .864
             v.co.z = (v.co.z-lamp[2]*MM)*.864 - 13.44*MM
@@ -387,7 +399,7 @@ def model():
     turn(tail, 'Connector shadow', port, [(.75,2.66),(1.18,2.67)], dark, sides=32)
 
     # Only visible in the matched rear reference render; not part of the module envelope.
-    plug = scene_collection('06  Reference-only cable plug')
+    plug = scene_collection(PLUG)
     turn(plug, 'Plug socket sleeve', port, [(-2.62,3.40),(-2.4,3.73),(-.15,3.75),(.1,3.49)], clamp, sides=40)
     plug_outline = [(-3.5,-1.90),(3.5,-1.90),(4.72,-3.19),(4.72,-8.95),
                     (3.58,-10.18),(-3.58,-10.18),(-4.72,-8.95),(-4.72,-3.19)]
@@ -407,15 +419,15 @@ def model():
     pad = [(-43.1,-19.0),(-40.7,-19.6),(-34.95,-21.95),(-27.2,-26.2),(-26.85,-28.4),
            (-28.55,-29.1),(-42.25,-22.32)]
     profile(tail, 'Recessed large pressure pad', pad, -10.45, 10.45, rubber, .76)
+    # The grip strokes keep the same pitch across the underside slope.
+    rotation = Matrix.Rotation(math.radians(-25), 3, 'X')
     for i in range(9):
         t = i / 8
         y = -41.34+12.55*t
         z = -22.32 - (y+42.25)*.495 - .07
         bar = box(tail, f'Pressure pad grip rib {i+1}', (0,y,z),
                   (15.4+3.55*math.sin(t*math.pi/1.5), .73, .70), rubber, .20)
-        # The grip strokes keep the same pitch across the underside slope.
         pivot = Vector((0,y*MM,z*MM))
-        rotation = Matrix.Rotation(math.radians(-25), 3, 'X')
         for v in bar.data.vertices:
             v.co = pivot + rotation @ (v.co - pivot)
     profile(tail, 'Forward underside switch guard', [(-28.5,-27.1),(-15.6,-26.2),(-15.6,-33.85),
@@ -428,13 +440,9 @@ def model():
               (-19.38,-13.39),(-18.82,-14.49),(-21.13,-13.9),(-31.32,-11.48)],
             14.01, 14.68, anod, .37)
     # Raised index stops on an exposed arc behind the nose of the paddle.
-    arc = []
-    for i in range(11):
-        a = math.radians(-64 + i*12.8)
-        arc.append((-27.0+10.30*math.cos(a),-14.9+10.30*math.sin(a)))
-    for i in reversed(range(11)):
-        a = math.radians(-64 + i*12.8)
-        arc.append((-27.0+8.95*math.cos(a),-14.9+8.95*math.sin(a)))
+    angles = [math.radians(-64 + i*12.8) for i in range(11)]
+    arc = [(-27.0+r*math.cos(a),-14.9+r*math.sin(a))
+           for r,sweep in ((10.30,angles),(8.95,reversed(angles))) for a in sweep]
     profile(tail, 'Three-mode index arc', arc, 12.41, 13.24, clamp, .21)
     for i, angle in enumerate((-53, 0, 53)):
         a = math.radians(angle)
@@ -446,65 +454,70 @@ def model():
         turn(tail, 'Lower housing attachment pin', (s*10.97,-23.5,-30.18),
              [(-.3,1.01),(.3,1.01)], clamp, axis='X', sides=24)
 
-    streamlight_mark(marks, white)
-    label(marks, 'Wordmark registration', '®', 1, 12.65, 14.47,-15.05,.92,.88,white)
-    label(marks, 'Patent marking', 'Patented', 1, 12.62, 3.5,-16.42,1.60,6.0,white,.042)
-    label(marks, 'CE mark', 'CE', 1, 13.47, -12.40,-2.29,2.42,2.65,white,.07)
+    plate = box(tail, 'Underbody yellow warning plate', (1.25,-14.15,-33.84), (11.9,8.0,.30), yellow, .11)
+    plate['uv_weight'] = 1.25
+    streamlight_mark(marks, carrier, white)
+    label(marks, carrier, 'Wordmark registration', '®', 1, 12.65, 14.47,-15.05,.92,.88,white)
+    label(marks, carrier, 'Patent marking', 'Patented', 1, 12.62, 3.5,-16.42,1.60,6.0,white,.042)
+    label(marks, carrier, 'CE mark', 'CE', 1, 13.47, -12.40,-2.29,2.42,2.65,white,.07)
     glyphs = [
         [(0,0),(0,.74),(-.34,.74),(-.34,1),(.61,1),(.61,.74),(.28,.74),(.28,0),(0,0)],
         [(0,0),(0,1),(.27,1),(.27,.24),(.81,.24),(.81,0),(0,0)],
         [(0,0),(0,1),(.72,1),(.90,.81),(.90,.56),(.72,.43),(.96,0),(.63,0),(.38,.39),(.28,.39),(.28,0),(0,0)],
         [(.28,.63),(.58,.63),(.65,.72),(.57,.80),(.28,.80),(.28,.63)],
     ]
-    for origin, path in zip((12.6,9.25,6.15,6.15),glyphs):
-        stroke(marks, 'Outlined TLR letter', [(origin-u*2.7,-15.7+v*2.86) for u,v in path],
-               -1,12.62,white,.089)
-    label(marks, 'TLR registration', '®', -1, 12.62, 2.75,-12.87,1.08,1.02,white,.04)
-    label(marks, 'Model wordmark', 'RM', -1, 12.62, -1.18,-14.2,4.19,6.15,white,.136)
-    stroke(marks, 'The stepped numeral one', [(-6.05,-13.38),(-7.10,-12.96),(-7.10,-15.69)],
-           -1,12.62,white,.24)
-    label(marks, 'Series marking', 'LASER-G', -1, 12.62, -2.94,-17.52,2.83,10.0,white,.067,.16)
-    label(marks, 'Sample serial marking', 'S/N 017040A', -1, 14.18, -7.0,-1.45,1.43,5.9,white)
-    label(marks, 'Date marking', '1023', -1, 14.18, -7.2,-3.05,1.42,2.75,white)
-    stroke(marks, 'Battery outline', [(9.0,-1.5),(5.8,-1.5),(5.8,-4.22),(9,-4.22),
-           (9,-3.5),(9.53,-3.5),(9.53,-2.25),(9,-2.25),(9,-1.5)],-1,14.18,white,.095)
-    for y, z, r, side, x, name in [(-13.21,-18.0,1.07,1,13.37,'Laser star icon'),
-                                  (-.2,-20.48,1.56,-1,12.62,'Upper adjustment arc'),
-                                  (-1,-27.94,.89,-1,12.96,'Lower adjustment arc')]:
-        if side == 1:
-            for j in range(6):
-                a = math.tau*j/12
-                dy,dz = r*math.cos(a),r*math.sin(a)
-                stroke(marks,name,[(y-dy,z-dz),(y+dy,z+dz)],side,x,white,.078,surface=carrier)
-        else:
-            stroke(marks, name, [(y+r*math.cos(math.pi*j/10), z+r*math.sin(math.pi*j/10)*.48)
-                                  for j in range(11)],side,x,white,.09,surface=carrier)
-    for z in (-6.78,-12.5):
-        stroke(marks, 'White-light selector icon', [(-14.19,z-.37),(-13.64,z-.37),(-12.91,z-.98),
-               (-12.91,z+.98),(-13.60,z+.40),(-14.19,z+.40),(-14.19,z-.37)],1,13.32,white,.087,surface=carrier)
-    box(marks, 'Underbody yellow warning plate', (1.25,-14.15,-33.84), (11.9,8.0,.30), yellow, .11)
-    box(marks, 'Underbody warning print field', (1.25,-14.08,-34.01), (10.16,4.5,.12), dark, .06)
+    outline = [[(origin-u*2.7,-15.7+v*2.86) for u,v in path]
+               for origin,path in zip((12.6,9.25,6.15,6.15),glyphs)]
+    strokes(marks, carrier, 'Outlined TLR lettering', outline, -1,12.62,white,.089)
+    label(marks, carrier, 'TLR registration', '®', -1, 12.62, 2.75,-12.87,1.08,1.02,white,.04)
+    label(marks, carrier, 'Model wordmark', 'RM', -1, 12.62, -1.18,-14.2,4.19,6.15,white,.136)
+    strokes(marks, carrier, 'The stepped numeral one', [[(-6.05,-13.38),(-7.10,-12.96),(-7.10,-15.69)]],
+            -1,12.62,white,.24)
+    label(marks, carrier, 'Series marking', 'LASER-G', -1, 12.62, -2.94,-17.52,2.83,10.0,white,.067,.16)
+    label(marks, moving_jaw, 'Sample serial marking', 'S/N 017040A', -1, 14.18, -7.0,-1.45,1.43,5.9,white)
+    label(marks, moving_jaw, 'Date marking', '1023', -1, 14.18, -7.2,-3.05,1.42,2.75,white)
+    strokes(marks, moving_jaw, 'Battery outline', [[(9.0,-1.5),(5.8,-1.5),(5.8,-4.22),(9,-4.22),
+            (9,-3.5),(9.53,-3.5),(9.53,-2.25),(9,-2.25),(9,-1.5)]],-1,14.18,white,.095)
+    star = []
+    for j in range(6):
+        a = math.tau*j/12
+        dy,dz = 1.07*math.cos(a),1.07*math.sin(a)
+        star.append([(-13.21-dy,-18.0-dz),(-13.21+dy,-18.0+dz)])
+    strokes(marks, carrier, 'Laser star icon', star, 1,13.37,white,.078,conform=True)
+    for y,z,r,x,name in [(-.2,-20.48,1.56,12.62,'Upper adjustment arc'),
+                         (-1,-27.94,.89,12.96,'Lower adjustment arc')]:
+        arc = [(y+r*math.cos(math.pi*j/10), z+r*math.sin(math.pi*j/10)*.48) for j in range(11)]
+        strokes(marks, carrier, name, [arc], -1,x,white,.09,conform=True)
+    icons = [[(-14.19,z-.37),(-13.64,z-.37),(-12.91,z-.98),(-12.91,z+.98),
+              (-13.60,z+.40),(-14.19,z+.40),(-14.19,z-.37)] for z in (-6.78,-12.5)]
+    strokes(marks, carrier, 'White-light selector icons', icons, 1,13.32,white,.087,conform=True)
+    box(marks, 'Underbody warning print field', (1.25,-14.08,-34.01),
+        (10.16,4.5,.12), dark, .06)['decal_on'] = plate
     for i, width in enumerate((7.8,6.3,8.5,5.6)):
-        box(marks, 'Warning plate microprint line', (1.25,-15.65+i*1.02,-34.074), (width,.28,.018), yellow,.008)
-    stroke(marks, 'Face cap rotation cue', [(18.90,-8.88),(18.53,-10.60),(18.52,-12.9),(18.84,-15.03),
-           (19.18,-16.58)], -1,11.30,white,.105)
-    for z, s in [(-8.88,-1),(-16.58,1)]:
-        stroke(marks, 'Face cap cue arrowhead', [(18.40,z+s*.7),(18.98,z),(19.38,z+s*.82)],
-               -1,11.30,white,.092)
+        box(marks, 'Warning plate microprint line', (1.25,-15.65+i*1.02,-34.074),
+            (width,.28,.018), yellow,.008)['decal_on'] = plate
+    strokes(marks, throat, 'Face cap rotation cue', [[(18.90,-8.88),(18.53,-10.60),(18.52,-12.9),
+            (18.84,-15.03),(19.18,-16.58)]], -1,11.30,white,.105)
+    arrows = [[(18.40,z+s*.7),(18.98,z),(19.38,z+s*.82)] for z,s in [(-8.88,-1),(-16.58,1)]]
+    strokes(marks, throat, 'Face cap cue arrowheads', arrows, -1,11.30,white,.092)
     bpy.data.collections.remove(cutters)
     return (body, light, tail, marks)
 
 
 def validate(collections):
     graph = bpy.context.evaluated_depsgraph_get()
-    points = []
+    lo, hi = [math.inf]*3, [-math.inf]*3
     for collection in collections:
         for source in collection.objects:
             obj = source.evaluated_get(graph)
+            matrix = obj.matrix_world
             data = obj.to_mesh()
-            points.extend(obj.matrix_world @ vertex.co for vertex in data.vertices)
+            for vertex in data.vertices:
+                for axis, value in enumerate(matrix @ vertex.co):
+                    lo[axis] = min(lo[axis], value)
+                    hi[axis] = max(hi[axis], value)
             obj.to_mesh_clear()
-    measured = tuple((max(p[i] for p in points)-min(p[i] for p in points))/MM for i in range(3))
+    measured = tuple((b-a)/MM for a,b in zip(lo,hi))
     if any(abs(a-b) > .02 for a,b in zip(measured, ENVELOPE)):
         raise ValueError(f'Envelope X/Y/Z {measured!r} mm differs from {ENVELOPE!r}')
     print('Envelope X/Y/Z (mm):', *(round(x,3) for x in measured), flush=True)

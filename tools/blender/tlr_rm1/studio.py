@@ -5,6 +5,8 @@ import math
 import bpy
 from mathutils import Quaternion, Vector
 
+PLUG = '06  Reference-only cable plug'
+
 # Manufacturer 02/03/04 have no EXIF camera metadata. These are matched by eye
 # to the barrel axis, lens ellipse and side silhouette, not a per-axis warp.
 VIEWS = {
@@ -37,8 +39,9 @@ def setup(quick):
     cameras = {}
     for name, (direction, (y,z), width) in VIEWS.items():
         data = bpy.data.cameras.new(name)
-        distance = .225 if name == 'front-quarter' else .240
-        if name == 'front-quarter':
+        perspective = name == 'front-quarter'
+        distance = .225 if perspective else .240
+        if perspective:
             data.type = 'PERSP'
             data.lens = data.sensor_width * distance / (width * .001)
         else:
@@ -50,7 +53,7 @@ def setup(quick):
         focus = Vector((0,y*.001,z*.001))
         camera.location = focus + Vector(direction).normalized() * distance
         rotation = (focus-camera.location).to_track_quat('-Z', 'Y')
-        if name == 'front-quarter':
+        if perspective:
             rotation = rotation @ Quaternion((0,0,1),math.radians(-9))
         camera.rotation_euler = rotation.to_euler()
         cameras[name] = camera
@@ -111,7 +114,7 @@ def render(directory):
         scene.camera = bpy.data.objects[name]
         scene.render.filepath = str(directory / f'{name}.png')
         bpy.ops.render.render(write_still=True)
-    plug = bpy.data.collections['06  Reference-only cable plug']
+    plug = bpy.data.collections[PLUG]
     plug.hide_render = False
     scene.camera = bpy.data.objects['rear-quarter']
     scene.render.filepath = str(directory / 'rear-quarter-with-plug.png')
