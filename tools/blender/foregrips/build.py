@@ -349,12 +349,12 @@ def dd_vertical():
         field = []
         for z,w in ((-.0298,.73),(-.0306,.89),(-.032,.97),(-.034,1),(-.036,1),
                     (-.064,1),(-.089,1),(-.091,.97),(-.0925,.88),(-.0933,.73)):
-            field.append(panel_surface([(w*u,z) for u in (-1,-.97,-.9,-.66,-.33,0,.33,.66,.9,.97,1)],
-                                       .00044))
-            for i in (0,10):
-                x,y,h = field[-1][i]
-                field[-1][i] = x-side*.00065,y,h
-            field[-1].extend(panel_surface([(w,z),(-w,z)], -.0011))
+            ring = panel_surface([(w*u,z) for u in (-1,-.97,-.9,-.66,-.33,0,.33,.66,.9,.97,1)],
+                                 .00044)
+            for i in (0,-1):
+                x,y,h = ring[i]
+                ring[i] = x-side*.00065,y,h
+            field.append(ring + panel_surface([(w,z),(-w,z)], -.0011))
         smooth(loft('Curved rubber overmold', field, rubber))
 
         def tread(name, outline, direction=1):
@@ -418,11 +418,13 @@ def dd_vertical():
         (-.1121,.01555,.01695,.095,4.3,.66), (-.1133,.0153,.01665,.068,3.9,1),
         (-.1133,.0122,.0132,0,0,1), (-.1125,.0104,.0113,0,0,.48),
         (-.1116,.0097,.0107,0,0,0)):
-        ring = []
-        for i,(u,v,w) in enumerate(ellipse(z,x,y,.87,steps=64)):
-            offset = abs((2*i+8)%16-8)
+        ring, steps = [], 64
+        for i,(u,v,w) in enumerate(ellipse(z,x,y,.87,steps)):
+            # Eight scallops per turn; offset is the distance from a scallop crown in 16ths.
+            turn = i/steps
+            offset = 16*abs((8*turn+.5)%1-.5)
             scale = 1 - depth*ease((half-offset)/1.9)
-            notch = ease((2.85-abs(2*i-112))/.95)
+            notch = ease((2.85-128*abs(turn-.875))/.95)
             ring.append((scale*u,scale*v,w+lip*.0032*notch))
         rings.append(ring)
     smooth(loft('Round-ended scallops and closed end dish', rings, polymer))

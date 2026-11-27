@@ -41,14 +41,15 @@ data.type, data.ortho_scale = 'ORTHO', .171
 camera = bpy.data.objects.new(data.name, data)
 scene.collection.objects.link(camera)
 scene.camera = camera
-vertical = bpy.data.objects.get('ATTACHMENT_dd_vertical') is not None
-center = Vector((0, 0, -.056 if vertical else -.026))
-for name, direction in (
-    ('side', (1,0,0)),
-    ('oblique', (1,.52,.03) if vertical else (1,.52,.48)),
-    ('underside', (.29,.14,-1) if vertical else (.70,-.40,-1)),
-    ('end', (0,1,.15) if vertical else (.30,1,-.23)),
-):
+# Per-asset framing: center height, then oblique, underside and end directions.
+VIEWS = {
+    'afg2': (-.026, (1,.52,.48), (.70,-.40,-1), (.30,1,-.23)),
+    'dd_vertical': (-.056, (1,.52,.03), (.29,.14,-1), (0,1,.15)),
+}
+root = next(o for o in bpy.data.objects if o.name.startswith('ATTACHMENT_'))
+height, *directions = VIEWS[root.name.removeprefix('ATTACHMENT_')]
+center = Vector((0, 0, height))
+for name, direction in zip(('side', 'oblique', 'underside', 'end'), ((1,0,0), *directions)):
     camera.location = center + Vector(direction).normalized() * .42
     aim(camera, center)
     scene.render.filepath = str(args.output/f'{name}.png')
