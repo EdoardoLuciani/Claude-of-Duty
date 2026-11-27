@@ -517,6 +517,7 @@ def main():
     parser.add_argument('--output', type=Path, default=OUT)
     parser.add_argument('--render', action='store_true')
     parser.add_argument('--quick', action='store_true')
+    parser.add_argument('--optimize', action='store_true', help='Bake and export the separate optimized exterior')
     args = parser.parse_args(sys.argv[sys.argv.index('--')+1:] if '--' in sys.argv else [])
     args.output = args.output.resolve()
     args.output.mkdir(parents=True, exist_ok=True)
@@ -528,6 +529,17 @@ def main():
     bpy.ops.wm.save_as_mainfile(filepath=str(args.output / 'tlr-rm1.blend'))
     if args.render:
         render(args.output / 'renders')
+    if args.optimize:
+        from optimize import optimize
+
+        target = optimize(model_collections, args.output)
+        validate((target,))
+        bpy.context.scene.camera = bpy.data.objects['front-quarter']
+        bpy.ops.wm.save_as_mainfile(filepath=str(args.output / 'tlr-rm1-optimized.blend'))
+        bpy.ops.export_scene.gltf(filepath=str(args.output / 'tlr-rm1-optimized.glb'),
+                                  export_format='GLB', use_selection=True, export_tangents=True)
+        if args.render:
+            render(args.output / 'renders-optimized')
 
 
 if __name__ == '__main__':
