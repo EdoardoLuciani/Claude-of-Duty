@@ -37,9 +37,11 @@ for asset in afg2 dd_vertical; do
 done
 ```
 
-Each bake produces an editable `.blend` and a standalone `.glb` with three opaque
-finishes and no textures, skin or animation. The review cameras render isolated
-side, oblique, underside and end views without changing the saved scene. The
+Each bake produces an editable `.blend` and a standalone `.glb` with one mesh
+primitive and one opaque material. Vertex colors distinguish the finish tints
+without extra primitives or textures. Neither prop includes skinning or
+animation. The review cameras render isolated side, oblique, underside and end
+views without changing the saved scene. The
 runtime catalog must not list a grip on the strength of these renders or a rigid
 seat alone; each fit also needs its own left-hand contact and animation checks.
 

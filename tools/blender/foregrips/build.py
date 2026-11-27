@@ -12,13 +12,9 @@ from mathutils.bvhtree import BVHTree
 ROOT = Path(__file__).resolve().parents[3]
 
 
-def finish(name, value, roughness, metal=0):
+def finish(name, value):
     material = bpy.data.materials.new(name)
     material.diffuse_color = (value * .99, value, value * 1.02, 1)
-    shader = material.node_tree.nodes.get('Principled BSDF')
-    shader.inputs['Base Color'].default_value = material.diffuse_color
-    shader.inputs['Roughness'].default_value = roughness
-    shader.inputs['Metallic'].default_value = metal
     return material
 
 
@@ -140,8 +136,8 @@ def ribbed_pad(name, path, ribs, material, rib_run=None, back=None, crown=None):
         y = first + (last-first) * (i+.5) / ribs
         for d, up in ((-.00058, 0), (-.00024, .00055), (.00024, .00055), (.00058, 0)):
             cuts.append((y+d, up))
-    surface = ((-1,.0017), (-.9,.00073), (-.69,.00026), (-.4,.00007), (0,0),
-               (.4,.00007), (.69,.00026), (.9,.00073), (1,.0017))
+    surface = ((-1,.0017), (-.88,.00067), (-.62,.00020), (0,0),
+               (.62,.00020), (.88,.00067), (1,.0017))
     for y, lift in sorted(cuts):
         a, b = next((a, b) for a, b in zip(path, path[1:]) if a[0] <= y <= b[0])
         t = (y-a[0]) / (b[0]-a[0])
@@ -186,9 +182,9 @@ def afg_web_opening():
 
 
 def afg2():
-    polymer = finish('Black molded polymer', .023, .59)
-    grip = finish('Textured black polymer', .020, .73)
-    steel = finish('Blackened hardware', .053, .39, .60)
+    polymer = finish('Black molded polymer', .023)
+    grip = finish('Textured black polymer', .020)
+    steel = finish('Blackened hardware', .041)
     # The rising V has a round heel, a shorter front toe, and a web opening
     # offset toward the heel. The rail-facing skin is deliberately closed.
     outline = [(-.068,-.005), (.058,-.005), (.061,-.008), (.066,-.008),
@@ -218,7 +214,7 @@ def afg2():
         for a,b in ((-.066,-.040), (-.031,.028), (.038,.058)):
             round_edges(profile('Crown edge highlight', [(a,-.0059), (b,-.0059),
                 (b,-.0013), (b-.001,.0009), (a+.001,.0009), (a,-.0013)],
-                .0019, polymer, side*.0135), .0009)
+                .0019, polymer, side*.0135), .0009, segments=1)
         for y,z,r in [(-.0585,-.0163,.0036), (-.0485,-.0495,.0034), (.0596,-.0163,.0031),
                       (.0006,-.0114,.0055)]:
             is_large = r > .004
@@ -229,7 +225,7 @@ def afg2():
                     for x,radius in ((.0169,r), (.01766,r), (.01793,r+.00006),
                         (.01812,r+.00019), (.0183,r+.00040), (.0197,r+.00040))], None)
             else:
-                sink = cylinder('Fastener cup', (side*.0183, y, z), r, .0028, None)
+                sink = cylinder('Fastener cup', (side*.0183, y, z), r, .0028, None, 16)
             recess(shell, sink)
             outer = .0189 if is_large else .0181
             if is_large:
@@ -239,14 +235,14 @@ def afg2():
                     (side*(outer-.00072),y,z), r*.72, .0015, steel, 6), .00019, segments=2)
                 continue
             screw = cylinder('Slotted face' if is_large else 'Socket face',
-                (side*(outer-.00072),y,z), r*.83, .0015, steel, 20)
+                (side*(outer-.00072),y,z), r*.83, .0015, steel, 16)
             if is_large:
                 slot = profile('Slot recess', [(y-.0044,z-.0019), (y+.0044,z+.0009),
                     (y+.0044,z+.0019), (y-.0044,z-.0009)], .0008, None, side*outer)
             else:
                 slot = cylinder('Dark hex recess', (side*outer,y,z), r*.39, .0018, None, 6)
             recess(screw, slot)
-            round_edges(screw, .00016, segments=2)
+            round_edges(screw, .00016, segments=1)
             if not is_large:
                 matrix = screw.matrix_world
                 local = matrix.inverted()
@@ -260,7 +256,7 @@ def afg2():
                                    [f.vertices[:] for f in shell.data.loop_triangles], all_triangles=True)
     seam = ((-.039,-.038), (-.033,-.0343), (-.027,-.0307), (-.022,-.0277))
     stations = [(y+(ny-y)*t, z+(nz-z)*t) for (y,z), (ny,nz) in zip(seam, seam[1:])
-                for t in (0, .25, .5, .75)] + [seam[-1]]
+                for t in (0, .5)] + [seam[-1]]
     for side in (-1, 1):
         for i in range(3):
             dz = i*.00105
@@ -288,7 +284,7 @@ def afg2():
         4, grip, (.0079,.0124), back=lambda y: .60*y-.0238, crown=lambda y: .0033*ease((.010-y)/.004))
 
 
-def ellipse(z, x, y, squareness, steps=64):
+def ellipse(z, x, y, squareness, steps=40):
     ring = []
     for i in range(steps):
         angle = tau*i/steps
@@ -304,9 +300,9 @@ def smooth(obj):
 
 
 def dd_vertical():
-    polymer = finish('Black molded polymer', .021, .50)
-    rubber = finish('Black rubber overmold', .014, .72)
-    relief = finish('Black tread and emblem', .018, .64)
+    polymer = finish('Black molded polymer', .021)
+    rubber = finish('Black rubber overmold', .014)
+    relief = finish('Black tread and emblem', .018)
     handle = ((-.028, .0126, .01455, .70), (-.036, .0130, .01475, .70),
               (-.064, .0141, .01615, .72), (-.091, .0155, .01745, .77),
               (-.098, .0160, .01775, .81))
@@ -331,19 +327,17 @@ def dd_vertical():
         return tuple(v + (w-v)*t for v,w in zip(a[1:], b[1:]))
 
     for side in (-1, 1):
-        # A low contrast, hand-built mark on the shoulder, without a raised badge plate.
-        for text, y, z, size in (('D', -.0069, -.0084, .0059), ('ANIEL', -.0000, -.0072, .00275),
-                                  ('EFENSE', .0006, -.0105, .00275)):
-            data = bpy.data.curves.new(text, 'FONT')
-            data.body, data.align_x, data.align_y = text, 'CENTER', 'CENTER'
-            data.size, data.extrude, data.resolution_u = size, .000035, 3
-            obj = bpy.data.objects.new(text, data)
-            bpy.context.collection.objects.link(obj)
-            obj.location = (side*.01749, y*side, z)
-            obj.rotation_euler = (pi/2, 0, side*pi/2)
-            data.materials.append(relief)
-            activate(obj)
-            bpy.ops.object.convert(target='MESH')
+        # Keep the shoulder emblem without tessellating the tiny wordmark.
+        data = bpy.data.curves.new('Shoulder emblem', 'FONT')
+        data.body, data.align_x, data.align_y = 'D', 'CENTER', 'CENTER'
+        data.size, data.extrude, data.resolution_u = .0059, .000035, 3
+        obj = bpy.data.objects.new(data.name, data)
+        bpy.context.collection.objects.link(obj)
+        obj.location = (side*.01749, -.0069*side, -.0084)
+        obj.rotation_euler = (pi/2, 0, side*pi/2)
+        data.materials.append(relief)
+        activate(obj)
+        bpy.ops.object.convert(target='MESH')
 
         def panel_surface(outline, depth):
             ring = []
@@ -368,8 +362,11 @@ def dd_vertical():
 
         def tread(name, outline, direction=1):
             outline = [(direction*u, z) for u,z in outline]
-            round_edges(loft(name, [panel_surface(outline, depth) for depth in (.00014,.00102)],
-                             relief), .00022, segments=1)
+            # Chamfer the exposed face only; its buried back needs no bevel.
+            u_mid, z_mid = (sum(p[i] for p in outline)/len(outline) for i in (0, 1))
+            lip = [(u+(u_mid-u)*.10, z+(z_mid-z)*.10) for u,z in outline]
+            loft(name, [panel_surface(outline, d) for d in (.00014,.00080)]
+                 + [panel_surface(lip, .00102)], relief)
 
         # Each group has a long, nested arrow and a staggered surround, not rows of individual teeth.
         for group in range(4):
@@ -425,7 +422,8 @@ def dd_vertical():
         (-.1133,.0122,.0132,0,0,1), (-.1125,.0104,.0113,0,0,.48),
         (-.1116,.0097,.0107,0,0,0)):
         ring = []
-        for i,(u,v,w) in enumerate(ellipse(z,x,y,.87,steps=128)):
+        for i,(u,v,w) in enumerate(ellipse(z,x,y,.87,steps=64)):
+            i *= 2  # Same scallop and notch phases, on a coarser ring.
             offset = abs((i+8)%16-8)
             scale = 1 - depth*ease((half-offset)/1.9)
             notch = ease((2.85-abs(i-112))/.95)
@@ -437,24 +435,31 @@ def dd_vertical():
 def export(asset, output):
     root = bpy.data.objects.new(f'ATTACHMENT_{asset}', None)
     bpy.context.collection.objects.link(root)
-    for obj in tuple(bpy.context.scene.objects):
-        if obj.type == 'MESH':
-            obj.parent = root
+    batch = [obj for obj in bpy.context.scene.objects if obj.type == 'MESH']
     mount = bpy.data.objects.new('SOCKET_mount', None)
     bpy.context.collection.objects.link(mount)
     mount.parent = root
-    # Join by finish to cap draw calls while preserving the modeled detail.
-    materials = bpy.data.materials[:]
-    for material in materials:
-        batch = [obj for obj in root.children if obj.type == 'MESH' and obj.data.materials[0] == material]
-        if not batch:
-            continue
-        activate(batch[0])
-        for obj in batch:
-            obj.select_set(True)
-        if len(batch) > 1:
-            bpy.ops.object.join()
-        batch[0].name = material.name
+
+    # Encode the finish tints in vertex colors so the prop is one opaque primitive.
+    material = finish('Foregrip | opaque finishes', 1)
+    shader = material.node_tree.nodes.get('Principled BSDF')
+    shader.inputs['Roughness'].default_value = .61
+    color = material.node_tree.nodes.new('ShaderNodeVertexColor')
+    color.layer_name = 'Finish'
+    material.node_tree.links.new(color.outputs['Color'], shader.inputs['Base Color'])
+    for obj in batch:
+        obj.parent = root
+        data = obj.data
+        tint = tuple(data.materials[0].diffuse_color)
+        colors = data.color_attributes.new(name=color.layer_name, type='BYTE_COLOR', domain='POINT')
+        colors.data.foreach_set('color', tint * len(colors.data))
+        data.materials.clear()
+        data.materials.append(material)
+    activate(batch[0])
+    for obj in batch:
+        obj.select_set(True)
+    bpy.ops.object.join()
+    batch[0].name = asset
     if asset == 'afg2':
         # Bake published length/width into the exterior; keep the side profile's
         # proportions rather than treating the maker's over-rail height as total height.
@@ -468,7 +473,8 @@ def export(asset, output):
     bpy.context.preferences.filepaths.save_version = 0
     bpy.ops.wm.save_as_mainfile(filepath=str(output/f'{asset}.blend'))
     bpy.ops.export_scene.gltf(filepath=str(output/f'{asset}.glb'), export_format='GLB',
-                              export_animations=False, export_texcoords=False)
+                              export_animations=False, export_texcoords=False,
+                              export_vertex_color='NAME', export_vertex_color_name=color.layer_name)
 
 
 if __name__ == '__main__':
