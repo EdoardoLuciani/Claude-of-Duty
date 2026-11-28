@@ -7,7 +7,8 @@ before subsystem changes: it owns directory assignments, APIs and event contract
 
 ## Workflow
 
-- Before modifying files, create a dedicated **git worktree**; do all work there.
+- Do all work in the **git worktree** provided for the task. Do not create another
+  worktree unless explicitly asked.
 - Keep one change per branch. Commit and push, then open a PR against **develop**.
 - For visual changes, attach before/after screenshots with `gh pr create --attach`
   (also supported by `gh pr edit` and `gh pr comment`).
