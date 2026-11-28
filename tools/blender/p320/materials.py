@@ -1,11 +1,11 @@
 """P320 procedural finishes and unique-UV atlas baking; no cached asset inputs."""
 import bpy
-from .surfaces import active, build_surfaces, stash_sources
+from .surfaces import active, bake_mesh, build_surfaces, stash_sources
 
 ATLAS_RESOLUTIONS = {'base': 1024, 'orm': 1024, 'normal': 1024, 'emission': 1024}
-# Cycles samples per map. Normal projection needs the most to keep fine bump
-# detail in grazing light; ORM is a direct scalar emission bake.
-ATLAS_SAMPLES = {'base': 4, 'orm': 1, 'normal': 8, 'emission': 16}
+# Multisample cavity shading and sub-texel bump detail. Scalar finishes and
+# unlit sight emission do not need extra samples.
+ATLAS_SAMPLES = {'base': 4, 'orm': 1, 'normal': 4, 'emission': 1}
 
 def build_source_materials(coords):
     def material(name, color, rough=.6, metal=0, grain=0):
@@ -104,31 +104,14 @@ def grip_finish(polymer):
     l.new(bump.outputs[0],p.inputs['Normal'])
 
 
-def bake_orm(asset, surfaces):
-    # Bake scalar finishes directly, keeping projected details out of ORM.
-    # Joining temporary copies avoids paying bake setup for each island owner.
-    copies = []
-    for surface, _ in surfaces:
-        clone = surface.copy()
-        clone.data = surface.data.copy()
-        asset.objects.link(clone)
-        copies.append(clone)
-    meshes = {clone.data for clone in copies}
-    merged = copies[0]
-    active(merged)
-    for clone in copies:
-        clone.select_set(True)
-    bpy.ops.object.join()
-    bpy.ops.object.bake(type='EMIT', use_selected_to_active=False)
-    bpy.data.objects.remove(merged, do_unlink=True)
-    for mesh in meshes:
-        if mesh.users == 0:
-            bpy.data.meshes.remove(mesh)
-
-
-def bake_atlas(output, asset, weapon_meshes):
+def bake_atlas(output, asset, coords, weapon_meshes):
     scene = bpy.context.scene
     surfaces = build_surfaces(asset, weapon_meshes)
+    receiver = bake_mesh(asset, [(low,) for low, _ in surfaces], coords, 'Isolated atlas receiver')
+    donor = bake_mesh(asset, [high for _, high in surfaces], coords, 'Isolated atlas donor')
+    originals = {obj: obj.hide_render for obj in [*weapon_meshes, *(low for low, _ in surfaces)]}
+    for obj in originals:
+        obj.hide_render = True
     atlas = {}
     for name, resolution in ATLAS_RESOLUTIONS.items():
         im = bpy.data.images.new('P320_' + name, width=resolution, height=resolution, alpha=False)
@@ -138,9 +121,22 @@ def bake_atlas(output, asset, weapon_meshes):
     bake = scene.render.bake
     bake.use_clear = False
     bake.margin = 4
-    bake.use_selected_to_active = True
-    bake.max_ray_distance = .0024
-    all_mats = {slot.material for obj in weapon_meshes for slot in obj.material_slots if slot.material}
+    bake.cage_extrusion, bake.max_ray_distance = .0015, .0024
+    all_mats = {m for obj in (receiver, donor) for m in obj.data.materials if m}
+    # Separation is only for rays: finishes still use the undisplaced art coordinates.
+    rewired = []
+    for mat in all_mats:
+        n, l = mat.node_tree.nodes, mat.node_tree.links
+        texture_coords = n.get('Texture Coordinate')
+        if texture_coords is None:
+            continue
+        original = texture_coords.outputs['Object']
+        attribute = n.new('ShaderNodeAttribute')
+        attribute.attribute_name = '_p320_bake_position'
+        destinations = [link.to_socket for link in original.links]
+        for socket in destinations:
+            l.new(attribute.outputs['Vector'], socket)
+        rewired.append((n, l, original, attribute, destinations))
     # Project the wordmark, traction and SIGLITE surfaces into the shared atlas.
     samples = scene.cycles.samples
     for name in atlas:
@@ -178,20 +174,12 @@ def bake_atlas(output, asset, weapon_meshes):
                     strength = p.inputs['Emission Strength'].default_value if name == 'emission' else 1
                     emit.inputs[0].default_value = tuple(v * strength for v in socket.default_value[:3]) + (1,)
             l.new(emit.outputs[0], out.inputs['Surface'])
-        if name == 'orm':
-            bake_orm(asset, surfaces)
-        else:
-            for surface, sources in surfaces:
-                # Only the slide carries emissive SIGLITE insets; other islands stay black.
-                is_slide = surface.parent.name == 'slide'
-                if name == 'emission' and not is_slide:
-                    continue
-                # Cast from outside the rear rings above the slide's sloped sight face.
-                bake.cage_extrusion = .0015 if is_slide else .0012
-                active(surface)
-                for source in sources:
-                    source.select_set(True)
-                bpy.ops.object.bake(type='NORMAL' if name == 'normal' else 'EMIT')
+        # Keep roughness and metalness on the receiver so projected markings
+        # do not overwrite the host material channels.
+        active(receiver)
+        bake.use_selected_to_active = name != 'orm'
+        donor.select_set(bake.use_selected_to_active)
+        bpy.ops.object.bake(type='NORMAL' if name == 'normal' else 'EMIT')
         im = atlas[name]
         im.filepath_raw = str(output / 'textures' / f'p320-{name}.png')
         im.file_format = 'PNG'
@@ -200,6 +188,16 @@ def bake_atlas(output, asset, weapon_meshes):
         im.filepath = '//textures/p320-' + name + '.png'
     scene.cycles.samples = samples
     bake.use_selected_to_active = False
+    for obj in (receiver, donor):
+        data = obj.data
+        bpy.data.objects.remove(obj, do_unlink=True)
+        bpy.data.meshes.remove(data)
+    for obj, hidden in originals.items():
+        obj.hide_render = hidden
+    for n, l, original, attribute, destinations in rewired:
+        n.remove(attribute)
+        for socket in destinations:
+            l.new(original, socket)
     for mat in all_mats:
         n = mat.node_tree.nodes
         mat.node_tree.links.new(n.get('Principled BSDF').outputs[0], n.get('Material Output').inputs[0])

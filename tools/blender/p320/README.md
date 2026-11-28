@@ -20,8 +20,10 @@ Sources live in `tools/blender/p320/`: `build.py` stages geometry/materials,
 `surfaces.py` owns the bake surfaces and UV layout, `skin.py` owns the rigid
 bones, and `actions.py`/`export.py` own the clips and sampled export.
 The mechanical skin and two ordinary barrel-owned muzzle-state meshes share one
-opaque material and one UV layout across all four maps. The blend retains
-editable high bake sources, including the slide wordmark and SIGLITE insets.
+opaque material and one UV layout across all four maps. The atlas batches each
+map in one pass using temporary isolated donor/receiver pairs; procedural
+finishes evaluate at the undisplaced art positions. The blend retains editable
+high bake sources, including the slide wordmark and SIGLITE insets.
 Preserve STEP magazines, sockets, events, hand contacts and runtime slide overrides.
 Shared arms and `hand-reference.json` are read-only; ordinary builds never refit.
 

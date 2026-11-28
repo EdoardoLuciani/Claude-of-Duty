@@ -40,7 +40,7 @@ def build(output, render=False, quick=False):
 
     asset, coords, pivots, weapon_meshes = build_geometry(asset)
     rig, body, slide, barrel, trigger, catch, mag, spare, round_live, round_spare = pivots
-    bake_atlas(output, asset, weapon_meshes)
+    bake_atlas(output, asset, coords, weapon_meshes)
     # Spare shares the same evaluated geometry and atlas UVs.
     for obj in list(asset.objects):
         if obj.type == 'MESH' and obj.parent in (mag, round_live):
