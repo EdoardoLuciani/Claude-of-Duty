@@ -15,13 +15,14 @@ import {
 
 const grips: Record<Side, GripFrame> = {
   right: { pos: [0.0351, -0.012, 0.083], finger: [0.15, 0.35, -0.92], back: [1, 0.03, 0.04] },
-  left: { pos: [-0.073, 0.048, -0.243], finger: [0.7, -0.1, -0.71], back: [-0.14, -0.985, 0.001] },
+  left: { pos: [-0.073, 0.034, -0.243], finger: [0.7, -0.1, -0.71], back: [-0.14, -0.985, 0.001] },
 };
 const sides: Partial<Record<Side, HandSideReference>> = {};
 for (const side of ['right', 'left'] as const) {
   const grip = grips[side];
   const arm = new Arm(side === 'left' ? -1 : 1, { scale: side === 'left' ? 0.97 : 1 });
-  arm.hand.position.fromArray(grip.pos);
+  // Fit the curl at the bare handguard; the authored wrist sits lower to clear the rail.
+  arm.hand.position.fromArray(side === 'left' ? [-0.073, 0.048, -0.243] : grip.pos);
   arm.hand.quaternion.copy(basis(grip.finger, grip.back));
   arm.setPose(side === 'right' ? 'gripRifle' : 'clamp');
   if (side === 'left') {

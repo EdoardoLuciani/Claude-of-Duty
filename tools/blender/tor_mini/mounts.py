@@ -11,10 +11,11 @@ import sys
 
 import bpy
 from mathutils import Matrix, Vector
-from mathutils.bvhtree import BVHTree
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import attachment_source
+from attachment_source import bounds, geometry, surface, tree
+
 # Only mating rail surfaces may contact the clamp, inside the local seat patch.
 PROFILES = {
     'm4': ('M4_RIG', 'M4A1 | authored components', 'handguard', ('RIS II 1 tooth',)),
@@ -32,25 +33,18 @@ FOREGRIP_GUARDS = {
 }
 
 
-def geometry(obj, transform, group=None):
-    evaluated = obj.evaluated_get(bpy.context.evaluated_depsgraph_get())
-    mesh = evaluated.to_mesh()
-    mesh.calc_loop_triangles()
-    matrix = transform @ evaluated.matrix_world
-    vertices = [matrix @ v.co for v in mesh.vertices]
-    if group is None:
-        faces = [tuple(t.vertices) for t in mesh.loop_triangles]
-    else:
-        index = obj.vertex_groups[group].index
-        selected = {v.index for v in mesh.vertices if any(g.group == index and g.weight > .5 for g in v.groups)}
-        faces = [tuple(t.vertices) for t in mesh.loop_triangles if all(i in selected for i in t.vertices)]
-        assert faces, (obj.name, group, 'missing authored hardware surfaces')
-    evaluated.to_mesh_clear()
-    return vertices, faces
-
-
-def tree(vertices, faces):
-    return BVHTree.FromPolygons(vertices, faces, all_triangles=True)
+def underside_rail(weapon, guard, weapon_meshes, inverse):
+    """Check fixed seating, then return the targets for the shared clip sweep."""
+    parent = bpy.data.objects['MOUNT_foregrip'].parent
+    backing = bpy.data.objects['Foregrip rail adapter backing']
+    rails = [o for o in weapon_meshes if o.name.startswith(('Foregrip rail adapter tooth', 'Foregrip rail adapter groove bed'))]
+    assert rails and all(o.parent == parent == guard.parent for o in [*rails, backing]), (weapon, 'underside rail must travel with the guard')
+    backing_tree, rails_tree = surface([backing], inverse), surface(rails, inverse)
+    assert backing_tree.overlap(surface([guard], inverse)), (weapon, 'floating underside backing')
+    assert backing_tree.overlap(rails_tree), (weapon, 'rail detached from backing')
+    corners = bounds([backing, *rails], inverse)
+    low, high = ([reduce(p[i] for p in corners) for i in range(3)] for reduce in (min, max))
+    return (backing_tree, rails_tree), low, high
 
 
 def overlaps_bounds(points, low, high):
@@ -66,6 +60,7 @@ def check_laser_mount(weapon):
         assert mount.parent_type == 'BONE' and mount.parent_bone == parent
     else:
         assert mount.parent.name == parent, (weapon, 'wrong animated rail parent')
+    inverse = mount.matrix_world.inverted()
     weapon_meshes = [o for o in bpy.data.collections[collection].objects if o.type == 'MESH']
     hands = [o for o in scene.objects if o.type == 'MESH' and any(
         'authored hands' in c.name or 'review hands' in c.name for c in o.users_collection)]
@@ -80,7 +75,7 @@ def check_laser_mount(weapon):
         assert hardware_sources, (weapon, 'missing laser support hardware')
     hardware_vertices, hardware_faces = [], []
     for obj, group in hardware_sources:
-        points, triangles = geometry(obj, mount.matrix_world.inverted(), group)
+        points, triangles = geometry(obj, inverse, group)
         offset = len(hardware_vertices)
         hardware_vertices.extend(points)
         hardware_faces.extend(tuple(offset + i for i in triangle) for triangle in triangles)
@@ -92,25 +87,13 @@ def check_laser_mount(weapon):
     laser = tree(vertices, faces)
     emission = base.matrix_world.inverted() @ emitter.matrix_world.translation
     forward = Vector((0, 1, 0))
-    # These models carry a second, permanent rail. Check its seating and use
-    # the same evaluated hand/mechanism sweep as the adjacent laser hardware.
-    foregrip = None
+    # Reuse the laser's evaluated hand/mechanism sweep for the fixed underside rail.
+    foregrip = ()
     if weapon in FOREGRIP_GUARDS:
-        inverse = mount.matrix_world.inverted()
-        base = bpy.data.objects['MOUNT_foregrip']
         guard = bpy.data.objects[FOREGRIP_GUARDS[weapon]]
-        backing = bpy.data.objects['Foregrip rail adapter backing']
-        rails = [o for o in weapon_meshes if o.name.startswith(('Foregrip rail adapter tooth', 'Foregrip rail adapter groove bed'))]
-        assert rails and all(o.parent == base.parent == guard.parent for o in [*rails, backing]), (weapon, 'underside rail must travel with the guard')
-        surface = attachment_source.surface
-        assert surface([backing], inverse).overlap(surface([guard], inverse)), (weapon, 'floating underside backing')
-        assert surface([backing], inverse).overlap(surface(rails, inverse)), (weapon, 'rail detached from backing')
-        foregrip = surface([backing, *rails], inverse)
-        bounds = [inverse @ o.matrix_world @ Vector(p) for o in [backing, *rails] for p in o.bound_box]
-        grip_low, grip_high = ([reduce(p[i] for p in bounds) for i in range(3)] for reduce in (min, max))
+        foregrip, grip_low, grip_high = underside_rail(weapon, guard, weapon_meshes, inverse)
         moving = set(hands) | {o for o in weapon_meshes if o.parent and o.parent not in (rig, guard.parent) and o.parent.animation_data}
     if weapon == 'mcx':
-        inverse = mount.matrix_world.inverted()
         sight = inverse @ bpy.data.objects['SOCKET_sight'].matrix_world.translation
         sight_direction = (inverse.to_3x3() @ rig.matrix_world.to_3x3() @ Vector((1,0,0))).normalized()
         assert laser.ray_cast(sight,sight_direction,1)[0] is None, 'MCX laser blocks ACOG sight line'
@@ -150,20 +133,19 @@ def check_laser_mount(weapon):
                     if min(obj.scale) < .001:
                         continue  # authored STEP-hidden transfer parts
                     evaluated = obj.evaluated_get(bpy.context.evaluated_depsgraph_get())
-                    matrix = inverse @ evaluated.matrix_world
-                    bounds = [matrix @ Vector(p) for p in evaluated.bound_box]
+                    corners = bounds([evaluated], inverse)
                     # Broad phase covers both the real module and its forward
                     # emission corridor; only overlapping surfaces need a BVH.
                     low, high = (-.018, -.028, -.032), (.018, 1.026, .007)
                     check_hardware = hardware is not None and obj in hands
-                    check_laser = check_hardware or overlaps_bounds(bounds, low, high)
-                    check_foregrip = foregrip is not None and obj in moving and overlaps_bounds(bounds, grip_low, grip_high)
+                    check_laser = check_hardware or overlaps_bounds(corners, low, high)
+                    check_foregrip = foregrip and obj in moving and overlaps_bounds(corners, grip_low, grip_high)
                     if not check_laser and not check_foregrip:
                         continue
                     points, triangles = geometry(obj, inverse)
                     target = tree(points, triangles)
                     if check_foregrip:
-                        assert not foregrip.overlap(target), (weapon, name, sample, obj.name, 'underside rail intersects stock animation')
+                        assert not any(rail.overlap(target) for rail in foregrip), (weapon, name, sample, obj.name, 'underside rail intersects stock animation')
                     if not check_laser:
                         continue
                     if check_hardware:
@@ -206,7 +188,7 @@ def check_laser_mount(weapon):
                     track.mute = track.name != 'Idle'
         scene.frame_set(0)
     print('TOR_MINI_MOUNT_OK:', weapon, count, 'sampled poses; actual rail contact, emitter ray, weapon/mechanisms and', len(hands), 'review-hand meshes; runtime/visual review separate')
-    if foregrip is not None:
+    if foregrip:
         print('UNDERSIDE_RAIL_OK:', weapon, count, 'sampled stock poses')
 
 

@@ -21,8 +21,7 @@ def author_actions(root, asset, rig, parts, mag, spare, bolt, trigger, release, 
     scene = bpy.context.scene
     ref = json.loads((root / 'src/weapons/authored/sig-mpx/hand-reference.json').read_text())
     indexed = ref['sides']['right']['indexed']
-    # Settle the bare-handguard wrap just below the permanent underside rail.
-    support = Vector(ref['grips']['left']['pos']) + Vector((0, -.018, .010))
+    support = Vector(ref['grips']['left']['pos'])
     controls = []; hands = {}; clips = {}
     def control(name):
         o = bpy.data.objects.new(name, None); asset.objects.link(o); o.parent = rig
@@ -45,8 +44,7 @@ def author_actions(root, asset, rig, parts, mag, spare, bolt, trigger, release, 
         for prop in ('location', 'rotation_quaternion', 'scale'): o.keyframe_insert(prop, frame=time * FPS, group=o.name)
     def pose(side, time, pos=None, q=None, p=None):
         data = ref['sides'][side]; cs = hands[side]; f = time * FPS
-        rest_position = support if side == 'left' else ref['grips'][side]['pos']
-        wrist = cs['wrist']; wrist.location = xyz(pos if pos is not None else rest_position)
+        wrist = cs['wrist']; wrist.location = xyz(pos if pos is not None else ref['grips'][side]['pos'])
         wrist.rotation_quaternion = quat(q if q is not None else Quaternion((data['quaternion'][3], *data['quaternion'][:3])))
         for prop in ('location', 'rotation_quaternion'): wrist.keyframe_insert(prop, frame=f)
         p = p if p is not None else data['grip']
@@ -203,18 +201,18 @@ def author_actions(root, asset, rig, parts, mag, spare, bolt, trigger, release, 
         for k,a in ([(0,1),(.25,.75),(.70,.12),(.86,0),(1,0)] if drawing else [(0,0),(.13,0),(.25,.08),(.65,.75),(1,1)]):
             key(rig,k*d,(.11*a,-.38*a,.12*a),(-44*a,42*a,36*a))
             pose('right',k*d,p=indexed if a > .02 else None)
-        g = support; gp = ref['sides']['left']['grip']
+        gp = ref['sides']['left']['grip']
         gq = Quaternion((ref['sides']['left']['quaternion'][3],*ref['sides']['left']['quaternion'][:3]))
         r = ref['restLeft']; rq = Quaternion((r['quaternion'][3],*r['quaternion'][:3]))
         # Approach below/outboard of the PM II objective. Change the curl
         # below the rail, not while the glove is already against it.
-        approach = g + Vector((-.13,-.095,.05) if drawing else (-.27,-.18,.05))
-        low = g + Vector((0, -.025, 0))
+        approach = support + Vector((-.13,-.095,.05) if drawing else (-.27,-.18,.05))
+        low = support + Vector((0, -.025, 0))
         if drawing:
             keys = [(0,r['pos'],rq,r['pose']),(.30*d,r['pos'],rq,r['pose']),(.70*d,approach,gq,r['pose']),
-                    (.89*d,low,gq,r['pose']),(.95*d,low,gq,gp),(d,g,gq,gp)]
+                    (.89*d,low,gq,r['pose']),(.95*d,low,gq,gp),(d,support,gq,gp)]
         else:
-            keys = [(0,g,gq,gp),(.03*d,g,gq,gp),(.13*d,low,gq,gp),(.28*d,approach,gq,r['pose']),
+            keys = [(0,support,gq,gp),(.03*d,support,gq,gp),(.13*d,low,gq,gp),(.28*d,approach,gq,r['pose']),
                     (.60*d,approach,gq,r['pose']),(.95*d,r['pos'],rq,r['pose']),(d,r['pos'],rq,r['pose'])]
         free_left_path(keys)
         clips[name]['events'] = [{'time': d-.0001, 'event': 'end'}]; finish(name)

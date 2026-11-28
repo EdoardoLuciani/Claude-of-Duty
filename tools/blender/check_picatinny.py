@@ -73,26 +73,24 @@ for id in (*attachment_source.OPTICS,'laser'):
     except AssertionError as error:
         errors.append(str(error));print('PICATINNY_FAIL',error,flush=True)
 
+FOREGRIP_RAIL=('Foregrip rail adapter tooth','Foregrip rail adapter groove bed')
 WEAPONS=[
-    ('m4a1-block-ii/m4a1-block-ii',('Upper receiver rail ',),('RIS II 1 ',)),
-    ('mcx-virtus/mcx-virtus',('Continuous top rail foot','Picatinny rail tooth'),('Laser rail adapter tooth','Laser rail adapter groove bed')),
-    ('sig-mpx/mpx',('Picatinny spine','Picatinny rail tooth'),('Laser rail adapter tooth','Laser rail adapter groove bed')),
-    ('p320-compact/p320-compact',(),('Frame | continuous compact medium polymer shell',)),
-    ('fn-evolys-762/fn-evolys-762',('receiver_mesh',),('handguard_mesh',)),
-    ('m590/m590',('Optic Picatinny lug','Optic rail groove bed'),('Laser rail adapter tooth','Laser rail adapter groove bed')),
-    ('ax338/ax338',('Continuous top rail','Rail tooth'),('Laser rail adapter tooth','Laser rail adapter groove bed')),
+    ('m4a1-block-ii/m4a1-block-ii',('Upper receiver rail ',),('RIS II 1 ',),()),
+    ('mcx-virtus/mcx-virtus',('Continuous top rail foot','Picatinny rail tooth'),('Laser rail adapter tooth','Laser rail adapter groove bed'),FOREGRIP_RAIL),
+    ('sig-mpx/mpx',('Picatinny spine','Picatinny rail tooth'),('Laser rail adapter tooth','Laser rail adapter groove bed'),FOREGRIP_RAIL),
+    ('p320-compact/p320-compact',(),('Frame | continuous compact medium polymer shell',),()),
+    ('fn-evolys-762/fn-evolys-762',('receiver_mesh',),('handguard_mesh',),()),
+    ('m590/m590',('Optic Picatinny lug','Optic rail groove bed'),('Laser rail adapter tooth','Laser rail adapter groove bed'),()),
+    ('ax338/ax338',('Continuous top rail','Rail tooth'),('Laser rail adapter tooth','Laser rail adapter groove bed'),FOREGRIP_RAIL),
 ]
-for file,optic_names,rail_names in WEAPONS:
+for file,optic_names,rail_names,foregrip_names in WEAPONS:
     bpy.ops.wm.open_mainfile(filepath=str(ROOT/'.cache/blender/weapons'/(file+'.blend')))
     for obj in bpy.context.scene.objects:
         if obj.animation_data:
             obj.animation_data.action=None
             for track in obj.animation_data.nla_tracks:track.mute=track.name!='Idle'
     bpy.context.scene.frame_set(0);bpy.context.view_layer.update()
-    slots = [('optic', optic_names), ('rail', rail_names)]
-    if file.split('/')[0] in ('mcx-virtus', 'sig-mpx', 'ax338'):
-        slots.append(('foregrip', ('Foregrip rail adapter',)))
-    for slot,names in slots:
+    for slot,names in [('optic',optic_names),('rail',rail_names),('foregrip',foregrip_names)]:
         if not names:continue
         mount=bpy.data.objects['MOUNT_'+slot]
         inverse=mount.matrix_world.inverted()
