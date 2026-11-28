@@ -110,14 +110,14 @@
     }
   },
   "stats": {
-    "triangles": 22506,
-    "vertices": 41502,
+    "triangles": 22526,
+    "vertices": 41518,
     "meshes": 3,
     "primitives": 3,
     "materials": 1,
     "textureImages": 4,
     "joints": 9,
-    "bytes": 5783292
+    "bytes": 5780508
   },
   "textureResolutions": {
     "base": 1024,
