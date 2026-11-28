@@ -382,4 +382,12 @@ def build_geometry(materials):
     bpy.context.view_layer.update()
     picatinny.build_rail('Laser rail adapter',rail.matrix_world@Matrix.Rotation(math.pi,4,'Y'),-.0226,.0226,anodized,body,asset)
 
+    # Permanent cosmetic underside rail; the backing bridges the open lower slots.
+    foregrip = empty('MOUNT_foregrip', (.212, 0, -.024), body)
+    foregrip.rotation_euler.z = -math.pi / 2
+    box('Foregrip rail adapter backing', (.212, 0, -.0179), (.062, .022, .003), coating)
+    bpy.context.view_layer.update()
+    picatinny.build_rail('Foregrip rail adapter', foregrip.matrix_world @ Matrix.Rotation(math.pi, 4, 'Y'),
+                        -.030, .030, anodized, body, asset, bottom=-.005)
+
     return asset, [rig, mag, spare, bolt, handle, trigger, cover, stock, case, release]

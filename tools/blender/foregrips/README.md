@@ -58,7 +58,7 @@ Optional captures compare no grip, a grip with the stock glove, and the draft po
 | M4A1            | AFG-2 and DD vertical, draft idle poses                                                                                        |
 | M590            | AFG-2 and DD vertical, draft idle and held pump stroke                                                                         |
 | EVOLYS          | DD vertical, draft idle pose. Every full-span AFG-2 groove on the existing underside rail conflicts with the mounted TOR Mini. |
-| MCX, MPX, AX338 | No authored underside Picatinny seat; the existing side laser adapters are not support-hand mounts.                            |
+| MCX, MPX, AX338 | Permanent underside Picatinny adapters in the base models. Grip and support-hand fits are not yet verified.                    |
 | P320            | Its short frame accessory rail is not a support-hand location.                                                                 |
 
 After running `bun tools/build-assets.ts` and baking both props to their default

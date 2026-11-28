@@ -98,6 +98,11 @@ receiver with unit scale and local +Y rifle-forward (glTF -Z).
 | muzzle | `MOUNT_muzzle` at the direct-thread shoulder                    | either                                                    |
 | rail   | canted upper-right `MOUNT_rail` on a game-fit handguard adapter | either                                                    |
 
+A separate Picatinny adapter is baked into the underside of the base handguard.
+It stays visible with or without the TOR Mini. `MOUNT_foregrip` marks its centre
+for future fit review; it does not enable a catalog slot. The stock support hand
+wraps below the adapter and clears it on release and return.
+
 The base muzzle's open three-prong device lives under `MUZZLE_device` and hides
 with the can installed; the thread stays on the barrel. The empty-reload glove
 leaves the charging latch on a lowered arc so it clears the optic bodies and passes

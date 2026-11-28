@@ -52,7 +52,9 @@ bridging the crown to the shared rear mount); see the
 [shared calibre decision](../suppressor/README.md). The short Picatinny rail
 sits back from the front lip on the upper-right handguard chamfer and stays
 visible with or without the laser. The TOR Mini shares the rail's cant and
-still points along the bore.
+still points along the bore. The separate underside Picatinny adapter is also
+part of the base handguard. `MOUNT_foregrip` is its review datum, not a catalog
+slot. The stock support hand opens and closes below this rail.
 
 `check.py` verifies catalog seating, iron clashes, both iron states, concurrent
 slots, fixed surfaces, every clip's mechanisms and deformed hands at 120 Hz, plus

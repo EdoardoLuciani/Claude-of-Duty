@@ -89,14 +89,17 @@ for file,optic_names,rail_names in WEAPONS:
             obj.animation_data.action=None
             for track in obj.animation_data.nla_tracks:track.mute=track.name!='Idle'
     bpy.context.scene.frame_set(0);bpy.context.view_layer.update()
-    for slot,names in [('optic',optic_names),('rail',rail_names)]:
+    slots = [('optic', optic_names), ('rail', rail_names)]
+    if file.split('/')[0] in ('mcx-virtus', 'sig-mpx', 'ax338'):
+        slots.append(('foregrip', ('Foregrip rail adapter',)))
+    for slot,names in slots:
         if not names:continue
         mount=bpy.data.objects['MOUNT_'+slot]
         inverse=mount.matrix_world.inverted()
-        if slot=='rail':inverse=Matrix.Rotation(math.pi,4,'Y')@inverse
+        if slot!='optic':inverse=Matrix.Rotation(math.pi,4,'Y')@inverse
         meshes=[o for o in bpy.context.scene.objects if o.type=='MESH' and o.name.startswith(names)]
         try:check_rail(surface(meshes,inverse),file+' '+slot)
         except AssertionError as error:
             errors.append(str(error));print('PICATINNY_FAIL',error,flush=True)
 assert not errors,errors
-print('PICATINNY_INTERFACES_OK: 6 optic rails, 7 laser rails and 5 shared clamps',flush=True)
+print('PICATINNY_INTERFACES_OK: optic, laser and underside rails; all shared clamps',flush=True)

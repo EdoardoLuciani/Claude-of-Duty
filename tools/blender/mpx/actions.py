@@ -21,6 +21,8 @@ def author_actions(root, asset, rig, parts, mag, spare, bolt, trigger, release, 
     scene = bpy.context.scene
     ref = json.loads((root / 'src/weapons/authored/sig-mpx/hand-reference.json').read_text())
     indexed = ref['sides']['right']['indexed']
+    # Settle the bare-handguard wrap just below the permanent underside rail.
+    support = Vector(ref['grips']['left']['pos']) + Vector((0, -.018, .010))
     controls = []; hands = {}; clips = {}
     def control(name):
         o = bpy.data.objects.new(name, None); asset.objects.link(o); o.parent = rig
@@ -43,7 +45,8 @@ def author_actions(root, asset, rig, parts, mag, spare, bolt, trigger, release, 
         for prop in ('location', 'rotation_quaternion', 'scale'): o.keyframe_insert(prop, frame=time * FPS, group=o.name)
     def pose(side, time, pos=None, q=None, p=None):
         data = ref['sides'][side]; cs = hands[side]; f = time * FPS
-        wrist = cs['wrist']; wrist.location = xyz(pos if pos is not None else ref['grips'][side]['pos'])
+        rest_position = support if side == 'left' else ref['grips'][side]['pos']
+        wrist = cs['wrist']; wrist.location = xyz(pos if pos is not None else rest_position)
         wrist.rotation_quaternion = quat(q if q is not None else Quaternion((data['quaternion'][3], *data['quaternion'][:3])))
         for prop in ('location', 'rotation_quaternion'): wrist.keyframe_insert(prop, frame=f)
         p = p if p is not None else data['grip']
@@ -130,7 +133,7 @@ def author_actions(root, asset, rig, parts, mag, spare, bolt, trigger, release, 
         for k,s in [(0,0),(out-.05,0),(out-.025,1),(out,1),(out+.035,0),(1,0)]: key(mag_catch,k*d,(.0015*s,0,0))
         if empty: key(rounds,0,scale=0)
         clips[name]['magazineReleaseWindow'] = [(out-.025)*d,out*d]
-        pose('left', .07*d, [-.09, -.07, -.16], p=relaxed('left'))
+        pose('left', .07*d, [-.09, -.07, -.12], p=relaxed('left'))
         contact('magazine', (out-.05)*d)
         removed = Vector(ref['magazine']['pos']) + Vector((-.01, -.29, .06))
         # Tactical: glove carries the partial magazine down into the pouch.
@@ -157,6 +160,7 @@ def author_actions(root, asset, rig, parts, mag, spare, bolt, trigger, release, 
                 contact('boltRelease',f/FPS,Vector(ref['boltRelease']['pos'])+shift)
             clips[name]['boltContactWindow'] = [math.ceil(.815*d*FPS)/FPS,math.floor(.865*d*FPS)/FPS]
             pose('left', .895*d, [-.10, -.075, -.055], p=relaxed('left'))
+            pose('left', .93*d, support + Vector((0, -.034, .005)))
             clips[name]['events'].append({'time': .865*d, 'event': 'boltrelease'})
         pose('left', .96*d)
         clips[name]['magazineClearTime'] = clear*d; clips[name]['magazineInsertTime'] = insert*d
@@ -195,15 +199,23 @@ def author_actions(root, asset, rig, parts, mag, spare, bolt, trigger, release, 
     clips['Inspect']['events'] = [{'time': d-.0001, 'event': 'end'}]; finish('Inspect')
     for name, d, drawing in [('Draw', .52, True), ('Holster', .34, False)]:
         begin(name, d)
-        for k,a in ([(0,1),(.25,.75),(.70,.12),(.86,0),(1,0)] if drawing else [(0,0),(.15,.08),(.65,.75),(1,1)]):
+        # On holster, let the stock hand peel below the rail before dipping the gun.
+        for k,a in ([(0,1),(.25,.75),(.70,.12),(.86,0),(1,0)] if drawing else [(0,0),(.13,0),(.25,.08),(.65,.75),(1,1)]):
             key(rig,k*d,(.11*a,-.38*a,.12*a),(-44*a,42*a,36*a))
             pose('right',k*d,p=indexed if a > .02 else None)
-        g = ref['grips']['left']['pos']; gp = ref['sides']['left']['grip']
+        g = support; gp = ref['sides']['left']['grip']
         gq = Quaternion((ref['sides']['left']['quaternion'][3],*ref['sides']['left']['quaternion'][:3]))
         r = ref['restLeft']; rq = Quaternion((r['quaternion'][3],*r['quaternion'][:3]))
-        # Approach below/outboard of the PM II objective, then seat the unchanged grip.
-        approach = list(Vector(g)+Vector((-.13,-.095,.05) if drawing else (-.27,-.18,.05)))
-        keys = [(0,r['pos'],rq,r['pose']),(.30*d,r['pos'],rq,r['pose']),(.70*d,approach,gq,r['pose']),(.90*d,g,gq,r['pose']),(.98*d,g,gq,gp),(d,g,gq,gp)] if drawing else [(0,g,gq,gp),(.03*d,g,gq,gp),(.28*d,approach,gq,r['pose']),(.60*d,approach,gq,r['pose']),(.95*d,r['pos'],rq,r['pose']),(d,r['pos'],rq,r['pose'])]
+        # Approach below/outboard of the PM II objective. Change the curl
+        # below the rail, not while the glove is already against it.
+        approach = g + Vector((-.13,-.095,.05) if drawing else (-.27,-.18,.05))
+        low = g + Vector((0, -.025, 0))
+        if drawing:
+            keys = [(0,r['pos'],rq,r['pose']),(.30*d,r['pos'],rq,r['pose']),(.70*d,approach,gq,r['pose']),
+                    (.89*d,low,gq,r['pose']),(.95*d,low,gq,gp),(d,g,gq,gp)]
+        else:
+            keys = [(0,g,gq,gp),(.03*d,g,gq,gp),(.13*d,low,gq,gp),(.28*d,approach,gq,r['pose']),
+                    (.60*d,approach,gq,r['pose']),(.95*d,r['pos'],rq,r['pose']),(d,r['pos'],rq,r['pose'])]
         free_left_path(keys)
         clips[name]['events'] = [{'time': d-.0001, 'event': 'end'}]; finish(name)
     author_review_hands(root, rig, hands, all_parts, clips, basis=C, label='MPX')

@@ -32,12 +32,16 @@ before running the attachment checks (normal `bun run build` does this).
 
 Game-frame metres, +Y up / -Z forward, under `AX338_RIG`:
 
-| Datum          | Contract                                                                                    |
-| -------------- | ------------------------------------------------------------------------------------------- |
-| `SOCKET_sight` | Rear aperture centre, aligned with the front post tip                                       |
-| `MOUNT_optic`  | Identity orientation; actual top-rail tooth contact plane                                   |
-| `MOUNT_muzzle` | Barrel-crown seating plane for the dedicated .338 can; identity, unit scale                 |
-| `MOUNT_rail`   | Right-side KeySlot/Picatinny adapter ahead of the support hand; local +Y points inward (-X) |
+| Datum            | Contract                                                                                    |
+| ---------------- | ------------------------------------------------------------------------------------------- |
+| `SOCKET_sight`   | Rear aperture centre, aligned with the front post tip                                       |
+| `MOUNT_optic`    | Identity orientation; actual top-rail tooth contact plane                                   |
+| `MOUNT_muzzle`   | Barrel-crown seating plane for the dedicated .338 can; identity, unit scale                 |
+| `MOUNT_rail`     | Right-side KeySlot/Picatinny adapter ahead of the support hand; local +Y points inward (-X) |
+| `MOUNT_foregrip` | Fixed underside Picatinny adapter; review datum, not a catalog slot                         |
+
+The underside adapter is part of the base forend and stays visible independently
+of the side laser.
 
 Irons are one removable `IRON_sights` assembly with no replacement part. Railway and
 ACOG clear the installed irons; the PM II crosses the rear aperture, and any mounted

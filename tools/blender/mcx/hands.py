@@ -57,7 +57,11 @@ def author_hands(root,asset,parts,clips):
         return {**grip['left'],'fingers':other['fingers'],'thumb':other['thumb'],'thumbBase':other['thumbBase']}
     pinch,opened = curl(ref['pinch']),curl(ref['open'])
     held = {side:(C @ (Vector(ref['grips'][side]['pos'])-ORIGIN),native(Quaternion((ref['sides'][side]['quaternion'][3],*ref['sides'][side]['quaternion'][:3])))) for side in hands}
-    rest = held['left'][0]
+    # Let the existing wrap sit against the fixed underside rail. Free reload
+    # contacts still use the magazine and charging-handle frames below.
+    rest, support_rotation = held['left']
+    rest = rest + Vector((0, 0, -.014))
+    held['left'] = (rest, support_rotation)
     def key(obj,prop,value,f):
         setattr(obj,prop,value); obj.keyframe_insert(prop,frame=f)
     def wrist(side,t,pos=None,q=None):
@@ -144,8 +148,8 @@ def author_hands(root,asset,parts,clips):
         begin(name)
         if name.startswith('Reload'):
             empty = name=='Reload_Empty'
-            # Drop the wrist clear of the laser bracket before reaching back to the magazine.
-            pose('left',.1,lowered(rest,.008))
+            # Drop clear of the fixed rails before turning toward the magazine.
+            pose('left',.1,lowered(rest,.038))
             follow(mag,magazine,*MAG_OUT)
             follow(spare,magazine,*SPARE_IN)
             if empty:
@@ -158,6 +162,7 @@ def author_hands(root,asset,parts,clips):
                 pose('left',3.05,lowered(rest,.05))
                 pose('left',3.25)
             else:
+                pose('left',2.20,lowered(rest+Vector((-.027,.014,0)),.067),p=opened)
                 pose('left',2.35)
         elif name=='Inspect':
             # Fit the exposed firing hand to the MCX grip and trigger window.
@@ -174,7 +179,7 @@ def author_hands(root,asset,parts,clips):
             # Unwrap the fingers outside the guard at the two grip transitions.
             for t in (.045,.135,duration-.135,duration-.045):
                 key(hands['right']['wrist'],'location',pos+C @ Vector((.023,-.004,0)),t*FPS)
-            pose('left',.10,rest+C @ Vector((-.016,-.016,.005)))
+            pose('left',.10,rest+C @ Vector((-.009,-.041,.009)))
             pose('left',.19,rest+C @ Vector((-.054,-.047,.014)))
             pose('left',.29,rest+C @ Vector((-.096,-.113,.022)),p=opened)
             # Park relative to ready, not the rolling receiver.
@@ -188,8 +193,8 @@ def author_hands(root,asset,parts,clips):
                 wrist('left',f/FPS,ready_to_rig @ (rest+C @ Vector(offset)),
                       ready_to_rig.to_quaternion() @ held['left'][1])
             wrist('left',3.58,rest+C @ Vector((-.108,-.080,.024)))
-            pose('left',3.75,rest+C @ Vector((-.064,-.043,.013)),p=opened)
-            pose('left',3.90,rest+C @ Vector((-.025,-.017,.004)))
+            pose('left',3.75,rest+C @ Vector((-.064,-.070,.013)),p=opened)
+            pose('left',3.90,rest+C @ Vector((-.010,-.036,.006)))
             pose('left',4.05)
         elif name=='Draw':
             pose('left',0,rest+C @ Vector((-.02,-.09,.06)))
