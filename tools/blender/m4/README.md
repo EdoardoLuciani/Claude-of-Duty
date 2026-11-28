@@ -35,28 +35,10 @@ acceptance remain in Git history; they are not general visual or FPS approval.
 
 ## Foregrip fit review
 
-`foregrip-review.json` holds the AFG-2 and DD vertical candidate seats and
-separate left-hand idle poses, using the same game-space conventions as the
-stock hand reference. `foregrip_review.py` seats the standalone Blender props,
-checks the actual geometry against the weapon and current accessories, and
-reports stock-skin intersections throughout the native clips. It also checks
-weapon/attachment clearance and palm/fingertip proximity on each draft idle
-pose with the shared review-arm skin. Optional matched renders compare no grip,
-a grip with the unmodified glove, and the draft pose.
-
-```sh
-bun tools/build-assets.ts
-for grip in afg2 dd_vertical; do
-  blender -b -t 2 --python-exit-code 1 --python tools/blender/foregrips/build.py -- "$grip"
-done
-blender -b -t 4 .cache/blender/weapons/m4a1-block-ii/m4a1-block-ii.blend \
-  --python-exit-code 1 --python tools/blender/m4/foregrip_review.py \
-  -- --renders .cache/foregrip-review/renders
-```
-
-These are Blender-only candidates. The draft poses do not replace the stock
-pose, follow animated releases/regrips, or register a player attachment.
-A rigid seat and an idle contact check are not motion or gameplay approval.
+The [shared foregrip fit review](../foregrips/README.md#weapon-fit-review)
+includes both M4 candidates, with distinct left-hand idle poses in the same
+game-space convention as the stock hand reference. The draft poses do not
+replace the stock pose or register a player attachment.
 
 ## Side-profile references
 
