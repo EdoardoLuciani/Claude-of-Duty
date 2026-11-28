@@ -57,11 +57,7 @@ def author_hands(root,asset,parts,clips):
         return {**grip['left'],'fingers':other['fingers'],'thumb':other['thumb'],'thumbBase':other['thumbBase']}
     pinch,opened = curl(ref['pinch']),curl(ref['open'])
     held = {side:(C @ (Vector(ref['grips'][side]['pos'])-ORIGIN),native(Quaternion((ref['sides'][side]['quaternion'][3],*ref['sides'][side]['quaternion'][:3])))) for side in hands}
-    # Let the existing wrap sit against the fixed underside rail. Free reload
-    # contacts still use the magazine and charging-handle frames below.
-    rest, support_rotation = held['left']
-    rest = rest + Vector((0, 0, -.014))
-    held['left'] = (rest, support_rotation)
+    rest = held['left'][0]
     def key(obj,prop,value,f):
         setattr(obj,prop,value); obj.keyframe_insert(prop,frame=f)
     def wrist(side,t,pos=None,q=None):

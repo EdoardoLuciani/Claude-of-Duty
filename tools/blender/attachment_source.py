@@ -32,6 +32,36 @@ SOURCES = {
 RAIL_SLOTS = {'m4': {'scope': 7}, 'evolys': {'railway': 3, 'exps3': 3, 'acog': 6, 'scope': 6}}
 
 
+def geometry(obj, transform, group=None):
+    """Evaluated vertices and triangles, optionally limited to a mating group."""
+    evaluated = obj.evaluated_get(bpy.context.evaluated_depsgraph_get())
+    mesh = evaluated.to_mesh()
+    mesh.calc_loop_triangles()
+    matrix = transform @ evaluated.matrix_world
+    vertices = [matrix @ v.co for v in mesh.vertices]
+    if group is None:
+        faces = [tuple(t.vertices) for t in mesh.loop_triangles]
+    else:
+        index = obj.vertex_groups[group].index
+        selected = {v.index for v in mesh.vertices if any(g.group == index and g.weight > .5 for g in v.groups)}
+        faces = [tuple(t.vertices) for t in mesh.loop_triangles if all(i in selected for i in t.vertices)]
+    evaluated.to_mesh_clear()
+    assert group is None or faces, (obj.name, group, 'missing authored hardware surfaces')
+    return vertices, faces
+
+
+def tree(vertices, faces):
+    return BVHTree.FromPolygons(vertices, faces, all_triangles=True)
+
+
+def bounds(objects, transform):
+    corners = []
+    for obj in objects:
+        matrix = transform @ obj.matrix_world
+        corners.extend(matrix @ Vector(p) for p in obj.bound_box)
+    return corners
+
+
 def surface(objects, transform):
     """BVH of the evaluated meshes' rendered triangles in `transform` space (e.g. the
     inverted rig matrix). Triangles, not polygon fans, keep concave ngons open."""
@@ -47,7 +77,7 @@ def surface(objects, transform):
         faces.extend(tuple(offset + i for i in t.vertices) for t in mesh.loop_triangles)
         evaluated.to_mesh_clear()
     assert vertices, 'missing fit surfaces'
-    return BVHTree.FromPolygons(vertices, faces, all_triangles=True)
+    return tree(vertices, faces)
 
 
 def named(objects, name):

@@ -43,7 +43,7 @@ function thumbPose(
 // trigger, thumb and three grip-pad targets under the existing joint bounds.
 const grips: Record<Side, GripFrame> = {
   right: { pos: [0.03, -0.11, 0.16], finger: [0, 0.111, -0.9938], back: [1, 0, 0] },
-  left: { pos: [-0.067, -0.022, -0.125], finger: [0.7, -0.1, -0.71], back: [-0.14, -0.985, 0.001] },
+  left: { pos: [-0.067, -0.04, -0.115], finger: [0.7, -0.1, -0.71], back: [-0.14, -0.985, 0.001] },
 };
 const sides: Partial<
   Record<
@@ -59,7 +59,8 @@ const result = { grips, sides };
 for (const side of ['right', 'left'] as const) {
   const g = grips[side];
   const arm = new Arm(side === 'left' ? -1 : 1, { scale: side === 'left' ? 0.97 : 1 });
-  arm.hand.position.fromArray(g.pos);
+  // Fit the curl at the bare handguard; the authored wrist sits lower and farther back.
+  arm.hand.position.fromArray(side === 'left' ? [-0.067, -0.022, -0.125] : g.pos);
   arm.hand.quaternion.copy(basis(g.finger, g.back));
   arm.setPose(side === 'right' ? 'gripRifle' : 'clamp');
   if (side === 'left') {
