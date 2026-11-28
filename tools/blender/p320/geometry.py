@@ -287,10 +287,10 @@ def build_geometry(asset):
     engraving.rotation_euler=Matrix(((0,0,1),(1,0,0),(0,1,0))).to_euler()
     cyl('Guide rod | front cap',(0,.141,.026),.0036,.018,steel,body,'Y')
     cyl('Guide rod | exposed shaft',(0,.063,.026),.0022,.136,steel,body,'Y')
-    # Rounded visible blade, following the photo's thin hook at the tip.
+    # Rounded blade with its upper shank tucked into the frame.
     sections=[(-.0176,.0388,.0406,.0008),(-.0168,.0359,.0410,.0018),(-.0150,.0328,.0397,.0025),
               (-.0125,.0299,.0370,.0028),(-.0078,.0279,.0346,.0032),(-.0028,.0272,.0339,.0035),
-              (.0026,.0275,.0349,.0036),(.0080,.0280,.0375,.0037)]
+              (.0026,.0275,.0349,.0036),(.0080,.0280,.0375,.0037),(.0110,.0280,.0375,.0037)]
     sides=24
     verts=[(width*math.copysign(abs(math.cos(a))**.8,math.cos(a)),
             (back+front+(front-back)*math.copysign(abs(math.sin(a))**.8,math.sin(a)))/2,z)
