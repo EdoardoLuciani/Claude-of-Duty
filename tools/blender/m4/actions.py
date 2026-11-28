@@ -9,22 +9,20 @@ from mathutils import Vector, Quaternion, Matrix
 from review_hands import author_review_hands, eq
 
 C=Matrix(((1,0,0),(0,0,-1),(0,1,0)));CI=C.inverted();FPS=120
-def xyz(v):return C@Vector(v)
-def quat(q):return (C@q.to_matrix()@CI).to_quaternion()
+def xyz(v, basis=C):return basis@Vector(v)
+def quat(q, basis=C):return (basis@q.to_matrix()@(CI if basis is C else basis.inverted())).to_quaternion()
 
 
 def set_hand_pose(controls, position, rotation, pose, *, basis=C):
-    inverse = basis.inverted()
-    def native(q): return (basis @ q.to_matrix() @ inverse).to_quaternion()
-    controls['wrist'].location = basis @ Vector(position)
-    controls['wrist'].rotation_quaternion = native(rotation)
+    controls['wrist'].location = xyz(position, basis)
+    controls['wrist'].rotation_quaternion = quat(rotation, basis)
     for i in range(4):
-        controls[f'finger_{i}_root'].rotation_quaternion = native(eq((0, pose['fingerSpread'][i], 0)))
+        controls[f'finger_{i}_root'].rotation_quaternion = quat(eq((0, pose['fingerSpread'][i], 0)), basis)
         for j in range(3):
-            controls[f'finger_{i}_{j}'].rotation_quaternion = native(eq((-pose['fingers'][i][j], 0, 0)))
-    controls['thumb_base'].rotation_quaternion = native(eq(pose['thumbBase']))
+            controls[f'finger_{i}_{j}'].rotation_quaternion = quat(eq((-pose['fingers'][i][j], 0, 0)), basis)
+    controls['thumb_base'].rotation_quaternion = quat(eq(pose['thumbBase']), basis)
     for j in range(2):
-        controls[f'thumb_{j}'].rotation_quaternion = native(eq((-pose['thumb'][j], 0, 0)))
+        controls[f'thumb_{j}'].rotation_quaternion = quat(eq((-pose['thumb'][j], 0, 0)), basis)
 
 
 def author_actions(root,asset,rig,parts,mag,spare,bolt,head,handle,trigger,cover,release,case):

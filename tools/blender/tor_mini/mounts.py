@@ -37,7 +37,7 @@ def underside_rail(weapon, guard, weapon_meshes, inverse):
     """Check fixed seating, then return the targets for the shared clip sweep."""
     parent = bpy.data.objects['MOUNT_foregrip'].parent
     backing = bpy.data.objects['Foregrip rail adapter backing']
-    rails = [o for o in weapon_meshes if o.name.startswith(('Foregrip rail adapter tooth', 'Foregrip rail adapter groove bed'))]
+    rails = [o for o in weapon_meshes if o.name.startswith(attachment_source.FOREGRIP_ADAPTER_SURFACES)]
     assert rails and all(o.parent == parent == guard.parent for o in [*rails, backing]), (weapon, 'underside rail must travel with the guard')
     backing_tree, rails_tree = surface([backing], inverse), surface(rails, inverse)
     assert backing_tree.overlap(surface([guard], inverse)), (weapon, 'floating underside backing')
