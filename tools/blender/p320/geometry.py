@@ -220,8 +220,8 @@ def build_geometry(asset):
     def silhouette(points):return [(.130-(x-136)*.000311,.050-(y-36)*.000311) for x,y in points]
     # The guard sweeps down around the opening, then blends back into the grip.
     guard=profile('Frame | integral trigger guard',left_profile([
-        (274,156),(282,172),(285,201),(284,237),(281,272),(305,277),(386,280),
-        (423,276),(449,270),(483,275),(502,215),(478,164)]),.0182,polymer,body,.0021,smooth=True)
+        (274,156),(282,172),(285,201),(284,237),(281,272),(305,275),(342,276),
+        (386,275),(423,272),(449,269),(483,275),(502,215),(478,164)]),.0182,polymer,body,.0021,smooth=True)
     window=curved_outline(left_profile([
         (306,184),(359,183),(419,182),(442,189),(453,206),(456,224),(452,245),
         (429,258),(387,262),(334,264),(306,260),(294,246),(292,212),(295,194)]))
