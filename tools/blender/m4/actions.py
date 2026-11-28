@@ -12,6 +12,19 @@ C=Matrix(((1,0,0),(0,0,-1),(0,1,0)));CI=C.inverted();FPS=120
 def xyz(v):return C@Vector(v)
 def quat(q):return (C@q.to_matrix()@CI).to_quaternion()
 
+
+def set_hand_pose(controls, position, rotation, pose):
+    controls['wrist'].location = xyz(position)
+    controls['wrist'].rotation_quaternion = quat(rotation)
+    for i in range(4):
+        controls[f'finger_{i}_root'].rotation_quaternion = quat(eq((0, pose['fingerSpread'][i], 0)))
+        for j in range(3):
+            controls[f'finger_{i}_{j}'].rotation_quaternion = quat(eq((-pose['fingers'][i][j], 0, 0)))
+    controls['thumb_base'].rotation_quaternion = quat(eq(pose['thumbBase']))
+    for j in range(2):
+        controls[f'thumb_{j}'].rotation_quaternion = quat(eq((-pose['thumb'][j], 0, 0)))
+
+
 def author_actions(root,asset,rig,parts,mag,spare,bolt,head,handle,trigger,cover,release,case):
     scene=bpy.context.scene
     ref=json.loads((root/'src/weapons/authored/m4a1-block-ii/hand-reference.json').read_text())
@@ -35,15 +48,10 @@ def author_actions(root,asset,rig,parts,mag,spare,bolt,head,handle,trigger,cover
         data=ref['sides'][side];cs=hand_controls[side];f=time*FPS
         pos=pos if pos is not None else ref['grips'][side]['pos']
         q=q if q is not None else Quaternion((data['quaternion'][3],*data['quaternion'][:3]));p=p if p is not None else data['grip']
-        wrist=cs['wrist'];wrist.location=xyz(pos);wrist.rotation_quaternion=quat(q)
-        wrist.keyframe_insert('location',frame=f);wrist.keyframe_insert('rotation_quaternion',frame=f)
-        for i in range(4):
-            o=cs[f'finger_{i}_root'];o.rotation_quaternion=quat(eq((0,p['fingerSpread'][i],0)));o.keyframe_insert('rotation_quaternion',frame=f)
-            for j in range(3):
-                o=cs[f'finger_{i}_{j}'];o.rotation_quaternion=quat(eq((-p['fingers'][i][j],0,0)));o.keyframe_insert('rotation_quaternion',frame=f)
-        o=cs['thumb_base'];o.rotation_quaternion=quat(eq(p['thumbBase']));o.rotation_quaternion.make_compatible(quat(eq(data['grip']['thumbBase'])));o.keyframe_insert('rotation_quaternion',frame=f)
-        for j in range(2):
-            o=cs[f'thumb_{j}'];o.rotation_quaternion=quat(eq((-p['thumb'][j],0,0)));o.keyframe_insert('rotation_quaternion',frame=f)
+        set_hand_pose(cs,pos,q,p)
+        cs['thumb_base'].rotation_quaternion.make_compatible(quat(eq(data['grip']['thumbBase'])))
+        cs['wrist'].keyframe_insert('location',frame=f)
+        for o in cs.values():o.keyframe_insert('rotation_quaternion',frame=f)
     def begin(name,duration):
         clips[name]={'frames':[0,duration*FPS],'duration':duration,'events':[]}
         for o in all_parts:

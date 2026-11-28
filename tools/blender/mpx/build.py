@@ -563,6 +563,13 @@ def build(output, render=False, quick=False):
     bpy.context.view_layer.update()
     picatinny.build_rail('Laser rail adapter',rail.matrix_world@Matrix.Rotation(math.pi,4,'Y'),-.0126,.0226,steel,body,asset)
 
+    foregrip = empty('MOUNT_foregrip', (.257, 0, -.031), body)
+    foregrip.rotation_euler.z = -math.pi / 2
+    box('Foregrip rail adapter backing', (.257, 0, -.0249), (.072, .020, .003), alloy)
+    bpy.context.view_layer.update()
+    picatinny.build_rail('Foregrip rail adapter', foregrip.matrix_world @ Matrix.Rotation(math.pi, 4, 'Y'),
+                        -.035, .035, steel, body, asset, bottom=-.005)
+
     # Stage 3: surface-fitted markings and original component atlas UVs.
     # Project original text mesh vertices onto their declared physical surface, not
     # a guessed plane beyond the part's edge. Fail loudly if any glyph misses it.

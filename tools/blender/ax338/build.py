@@ -346,6 +346,12 @@ def build(output,render=False,quick=False):
     for z in (-.475,-.435):
         cyl('Laser rail adapter screw',(.0358,.075,z),.002,.004,steel,hg,'X',24)
 
+    foregrip=empty('MOUNT_foregrip',(0,.044,-.386),hg)
+    box('Foregrip rail adapter backing',(0,.0509,-.386),(.020,.0046,.122),black,hg)
+    bpy.context.view_layer.update()
+    picatinny.build_rail('Foregrip rail adapter',foregrip.matrix_world@Matrix.Rotation(math.pi,4,'Y'),
+                        -.060,.060,steel,hg,asset,bottom=-.005)
+
     # Source and runtime share identical UVs and atlas regions; never save an
     # untextured DCC source and unwrap only the GLB after saving it.
     for o in list(asset.objects):

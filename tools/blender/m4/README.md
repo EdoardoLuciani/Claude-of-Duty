@@ -33,6 +33,13 @@ Preserve events, STEP visibility, iron rays, lockback, contacts and resource
 ownership. Representation/storage measurements and bounded normal-rounding
 acceptance remain in Git history; they are not general visual or FPS approval.
 
+## Foregrip fit review
+
+The [shared foregrip fit review](../foregrips/README.md#weapon-fit-review)
+includes both M4 candidates, with distinct left-hand idle poses in the same
+game-space convention as the stock hand reference. The draft poses do not
+replace the stock pose or register a player attachment.
+
 ## Side-profile references
 
 - [Colt Block II FSP parts photograph](https://www.reddit.com/r/GunPorn/comments/eqzf90/m4a1_block_ii_fsp/):

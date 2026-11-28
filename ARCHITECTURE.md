@@ -425,7 +425,9 @@ changes an owned, loaded weapon synchronously outside the frame loop.
 `mountAttachments()` validates all assets/datums before attaching groups under
 `MOUNT_optic`/`MOUNT_rail`/`MOUNT_muzzle` and switching authored hardware via
 `slotVisuals()`. Fixed side rails remain part of the base weapon when the laser is
-removed. Instances follow authored parents/animation, never a baked live pose;
+removed. The MCX, MPX and AX338 also have baked-in underside rail adapters;
+`MOUNT_foregrip` is a fit-review datum, not a runtime slot.
+Instances follow authored parents/animation, never a baked live pose;
 ADS uses the rest-pose optic datum in the weapon frame, while the reticle
 follows the live mount. The mount commit resolves the sight datum, eye relief,
 `OpticData`, laser emitter and muzzle socket on the viewmodel entry. Separately,

@@ -41,9 +41,42 @@ Each bake produces an editable `.blend` and a standalone `.glb` with one mesh
 primitive and one opaque material. Vertex colors distinguish the finish tints
 without extra primitives or textures. Neither prop includes skinning or
 animation. The review cameras render isolated side, oblique, underside and end
-views without changing the saved scene. The
-runtime catalog must not list a grip on the strength of these renders or a rigid
-seat alone; each fit also needs its own left-hand contact and animation checks.
+views without changing the saved scene.
+
+## Weapon fit review
+
+`fit-review.json` holds candidate cosmetic seats and independently reviewed
+left-hand poses. `fit_review.py` seats the standalone bakes on the actual models,
+checks the existing accessories and the laser ray, and sweeps the stock hands
+and mechanisms through the native clips. It checks palm and fingertip proximity
+and interference with the shared deformed skin on each draft pose. The M590
+review keeps the mount and posed wrist on the animated slide through `Pump`.
+Optional captures compare no grip, a grip with the stock glove, and the draft pose.
+
+| Game model      | Direct-seat review                                                                                                             |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| M4A1            | AFG-2 and DD vertical, draft idle poses                                                                                        |
+| M590            | AFG-2 and DD vertical, draft idle and held pump stroke                                                                         |
+| EVOLYS          | DD vertical, draft idle pose. Every full-span AFG-2 groove on the existing underside rail conflicts with the mounted TOR Mini. |
+| MCX, MPX, AX338 | Permanent underside Picatinny adapters in the base models. Grip and support-hand fits are not yet verified.                    |
+| P320            | Its short frame accessory rail is not a support-hand location.                                                                 |
+
+After running `bun tools/build-assets.ts` and baking both props to their default
+output locations (omit `--output` in the bake command above), run:
+
+```sh
+for model in m4:m4a1-block-ii m590:m590 evolys:fn-evolys-762; do
+  weapon=${model%%:*}
+  asset=${model#*:}
+  blender -b -t 4 ".cache/blender/weapons/$asset/$asset.blend" \
+    --python-exit-code 1 --python tools/blender/foregrips/fit_review.py \
+    -- "$weapon" --renders ".cache/foregrip-review/$weapon"
+done
+```
+
+These are Blender-only candidates; the stock wrists and gameplay are unchanged.
+A rigid seat or held-pose check does not verify the release/regrip paths or the
+runtime viewmodel. No pair is registered in the catalog.
 
 [magpul]: https://magpul.com/afg-2-angled-fore-grip.html
 [talos]: https://www.talosdefense.com/parts-upgrades/grips-stocks/magpul-angled-fore-grip-gen-2-afg2
