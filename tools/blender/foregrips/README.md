@@ -45,38 +45,43 @@ views without changing the saved scene.
 
 ## Weapon fit review
 
-`fit-review.json` holds candidate cosmetic seats and independently reviewed
-left-hand poses. `fit_review.py` seats the standalone bakes on the actual models,
-checks the existing accessories and the laser ray, and sweeps the stock hands
-and mechanisms through the native clips. It checks palm and fingertip proximity
-and interference with the shared deformed skin on each draft pose. The M590
-review keeps the mount and posed wrist on the animated slide through `Pump`.
-Optional captures compare no grip, a grip with the stock glove, and the draft pose.
+`fit-review.json` holds cosmetic seats and left-hand poses. `fit_review.py`
+checks rail contact, the catalog accessories and laser ray, and sweeps stock
+hands and mechanisms through the native clips. For the DD Vertical it checks
+the deformed support and firing arms while the support hand stays on the grip.
+The M590 mount and wrist follow the moving forend. MCX, MPX and AX338 seat on
+`MOUNT_foregrip`; `poseFrom` shares the M4A1 grip rotation and finger wrap with
+an independently positioned wrist on each model. Captures compare the bare
+rail, the grip with the stock glove, and the fitted pose.
 
-| Game model      | Direct-seat review                                                                                                             |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| M4A1            | AFG-2 and DD vertical, draft idle poses                                                                                        |
-| M590            | AFG-2 and DD vertical, draft idle and held pump stroke                                                                         |
-| EVOLYS          | DD vertical, draft idle pose. Every full-span AFG-2 groove on the existing underside rail conflicts with the mounted TOR Mini. |
-| MCX, MPX, AX338 | Permanent underside Picatinny adapters in the base models. Grip and support-hand fits are not yet verified.                    |
-| P320            | Its short frame accessory rail is not a support-hand location.                                                                 |
+| Game model | DD Vertical Blender fit                        | AFG-2 Blender fit                                                       |
+| ---------- | ---------------------------------------------- | ----------------------------------------------------------------------- |
+| M4A1       | Idle and firing clips                          | Idle                                                                    |
+| M590       | Idle and full pump stroke                      | Idle and full pump stroke                                               |
+| EVOLYS     | Idle and firing clips, with TOR Mini clearance | Every full-span groove on the existing rail conflicts with the TOR Mini |
+| MCX Virtus | Idle and firing                                | Not reviewed                                                            |
+| SIG MPX    | Idle and firing clips                          | Not reviewed                                                            |
+| AX338      | Idle, firing, and bolt cycle                   | Not reviewed                                                            |
+| P320       | No support-hand seat                           | No support-hand seat                                                    |
 
 After running `bun tools/build-assets.ts` and baking both props to their default
 output locations (omit `--output` in the bake command above), run:
 
 ```sh
-for model in m4:m4a1-block-ii m590:m590 evolys:fn-evolys-762; do
+for model in m4:m4a1-block-ii/m4a1-block-ii m590:m590/m590 evolys:fn-evolys-762/fn-evolys-762 \
+             mcx:mcx-virtus/mcx-virtus mpx:sig-mpx/mpx ax338:ax338/ax338; do
   weapon=${model%%:*}
   asset=${model#*:}
-  blender -b -t 4 ".cache/blender/weapons/$asset/$asset.blend" \
+  blender -b -t 4 ".cache/blender/weapons/$asset.blend" \
     --python-exit-code 1 --python tools/blender/foregrips/fit_review.py \
     -- "$weapon" --renders ".cache/foregrip-review/$weapon"
 done
 ```
 
-These are Blender-only candidates; the stock wrists and gameplay are unchanged.
-A rigid seat or held-pose check does not verify the release/regrip paths or the
-runtime viewmodel. No pair is registered in the catalog.
+These are Blender-only fits; the stock wrists and gameplay are unchanged.
+The MCX stock clears the mounted prop as it folds but crosses the fitted sleeve
+if the hand stays on. Stock fold, draw, holster, reload and inspect need
+release and regrip review in the runtime viewmodel before enabling a pair.
 
 [magpul]: https://magpul.com/afg-2-angled-fore-grip.html
 [talos]: https://www.talosdefense.com/parts-upgrades/grips-stocks/magpul-angled-fore-grip-gen-2-afg2
