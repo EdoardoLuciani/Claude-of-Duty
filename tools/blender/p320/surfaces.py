@@ -39,7 +39,7 @@ def build_surfaces(asset, sources):
             # the authored radius and into the booster's receiving sleeve.
             if not source.name.startswith('Barrel | external muzzle thread'):
                 reduce = obj.modifiers.new('Baked bevel reduction', 'DECIMATE')
-                reduce.ratio = 0.45
+                reduce.ratio = 0.32
                 bpy.ops.object.modifier_apply(modifier=reduce.name)
             low.append(obj)
         active(low[0])
@@ -109,8 +109,39 @@ def emphasize_marks(surfaces):
         surface.select_set(True)
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.mesh.select_all(action='SELECT')
-    bpy.ops.uv.pack_islands(rotate=True, scale=True, margin=.006)
+    bpy.ops.uv.pack_islands(rotate=True, shape_method='AABB', margin_method='FRACTION', margin=4/1024)
     bpy.ops.object.mode_set(mode='OBJECT')
+
+
+def bake_mesh(asset, groups, coords, name):
+    # One bake call per map. Move corresponding donor/target groups together
+    # so projection cannot hit an adjacent moving part or muzzle state.
+    basis = coords.matrix_world.inverted()
+    parts = []
+    for i, group in enumerate(groups, 1):
+        for source in group:
+            obj = source.copy()
+            obj.data = source.data.copy()
+            asset.objects.link(obj)
+            obj.parent = None
+            world = source.matrix_world.copy()
+            rest = basis @ world
+            attr = obj.data.attributes.new('_p320_bake_position', 'FLOAT_VECTOR', 'POINT')
+            attr.data.foreach_set('vector', [v for point in obj.data.vertices for v in rest @ point.co])
+            world.translation.x += i * .3
+            obj.matrix_world = world
+            parts.append(obj)
+    meshes = {obj.data for obj in parts}
+    active(parts[0])
+    for obj in parts[1:]:
+        obj.select_set(True)
+    bpy.ops.object.join()
+    joined = bpy.context.object
+    joined.name = name
+    for mesh in meshes:
+        if mesh.users == 0:
+            bpy.data.meshes.remove(mesh)
+    return joined
 
 
 def stash_sources(sources):

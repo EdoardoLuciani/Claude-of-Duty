@@ -107,5 +107,5 @@ def export_asset(asset, coords, output):
     assert stats['primitives'] == 3 and stats['materials'] == 1, stats
     for name in ('MUZZLE_device', 'MUZZLE_device_removed'):
         assert nodes[name] in doc['nodes'][nodes['barrel']].get('children', []), name
-    assert stats['triangles'] < 30000, stats
+    assert stats['triangles'] < 18_000, stats
     return stats
