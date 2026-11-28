@@ -415,8 +415,9 @@ one model across its verified fits. Stock, suppressor and brake are mutually exc
 unverified fits, never silently change them. `removableIrons` swaps required `IRON_sights`
 for optional `IRON_sights_removed` with any optic; fixed irons stay and must clear it.
 `removableMuzzleDevice` hides required `MUZZLE_device` for any muzzle attachment;
-only a suppressor reveals the optional `MUZZLE_device_removed` adapter. Permanent hardware
-stays when fitted. Missing required nodes fail loading.
+only a suppressor reveals optional `MUZZLE_device_removed` geometry. On the P320
+Full-Size this swaps the inset stock crown for the cosmetic threaded extension.
+Permanent hardware stays when fitted. Missing required nodes fail loading.
 
 `loadAttachments()` returns assets keyed by optic/rail ID or muzzle model. A failed
 asset disables only that key, never the base weapon. Weapons own shared assets;

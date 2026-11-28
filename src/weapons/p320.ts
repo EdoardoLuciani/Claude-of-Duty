@@ -9,12 +9,12 @@ import { convertWeaponScene } from './asset-material.ts';
 import { sampleAuthoredFire, MAGAZINE_ALIASES, disposeAuthoredMixer } from './authored-actions.ts';
 import { authoredModel, requiredNode, type AuthoredModelData } from './authored-model.ts';
 import { createAuthoredRig, sampleAuthoredPose } from './authored-rig.ts';
-import handReference from './authored/p320-compact/hand-reference.json' with { type: 'json' };
-import manifest from './authored/p320-compact/manifest.json' with { type: 'json' };
+import handReference from './authored/p320-full-size/hand-reference.json' with { type: 'json' };
+import manifest from './authored/p320-full-size/manifest.json' with { type: 'json' };
 import { buildMagazineClips, type Clip } from './clips.ts';
 import type { WeaponAnimation } from './runtime-types.ts';
 
-const P320_URL = 'models/weapons/p320-compact.runtime.glb';
+const P320_URL = 'models/weapons/p320-full-size.runtime.glb';
 const EJECT_DELAY = 2 / 60;
 const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(MAGAZINE_ALIASES)];
 
@@ -28,7 +28,7 @@ function makeP320Model(gltf: GLTF): P320Model {
   );
   const model = {
     id: 'pistol' as const,
-    label: 'P320 Compact',
+    label: 'P320 Full-Size',
     scene,
     root,
     opticMountRest,

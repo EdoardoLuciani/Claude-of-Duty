@@ -78,15 +78,15 @@ shoulders, keeping the external envelope.
 The module body is **below** its local mount: local +Y points **into** the seat.
 Side mounts therefore keep forward -Z but turn the body outward.
 
-| Weapon     | `MOUNT_rail` owner / physical support                                          |
-| ---------- | ------------------------------------------------------------------------------ |
-| M4A1       | Right RIS II rail, forward grooves clear of the support hand                   |
-| P320       | Frame bone, not slide; integral rail extended by one slot (game-fit deviation) |
-| EVOLYS     | Handguard; direct underside Picatinny rail                                     |
-| M590       | Receiver; two fixed magazine-tube clamps ahead of the pump stroke              |
-| AX338      | Fixed right KeySlot/Picatinny adapter, ahead of hand/bolt/folding stock        |
-| MCX VIRTUS | Receiver; upper-right chamfer adapter                                          |
-| SIG MPX    | Receiver; four-tooth right adapter anchored in the last M-LOK slot             |
+| Weapon     | `MOUNT_rail` owner / physical support                                   |
+| ---------- | ----------------------------------------------------------------------- |
+| M4A1       | Right RIS II rail, forward grooves clear of the support hand            |
+| P320       | Frame bone, not slide; integral underside rail                          |
+| EVOLYS     | Handguard; direct underside Picatinny rail                              |
+| M590       | Receiver; two fixed magazine-tube clamps ahead of the pump stroke       |
+| AX338      | Fixed right KeySlot/Picatinny adapter, ahead of hand/bolt/folding stock |
+| MCX VIRTUS | Receiver; upper-right chamfer adapter                                   |
+| SIG MPX    | Receiver; four-tooth right adapter anchored in the last M-LOK slot      |
 
 Each weapon's `check.py` checks the actual module, hardware, hands and mechanisms
 through the native clips; only bounded mating rail/clamp contacts are exempt. The

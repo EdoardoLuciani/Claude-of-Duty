@@ -246,7 +246,7 @@ check(
 );
 check(
   'P320 offered as a 400-credit secondary',
-  item('pistol').label === 'P320 Compact' &&
+  item('pistol').label === 'P320 Full-Size' &&
     item('pistol').cost === 400 &&
     item('pistol').slot === 'secondary'
 );

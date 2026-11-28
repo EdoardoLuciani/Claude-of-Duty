@@ -408,7 +408,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
 
   pistol: {
     id: 'pistol',
-    label: 'P320 Compact',
+    label: 'P320 Full-Size',
     class: 'pistol',
     audio: 'pistol',
     caliber: '9x19',

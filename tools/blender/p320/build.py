@@ -59,7 +59,7 @@ def build(output, render=False, quick=False):
     select_clip(parts, hands, clips, 'Idle')
     cameras = build_studio(studio, hands, quick)
     notes=bpy.data.texts.new('START HERE')
-    notes.write('P320 COMPACT / GENERATED PREVIEW\nEdit tools/blender/p320/, not this file.\nReference-specific early-production exterior.\nEight weapon + wrist/finger NLA actions.\nHands use existing glove/sleeve meshes; authored deformation lives in this file.\nSelect the same clip on weapon controls and the two armatures.\nRuntime exports hand controls and reuses shared skins (no duplicated texture cost).\nRun tools/blender/p320/review.py for stills or an animation reel.\nPacked base/ORM/normal/emission atlas (sizes in manifest textureResolutions); high bake sources and studio are excluded from GLB.\nNot manufacturing geometry; not endorsed by SIG SAUER.\n')
+    notes.write('P320 FULL-SIZE / GENERATED PREVIEW\nEdit tools/blender/p320/, not this file.\nCatalog-matched nonfunctional Nitron Full-Size exterior.\nEight weapon + wrist/finger NLA actions.\nHands use existing glove/sleeve meshes; authored deformation lives in this file.\nSelect the same clip on weapon controls and the two armatures.\nRuntime exports hand controls and reuses shared skins (no duplicated texture cost).\nRun tools/blender/p320/review.py for stills or an animation reel.\nPacked base/ORM/normal/emission atlas (sizes in manifest textureResolutions); high bake sources and studio are excluded from GLB.\nNot manufacturing geometry; not endorsed by SIG SAUER.\n')
     scene['clips']=json.dumps(clips)
     scene['hand_collection']='P320 | authored hands (shared appearance)'
     for s in bpy.data.screens:
@@ -68,19 +68,19 @@ def build(output, render=False, quick=False):
     bpy.ops.object.select_all(action='DESELECT')
     rig.select_set(True)
     bpy.context.view_layer.objects.active=rig
-    bpy.ops.wm.save_as_mainfile(filepath=str(output/'p320-compact.blend'))
+    bpy.ops.wm.save_as_mainfile(filepath=str(output/'p320-full-size.blend'))
     if render:
         for name,cam in cameras.items():
             scene.camera=cam;scene.render.filepath=str(output/'renders'/f'{name}.png');bpy.ops.render.render(write_still=True)
     stats = export_asset(asset, coords, output)
-    manifest={'asset':'SIG P320 Nitron Compact | early-production visual reconstruction','units':'metres','blender_forward':'+Y','gltf_forward':'-Z','clips':clips,'stats':stats,
+    manifest={'asset':'SIG P320 Nitron Full-Size | visual reconstruction','units':'metres','blender_forward':'+Y','gltf_forward':'-Z','clips':clips,'stats':stats,
      'textureResolutions':ATLAS_RESOLUTIONS,'geometry':'One rigidly weighted mechanical skin; lettering/traction baked from retained high source','handAnimation':'Blender wrist and finger controls; shared runtime skins and shoulder IK',
      'source':'tools/blender/p320/build.py + tools/blender/p320/ + tools/blender/p320/actions.py + tools/blender/p320/hand-reference.ts',
      'attachments':{
-      'muzzle':{'mount':'MOUNT_muzzle','parent':'barrel','position':[0,.037,-.132],
-                'status':'Compact 9mm booster fit; suppressor9mm; thread protector/exposed thread switch'},
+      'muzzle':{'mount':'MOUNT_muzzle','parent':'barrel','position':[0,.037,-.152],
+                'status':'Compact 9mm booster fit; suppressor9mm; stock crown/threaded extension switch'},
       'rail':{'mount':'MOUNT_rail','parent':'frame','position':[0,.002,-.097],
-              'status':'TOR Mini on a compact game-fit frame rail behind the dust-cover nose'}},
+              'status':'TOR Mini on the integral frame rail behind the dust-cover nose'}},
      'notes':['Original non-functional game art, not a dimensionally exact replica.','No downloaded models or textures.','No endorsement by SIG SAUER.']}
     (output/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
     print('P320_EXPORT_COMPLETE',json.dumps(stats))
@@ -88,7 +88,7 @@ def build(output, render=False, quick=False):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--output', type=Path, default=ROOT / '.cache/blender/weapons/p320-compact')
+    parser.add_argument('--output', type=Path, default=ROOT / '.cache/blender/weapons/p320-full-size')
     parser.add_argument('--render', action='store_true')
     parser.add_argument('--quick', action='store_true', help='Only reduce preview resolution/samples')
     args = parser.parse_args(sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else [])

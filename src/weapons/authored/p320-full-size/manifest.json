@@ -1,5 +1,5 @@
 {
-  "asset": "SIG P320 Nitron Compact | early-production visual reconstruction",
+  "asset": "SIG P320 Nitron Full-Size | visual reconstruction",
   "units": "metres",
   "blender_forward": "+Y",
   "gltf_forward": "-Z",
@@ -110,14 +110,14 @@
     }
   },
   "stats": {
-    "triangles": 19648,
-    "vertices": 39698,
+    "triangles": 22484,
+    "vertices": 41494,
     "meshes": 3,
     "primitives": 3,
     "materials": 1,
     "textureImages": 4,
     "joints": 9,
-    "bytes": 5417288
+    "bytes": 5824388
   },
   "textureResolutions": {
     "base": 1024,
@@ -135,9 +135,9 @@
       "position": [
         0,
         0.037,
-        -0.132
+        -0.152
       ],
-      "status": "Compact 9mm booster fit; suppressor9mm; thread protector/exposed thread switch"
+      "status": "Compact 9mm booster fit; suppressor9mm; stock crown/threaded extension switch"
     },
     "rail": {
       "mount": "MOUNT_rail",
@@ -147,7 +147,7 @@
         0.002,
         -0.097
       ],
-      "status": "TOR Mini on a compact game-fit frame rail behind the dust-cover nose"
+      "status": "TOR Mini on the integral frame rail behind the dust-cover nose"
     }
   },
   "notes": [

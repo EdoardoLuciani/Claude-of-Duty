@@ -74,7 +74,7 @@ def export_asset(asset, coords, output):
             if obj != coords:
                 obj.select_set(True)
         bpy.ops.export_scene.gltf(
-            filepath=str(output / 'p320-compact.glb'), export_format='GLB', use_selection=True,
+            filepath=str(output / 'p320-full-size.glb'), export_format='GLB', use_selection=True,
             export_animations=True, export_animation_mode='ACTIONS', export_merge_animation='NLA_TRACK',
             export_anim_single_armature=False,
             export_frame_range=False, export_force_sampling=False,
@@ -83,7 +83,7 @@ def export_asset(asset, coords, output):
             export_materials='EXPORT', export_cameras=False, export_lights=False,
         )
     # Read-only validation; never repair the GLB, textures or animation samplers.
-    raw = (output / 'p320-compact.glb').read_bytes()
+    raw = (output / 'p320-full-size.glb').read_bytes()
     length = struct.unpack_from('<I', raw, 12)[0]
     doc = json.loads(raw[20:20 + length])
     nodes = {node['name']: index for index, node in enumerate(doc['nodes']) if 'name' in node}

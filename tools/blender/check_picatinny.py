@@ -78,7 +78,7 @@ WEAPONS=[
     ('m4a1-block-ii/m4a1-block-ii',('Upper receiver rail ',),('RIS II 1 ',),()),
     ('mcx-virtus/mcx-virtus',('Continuous top rail foot','Picatinny rail tooth'),('Laser rail adapter tooth','Laser rail adapter groove bed'),FOREGRIP_RAIL),
     ('sig-mpx/mpx',('Picatinny spine','Picatinny rail tooth'),('Laser rail adapter tooth','Laser rail adapter groove bed'),FOREGRIP_RAIL),
-    ('p320-compact/p320-compact',(),('Frame | continuous compact medium polymer shell',),()),
+    ('p320-full-size/p320-full-size',(),('Frame | continuous Full-Size polymer shell',),()),
     ('fn-evolys-762/fn-evolys-762',('receiver_mesh',),('handguard_mesh',),()),
     ('m590/m590',('Optic Picatinny lug','Optic rail groove bed'),('Laser rail adapter tooth','Laser rail adapter groove bed'),()),
     ('ax338/ax338',('Continuous top rail','Rail tooth'),('Laser rail adapter tooth','Laser rail adapter groove bed'),FOREGRIP_RAIL),

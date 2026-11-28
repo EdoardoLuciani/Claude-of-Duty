@@ -146,10 +146,10 @@ export const MODEL_COOKS = {
     '-sp',
   ]),
   p320: {
-    directory: '.cache/blender/weapons/p320-compact',
-    authored: 'src/weapons/authored/p320-compact',
-    source: 'p320-compact.glb',
-    output: 'public/models/weapons/p320-compact.runtime.glb',
+    directory: '.cache/blender/weapons/p320-full-size',
+    authored: 'src/weapons/authored/p320-full-size',
+    source: 'p320-full-size.glb',
+    output: 'public/models/weapons/p320-full-size.runtime.glb',
     flags: ['-si', '0.50', '-se', '0.001', '-sp'],
   },
 };
