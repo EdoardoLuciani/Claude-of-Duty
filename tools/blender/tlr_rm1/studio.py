@@ -21,6 +21,12 @@ VIEWS = {
 }
 
 
+def scene_collection(name):
+    collection = bpy.data.collections.new(name)
+    bpy.context.scene.collection.children.link(collection)
+    return collection
+
+
 def setup(quick):
     scene = bpy.context.scene
     scene.unit_settings.system = 'METRIC'
@@ -34,8 +40,7 @@ def setup(quick):
     scene.view_settings.view_transform = 'AgX'
     scene.view_settings.look = 'AgX - Medium High Contrast'
 
-    studio = bpy.data.collections.new('05  Product photography — not part of asset')
-    scene.collection.children.link(studio)
+    studio = scene_collection('05  Product photography — not part of asset')
     cameras = {}
     for name, (direction, (y,z), width) in VIEWS.items():
         data = bpy.data.cameras.new(name)
@@ -77,7 +82,7 @@ def setup(quick):
     for name, where, target, power, size, height in [
         ('Overhead rectangular softbox', (-.058,.032,.105), (0,-.01,-.018), .185, .110, .063),
         ('Front card', (-.067,.105,-.057), (0,.026,-.014), .077, .049, .014),
-        ('Optics kicker', (.024,.091,.028), (0,.026,-.014), .043, .043, .043),
+        ('Optics kicker', (.024,.091,.028), (0,.026,-.014), .043, .043, None),
         ('Side fill', (.086,.012,.032), (0,-.01,-.019), .088, .088, .099),
         ('Right edge strip', (.085,-.020,.064), (0,-.01,-.019), .058, .083, .015),
         ('Left upper strip', (-.080,-.057,.053), (0,-.005,-.019), .166, .059, .028),
@@ -87,8 +92,8 @@ def setup(quick):
     ]:
         lamp = bpy.data.lights.new(name, 'AREA')
         lamp.energy, lamp.size = power, size
-        lamp.shape = 'DISK' if name == 'Optics kicker' else 'RECTANGLE'
-        if lamp.shape == 'RECTANGLE':
+        lamp.shape = 'RECTANGLE' if height is not None else 'DISK'
+        if height is not None:
             lamp.size_y = height
         obj = bpy.data.objects.new(name, lamp)
         studio.objects.link(obj)
@@ -110,13 +115,20 @@ def setup(quick):
 def render(directory):
     directory.mkdir(parents=True, exist_ok=True)
     scene = bpy.context.scene
-    for name in VIEWS:
-        scene.camera = bpy.data.objects[name]
+    plug = bpy.data.collections[PLUG]
+    camera, filepath, plug_hidden = scene.camera, scene.render.filepath, plug.hide_render
+
+    def shoot(view, name):
+        scene.camera = bpy.data.objects[view]
         scene.render.filepath = str(directory / f'{name}.png')
         bpy.ops.render.render(write_still=True)
-    plug = bpy.data.collections[PLUG]
-    plug.hide_render = False
-    scene.camera = bpy.data.objects['rear-quarter']
-    scene.render.filepath = str(directory / 'rear-quarter-with-plug.png')
-    bpy.ops.render.render(write_still=True)
-    plug.hide_render = True
+
+    try:
+        plug.hide_render = True
+        for name in VIEWS:
+            shoot(name, name)
+        plug.hide_render = False
+        shoot('rear-quarter', 'rear-quarter-with-plug')
+    finally:
+        scene.camera, scene.render.filepath = camera, filepath
+        plug.hide_render = plug_hidden

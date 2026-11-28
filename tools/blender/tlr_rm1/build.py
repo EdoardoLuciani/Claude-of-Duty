@@ -14,17 +14,11 @@ import bpy
 from mathutils import Matrix, Vector
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from studio import PLUG, setup, render
+from studio import PLUG, render, scene_collection, setup
 
 MM = .001
 ENVELOPE = (30.0, 92.5, 38.1)  # X width, Y length, Z height
 OUT = Path(__file__).resolve().parents[3] / '.cache/blender/attachments/tlr-rm1'
-
-
-def scene_collection(name):
-    collection = bpy.data.collections.new(name)
-    bpy.context.scene.collection.children.link(collection)
-    return collection
 
 
 def finish(name, color, rough, metal=0, grain=0, transmission=0):
@@ -547,7 +541,6 @@ def main():
 
         target = optimize(model_collections, args.output)
         validate((target,))
-        bpy.context.scene.camera = bpy.data.objects['front-quarter']
         bpy.ops.wm.save_as_mainfile(filepath=str(args.output / 'tlr-rm1-optimized.blend'))
         bpy.ops.export_scene.gltf(filepath=str(args.output / 'tlr-rm1-optimized.glb'),
                                   export_format='GLB', use_selection=True, export_tangents=True)

@@ -9,6 +9,8 @@ import math
 import bpy
 from mathutils import Vector
 
+from studio import scene_collection
+
 ATLAS_SIZE = 1024
 BAKE_SIZE = 2 * ATLAS_SIZE  # Supersample the engraved and printed strokes, not the shipped maps.
 MAX_TRIANGLES = 8000
@@ -45,8 +47,8 @@ def low_mesh(source, collection, ratio):
     obj = bpy.data.objects.new(source.name, source.data.copy())
     collection.objects.link(obj)
     bpy.context.view_layer.objects.active = obj
-    source.data.calc_loop_triangles()
-    if ratio < 1 and len(source.data.loop_triangles) > 48:
+    triangles = len(source.data.loops) - 2 * len(source.data.polygons)
+    if ratio < 1 and triangles > 48:
         mod = obj.modifiers.new('Reduce while retaining the main silhouette', 'DECIMATE')
         mod.ratio = ratio
         mod.use_collapse_triangulate = True
@@ -105,6 +107,7 @@ def bake_maps(body, donor, output):
         face.material_index = 0
     nodes, links = surface.node_tree.nodes, surface.node_tree.links
     shader = nodes.get('Principled BSDF')
+    # Donors share source materials, so rewrite and restore each shader once per pass.
     mats = [(m.node_tree.nodes, m.node_tree.links) for m in donor.data.materials if m is not None]
     active(body)
     donor.select_set(True)
@@ -164,17 +167,13 @@ def bake_maps(body, donor, output):
 
 
 def optimize(collections, output):
-    scene = bpy.context.scene
-    target = bpy.data.collections.new('00  Optimized exterior — one opaque mesh')
-    scene.collection.children.link(target)
-    temporary = bpy.data.collections.new('Temporary bake materials and donors')
-    scene.collection.children.link(temporary)
+    target = scene_collection('00  Optimized exterior — one opaque mesh')
+    temporary = scene_collection('Temporary bake materials and donors')
     graph = bpy.context.evaluated_depsgraph_get()
     sources = [obj for collection in collections for obj in collection.objects if not obj.get('source_only')]
     donors = {obj: copy_evaluated(obj, graph, temporary) for obj in sources}
     for collection in collections:
         collection.hide_viewport = collection.hide_render = True
-    # Donors share each source material's bake shader; restore it once per material.
     parts = []
     offsets = {}
     for source, donor in donors.items():
