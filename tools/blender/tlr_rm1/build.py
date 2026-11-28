@@ -289,7 +289,7 @@ def model():
     pin = (14.22,.65,-2.95)
     turn(body, 'Right counterbore shadow', pin, [(-.24,2.96),(.10,2.94)], dark, axis='X')
     turn(body, 'Fine rim of right counterbore', pin, [(.10,2.94),(.16,2.91),(.16,2.77),(.095,2.76)],
-         clamp, axis='X', hollow=True)
+         clamp, axis='X', hollow=True)['uv_split'] = True
     turn(body, 'Exposed right clamp pin', (14.40,.65,-2.95), [(-.10,1.45),(.30,1.45),(.60,1.13)], steel, axis='X')
     screw = (-14.40,1.0,-1.78)
     turn(body, 'Captive screw black seat', screw,
@@ -340,7 +340,10 @@ def model():
         bands = []
         for y, r, w in ((29.0,7.61,.09),(30.40,8.72,.14),(32.6,9.90,.10),(34.1,10.39,.045)):
             bands.extend((r*math.cos(a+u*w),y,lamp[2]+r*math.sin(a+u*w)) for u in (-1,1))
-        mesh(light, f'Cosmetic reflector facet {k+1}', bands, [(i,i+1,i+3,i+2) for i in (0,2,4)], facet_metal)
+        facet = mesh(light, f'Cosmetic reflector facet {k+1}', bands, [(i,i+1,i+3,i+2) for i in (0,2,4)], facet_metal)
+        # Open strips have no inside for normal recalculation to infer. Face the lens.
+        if facet.data.polygons[0].normal.y < 0:
+            facet.data.flip_normals()
     # Coated cosmetic window: retain a slight grazing reflection but leave the
     # bowl and its central surface visible instead of masking them with glare.
     glass = finish('Clear front optic with thin antireflective coating', (.94,.98,1.0), .026)
@@ -372,9 +375,11 @@ def model():
         (-36.2,12.65,-22.15,-1.1,3.15),(-29.2,12.7,-26.45,-1.65,3.2),
         (-22.6,12.7,-27.8,-1.73,2.5),(-15.65,12.62,-32.55,-2.05,2.1)
     ]], polymer)
+    tail_shell['uv_split'] = True
     rail_extension = [(-56.8,-.2),(-53.1,.58),(-51.2,-.65),(-41.35,-.67),(-40.58,-1.60),
                       (-22.8,-1.65),(-22.7,-5.90),(-40.58,-6.0),(-41.5,-7.7),(-56.8,-10.0)]
     shoulder = profile(tail, 'Molded shoulder with rear raised lip', rail_extension, -12.50, 12.50, polymer, .62)
+    shoulder['uv_split'] = True
     for obj in (tail_shell, shoulder):
         subtract(obj, box(cutters, 'Shallow top notch in rear collar', (0,-50.65,-1.08), (10.18,5.15,4.0), dark,.80))
     box(tail, 'Satin bottom of rear collar notch', (0,-50.65,-3.15), (9.83,4.88,.3), dark,.10)
@@ -383,6 +388,7 @@ def model():
                 (8.65,-15.6),(-8.65,-15.6),(-10.93,-12.28),(-10.93,-1.8)]
     surround = profile(tail, 'Rounded rear endcap and port surround', rear_end,
                        -57.5,-55.06,polymer,.78,'Y')
+    surround['uv_split'] = True
     box(tail, 'Dark receiver seam backing', (0,-15.61,-17.2), (24.1,1.3,30.0), dark, .32)
     port = (0,-57.5,-6.05)
     for obj in (tail_shell, surround):
@@ -493,9 +499,9 @@ def model():
         box(marks, 'Warning plate microprint line', (1.25,-15.65+i*1.02,-34.074),
             (width,.28,.018), yellow,.008)['decal_on'] = plate
     strokes(marks, throat, 'Face cap rotation cue', [[(18.90,-8.88),(18.53,-10.60),(18.52,-12.9),
-            (18.84,-15.03),(19.18,-16.58)]], -1,11.30,white,.105)
+            (18.84,-15.03),(19.18,-16.58)]], -1,11.30,white,.105,conform=True)
     arrows = [[(18.40,z+s*.7),(18.98,z),(19.38,z+s*.82)] for z,s in [(-8.88,-1),(-16.58,1)]]
-    strokes(marks, throat, 'Face cap cue arrowheads', arrows, -1,11.30,white,.092)
+    strokes(marks, throat, 'Face cap cue arrowheads', arrows, -1,11.30,white,.092,conform=True)
     bpy.data.collections.remove(cutters)
     return (body, light, tail, marks)
 

@@ -6,6 +6,7 @@ neighbor's hardware. Leave the studio and reference plug out of the target.
 
 import math
 
+import bmesh
 import bpy
 from mathutils import Vector
 
@@ -56,7 +57,52 @@ def low_mesh(source, collection, ratio):
     mod = obj.modifiers.new('Fix tangent-bake triangulation', 'TRIANGULATE')
     mod.keep_custom_normals = True
     bpy.ops.object.modifier_apply(modifier=mod.name)
+    # Collapsed faces cannot carry a tangent basis or useful atlas coverage.
+    collapsed = [face.index for face in obj.data.polygons if face.area <= 1e-16]
+    if collapsed:
+        bm = bmesh.new()
+        bm.from_mesh(obj.data)
+        bm.faces.ensure_lookup_table()
+        bmesh.ops.delete(bm, geom=[bm.faces[i] for i in collapsed], context='FACES')
+        bm.to_mesh(obj.data)
+        bm.free()
+        obj.data.update()
     return obj
+
+
+def split_tight_islands(data):
+    flags = data.attributes.get('_uv_split')
+    if flags is None:
+        return
+    loops = [tuple(face.loop_indices) for face in data.polygons if flags.data[face.index].value]
+
+    def area():
+        uv = data.uv_layers.active.data
+        return sum(abs((uv[b].uv-uv[a].uv).cross(uv[c].uv-uv[a].uv)) for a,b,c in loops)
+
+    original_area = area()
+    selection_mode = tuple(bpy.context.tool_settings.mesh_select_mode)
+    bpy.ops.object.mode_set(mode='EDIT')
+    bpy.ops.mesh.select_mode(type='FACE')
+    bpy.ops.mesh.select_all(action='DESELECT')
+    bm = bmesh.from_edit_mesh(data)
+    flags = bm.faces.layers.int['_uv_split']
+    for face in bm.faces:
+        if face[flags]:
+            face.select_set(True)
+    bmesh.update_edit_mesh(data)
+    # Tighter charts prevent the curved parts from folding over in projection.
+    bpy.ops.uv.smart_project(angle_limit=math.radians(46.5), island_margin=.002)
+    bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.object.mode_set(mode='OBJECT')
+    bpy.context.tool_settings.mesh_select_mode = selection_mode
+    # Smart Project fits each selection to the atlas; restore its relative density.
+    scale = math.sqrt(original_area/area())
+    uv = data.uv_layers.active.data
+    for triangle in loops:
+        for i in triangle:
+            uv[i].uv *= scale
+    data.attributes.remove(data.attributes['_uv_split'])
 
 
 def atlas_uv(obj):
@@ -68,6 +114,7 @@ def atlas_uv(obj):
     bpy.ops.mesh.select_all(action='SELECT')
     bpy.ops.uv.smart_project(angle_limit=math.radians(68), island_margin=.002)
     bpy.ops.object.mode_set(mode='OBJECT')
+    split_tight_islands(obj.data)
     # Rescale whole parts (and thus whole UV islands), never individual faces.
     weights = obj.data.attributes['_uv_weight']
     uv = obj.data.uv_layers.active.data
@@ -187,6 +234,9 @@ def optimize(collections, output):
             item.vector = vertex.co
         weights = obj.data.attributes.new('_uv_weight', 'FLOAT', 'FACE')
         weights.data.foreach_set('value', [source.get('uv_weight', 1.0)] * len(weights.data))
+        if source.get('uv_split'):
+            flags = obj.data.attributes.new('_uv_split', 'INT', 'FACE').data
+            flags.foreach_set('value', [1] * len(flags))
         obj.location = offset
         parts.append(obj)
     for source, donor in donors.items():
