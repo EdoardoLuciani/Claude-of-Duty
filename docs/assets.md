@@ -35,6 +35,10 @@ Audio and market-art provenance lives in [`docs/provenance/`](provenance/).
 
 ## Weapons: shape, finish, animation and checks
 
+In a trusted Pi session, use [`/remake-weapon`](../.pi/prompts/remake-weapon.md)
+with a weapon or attachment name to run the reference, pixel-diff, and blind
+visual review workflow. Run `/reload` if the command is new to your session.
+
 Each weapon's build entry point, checks and helpers share one directory.
 `build.py` orchestrates authoring; `check.py` checks the saved Blender scene.
 Where present, `actions.py` authors clips and `hand-reference.ts` explicitly
