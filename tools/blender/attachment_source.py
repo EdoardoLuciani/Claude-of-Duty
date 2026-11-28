@@ -13,6 +13,8 @@ import picatinny
 
 ROOT = Path(__file__).resolve().parents[2]
 OPTICS = ('railway', 'acog', 'scope', 'exps3')
+FOREGRIP_ADAPTER_TOOTH = 'Foregrip rail adapter tooth'
+FOREGRIP_ADAPTER_SURFACES = (FOREGRIP_ADAPTER_TOOTH, 'Foregrip rail adapter groove bed')
 SOURCES = {
     'railway': 'c-more-railway/railway.blend',
     'acog': 'trijicon-acog/acog.blend',

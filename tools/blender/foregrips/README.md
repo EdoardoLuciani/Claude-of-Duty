@@ -45,14 +45,14 @@ views without changing the saved scene.
 
 ## Weapon fit review
 
-`fit-review.json` holds cosmetic seats and left-hand poses. `fit_review.py`
-checks rail contact, the catalog accessories and laser ray, and sweeps stock
-hands and mechanisms through the native clips. For the DD Vertical it checks
-the deformed support and firing arms while the support hand stays on the grip.
-The M590 mount and wrist follow the moving forend. MCX, MPX and AX338 seat on
-`MOUNT_foregrip`; `poseFrom` shares the M4A1 grip rotation and finger wrap with
-an independently positioned wrist on each model. Captures compare the bare
-rail, the grip with the stock glove, and the fitted pose.
+`fit-review.json` holds cosmetic seats, left-hand poses and held clip checks.
+`fit_review.py` checks rail contact, the catalog accessories and laser ray,
+and sweeps stock hands and mechanisms through the native clips. Held clips
+check the deformed support arm and optionally its clearance from the firing
+arm. The M590 mount and wrist follow the moving forend. MCX, MPX and AX338
+seat on `MOUNT_foregrip` and inherit the M4A1 wrap and review settings through
+`poseFrom`, with their own wrist positions and clip overrides where needed.
+Captures compare the bare rail, the grip with the stock glove, and the fitted pose.
 
 | Game model | DD Vertical Blender fit                        | AFG-2 Blender fit                                                       |
 | ---------- | ---------------------------------------------- | ----------------------------------------------------------------------- |

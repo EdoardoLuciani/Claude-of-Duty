@@ -3,6 +3,7 @@
     "afg2": {
       "slot": 7,
       "inset": 0.00015,
+      "clips": ["Idle"],
       "position": [-0.0490094, -0.0446225, -0.2657363],
       "quaternion": [-0.3943922, -0.2898639, 0.8677601, 0.0861748],
       "pose": {
@@ -20,6 +21,8 @@
     "dd_vertical": {
       "slot": 6,
       "inset": 0.00115,
+      "clips": ["Idle", "Fire", "Last_Shot"],
+      "firingHand": true,
       "position": [-0.027239, -0.0251926, -0.2169104],
       "quaternion": [-0.0530144, 0.1110246, 0.7484085, 0.6517267],
       "pose": {
@@ -39,6 +42,7 @@
     "afg2": {
       "slot": 9,
       "inset": 0.00015,
+      "clips": ["Idle", "Pump"],
       "position": [-0.0487737, -0.0875423, -0.3345452],
       "quaternion": [-0.3928409, -0.2938668, 0.8672337, 0.0849928],
       "pose": {
@@ -56,6 +60,8 @@
     "dd_vertical": {
       "slot": 9,
       "inset": 0.00115,
+      "clips": ["Idle", "Pump"],
+      "firingHand": true,
       "position": [-0.0275978, -0.0678099, -0.2952867],
       "quaternion": [-0.0535966, 0.1107453, 0.7522677, 0.6472682],
       "pose": {
@@ -75,6 +81,8 @@
     "dd_vertical": {
       "slot": -6,
       "inset": 0.00115,
+      "clips": ["Idle", "Fire", "Last_Shot"],
+      "firingHand": true,
       "position": [-0.0995264, -0.0579798, -0.3079055],
       "quaternion": [-0.4901321, -0.3256734, 0.5590104, 0.5841358],
       "pose": {
@@ -94,6 +102,7 @@
     "dd_vertical": {
       "slot": 0,
       "inset": 0.00115,
+      "clips": ["Idle", "Fire"],
       "position": [-0.027239, -0.0956426, -0.1188648],
       "poseFrom": "m4"
     }
@@ -110,6 +119,7 @@
     "dd_vertical": {
       "slot": -3,
       "inset": 0.00115,
+      "clips": ["Idle", "Fire", "Last_Shot", "Bolt_Cycle"],
       "position": [-0.027239, -0.0276426, -0.262842],
       "poseFrom": "m4"
     }

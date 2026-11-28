@@ -11,36 +11,38 @@ from mathutils import Matrix, Quaternion, Vector
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import attachment_source
 import picatinny
-from attachment_source import bounds, geometry, surface, tree
+from attachment_source import FOREGRIP_ADAPTER_TOOTH, bounds, geometry, surface, tree
 from m4.actions import C, set_hand_pose
 from m4.animations import select_clip
-from mcx.hands import C as X_FORWARD
+from mcx.hands import C as MCX_BASIS
+from mpx.actions import C as MPX_BASIS
 from review_hands import author_review_hands
+from tor_mini.mounts import PROFILES
 
-# Rig label, editable collection, hand basis, carrier, rail origin, tooth prefix,
-# catalog muzzle props, and whether the carrier slides. On adapter models the
-# datum defines the carrier and rail frame; EVOLYS joins its rail into the guard.
-ADAPTER = 'Foregrip rail adapter tooth'
+# Review label, hand basis, carrier, rail origin, tooth prefix, catalog muzzle
+# props, and whether the carrier slides. On adapter models the datum defines the
+# carrier and rail frame; EVOLYS joins its rail into the guard.
 WEAPONS = {
-    'm4': ('M4', 'M4A1 | authored components', C, 'handguard', (.250, .04645), 'RIS II bottom tooth', ('srd762ti', 'm4_72'), False),
-    'm590': ('M590', 'M590 | authored components', C, 'forend', (.298, .004), 'Bottom Picatinny lug', ('suppressor12g', 'm4_72'), True),
-    'evolys': ('EVOLYS', 'EVOLYS | authored components', C, 'handguard', None, None, ('srd762ti', 'm4_72'), False),
-    'mcx': ('MCX', 'MCX VIRTUS | authored components', X_FORWARD, None, None, ADAPTER, ('srd762ti', 'm4_72'), False),
-    'mpx': ('MPX', 'MPX | editable exterior components', X_FORWARD, None, None, ADAPTER, ('suppressor9mm',), False),
-    'ax338': ('AX338', 'AX338 | authored components', C, None, None, ADAPTER, ('suppressor338', 'm4_72'), False),
+    'm4': ('M4', C, 'handguard', (.250, .04645), 'RIS II bottom tooth', ('srd762ti', 'm4_72'), False),
+    'm590': ('M590', C, 'forend', (.298, .004), 'Bottom Picatinny lug', ('suppressor12g', 'm4_72'), True),
+    'evolys': ('EVOLYS', C, 'handguard', None, None, ('srd762ti', 'm4_72'), False),
+    'mcx': ('MCX', MCX_BASIS, None, None, FOREGRIP_ADAPTER_TOOTH, ('srd762ti', 'm4_72'), False),
+    'mpx': ('MPX', MPX_BASIS, None, None, FOREGRIP_ADAPTER_TOOTH, ('suppressor9mm',), False),
+    'ax338': ('AX338', C, None, None, FOREGRIP_ADAPTER_TOOTH, ('suppressor338', 'm4_72'), False),
 }
 MOVING = {'bolt', 'bolt_head', 'charging_handle', 'trigger', 'dust_cover', 'mag_release', 'magazine',
           'magazine_spare', 'spent_case', 'shell_insert', 'feed_cover', 'pouch', 'pouch_spare', 'belt_rig',
           'bolt_release', 'magazine_catch', 'stock', 'stock_hinge'}
 PALM_AND_PADS = ('hand', 'thumb_1', *(f'finger_{i}_2' for i in range(4)))
-HELD_CLIPS = ('Idle', 'Fire', 'Last_Shot', 'Pump', 'Bolt_Cycle')
+CAPTURE_CLIPS = ('Idle', 'Pump', 'Bolt_Cycle')
+SAMPLE_HZ = 120
 
 
 def frames(scene, clip):
-    # Native scenes can store keys at a lower FPS; still inspect at 120 Hz.
+    # Sample at a common rate even when a scene stores keys at a lower FPS.
     duration = clip['duration']
-    for sample in range(math.ceil(duration * 120) + 1):
-        yield min(sample / 120, duration) * scene.render.fps
+    for sample in range(math.ceil(duration * SAMPLE_HZ) + 1):
+        yield min(sample / SAMPLE_HZ, duration) * scene.render.fps
 
 
 def seek(scene, frame):
@@ -51,6 +53,10 @@ def parents(obj):
     while obj.parent:
         obj = obj.parent
         yield obj
+
+
+def shown(obj):
+    return all(min(parent.scale) > .5 for parent in parents(obj))
 
 
 def draft_skin(id, candidate, controls, rig, basis, name, clip, carrier, carrier_rest):
@@ -98,14 +104,14 @@ def patch_gap(glove, patches, inverse, target):
                for patch in patches)
 
 
-def joined_rail(guard, inverse):
+def joined_rail(guard, inverse, rig_to_rail):
     """Partition the EVOLYS guard without exempting its shell from interference."""
     vertices, faces = geometry(guard, inverse)
     _, rail = geometry(guard, inverse, 'LASER_mount_hardware')
     rail_faces = set(rail)
     shell = [face for face in faces if face not in rail_faces]
     assert shell
-    stations = [vertices[i].y for i in {i for face in rail for i in face}]
+    stations = [(rig_to_rail @ vertices[i]).y for i in {i for face in rail for i in face}]
     return tree(vertices, rail), tree(vertices, shell), (min(stations), max(stations))
 
 
@@ -155,10 +161,11 @@ def capture(output, label, view):
 
 def main(weapon, output):
     scene = bpy.context.scene
-    label, collection, basis, carrier_name, origin, tooth_prefix, muzzle_props, moving_carrier = WEAPONS[weapon]
+    label, basis, carrier_name, origin, tooth_prefix, muzzle_props, moving_carrier = WEAPONS[weapon]
+    rig_name, collection, _, _ = PROFILES[weapon]
     datum = bpy.data.objects['MOUNT_foregrip'] if carrier_name is None else None
     carrier = datum.parent if datum else bpy.data.objects[carrier_name]
-    rig = bpy.data.objects[f'{label}_RIG']
+    rig = bpy.data.objects[rig_name]
     parts = list(bpy.data.collections[collection].objects)
     review = list(bpy.data.collections[f'{label} | authored hands (shared appearance)'].objects)
     meshes = [obj for obj in parts if obj.type == 'MESH']
@@ -186,14 +193,16 @@ def main(weapon, output):
     else:
         groove, bottom = origin or (rig_inverse @ bpy.data.objects['MOUNT_rail'].matrix_world.translation).yz
         rail_frame = rig.matrix_world @ Matrix.Translation((0, groove, bottom))
+    rail_inverse = rail_frame.inverted()
+    rail_in_carrier = inner @ rail_frame
     other_guard = None
     if tooth_prefix:
         rail_meshes = [o for o in meshes if o.name.startswith(tooth_prefix)]
         seats = surface(rail_meshes, rig_inverse)
     else:
         rail_meshes = [bpy.data.objects['handguard_mesh']]
-        seats, other_guard, span = joined_rail(rail_meshes[0], rig_inverse)
-    moving = {o: tuple(parents(o)) for o in meshes if any(parent.name in MOVING for parent in parents(o))}
+        seats, other_guard, span = joined_rail(rail_meshes[0], rig_inverse, rail_inverse @ rig.matrix_world)
+    moving = [o for o in meshes if any(parent.name in MOVING for parent in parents(o))]
     fixed = [o for o in meshes if o not in moving and o not in rail_meshes]
     pump_shell = None
     if moving_carrier:
@@ -215,12 +224,12 @@ def main(weapon, output):
     if other_guard is not None:
         # Report all whole grooves with the AFG-2 envelope inside the rail, not
         # just the nominated slot. This report never auto-enables a new pair.
-        holder, trial = place('afg2', carrier, rail_frame @ Matrix.Translation((0, 0, .00015)))
-        for slot in range(math.floor((span[0] - groove) / picatinny.PITCH),
-                          math.ceil((span[1] - groove) / picatinny.PITCH) + 1):
-            holder.location.y = (inner @ rig.matrix_world @ Vector((0, groove + slot * picatinny.PITCH, bottom))).y
+        inset = .00015
+        holder, trial = place('afg2', carrier, rail_frame @ Matrix.Translation((0, 0, inset)))
+        for slot in range(math.floor(span[0] / picatinny.PITCH), math.ceil(span[1] / picatinny.PITCH) + 1):
+            holder.matrix_basis = rail_in_carrier @ Matrix.Translation((0, slot * picatinny.PITCH, inset))
             bpy.context.view_layer.update()
-            bound = bounds(trial, rig_inverse)
+            bound = bounds(trial, rail_inverse)
             if min(p.y for p in bound) >= span[0] - .0001 and max(p.y for p in bound) <= span[1] + .0001:
                 probe = surface(trial, rig_inverse)
                 print(f'EVOLYS AFG-2 slot {slot}: {rigid_conflicts(probe) or "clear rigid candidate (not pose-verified)"}')
@@ -229,7 +238,6 @@ def main(weapon, output):
             o.hide_render = True
 
     targets, grips, views = {}, {}, {}
-    rail_inverse = rail_frame.inverted()
     if datum:
         adapter_bounds = bounds(rail_meshes, rail_inverse)
         span = min(p.y for p in adapter_bounds), max(p.y for p in adapter_bounds)
@@ -245,7 +253,7 @@ def main(weapon, output):
         assert not (conflicts := rigid_conflicts(target)), (id, 'intersects', conflicts)
         assert not pump_shell or not target.overlap(pump_shell), (id, 'intersects slide outside the tooth faces')
         targets[id], grips[id] = surface(grip, inner), grip
-        views[id] = inner @ rail_frame @ Matrix.Translation((0, offset, -.045))
+        views[id] = rail_in_carrier @ Matrix.Translation((0, offset, -.045))
         print(f'{weapon} / {id}: bottom-tooth contact, clear of non-seating surfaces and mounted accessories', flush=True)
 
     checked_strokes = {round(carrier_rest.y, 6)}
@@ -258,7 +266,7 @@ def main(weapon, output):
             samples += 1
             inverse = carrier.matrix_world.inverted()
             posed_skin = surface(skin, inverse)
-            mechanism = surface([o for o, chain in moving.items() if all(min(parent.scale) > .5 for parent in chain)], inverse)
+            mechanism = surface([o for o in moving if shown(o)], inverse)
             for id, target in targets.items():
                 assert not target.overlap(mechanism), (id, name, frame, 'intersects moving weapon')
                 clashes[id] += bool(target.overlap(posed_skin))
@@ -289,7 +297,17 @@ def main(weapon, output):
             for obj in objects:
                 obj.hide_render = id != 'laser'
                 obj.color = (.045, .05, .055, 1)
-    for id, objects in grips.items():
+    # Stationary carriers keep their fixed meshes (including rails) and
+    # accessory mounts in the same carrier-space frames throughout held clips.
+    select_clip(parts, review, clips, 'Idle')
+    draft_dynamic = meshes if moving_carrier else moving
+    draft_fixed = None
+    draft_accessories = accessory_trees
+    if not moving_carrier:
+        draft_fixed = surface([o for o in meshes if o not in moving and not o.hide_render and shown(o)], inner)
+        draft_accessories = {id: surface(objects, inner) for id, objects in attachments.items()}
+    for id, candidate in candidates.items():
+        objects = grips[id]
         select_clip(parts, review, clips, 'Idle')
         if output:
             for obj in skin:
@@ -300,13 +318,13 @@ def main(weapon, output):
             capture(output, f'{id}-stock-hand', carrier.matrix_world @ views[id])
             for obj in skin:
                 obj.hide_render = obj.name.startswith(f'{label}_left_')
-        held = HELD_CLIPS if id == 'dd_vertical' else ('Idle', 'Pump')
-        for name in held:
+        check_firing_hand = candidate.get('firingHand', False)
+        for name in candidate['clips']:
             if name not in clips:
                 continue
             clip = clips[name]
             select_clip(parts, review, clips, name)
-            draft = draft_skin(id, candidates[id], controls, rig, basis, name, clip, carrier, carrier_rest)
+            draft = draft_skin(id, candidate, controls, rig, basis, name, clip, carrier, carrier_rest)
             posed = [obj for obj in draft if obj.type == 'MESH']
             glove = next(obj for obj in posed if 'Charcoal_woven_glove' in obj.name)
             patches = patch_indices(glove)
@@ -316,21 +334,23 @@ def main(weapon, output):
                 seek(scene, frame)
                 inverse = carrier.matrix_world.inverted()
                 skin_tree = surface(posed, inverse)
-                visible = [o for o in meshes if not o.hide_render and min(o.parent.scale) > .5]
-                assert not surface(visible, inverse).overlap(skin_tree), (id, name, frame, 'draft skin intersects weapon')
+                visible = [o for o in draft_dynamic if not o.hide_render and shown(o)]
+                if draft_fixed is not None:
+                    assert not draft_fixed.overlap(skin_tree), (id, name, frame, 'draft skin intersects fixed weapon')
+                assert not visible or not surface(visible, inverse).overlap(skin_tree), (id, name, frame, 'draft skin intersects weapon')
                 assert not target.overlap(skin_tree), (id, name, frame, 'draft skin intersects foregrip')
-                if id == 'dd_vertical':
+                if check_firing_hand:
                     firing_hand = surface(right_skin, inverse)
                     assert not target.overlap(firing_hand), (id, name, frame, 'firing hand intersects foregrip')
                     assert not skin_tree.overlap(firing_hand), (id, name, frame, 'support arm intersects firing arm')
-                # The foregrip follows the carrier; the accessories stay in rig space.
-                skin_rig = surface(posed, rig.matrix_world.inverted())
-                for accessory, accessory_tree in accessory_trees.items():
-                    assert not accessory_tree.overlap(skin_rig), (id, name, frame, 'draft skin intersects', accessory)
+                # Only the pump separates the foregrip and accessory frames during a clip.
+                accessory_skin = surface(posed, rig.matrix_world.inverted()) if moving_carrier else skin_tree
+                for accessory, accessory_tree in draft_accessories.items():
+                    assert not accessory_tree.overlap(accessory_skin), (id, name, frame, 'draft skin intersects', accessory)
                 max_gap = max(max_gap, patch_gap(glove, patches, inverse, target))
             assert max_gap < .003, (id, name, 'draft palm or pad is off the grip', max_gap)
             print(f'{weapon} / {id}: draft {name} skin clears weapon and attachments; palm/pad gap ≤ {max_gap*1000:.2f} mm', flush=True)
-            if output and name in ('Idle', 'Pump', 'Bolt_Cycle'):
+            if output and name in CAPTURE_CLIPS:
                 color_skin(posed)
                 if name != 'Idle':
                     seek(scene, .32 * clip['duration'] * scene.render.fps)

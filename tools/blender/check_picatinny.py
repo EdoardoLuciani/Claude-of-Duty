@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 import attachment_source
 import picatinny
-from attachment_source import surface
+from attachment_source import FOREGRIP_ADAPTER_SURFACES as FOREGRIP_RAIL, surface
 
 
 def hit(tree, origin, direction):
@@ -73,7 +73,6 @@ for id in (*attachment_source.OPTICS,'laser'):
     except AssertionError as error:
         errors.append(str(error));print('PICATINNY_FAIL',error,flush=True)
 
-FOREGRIP_RAIL=('Foregrip rail adapter tooth','Foregrip rail adapter groove bed')
 WEAPONS=[
     ('m4a1-block-ii/m4a1-block-ii',('Upper receiver rail ',),('RIS II 1 ',),()),
     ('mcx-virtus/mcx-virtus',('Continuous top rail foot','Picatinny rail tooth'),('Laser rail adapter tooth','Laser rail adapter groove bed'),FOREGRIP_RAIL),
