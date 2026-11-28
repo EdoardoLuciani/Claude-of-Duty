@@ -21,8 +21,9 @@ def build_studio(studio, hands, quick=False):
         d.type='ORTHO';d.ortho_scale=scale;aim(o,target);return o
     cameras={
     'hero':camera('CAM_hero',(-.36,.36,.20),(0,.030,-.009),.255),
-    'left-profile':camera('CAM_left_profile',(-.6,.035,-.012),(0,.035,-.012),.235),
-    'right-profile':camera('CAM_right_profile',(.6,.035,-.012),(0,.035,-.012),.235),
+    'left-profile':camera('CAM_left_profile',(-.6,.048,-.012),(0,.048,-.012),.237),
+    'right-profile':camera('CAM_right_profile',(.6,.048,-.012),(0,.048,-.012),.237),
+    'right-front':camera('CAM_right_front',(.42,.245,.014),(0,.048,-.012),.232),
     'rear-detail':camera('CAM_rear_detail',(-.13,-.30,.12),(0,-.018,.014),.18),
     'first-person':camera('CAM_first_person',(.035,-.42,.12),(0,.04,.008),.35),
     }

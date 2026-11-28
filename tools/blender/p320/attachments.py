@@ -45,7 +45,7 @@ def check_sight_emission(surface):
     atlas = bpy.data.images['P320_emission']
     width, height = atlas.size
     geometry = tree([surface])
-    for x, y, z in [(-.0048, -.03655, .0531), (.0048, -.03655, .0531), (0, .10925, .0528)]:
+    for x, y, z in [(-.0048, -.03655, .0531), (.0048, -.03655, .0531), (0, .12915, .0528)]:
         origin = surface.matrix_world @ Vector((x, y - .002, z))
         direction = surface.matrix_world.to_3x3() @ Vector((0, 1, 0))
         hit, normal, _, _ = geometry.ray_cast(origin, direction, .006)

@@ -8,7 +8,7 @@ ATLAS_RESOLUTIONS = {'base': 1024, 'orm': 1024, 'normal': 1024, 'emission': 1024
 ATLAS_SAMPLES = {'base': 4, 'orm': 1, 'normal': 8, 'emission': 16}
 
 def build_source_materials(coords):
-    def material(name, color, rough=.6, metal=0, grain=0, stipple=False):
+    def material(name, color, rough=.6, metal=0, grain=0):
         m = bpy.data.materials.new(name); m.use_nodes = True
         m.diffuse_color = (*color,1)
         n, l = m.node_tree.nodes, m.node_tree.links
@@ -29,11 +29,11 @@ def build_source_materials(coords):
         rough_ramp.inputs['To Min'].default_value = rough-.075
         rough_ramp.inputs['To Max'].default_value = min(1,rough+.075)
         l.new(noise.outputs['Fac'],rough_ramp.inputs[0]); l.new(rough_ramp.outputs[0],p.inputs['Roughness'])
-        micro = n.new('ShaderNodeTexNoise'); micro.inputs['Scale'].default_value = 4300 if not stipple else 1700
+        micro = n.new('ShaderNodeTexNoise'); micro.inputs['Scale'].default_value = 4300
         micro.inputs['Detail'].default_value = 2.8; micro.inputs['Roughness'].default_value = .72
         l.new(uv.outputs['Object'],micro.inputs['Vector'])
         bump = n.new('ShaderNodeBump'); bump.inputs['Strength'].default_value = grain
-        bump.inputs['Distance'].default_value = .00014 if not stipple else .00065
+        bump.inputs['Distance'].default_value = .00014
         l.new(micro.outputs['Fac'],bump.inputs['Height']); l.new(bump.outputs['Normal'],p.inputs['Normal'])
         # Faint cavity darkening baked explicitly into base. No drawn-on white edges.
         ao = n.new('ShaderNodeAmbientOcclusion'); ao.inputs['Distance'].default_value = .004
@@ -42,20 +42,67 @@ def build_source_materials(coords):
         l.new(mix.outputs[0],p.inputs['Base Color'])
         return m
 
-    nitron = material('Nitron | satin coated steel',(.033,.036,.039),.53,0,.24)
-    polymer = material('Frame | fine injection moulding',(.026,.028,.030),.72,0,.48)
-    stipple = material('Grip | moulded pebbled texture',(.017,.019,.020),.86,0,.8,True)
-    steel = material('Controls | blackened steel',(.041,.043,.045),.52,.38,.18)
+    nitron = material('Nitron | satin coated steel',(.041,.040,.042),.29,.48,.27)
+    polymer = material('Frame | fine injection moulding',(.019,.018,.019),.63,0,.74)
+    molding = next(n for n in polymer.node_tree.nodes if n.type=='VALTORGB')
+    molding.inputs[0].links[0].from_node.inputs['Scale'].default_value=2150
+    molding.color_ramp.elements[0].color=(.011,.011,.012,1)
+    molding.color_ramp.elements[1].color=(.025,.024,.025,1)
+    grip_finish(polymer)
+    steel = material('Controls | blackened steel',(.046,.046,.049),.36,.47,.19)
     barrel_mat = material('Barrel | polished nitriding',(.061,.065,.070),.29,.72,.12)
     mag_mat = material('Magazine | blued stamped steel',(.033,.039,.044),.37,.75,.18)
     cavity = material('Recess | shadowed coating',(.007,.008,.009),.86,0,.12)
     mark = bpy.data.materials.new('Laser etching | subtle warm grey'); mark.use_nodes = True
-    mark.node_tree.nodes.get('Principled BSDF').inputs['Base Color'].default_value = (.18,.18,.17,1)
+    mark.node_tree.nodes.get('Principled BSDF').inputs['Base Color'].default_value = (.085,.084,.079,1)
     brass = material('Visible dummy round | brass',(.38,.22,.07),.33,1,.1)
     copper = material('Visible dummy round | copper',(.30,.105,.045),.32,1,.1)
     white = material('SIGLITE | white surround',(.68,.69,.63),.58,0,.05)
 
-    return nitron, polymer, stipple, steel, barrel_mat, mag_mat, cavity, mark, brass, copper, white
+    return nitron, polymer, steel, barrel_mat, mag_mat, cavity, mark, brass, copper, white
+
+
+def grip_finish(polymer):
+    # Object-space rounded panel follows the grip rake, independent of mesh tessellation.
+    n,l=polymer.node_tree.nodes,polymer.node_tree.links
+    p=n.get('Principled BSDF'); coord=n.get('Texture Coordinate').outputs['Object']
+    yz=n.new('ShaderNodeSeparateXYZ'); l.new(coord,yz.inputs[0])
+
+    def calc(op,*inputs):
+        node=n.new('ShaderNodeMath');node.operation=op
+        for i,value in enumerate(inputs):
+            if isinstance(value,(int,float)):node.inputs[i].default_value=value
+            else:l.new(value,node.inputs[i])
+        return node.outputs[0]
+
+    y=calc('ADD',yz.outputs['Y'],calc('MULTIPLY_ADD',yz.outputs['Z'],-.24,.009))
+    z=calc('ADD',yz.outputs['Z'],.0515)
+    corner=n.new('ShaderNodeCombineXYZ')
+    for i,axis,half in ((0,y,.0126),(1,z,.0234)):
+        l.new(calc('MAXIMUM',calc('SUBTRACT',calc('ABSOLUTE',axis),half),0),corner.inputs[i])
+    length=n.new('ShaderNodeVectorMath');length.operation='LENGTH';l.new(corner.outputs[0],length.inputs[0])
+    mask=n.new('ShaderNodeMapRange');mask.interpolation_type='SMOOTHSTEP'
+    l.new(length.outputs['Value'],mask.inputs['Value'])
+    for key,value in [('From Min',.00345),('From Max',.0038),('To Min',1),('To Max',0)]:
+        mask.inputs[key].default_value=value
+    pebbles=n.new('ShaderNodeTexNoise');pebbles.inputs['Scale'].default_value=2000
+    pebbles.inputs['Detail'].default_value=2.5;l.new(coord,pebbles.inputs['Vector'])
+    ramp=n.new('ShaderNodeValToRGB')
+    ramp.color_ramp.elements[0].position=.30;ramp.color_ramp.elements[0].color=(.006,.0065,.007,1)
+    ramp.color_ramp.elements[1].position=.72;ramp.color_ramp.elements[1].color=(.026,.028,.029,1)
+    l.new(pebbles.outputs['Fac'],ramp.inputs[0])
+    color=n.new('ShaderNodeMixRGB');l.new(mask.outputs[0],color.inputs[0])
+    l.new(p.inputs['Base Color'].links[0].from_socket,color.inputs[1]);l.new(ramp.outputs[0],color.inputs[2])
+    l.new(color.outputs[0],p.inputs['Base Color'])
+    smooth=n.new('ShaderNodeMixRGB');l.new(mask.outputs[0],smooth.inputs[0])
+    l.new(p.inputs['Roughness'].links[0].from_socket,smooth.inputs[1])
+    l.new(calc('MULTIPLY_ADD',pebbles.outputs['Fac'],-.43,.94),smooth.inputs[2])
+    l.new(smooth.outputs[0],p.inputs['Roughness'])
+    bump=n.new('ShaderNodeBump');bump.inputs['Distance'].default_value=.00050
+    l.new(p.inputs['Normal'].links[0].from_socket,bump.inputs['Normal'])
+    l.new(pebbles.outputs['Fac'],bump.inputs['Height']);l.new(mask.outputs[0],bump.inputs['Strength'])
+    l.new(bump.outputs[0],p.inputs['Normal'])
+
 
 def bake_orm(asset, surfaces):
     # Bake scalar finishes directly, keeping projected details out of ORM.

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { GLTFPACK_FLAGS, MODEL_COOKS } from '../../build/models.ts';
@@ -14,7 +14,7 @@ try {
   const encoder = join(directory, 'gltfpack.mjs');
   const log = join(directory, 'args.json');
   const input = join(directory, MODEL_COOKS.p320.source);
-  const output = join(directory, 'p320-compact.runtime.glb');
+  const output = join(directory, basename(MODEL_COOKS.p320.output));
   const bytes = Buffer.from('native authoring fixture');
   writeFileSync(input, bytes);
   // Exercise the real Bun CLI and native subprocess contract without requiring

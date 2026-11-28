@@ -110,7 +110,7 @@ const CATALOG = [
   },
   {
     id: 'pistol',
-    label: 'P320 Compact',
+    label: 'P320 Full-Size',
     cost: 400,
     step: 1,
     max: 1,

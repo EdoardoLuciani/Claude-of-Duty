@@ -1,5 +1,5 @@
 """Check the saved editable source, including its real skinned hands.
-blender -b .cache/blender/weapons/p320-compact/p320-compact.blend --python-exit-code 1 --python tools/blender/p320/check.py
+blender -b .cache/blender/weapons/p320-full-size/p320-full-size.blend --python-exit-code 1 --python tools/blender/p320/check.py
 """
 import json
 import math
@@ -14,7 +14,7 @@ from attachments import check_mounts, check_sight_emission, tree
 
 def check_inspect_grip(end):
     rig = bpy.data.objects['P320_RIG']
-    frame = bpy.data.objects['Frame | continuous compact medium polymer shell']
+    frame = bpy.data.objects['Frame | continuous Full-Size polymer shell']
     trigger = bpy.data.objects['Trigger | original curved blade']
     glove = bpy.data.objects['P320_right_Charcoal_woven_glove_skin']
     digits = [(v.index, bone) for v in glove.data.vertices if v.groups
@@ -56,9 +56,16 @@ surface=bpy.data.objects['P320_surface']
 assert len(surface.data.materials)==1
 assert len(surface.data.uv_layers)==1
 # The integral accessory rail must not protrude ahead of the loaded slide nose.
-frame=bpy.data.objects['Frame | continuous compact medium polymer shell']
+frame=bpy.data.objects['Frame | continuous Full-Size polymer shell']
 slide=bpy.data.objects['Slide | chamfered Nitron shell']
 assert max((frame.matrix_world@v.co).y for v in frame.data.vertices)<=max((slide.matrix_world@v.co).y for v in slide.data.vertices), 'accessory rail extends past slide nose'
+# Check the source's stock envelope in rig-local metres, excluding the optional threaded barrel extension.
+rest = bpy.data.objects['P320_RIG'].matrix_world.inverted()
+threaded = set(bpy.data.objects['MUZZLE_device_removed'].children_recursive)
+points = [rest @ o.matrix_world @ v.co for o in bpy.data.collections['P320 | high bake source (not exported)'].objects
+          if o.type == 'MESH' and o not in threaded for v in o.data.vertices]
+span = tuple(max(p[i] for p in points)-min(p[i] for p in points) for i in range(3))
+assert all(abs(a-b)<.001 for a,b in zip(span,(.033,.203,.140))), ('stock Full-Size envelope', span)
 for uv in surface.data.uv_layers:
     assert all(0<=coord<=1 for loop in uv.data for coord in loop.uv)
 surface.data.calc_loop_triangles()
@@ -104,7 +111,7 @@ for name,info in clips.items():
             o=bpy.data.objects[part]
             assert min(abs(o.scale.x),abs(o.scale.x-1))<1e-5
 # Body must not have an exposed rail gap or a sealed magazine bottom.
-body=bpy.data.objects['Frame | continuous compact medium polymer shell']
+body=bpy.data.objects['Frame | continuous Full-Size polymer shell']
 assert len(body.data.vertices)>500
 # No exterior barrel/slide pieces can be empty or collapsed in source.
 for o in bpy.data.collections['P320 | editable weapon'].objects:

@@ -17,7 +17,7 @@ def quat(q):return (C@q.to_matrix()@CI).to_quaternion()
 
 def author_actions(root,asset,rig,parts,mag,spare,slide,barrel,trigger,catch,round_live):
     scene=bpy.context.scene
-    ref=json.loads((root/'src/weapons/authored/p320-compact/hand-reference.json').read_text())
+    ref=json.loads((root/'src/weapons/authored/p320-full-size/hand-reference.json').read_text())
     controls=[];hand_controls={}
     def control(name):
         o=bpy.data.objects.new(name,None);asset.objects.link(o);o.parent=rig

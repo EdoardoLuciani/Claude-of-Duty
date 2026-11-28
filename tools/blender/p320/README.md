@@ -1,9 +1,17 @@
-# P320 Compact
+# P320 Full-Size
 
-Nitron Compact game base, curved trigger, fixed SIGLITE irons, threaded barrel
-and flush 15-round magazine. The bare slide retains fixed SIGLITE iron sights;
-optic customization is unsupported. The compact under-barrel laser seat and
-threaded barrel are game-fit adaptations, not a certified factory replica.
+Nitron Full-Size game exterior, with a curved trigger, fixed SIGLITE irons,
+inset stock crown and flush Full-Size magazine shell. Magazine capacity is game
+balance data and is independent of the sculpt. Optic customization is unsupported.
+
+The [SIG SAUER catalog](https://www.sigsauer.com/media/sigsauer/resources/SOF_P320_Section.pdf#page=5)
+provides the Full-Size envelope and right-front view; the
+[2017 SIG SAUER catalog, printed p. 25](https://luxuscap.com/wp-content/uploads/2025/12/2017-SIG-Sauer-Catalog.pdf#page=26)
+shows the left profile with SIGLITE sights. Compare the slide chamfers, curved
+frame junction, rail, guard, grip pad and flush floorplate in both views. The
+source checker measures the stock envelope in the rig frame. Photos are review
+references only, not runtime textures. The modeled details are nonfunctional art,
+not manufacturer CAD or a certified replica.
 
 [Shared workflow](../README.md) ·
 [Runtime cook](../../../build/README.md)
@@ -24,7 +32,7 @@ Run from the repository root with Blender 5.3.0 and gltfpack 1.3:
 
 ```sh
 blender -b -t 8 --python-exit-code 1 --python tools/blender/p320/build.py
-blender -b -t 8 .cache/blender/weapons/p320-compact/p320-compact.blend \
+blender -b -t 8 .cache/blender/weapons/p320-full-size/p320-full-size.blend \
   --python-exit-code 1 --python tools/blender/p320/check.py
 bun build/models.ts p320
 ```
@@ -47,13 +55,13 @@ The base has no glass, reticle, suppressor or laser. SIGLITE irons are fixed
 | `MOUNT_muzzle` | tilting barrel; -Z forward, +Y up, unit scale  |
 | `MOUNT_rail`   | frame; local +Y points into the underside seat |
 
-The thread travels with the barrel, not the slide; the enlarged upper muzzle
-opening clears barrel tilt. SIGLITE rings and luminous insets are baked onto the
-sight faces in the shared atlas; the checker samples green emission at the inset
-centres, a neutral rear housing and front-facing upper-ring normals.
+The muzzle follows the barrel, not the slide. SIGLITE rings and luminous insets
+are baked onto the sight faces in the shared atlas; the checker samples green
+emission at the inset centres, a neutral rear housing and front-facing upper-ring
+normals.
 
-The TOR Mini seats on a shortened game-fit integral frame rail (not the factory
-Compact frame), with its activation pads immediately ahead of the trigger guard.
+The TOR Mini seats on the integral frame rail, with its activation pads immediately
+ahead of the trigger guard.
 Reload and handling hand paths clear the module, which stays below the bore/slide
 path and never follows the slide. See the
 [shared laser mount contract](../tor_mini/README.md#weapon-mounting).
@@ -62,10 +70,10 @@ path and never follows the slide. See the
 
 The `suppressor` fit names the `suppressor9mm` can model: the original
 [compact booster can](../suppressor9mm/README.md). The muzzle seat
-follows the tilting barrel. `MUZZLE_device` owns the removable thread protector;
-`MUZZLE_device_removed` owns the exposed helical thread, both ordinary meshes under
-the barrel bone. Preserve the thread geometry: bevel decimation can enlarge its
-crest into the booster receiving bore. In loaded rest the can stays below the fixed
+follows the tilting barrel. `MUZZLE_device` owns the inset stock crown;
+`MUZZLE_device_removed` owns the fitted threaded extension, a cosmetic game-fit
+adaptation. Both are ordinary meshes under the barrel bone. Preserve the thread
+geometry: bevel decimation can move its silhouette into the booster. In loaded rest the can stays below the fixed
 SIGLITE aim ray, so no raised sights or altered ADS position are needed; during
 tilt and empty lockback the bore moves, as it should.
 
