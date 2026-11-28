@@ -63,15 +63,17 @@ def build_geometry(asset):
         bpy.ops.mesh.normals_make_consistent(inside=False); bpy.ops.object.mode_set(mode='OBJECT')
         return finish(o,name,mat,parent,bevel,smooth)
 
+    def curved_outline(points):
+        outline=[]
+        for i in range(len(points)):
+            p0,p1,p2,p3=(Vector(points[j%len(points)]) for j in (i-1,i,i+1,i+2))
+            for step in range(6):
+                t=step/6
+                outline.append(.5*((2*p1)+(-p0+p2)*t+(2*p0-5*p1+4*p2-p3)*t*t+(-p0+3*p1-3*p2+p3)*t*t*t))
+        return outline
+
     def profile(name,points,width,mat=polymer,parent=body,bevel=.0005,x=0,smooth=False):
-        if smooth:
-            outline=[]
-            for i in range(len(points)):
-                p0,p1,p2,p3=(Vector(points[j%len(points)]) for j in (i-1,i,i+1,i+2))
-                for step in range(6):
-                    t=step/6
-                    outline.append(.5*((2*p1)+(-p0+p2)*t+(2*p0-5*p1+4*p2-p3)*t*t+(-p0+3*p1-3*p2+p3)*t*t*t))
-            points=outline
+        if smooth:points=curved_outline(points)
         n=len(points)
         verts=[(x+s*width/2,y,z) for s in (-1,1) for y,z in points]
         faces=[tuple(range(n-1,-1,-1)),tuple(range(n,2*n))]
@@ -216,16 +218,24 @@ def build_geometry(asset):
         cut(frame,profile('CUT',recess,.004,None,None,.0004,sign*.01335))
         cut(frame,profile('CUT',relief,.0035,None,None,.00035,sign*.0141))
     def silhouette(points):return [(.130-(x-136)*.000311,.050-(y-36)*.000311) for x,y in points]
-    # Slim rounded guard, traced independently of the grip and inset under the rail.
+    # The guard sweeps down around the opening, then blends back into the grip.
     guard=profile('Frame | integral trigger guard',left_profile([
-        (274,156),(282,172),(285,201),(284,237),(281,267),(305,271),(386,274),
-        (423,270),(447,263),(483,275),(502,215),(478,164)]),.0182,polymer,body,.0021,smooth=True)
-    inner=profile('CUT',left_profile([
-        (306,180),(359,178),(419,178),(443,186),(450,203),(451,222),(443,243),
-        (419,256),(387,262),(334,261),(306,258),(294,245),(292,211),(295,191)]),.030,None,None,.0024,smooth=True)
-    active(inner)
-    for mod in list(inner.modifiers):bpy.ops.object.modifier_apply(modifier=mod.name)
-    cut(guard,inner)
+        (274,156),(282,172),(285,201),(284,237),(281,272),(305,277),(386,280),
+        (423,276),(449,270),(483,275),(502,215),(478,164)]),.0182,polymer,body,.0021,smooth=True)
+    window=curved_outline(left_profile([
+        (306,184),(359,183),(419,182),(442,189),(453,206),(456,224),(452,245),
+        (429,258),(387,262),(334,264),(306,260),(294,246),(292,212),(295,194)]))
+    # Flare the rear of the aperture into the outer grip. Cut the complete
+    # molded shell once, so the grip cannot hide part of the traced opening.
+    rings=[(-.019,1),(-.0125,1),(-.0105,.55),(-.008,.16),(-.006,0),
+           (.006,0),(.008,.16),(.0105,.55),(.0125,1),(.019,1)]
+    n=len(window)
+    verts=[(x,y-.0022*k*min(1,max(0,(.038-y)/.018)),z)
+           for x,k in rings for y,z in window]
+    faces=[tuple(reversed(range(n))),tuple(range(len(verts)-n,len(verts)))]
+    faces.extend((j*n+i,j*n+(i+1)%n,(j+1)*n+(i+1)%n,(j+1)*n+i)
+                 for j in range(len(rings)-1) for i in range(n))
+    guard_window=mesh('CUT continuous guard opening',verts,faces,polymer,body,0,True)
     for z in [.001,-.002,-.005,-.008,-.011,-.014]:
         rounded_cut(guard,(0,.0692,z),(.021,.0025,.0009),.0003)
     # The longer frame carries the integral rail forward, without moving the TOR Mini seat.
@@ -375,6 +385,7 @@ def build_geometry(asset):
     for piece in (frame,guard,rail):
         active(grip);mod=grip.modifiers.new('Continuous molded frame','BOOLEAN');mod.operation='UNION';mod.object=piece
         bpy.ops.object.modifier_apply(modifier=mod.name);bpy.data.objects.remove(piece,do_unlink=True)
+    cut(grip,guard_window)
     # Continue the molded side highlights across the union without moving the
     # surfaces used by the inspected finger contact or the rail datums.
     for face in grip.data.polygons:
