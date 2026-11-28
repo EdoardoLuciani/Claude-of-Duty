@@ -13,16 +13,18 @@ def xyz(v):return C@Vector(v)
 def quat(q):return (C@q.to_matrix()@CI).to_quaternion()
 
 
-def set_hand_pose(controls, position, rotation, pose):
-    controls['wrist'].location = xyz(position)
-    controls['wrist'].rotation_quaternion = quat(rotation)
+def set_hand_pose(controls, position, rotation, pose, *, basis=C):
+    inverse = basis.inverted()
+    def native(q): return (basis @ q.to_matrix() @ inverse).to_quaternion()
+    controls['wrist'].location = basis @ Vector(position)
+    controls['wrist'].rotation_quaternion = native(rotation)
     for i in range(4):
-        controls[f'finger_{i}_root'].rotation_quaternion = quat(eq((0, pose['fingerSpread'][i], 0)))
+        controls[f'finger_{i}_root'].rotation_quaternion = native(eq((0, pose['fingerSpread'][i], 0)))
         for j in range(3):
-            controls[f'finger_{i}_{j}'].rotation_quaternion = quat(eq((-pose['fingers'][i][j], 0, 0)))
-    controls['thumb_base'].rotation_quaternion = quat(eq(pose['thumbBase']))
+            controls[f'finger_{i}_{j}'].rotation_quaternion = native(eq((-pose['fingers'][i][j], 0, 0)))
+    controls['thumb_base'].rotation_quaternion = native(eq(pose['thumbBase']))
     for j in range(2):
-        controls[f'thumb_{j}'].rotation_quaternion = quat(eq((-pose['thumb'][j], 0, 0)))
+        controls[f'thumb_{j}'].rotation_quaternion = native(eq((-pose['thumb'][j], 0, 0)))
 
 
 def author_actions(root,asset,rig,parts,mag,spare,bolt,head,handle,trigger,cover,release,case):
